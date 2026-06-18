@@ -1,0 +1,31 @@
+@page "/"
+@using Template.Shared.Ui.Auth
+@inject AuthService Auth
+
+<PageTitle>Home</PageTitle>
+
+@if (Auth.IsAuthenticated)
+{
+    <div class="welcome-card card shadow-sm">
+        <div class="card-body p-4">
+            <div class="welcome-icon mb-3">&#x1F3E0;</div>
+            <h1 class="h3 fw-bold mb-1">Welcome back, @Auth.DisplayName!</h1>
+            <p class="text-muted mb-4">
+                Signed in to the <strong>@Auth.TenantName</strong> household.
+            </p>
+            <hr class="my-3" />
+            <p class="text-muted small mb-0"><!-- TODO: app-specific content goes here --></p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="hero-section text-center py-5">
+        <div class="hero-icon mb-4">&#x1F527;</div>
+        <h1 class="display-5 fw-bold mb-3">Welcome to AppName</h1>
+        <p class="lead text-muted mb-4 mx-auto" style="max-width:480px">
+            Sign in to get started with your household.
+        </p>
+        <a href="/login" class="btn btn-primary btn-lg px-5">Sign in &rarr;</a>
+    </div>
+}

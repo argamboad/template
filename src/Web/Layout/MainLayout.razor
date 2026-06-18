@@ -1,0 +1,48 @@
+@inherits LayoutComponentBase
+@using Template.Shared.Ui.Auth
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+@if (!_initialized)
+{
+    <div class="app-loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading…</span>
+        </div>
+    </div>
+}
+else if (!Auth.IsAuthenticated)
+{
+    @* Anonymous pages (login, auth-callback, auth-error, join) render chromeless. *@
+    @Body
+}
+else
+{
+    <AppHeader />
+    <main class="main-content">
+        <div class="content-container">
+            @Body
+        </div>
+    </main>
+}
+
+@code {
+    private bool _initialized;
+
+    // Pages reachable without authentication. /auth-callback receives the sign-in
+    // handoff; /join shows the invite prompt and stores its own return URL.
+    private static readonly string[] AnonymousPaths = ["/login", "/auth-callback", "/auth-error", "/join"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // THE single auth entry point: one silent refresh from the cookie, awaited
+        // before @Body renders. No page triggers its own refresh → no rotation race.
+        await Auth.InitializeAsync();
+        _initialized = true;
+
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        var isAnonymous = AnonymousPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+        if (!Auth.IsAuthenticated && !isAnonymous)
+            Nav.NavigateTo("/login", replace: true);
+    }
+}

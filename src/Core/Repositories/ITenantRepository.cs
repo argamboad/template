@@ -1,0 +1,71 @@
+using Template.Core.Entities;
+
+namespace Template.Core.Repositories;
+
+/// <summary>
+/// Tenants and their membership. Identity (logins, inboxes) stays user-scoped;
+/// this repository owns the user→tenant resolution that app-data scoping depends
+/// on.
+/// </summary>
+public interface ITenantRepository
+{
+    /// <summary>
+    /// Resolves the caller's tenant id via membership; null when the user has no
+    /// membership (callers fail closed — never an unscoped read).
+    /// </summary>
+    Task<Guid?> GetTenantIdForUserAsync(Guid userId);
+
+    Task<Tenant> CreateAsync(Tenant tenant);
+    Task<TenantMembership> AddMemberAsync(TenantMembership member);
+
+    Task<Tenant?> GetByIdAsync(Guid tenantId);
+
+    /// <summary>The user's single membership (tenant + role), or null.</summary>
+    Task<TenantMembership?> GetMembershipAsync(Guid userId);
+
+    Task<List<TenantMembership>> GetMembersAsync(Guid tenantId);
+
+    /// <summary>True if any member of the tenant has the given (normalized) email.</summary>
+    Task<bool> IsEmailMemberAsync(Guid tenantId, string email);
+
+    Task UpdateMemberAsync(TenantMembership member);
+
+    /// <summary>
+    /// Atomically flips <paramref name="currentOwnerUserId"/> from 'owner' to 'member'
+    /// and <paramref name="targetUserId"/> to 'owner', guarded by a conditional update
+    /// on the current owner's role. Returns false if the current owner no longer holds
+    /// the 'owner' role (race lost — caller must abort its transaction scope).
+    /// Must be called inside an active <see cref="IUnitOfWork"/> transaction scope.
+    /// </summary>
+    Task<bool> TryTransferOwnershipAsync(Guid tenantId, Guid currentOwnerUserId, Guid targetUserId);
+
+    /// <summary>Hard-deletes a tenant (cascades its data) — used when a solo
+    /// tenant-of-one is dissolved as its owner joins another.</summary>
+    Task DeleteTenantAsync(Guid tenantId);
+
+    /// <summary>
+    /// True if the tenant has any real app data the owner would abandon by joining
+    /// another tenant. The template has no domain tables yet, so this is always
+    /// false; hook real domain tables in here once they exist.
+    /// </summary>
+    Task<bool> HasDataAsync(Guid tenantId);
+
+    /// <summary>The tenant's members joined to their user display info.</summary>
+    Task<List<TenantMemberDetail>> GetMemberDetailsAsync(Guid tenantId);
+
+    Task UpdateTenantAsync(Tenant tenant);
+
+    Task RemoveMemberAsync(TenantMembership member);
+
+    /// <summary>
+    /// Irreversibly wipes a tenant and all its app data in one transaction. The
+    /// template has no domain tables yet, so this only removes invitations,
+    /// memberships, and the tenant row; hook real domain tables in here once they
+    /// exist. User-scoped data (logins, tokens) is untouched.
+    /// </summary>
+    Task WipeDataAsync(Guid tenantId);
+}
+
+/// <summary>A roster row: membership joined to the user's display info.</summary>
+public record TenantMemberDetail(
+    Guid UserId, string? DisplayName, string Email, string Role, DateTimeOffset JoinedAt);

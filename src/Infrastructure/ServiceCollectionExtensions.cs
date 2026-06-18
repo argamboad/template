@@ -1,0 +1,107 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Template.Core.Abstractions;
+using Template.Core.Repositories;
+using Template.Infrastructure.Email;
+using Template.Infrastructure.Persistence;
+using Template.Infrastructure.Repositories;
+
+namespace Template.Infrastructure;
+
+public static class ServiceCollectionExtensions
+{
+    /// <summary>
+    /// Dedicated cookie scheme that serves only as the temporary carrier for the
+    /// external OAuth principal. The provider handlers sign into this scheme; the
+    /// callback reads the external principal from it, then issues the real session
+    /// (JWT + refresh cookie) and signs the carrier out.
+    /// </summary>
+    public const string ExternalScheme = "External";
+
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Persistence
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+
+        // Data Protection — keys stored in DB so the OAuth correlation/nonce cookies
+        // survive server restarts/redeploys.
+        services.AddDataProtection()
+            .PersistKeysToDbContext<AppDbContext>()
+            .SetApplicationName("template");
+
+        // Email — dev: points to Mailpit via appsettings.Development.json
+        services.Configure<SmtpSettings>(configuration.GetSection("Email:Smtp"));
+        services.AddTransient<IEmailSender, SmtpEmailSender>();
+
+        // Repositories + unit of work
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserLoginRepository, UserLoginRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<ILoginTokenRepository, LoginTokenRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<ITenantInvitationRepository, TenantInvitationRepository>();
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+
+        // External OAuth — to add a new provider, append .AddXxx(...) below.
+        // Credentials come from config; use user-secrets in dev (never commit secrets).
+        var auth = services.AddAuthentication();
+
+        // Temporary carrier cookie for the external principal during the OAuth round-trip.
+        auth.AddCookie(ExternalScheme, o =>
+        {
+            o.Cookie.Name = ".app.external";
+            o.Cookie.HttpOnly = true;
+            o.Cookie.SameSite = SameSiteMode.Lax;
+            o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            o.ExpireTimeSpan = TimeSpan.FromMinutes(10);
+        });
+
+        // When the provider redirect fails (user denies consent, state mismatch, etc.)
+        // send them back to the client error page instead of throwing an unhandled 500.
+        var appBase = configuration["Auth:AppBaseUrl"]?.TrimEnd('/') ?? string.Empty;
+        var remoteFailureUrl = $"{appBase}/auth-error";
+        Task OnRemoteFailure(RemoteFailureContext ctx)
+        {
+            ctx.Response.Redirect(remoteFailureUrl);
+            ctx.HandleResponse();
+            return Task.CompletedTask;
+        }
+
+        // Only register an OAuth provider when credentials are present.
+        // Configure via user-secrets in dev; environment variables in production.
+        if (!string.IsNullOrEmpty(configuration["Authentication:Google:ClientId"]))
+            auth.AddGoogle(google =>
+            {
+                google.ClientId = configuration["Authentication:Google:ClientId"]!;
+                google.ClientSecret = configuration["Authentication:Google:ClientSecret"]!;
+                google.SignInScheme = ExternalScheme;
+                google.Events.OnRemoteFailure = OnRemoteFailure;
+            });
+
+        if (!string.IsNullOrEmpty(configuration["Authentication:Microsoft:ClientId"]))
+            auth.AddMicrosoftAccount(ms =>
+            {
+                ms.ClientId = configuration["Authentication:Microsoft:ClientId"]!;
+                ms.ClientSecret = configuration["Authentication:Microsoft:ClientSecret"]!;
+                ms.SignInScheme = ExternalScheme;
+                // Pin the tenant authority. "consumers" = personal Microsoft accounts;
+                // the bare default routes to the legacy login.live.com endpoint, which
+                // rejects the registered redirect URI. Override to "common",
+                // "organizations", or a tenant GUID as needed.
+                var msTenant = configuration["Authentication:Microsoft:Tenant"] ?? "consumers";
+                ms.AuthorizationEndpoint = $"https://login.microsoftonline.com/{msTenant}/oauth2/v2.0/authorize";
+                ms.TokenEndpoint = $"https://login.microsoftonline.com/{msTenant}/oauth2/v2.0/token";
+                ms.Events.OnRemoteFailure = OnRemoteFailure;
+            });
+
+        return services;
+    }
+}

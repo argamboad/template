@@ -27,7 +27,10 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 5. **Don't build non-web clients now.** Mobile + desktop (MAUI Blazor Hybrid) are deferred; web
    first.
 6. **Latest stable versions only, never previews.**
-7. **Work in vertical slices.** Each slice is end-to-end and leaves the app working; follow
+7. **Test-Driven Development — always.** Write the failing test before the production code on
+   every slice. Unit tests (xUnit) in `Core.Tests` / `Api.Tests`; E2E tests (Playwright/NUnit)
+   in `E2E.Tests`. No slice merges without tests that drove it; Gherkin scenarios map 1:1 to tests.
+8. **Work in vertical slices.** Each slice is end-to-end and leaves the app working; follow
    `docs/WAYS_OF_WORKING.md` for slices, Gherkin stories, Conventional Commits, and the PR
    template. Don't build sprawling multi-epic chunks — propose a split.
 
@@ -37,12 +40,24 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 _TODO_
 
 ## Tech stack (see `docs/TECH_STACK.md`)
-- **Versions:** latest stable on the current .NET line — **re-verified for this project as: _TODO_.**
+- **Versions:** latest stable on the current .NET line — **re-verified 2026-06-17: .NET SDK 10.0.301, ASP.NET Core / EF Core / Identity 10.0.9, Npgsql.EF 10.0.2, PostgreSQL 17.**
 - **Backend:** ASP.NET Core Web API behind a clean API boundary.
 - **Web frontend:** Blazor WebAssembly; UI components in a shared **RCL** (hard rule).
 - **DB:** PostgreSQL via **EF Core (Npgsql)**; schema/migrations generated from `docs/DATA_MODEL.md`.
 - **Auth:** ASP.NET Core Identity; tenant scoping layered on top.
 - **Non-web clients:** MAUI Blazor Hybrid (mobile + Win/macOS desktop) — *deferred, don't build now.*
+
+## Auth rules (constant)
+- **OAuth credentials are never in appsettings.** Use `dotnet user-secrets` in dev; environment
+  variables in production. See `docs/TECH_STACK.md` for the commands.
+- **New OAuth provider = one line.** Add `.AddXxx()` in `ServiceCollectionExtensions`. Don't
+  restructure anything else.
+- **Magic links use `MagicLinkTokenProvider`.** Purpose constant: `MagicLinkTokenProvider.Purpose`.
+  Token lifetime is in config (`Auth:MagicLink:TokenLifespanMinutes`).
+- **`IEmailSender` (Core abstraction) is the only way to send email.** Never reference MailKit
+  directly outside `Infrastructure/Email/`.
+- **JWT Bearer auth is not pre-configured.** Add it in the auth story slice — scheme choice is
+  app-specific.
 
 ## Scope discipline
 Before building anything, check the **"OUT" list in `docs/PROJECT_BRIEF.md`**. Don't implement

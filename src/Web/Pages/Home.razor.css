@@ -1,0 +1,22 @@
+.welcome-card {
+    max-width: 640px;
+    border-radius: 12px;
+    border: 1px solid var(--app-border, #E0E7EF);
+}
+
+.welcome-icon {
+    color: var(--bs-primary);
+    font-size: 1.4rem;
+    letter-spacing: .15rem;
+}
+
+.hero-section {
+    max-width: 640px;
+    margin: 3rem auto;
+}
+
+.hero-icon {
+    font-size: 3rem;
+    color: var(--bs-primary);
+    opacity: .8;
+}

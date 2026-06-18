@@ -67,3 +67,35 @@ Vertical end-to-end slices that keep the app working; stories in `docs/stories/`
 with Gherkin acceptance criteria; Conventional Commits for branches/commits/PR titles; PRs use
 `.github/pull_request_template.md`. Full detail in `docs/WAYS_OF_WORKING.md`. *Rationale:* a
 lightweight defined process keeps solo + Claude Code work consistent and mergeable.
+
+**ADR-C14 — Testing: 100% TDD; unit tests (xUnit) + E2E (Playwright/NUnit). (2026-06-17)**
+All production code is test-driven (red-green-refactor). Unit tests (xUnit) in `Core.Tests` and
+`Api.Tests` cover domain logic, derived rules, and API behavior. E2E tests (Playwright 1.60,
+NUnit) in `E2E.Tests` cover critical user flows through a real browser against the full running
+stack; Page Object Model in `tests/E2E.Tests/Pages/`. Gherkin scenarios from user stories map
+directly to test cases. No slice merges without passing tests. `playwright install` required once
+after first build. *Rationale:* TDD forces clear interfaces and prevents regression; E2E tests
+confirm real user flows end-to-end; together they give confidence to ship and refactor continuously.
+
+**ADR-C15 — Auth strategy: OAuth (Google + Microsoft, extensible) + magic links (web) + OTP framework (mobile, deferred). (2026-06-17)**
+External OAuth via ASP.NET Core's provider model — new providers added as a single `.AddXxx()`
+call, no structural changes. Magic links use a custom `MagicLinkTokenProvider`
+(`DataProtectorTokenProvider` subclass, 15-min default) for passwordless web sign-in; tokens are
+Data Protection-backed, single-use, and server-bound. OTP infrastructure provided by
+`AddDefaultTokenProviders()` — TOTP (authenticator app) and email OTP are ready; SMS OTP deferred
+until mobile work begins. `TenantInvitation` entity added for household membership flow. OAuth
+credentials stored in user-secrets (dev) / environment variables (prod) — never in appsettings.
+Email sent via `IEmailSender` (Core abstraction) → `SmtpEmailSender` (MailKit, `Email:Smtp`
+config); dev points to Mailpit. JWT Bearer auth intentionally omitted from this ADR — configured
+in the auth story slice to keep it app-specific.
+*Rationale:* provider-agnostic OAuth avoids re-architecting for new providers; magic links remove
+password friction on web; OTP framework is in place without committing to an SMS provider;
+abstracting `IEmailSender` keeps Core independent of sending infrastructure.
+
+**ADR-C13 — Local dev infrastructure via Docker Compose: PostgreSQL 17 + Mailpit. (2026-06-17)**
+`docker-compose.yml` at repo root; configuration via `.env` (gitignored; copy from `.env.example`).
+All ports are environment-variable-driven so multiple projects can run simultaneously without
+conflicts. Both services expose healthchecks; API containers should declare `depends_on: db:
+condition: service_healthy`. No pgAdmin in the template — devs use their own DB client.
+*Rationale:* PostgreSQL is always needed; Mailpit covers Identity email flows (confirm account,
+password reset) with zero config; env-var ports prevent port clashes across projects.

@@ -1,0 +1,430 @@
+@page "/household"
+@using System.Net.Http.Json
+@using System.Text.Json.Serialization
+@inject AuthService Auth
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Household</PageTitle>
+
+<div class="household-wrapper">
+    <div class="d-flex align-items-center justify-content-between mb-1">
+        <h1 class="h4 fw-bold mb-0">Household</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="/join">Have an invite?</a>
+    </div>
+    <p class="text-muted mb-4">Manage who shares this household.</p>
+
+    @if (!string.IsNullOrEmpty(_status))
+    {
+        <div class="alert @(_statusOk ? "alert-success" : "alert-danger") py-2">@_status</div>
+    }
+
+    @if (_loading)
+    {
+        <div class="p-4 text-center text-muted">
+            <span class="spinner-border spinner-border-sm me-2"></span> Loading…
+        </div>
+    }
+    else if (_household is not null)
+    {
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                @* ── Name ── *@
+                @if (IsOwner)
+                {
+                    <label class="form-label fw-medium">Household name</label>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <input class="form-control" style="max-width:320px" @bind="_name" />
+                        <button class="btn btn-primary"
+                                disabled="@(_busy || string.IsNullOrWhiteSpace(_name) || _name.Trim() == _household.Name)"
+                                @onclick="SaveName">Rename</button>
+                    </div>
+                }
+                else
+                {
+                    <h2 class="h5 mb-0">@_household.Name</h2>
+                }
+            </div>
+        </div>
+
+        @* ── Members ── *@
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <h2 class="h6 fw-bold mb-3">Members</h2>
+                <ul class="list-group list-group-flush">
+                    @foreach (var m in _household.Members)
+                    {
+                        <li class="list-group-item d-flex align-items-center justify-content-between px-0">
+                            <div>
+                                <div class="fw-medium">@(string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName)</div>
+                                @if (!string.IsNullOrWhiteSpace(m.DisplayName))
+                                {
+                                    <div class="small text-muted">@m.Email</div>
+                                }
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                @if (m.Role == "owner")
+                                {
+                                    <span class="badge bg-primary-subtle text-primary-emphasis">Owner</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Member</span>
+                                }
+                                @if (IsOwner && m.UserId != _myUserId)
+                                {
+                                    <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
+                                            @onclick="() => RemoveMember(m)">Remove</button>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+        @* ── Invitations (owner only) ── *@
+        @if (IsOwner)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <h2 class="h6 fw-bold mb-3">Invitations</h2>
+                    <div class="d-flex gap-2 flex-wrap mb-3">
+                        <input class="form-control" style="max-width:320px" type="email"
+                               placeholder="email@example.com" @bind="_inviteEmail" />
+                        <button class="btn btn-outline-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_inviteEmail))"
+                                @onclick="SendInvite">Invite</button>
+                    </div>
+
+                    @if (_revealedToken is not null)
+                    {
+                        <div class="alert alert-success py-2">
+                            <div class="fw-medium mb-1">Invitation token for @(_revealedEmail) (shown once):</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <code class="text-break">@_revealedToken</code>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => CopyToken(_revealedToken)">Copy</button>
+                            </div>
+                            <div class="small text-muted mt-1">We also emailed a join link to the invitee.</div>
+                        </div>
+                    }
+
+                    @if (_pending.Count == 0)
+                    {
+                        <p class="text-muted small mb-0">No pending invitations.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var inv in _pending)
+                            {
+                                <li class="list-group-item d-flex align-items-center justify-content-between px-0">
+                                    <div>
+                                        <div class="fw-medium">@inv.InvitedEmail</div>
+                                        <div class="small text-muted">Expires @inv.ExpiresAt.ToLocalTime().ToString("MMM d, yyyy")</div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-secondary btn-sm" disabled="@_busy"
+                                                @onclick="() => RegenerateInvite(inv)">Regenerate</button>
+                                        <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
+                                                @onclick="() => RevokeInvite(inv)">Revoke</button>
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Membership lifecycle ── *@
+        <div class="card shadow-sm">
+            <div class="card-body">
+                @if (IsOwner && OtherMembers.Count > 0)
+                {
+                    <h2 class="h6 fw-bold mb-3">Transfer ownership</h2>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <select class="form-select" style="max-width:320px" @bind="_transferTargetId">
+                            <option value="">Choose a member…</option>
+                            @foreach (var m in OtherMembers)
+                            {
+                                <option value="@m.UserId">@(string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName)</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-primary" disabled="@(_busy || string.IsNullOrEmpty(_transferTargetId))"
+                                @onclick="TransferOwnership">Transfer</button>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0">You must transfer ownership before you can leave this household.</p>
+                }
+                else if (IsOwner)
+                {
+                    <h2 class="h6 fw-bold mb-2 text-danger">Leave &amp; dissolve</h2>
+                    <p class="small text-muted">You're the only member. Leaving permanently deletes this household and its data.</p>
+                    <button class="btn btn-danger" disabled="@_busy" @onclick="DissolveAndLeave">Leave and delete</button>
+                }
+                else
+                {
+                    <h2 class="h6 fw-bold mb-2">Leave household</h2>
+                    <p class="small text-muted">The shared household stays intact; you'll get a fresh household of your own.</p>
+                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick="LeaveAsMember">Leave</button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string? _status;
+    private bool _statusOk;
+    private TenantView? _household;
+    private Guid _myUserId;
+    private string _name = "";
+    private string _inviteEmail = "";
+    private List<Invitation> _pending = new();
+    private string? _transferTargetId;
+    private string? _revealedToken;
+    private string? _revealedEmail;
+
+    private bool IsOwner => _household?.MyRole == "owner";
+    private List<Member> OtherMembers =>
+        _household?.Members.Where(m => m.UserId != _myUserId).ToList() ?? new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+        _myUserId = Auth.UserId ?? Guid.Empty;
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        _loading = true;
+        try
+        {
+            _household = await Http.GetFromJsonAsync<TenantView>("/api/household");
+            _name = _household?.Name ?? "";
+            if (IsOwner)
+                _pending = await Http.GetFromJsonAsync<List<Invitation>>("/api/household/invitations") ?? new();
+            else
+                _pending = new();
+        }
+        catch
+        {
+            SetStatus("Couldn't load the household.", false);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    // The tenant_name claim drives the header; refresh it silently after tenant changes.
+    // The header re-renders on the next navigation (leave/dissolve force a full reload).
+    private Task RefreshHeaderAsync() => Auth.TryRefreshAsync();
+
+    private async Task SaveName()
+    {
+        _busy = true;
+        try
+        {
+            var resp = await Http.PutAsJsonAsync("/api/household", new { name = _name.Trim() });
+            if (resp.IsSuccessStatusCode)
+            {
+                SetStatus("Household renamed.", true);
+                await RefreshHeaderAsync();
+                await Reload();
+            }
+            else { SetStatus("Couldn't rename the household.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task SendInvite()
+    {
+        _busy = true;
+        _revealedToken = null;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("/api/household/invitations", new { email = _inviteEmail.Trim() });
+            if (resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadFromJsonAsync<CreateInvitationResult>();
+                _revealedToken = body?.Token;
+                _revealedEmail = body?.InvitedEmail ?? _inviteEmail.Trim();
+                _inviteEmail = "";
+                SetStatus(null, true);
+                await Reload();
+            }
+            else if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                SetStatus("That email is already a member.", false);
+            }
+            else { SetStatus("Couldn't send the invitation.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task RegenerateInvite(Invitation inv)
+    {
+        _busy = true;
+        _revealedToken = null;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync($"/api/household/invitations/{inv.InvitationId}/regenerate", new { });
+            if (resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadFromJsonAsync<CreateInvitationResult>();
+                _revealedToken = body?.Token;
+                _revealedEmail = inv.InvitedEmail;
+                await Reload();
+            }
+            else { SetStatus("Couldn't regenerate the token.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task RevokeInvite(Invitation inv)
+    {
+        _busy = true;
+        _revealedToken = null;
+        try
+        {
+            var resp = await Http.DeleteAsync($"/api/household/invitations/{inv.InvitationId}");
+            if (resp.IsSuccessStatusCode)
+            {
+                SetStatus("Invitation revoked.", true);
+                await Reload();
+            }
+            else { SetStatus("Couldn't revoke the invitation.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task RemoveMember(Member m)
+    {
+        var name = string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName;
+        if (!await Confirm($"Remove {name} from this household?")) return;
+
+        _busy = true;
+        try
+        {
+            var resp = await Http.DeleteAsync($"/api/household/members/{m.UserId}");
+            if (resp.IsSuccessStatusCode)
+            {
+                SetStatus("Member removed.", true);
+                await Reload();
+            }
+            else { SetStatus("Couldn't remove the member.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task TransferOwnership()
+    {
+        if (!Guid.TryParse(_transferTargetId, out var target)) return;
+        _busy = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("/api/household/transfer-ownership", new { user_id = target });
+            if (resp.IsSuccessStatusCode)
+            {
+                _transferTargetId = null;
+                SetStatus("Ownership transferred.", true);
+                await Reload();
+            }
+            else { SetStatus("Couldn't transfer ownership.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task LeaveAsMember()
+    {
+        if (!await Confirm("Leave this household?")) return;
+        _busy = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("/api/household/leave", new { });
+            if (resp.IsSuccessStatusCode)
+            {
+                await RefreshHeaderAsync();
+                Nav.NavigateTo("/", forceLoad: true);
+            }
+            else { SetStatus("Couldn't leave the household.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task DissolveAndLeave()
+    {
+        if (!await Confirm("This permanently deletes the household and its data. Continue?")) return;
+        _busy = true;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("/api/household/leave", new { confirm_dissolve = true });
+            if (resp.IsSuccessStatusCode)
+            {
+                await RefreshHeaderAsync();
+                Nav.NavigateTo("/", forceLoad: true);
+            }
+            else { SetStatus("Couldn't dissolve the household.", false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task CopyToken(string? token)
+    {
+        if (token is null) return;
+        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", token); }
+        catch { /* clipboard may be unavailable; the token is still visible */ }
+    }
+
+    private async Task<bool> Confirm(string message)
+    {
+        try { return await JS.InvokeAsync<bool>("confirm", message); }
+        catch { return true; }
+    }
+
+    private void SetStatus(string? text, bool ok)
+    {
+        _status = text;
+        _statusOk = ok;
+    }
+
+    private record TenantView
+    {
+        [JsonPropertyName("id")] public Guid Id { get; init; }
+        [JsonPropertyName("name")] public string Name { get; init; } = "";
+        [JsonPropertyName("my_role")] public string MyRole { get; init; } = "member";
+        [JsonPropertyName("members")] public List<Member> Members { get; init; } = new();
+    }
+
+    private record Member
+    {
+        [JsonPropertyName("user_id")] public Guid UserId { get; init; }
+        [JsonPropertyName("display_name")] public string? DisplayName { get; init; }
+        [JsonPropertyName("email")] public string Email { get; init; } = "";
+        [JsonPropertyName("role")] public string Role { get; init; } = "member";
+        [JsonPropertyName("joined_at")] public DateTimeOffset JoinedAt { get; init; }
+    }
+
+    // List response — no token.
+    private record Invitation
+    {
+        [JsonPropertyName("invitation_id")] public Guid InvitationId { get; init; }
+        [JsonPropertyName("invited_email")] public string InvitedEmail { get; init; } = "";
+        [JsonPropertyName("expires_at")] public DateTimeOffset ExpiresAt { get; init; }
+    }
+
+    // One-time create/regenerate response — includes raw token.
+    private record CreateInvitationResult
+    {
+        [JsonPropertyName("token")] public string Token { get; init; } = "";
+        [JsonPropertyName("invited_email")] public string InvitedEmail { get; init; } = "";
+    }
+}

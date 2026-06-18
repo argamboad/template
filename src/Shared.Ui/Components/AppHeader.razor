@@ -1,0 +1,38 @@
+@using Template.Shared.Ui.Auth
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<nav class="navbar navbar-expand navbar-dark app-header">
+    <div class="container-fluid">
+
+        <a class="navbar-brand app-brand" href="/">
+            <!-- TODO: replace with your app name / logo -->
+            <span class="brand-icon">&#9632;</span>
+            <span class="brand-text">AppName</span>
+        </a>
+
+        <ul class="navbar-nav me-auto ms-4">
+            <li class="nav-item">
+                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Home</NavLink>
+            </li>
+            <!-- TODO: add app-specific nav links here -->
+        </ul>
+
+        <div class="header-user d-flex align-items-center gap-3">
+            <span class="tenant-badge">@Auth.TenantName</span>
+            <span class="user-name text-white-50 small">@Auth.DisplayName</span>
+            <NavLink class="btn btn-outline-light btn-sm" href="/household">Household</NavLink>
+            <NavLink class="btn btn-outline-light btn-sm" href="/settings">Settings</NavLink>
+            <button class="btn btn-outline-light btn-sm" @onclick="SignOutAsync">Sign out</button>
+        </div>
+
+    </div>
+</nav>
+
+@code {
+    private async Task SignOutAsync()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+}

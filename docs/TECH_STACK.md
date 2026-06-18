@@ -22,10 +22,10 @@
 > ⚠️ **RE-VERIFY at project start.** Versions move; search for current stable before committing.
 > Policy: **target the latest _stable_ release, never previews.**
 >
-> Baseline at template authoring (2026-06): the **.NET 10 (LTS)** line — .NET 10, ASP.NET Core
-> 10, Blazor 10, EF Core 10.0.x, Npgsql.EntityFrameworkCore.PostgreSQL 10.0.x, Identity 10.
-> PostgreSQL server 17 stable (18 enables native `uuidv7()` via `Guid.CreateVersion7()` with
-> EFCore.PG 10 — worth considering for time-ordered primary keys).
+> **Verified 2026-06-17:** .NET SDK 10.0.301 · ASP.NET Core / EF Core / Identity **10.0.9** ·
+> Npgsql.EntityFrameworkCore.PostgreSQL **10.0.2** · PostgreSQL server **17**.
+> Note: `Guid.CreateVersion7()` (time-ordered UUIDv7) is supported in .NET 9+ — already used in
+> `Tenant.cs`. PostgreSQL 18 adds a native `uuidv7()` SQL function but is not required for this.
 
 ## Architecture shape
 
@@ -87,7 +87,42 @@ differ) but captures the majority of the UI. Cheap now, expensive to retrofit �
 
 - Final non-web-client framework commitment (MAUI intended).
 - Hosting specifics (pick near deploy; undemanding profile).
-- Identity details (social login, email confirmation, etc., as auth is built).
+- JWT Bearer auth scheme — configured in the auth story slice (scheme choice is app-specific).
+- SMS OTP provider (Twilio etc.) — deferred until mobile client work begins.
+
+## Local dev environment (constant)
+
+Spun up via `docker compose up -d`. Copy `.env.example` → `.env` and adjust before first run.
+
+| Service | Image | Default port(s) | Purpose |
+|---------|-------|-----------------|---------|
+| `db` | `postgres:17` | `${DB_PORT:-5432}` | PostgreSQL — matches production DB engine |
+| `mail` | `axllent/mailpit:latest` | SMTP `${MAIL_SMTP_PORT:-1025}`, UI `${MAIL_UI_PORT:-8025}` | Local SMTP trap for Identity email flows |
+
+Both services have healthchecks. When the API container is added to compose (per-project), it should declare `depends_on: db: condition: service_healthy`.
+
+Port variables allow multiple projects to run simultaneously without conflicts.
+
+## Auth packages (constant)
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `Microsoft.AspNetCore.Authentication.Google` | 10.0.9 | Google OAuth provider |
+| `Microsoft.AspNetCore.Authentication.MicrosoftAccount` | 10.0.9 | Microsoft OAuth provider |
+| `MailKit` | 4.17.0 | SMTP email sending (magic links, invitations) |
+
+**Adding a new OAuth provider:** install the provider package, add `.AddXxx(options => ...)` in
+`ServiceCollectionExtensions.AddInfrastructure()`. No structural changes needed.
+
+**OAuth credentials in dev:** use `dotnet user-secrets` — never put client IDs/secrets in
+`appsettings.json` or `appsettings.Development.json`.
+```sh
+cd src/Api
+dotnet user-secrets set "Authentication:Google:ClientId" "..."
+dotnet user-secrets set "Authentication:Google:ClientSecret" "..."
+dotnet user-secrets set "Authentication:Microsoft:ClientId" "..."
+dotnet user-secrets set "Authentication:Microsoft:ClientSecret" "..."
+```
 
 ## App-specific notes
 <!-- Fill per project: anything this app needs beyond the constant stack — extra libraries,
