@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Template.Shared.Ui;
 using Template.Shared.Ui.Auth;
-using Template.Web;
 using Template.Web.Http;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
