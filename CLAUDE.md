@@ -89,6 +89,7 @@ deferred items without an explicit decision.
 | `docs/DECISIONS.md` | ADR log (the "why") |
 | `docs/WAYS_OF_WORKING.md` | Slices, story format, commit/PR conventions |
 | `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
+| `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
 | `docs/stories/` | User stories per epic — generated at build time |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |

@@ -17,7 +17,10 @@ Backstop after working through the list: `git grep -i perezosoft` and a search f
 - `src/Web/wwwroot/index.html` — `<title>` + `og:title`
 - `src/Maui/wwwroot/index.html` — `<title>`
 - `src/Maui/Auth/LoopbackOAuthInitiator.cs` — the "you can close this tab" page title
-- **`src/Infrastructure/Email/BrandedEmail.cs`** — email wordmark, headings (e.g. "Sign in to Perezosoft"), footer
+- **`src/Infrastructure/Email/BrandedEmail.cs`** — email footer wordmark + tagline (brand, not localized)
+- **Localization resources (every language!)** — the brand name + product copy live in
+  `src/Shared.Ui/Resources/AppStrings.*.resx` and `src/Infrastructure/Email/EmailStrings.*.resx`.
+  Update "Perezosoft" in each `.resx` you have (en, es, …). See `docs/LOCALIZATION.md`.
 - **Email sender name** — `Email:Smtp:FromName` (user-secrets in dev / env in prod), currently "Perezosoft"
 
 ## 2. Tagline — "Lazy reputation. Efficient engineering." → yours
