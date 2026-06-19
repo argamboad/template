@@ -1,0 +1,88 @@
+@page "/join"
+@using System.Net.Http.Json
+@inject AuthService Auth
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Join household</PageTitle>
+
+<div class="join-wrapper text-center py-5">
+    @if (_state == State.Working)
+    {
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Working…</span>
+        </div>
+        <p class="text-muted mt-3">Joining the household…</p>
+    }
+    else if (_state == State.NeedsSignIn)
+    {
+        <h1 class="h5 fw-bold mb-2">You've been invited</h1>
+        <p class="text-muted">Sign in to accept — we'll bring you right back here.</p>
+        <a class="btn btn-primary" href="/login">Sign in to accept</a>
+    }
+    else if (_state == State.Success)
+    {
+        <h1 class="h5 fw-bold mb-2 text-success">You're in!</h1>
+        <p class="text-muted">You've joined the household.</p>
+        <button class="btn btn-primary" @onclick="@(() => Nav.NavigateTo("/household", forceLoad: true))">Go to household</button>
+    }
+    else if (_state == State.MissingToken)
+    {
+        <h1 class="h5 fw-bold mb-2">Invalid link</h1>
+        <p class="text-muted">This invite link is missing its token.</p>
+    }
+    else if (_state == State.Error)
+    {
+        <h1 class="h5 fw-bold mb-2 text-danger">Couldn't join</h1>
+        <p class="text-muted">@_error</p>
+        <a class="btn btn-outline-secondary" href="/household">Back to household</a>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Token { get; set; }
+
+    private enum State { Working, NeedsSignIn, Success, MissingToken, Error }
+    private State _state = State.Working;
+    private string _error = "The invitation is invalid or has expired.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            _state = State.MissingToken;
+            return;
+        }
+
+        if (!Auth.IsAuthenticated)
+        {
+            // Remember where to return after sign-in. localStorage is shared across
+            // tabs for this origin, so it survives the OAuth/magic-link round-trip —
+            // even when a magic-link email opens a new tab.
+            await JS.InvokeVoidAsync("localStorage.setItem",
+                "post_login_redirect", "/" + Nav.ToBaseRelativePath(Nav.Uri));
+            _state = State.NeedsSignIn;
+            return;
+        }
+
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("/api/household/invitations/accept", new { token = Token });
+            // The tenant_name claim changed — refresh so the new household shows.
+            if (resp.IsSuccessStatusCode)
+            {
+                await Auth.TryRefreshAsync();
+                _state = State.Success;
+            }
+            else
+            {
+                _state = State.Error;
+            }
+        }
+        catch
+        {
+            _state = State.Error;
+        }
+    }
+}

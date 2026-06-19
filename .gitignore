@@ -1,0 +1,18 @@
+# Local dev environment — never commit secrets
+.env
+
+# .NET build output
+bin/
+obj/
+
+# User-specific VS/Rider files
+*.user
+.vs/
+.idea/
+
+# Agent / editor tooling
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

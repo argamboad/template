@@ -1,0 +1,67 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using Template.Shared.Ui.Auth
+@implements IDisposable
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<nav class="navbar navbar-expand-lg navbar-dark app-header">
+    <div class="container-fluid">
+
+        <a class="navbar-brand app-brand d-flex align-items-center gap-2" href="/">
+            <!-- Brand mark from the RCL's static web assets (shared by Web + MAUI). -->
+            <img src="_content/Template.Shared.Ui/brand/icon_light.svg" alt="" class="brand-icon" height="32" width="34" />
+            <span class="brand-text">Perezosoft</span>
+        </a>
+
+        <!-- Hamburger: shown below the lg breakpoint (phones/tablets); Bootstrap hides it
+             on wide screens. Toggled by Blazor state — the app doesn't load Bootstrap JS. -->
+        <button class="navbar-toggler" type="button" @onclick="ToggleMenu"
+                aria-label="Toggle navigation" aria-expanded="@_menuOpen.ToString().ToLowerInvariant()">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse @(_menuOpen ? "show" : "")">
+            <ul class="navbar-nav me-auto ms-lg-4 mt-2 mt-lg-0">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Home</NavLink>
+                </li>
+                <!-- TODO: add app-specific nav links here -->
+            </ul>
+
+            <div class="header-user d-flex flex-column flex-lg-row align-items-lg-center gap-2 gap-lg-3 mt-3 mt-lg-0 pb-2 pb-lg-0">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="tenant-badge">@Auth.TenantName</span>
+                    <span class="user-name text-white-50 small">@Auth.DisplayName</span>
+                </div>
+                <NavLink class="btn btn-outline-light btn-sm" href="/household">Household</NavLink>
+                <NavLink class="btn btn-outline-light btn-sm" href="/settings">Settings</NavLink>
+                <button class="btn btn-outline-light btn-sm" @onclick="SignOutAsync">Sign out</button>
+            </div>
+        </div>
+
+    </div>
+</nav>
+
+@code {
+    private bool _menuOpen;
+
+    // Close the menu after any navigation so it doesn't stay open over the new page on mobile.
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (!_menuOpen) return;
+        _menuOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private async Task SignOutAsync()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

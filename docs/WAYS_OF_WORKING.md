@@ -26,9 +26,10 @@ horizontal layer in isolation.
 **Slice lifecycle**
 1. Pick the next slice (from `ROADMAP.md` once it exists).
 2. Write/refine the user story/stories for it (see template below) under `docs/stories/`.
-3. Branch, build, keep `Core` derived-rule logic unit-tested.
-4. Open a PR using the PR template; self-review against acceptance criteria.
-5. Merge; app remains in a working state. Add ADRs to `DECISIONS.md` for any decisions made.
+3. **Write the tests first (TDD).** Unit tests for Core logic; E2E tests for the user-facing flow.
+4. Branch, implement until all tests are green; refactor.
+5. Open a PR using the PR template; self-review against acceptance criteria.
+6. Merge; app remains in a working state. Add ADRs to `DECISIONS.md` for any decisions made.
 
 ## User stories
 
@@ -62,8 +63,8 @@ Scenario: <another scenario — include edge cases and the unhappy path>
   Then ...
 
 **Out of scope:** <what this story explicitly does NOT cover>
-**Definition of done:** criteria pass, Core logic unit-tested, tenant-scoping verified, merged,
-app still working.
+**Definition of done:** tests written first (TDD); all unit + E2E scenarios green; Core logic
+unit-tested; E2E covers happy + key unhappy paths; tenant-scoping verified; merged, app working.
 ```
 
 ### Story ID & naming
@@ -119,6 +120,9 @@ Stored at `.github/pull_request_template.md` (auto-loaded by GitHub). Contents:
 - [ ] Edge / unhappy-path scenarios covered
 
 ## Checklist
+- [ ] Tests written first (TDD) — no production code without a failing test
+- [ ] Unit tests green (Core.Tests, Api.Tests)
+- [ ] E2E tests green (E2E.Tests) — happy + key unhappy paths covered
 - [ ] Vertical slice — app is in a working state
 - [ ] Tenant-scoping enforced (no cross-tenant leakage)
 - [ ] Core derived-rule logic unit-tested (if touched)
@@ -131,9 +135,56 @@ Stored at `.github/pull_request_template.md` (auto-loaded by GitHub). Contents:
 <anything reviewers/future-you should know>
 ```
 
+## Testing strategy (TDD — constant)
+
+**Test-Driven Development is the default on every slice.** Write the failing test first; only
+then write the production code that makes it pass; then refactor. No production code is written
+without a test that drove it.
+
+### Red-Green-Refactor
+1. **Red** — write a failing test derived from the Gherkin scenario.
+2. **Green** — write the minimum production code to pass it.
+3. **Refactor** — clean up without breaking the tests.
+
+### Test layers
+
+| Layer | Project | Framework | What it covers |
+|-------|---------|-----------|----------------|
+| Unit | `tests/Core.Tests` | xUnit | Domain logic, derived rules, entity invariants |
+| Unit | `tests/Api.Tests` | xUnit | API endpoints, request/response shape, auth guards |
+| E2E | `tests/E2E.Tests` | Playwright (NUnit) | Critical user flows through a real browser |
+
+### Unit tests (`Core.Tests`, `Api.Tests` — xUnit)
+- One test class per production class; file mirrors the source tree.
+- Cover every derived rule, happy path, unhappy path, and tenant-scoping boundary.
+- No real database in unit tests — use in-memory EF or mocks at the repository boundary.
+
+### E2E tests (`E2E.Tests` — Playwright/NUnit)
+- One test file per epic, mirroring `docs/stories/`.
+- Tests inherit from Playwright's `PageTest`; use Page Object Model (`tests/E2E.Tests/Pages/`).
+- Cover the Gherkin happy path + key unhappy paths through the real running UI.
+- Run against the full stack: `docker compose up -d`, then start API and Web before running.
+- Base URL configured via `PLAYWRIGHT_BASE_URL` env var or `playwright.runsettings`.
+
+### First-time Playwright setup
+```sh
+dotnet build tests/E2E.Tests
+pwsh tests/E2E.Tests/bin/Debug/net10.0/playwright.ps1 install
+```
+
+### Running tests
+```sh
+dotnet test tests/Core.Tests
+dotnet test tests/Api.Tests
+# E2E — requires docker compose + servers running
+dotnet test tests/E2E.Tests -- RunSettings=tests/E2E.Tests/playwright.runsettings
+```
+
 ## How Claude Code should use this
 - Default to vertical slices; refuse to build sprawling multi-epic chunks in one go — propose a
   split instead.
+- **Write tests first.** For every slice: unit tests before Core/API code; E2E tests before UI
+  code. Gherkin scenarios map directly to test cases.
 - Write the per-epic story file before starting an epic; use the story + Gherkin as the spec.
 - Name branches, commits, and PRs per the conventions above.
 - Fill the PR template; check every box honestly or note why N/A.
