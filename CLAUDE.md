@@ -93,6 +93,7 @@ deferred items without an explicit decision.
 | `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
+| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web/desktop/Android (smoke + regression) |
 | `docs/stories/` | User stories per epic — generated at build time |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `SCHEMA.sql` / migrations | Concrete schema — generated from DATA_MODEL.md |
