@@ -42,6 +42,7 @@ public class AuthController(
     ILogger<AuthController> logger) : ControllerBase
 {
     private static readonly string[] SupportedProviders = ["microsoft", "google"];
+    private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
 
     /// <summary>
     /// Starts the OAuth flow: challenges the matching scheme. The callback route
@@ -166,7 +167,7 @@ public class AuthController(
 
             var tenantName = await ResolveTenantNameAsync(user.Id);
             var newJwt = jwtTokenService.IssueAccessToken(
-                user.Id, user.Email, validToken.Provider, user.DisplayName, tenantName);
+                user.Id, user.Email, validToken.Provider, user.DisplayName, tenantName, user.Locale);
 
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ipAddress, validToken.Provider);
@@ -250,6 +251,24 @@ public class AuthController(
             UserName = user.DisplayName ?? user.Email,
             TenantName = tenantName ?? string.Empty
         });
+    }
+
+    /// <summary>
+    /// Saves the signed-in user's preferred UI language so it follows them across
+    /// devices. The new value lands in the JWT on the next refresh.
+    /// </summary>
+    [HttpPut("locale")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> SetLocale([FromBody] LocaleRequest req)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        var locale = req.Locale?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(locale) || !SupportedLocales.Contains(locale))
+            return BadRequest(errorFactory.CreateError("unsupported_locale", "Unsupported locale."));
+
+        await userService.UpdateLocaleAsync(userId, locale);
+        return Ok();
     }
 
     // ── Account linking ──────────────────────────────────────────────────────
@@ -388,7 +407,7 @@ public class AuthController(
 
         var tenantName = await ResolveTenantNameAsync(result.User.Id);
         var jwt = jwtTokenService.IssueAccessToken(
-            result.User.Id, result.User.Email, LoginTokenPurpose.Otp, result.User.DisplayName, tenantName);
+            result.User.Id, result.User.Email, LoginTokenPurpose.Otp, result.User.DisplayName, tenantName, result.User.Locale);
 
         return Ok(new TokenResponse
         {
@@ -499,7 +518,7 @@ public class AuthController(
 
         var tenantName = await ResolveTenantNameAsync(user.Id);
         var jwt = jwtTokenService.IssueAccessToken(
-            user.Id, user.Email, grant.Value.Provider, user.DisplayName, tenantName);
+            user.Id, user.Email, grant.Value.Provider, user.DisplayName, tenantName, user.Locale);
 
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ip, grant.Value.Provider);
@@ -584,3 +603,6 @@ public record RefreshRequest(
 
 public record NativeExchangeRequest(
     [property: System.Text.Json.Serialization.JsonPropertyName("code")] string Code);
+
+public record LocaleRequest(
+    [property: System.Text.Json.Serialization.JsonPropertyName("locale")] string? Locale);

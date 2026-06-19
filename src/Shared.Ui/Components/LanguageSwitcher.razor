@@ -1,6 +1,10 @@
 @using System.Globalization
+@using System.Net.Http.Json
+@using Template.Shared.Ui.Auth
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject HttpClient Http
+@inject AuthService Auth
 @inject IStringLocalizer<AppStrings> Localizer
 
 <select class="form-select form-select-sm lang-switcher" value="@_current"
@@ -28,9 +32,19 @@
     {
         var code = e.Value?.ToString() ?? "en";
         if (code == _current) return;
-        // Persist the choice and reload so the culture is applied at startup. (Per-user
-        // server-side persistence is wired in a later slice; this is the device-local store.)
+
+        // Device-local store (survives the web reload), plus the in-process culture so the
+        // MAUI webview reload picks it up (MauiProgram doesn't re-run on reload).
         await JS.InvokeVoidAsync("localStorage.setItem", "app_culture", code);
+        CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(code);
+
+        // Signed in: persist server-side so the choice follows the user across devices.
+        if (Auth.IsAuthenticated)
+        {
+            try { await Http.PutAsJsonAsync("/api/auth/locale", new { locale = code }); }
+            catch { /* best-effort; the local choice still applies */ }
+        }
+
         Nav.NavigateTo(Nav.Uri, forceLoad: true);
     }
 }

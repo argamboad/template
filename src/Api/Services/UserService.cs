@@ -35,6 +35,9 @@ public interface IUserService
 
     /// <summary>Gets a user by ID.</summary>
     Task<User?> GetUserByIdAsync(Guid userId);
+
+    /// <summary>Updates the user's preferred UI language (null clears it).</summary>
+    Task UpdateLocaleAsync(Guid userId, string? locale);
 }
 
 /// <summary>
@@ -194,6 +197,15 @@ public class UserService(IUserRepository repository, AppDbContext db, ILogger<Us
     }
 
     public Task<User?> GetUserByIdAsync(Guid userId) => repository.GetByIdAsync(userId);
+
+    public async Task UpdateLocaleAsync(Guid userId, string? locale)
+    {
+        var user = await repository.GetByIdAsync(userId);
+        if (user is null) return;
+        user.Locale = locale;
+        user.UpdatedAt = DateTime.UtcNow;
+        await repository.UpdateAsync(user);
+    }
 
     public async Task<LinkLoginResult> LinkLoginAsync(Guid userId, string provider, string providerUserId)
     {

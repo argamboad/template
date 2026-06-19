@@ -16,7 +16,7 @@ public interface IJwtTokenService
     /// name becomes a 'name' claim and the tenant name becomes a tenant_name claim
     /// (both surfaced in the client top bar).
     /// </summary>
-    string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null);
+    string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null);
 
     /// <summary>Validates a JWT token and returns its claims if valid.</summary>
     ClaimsPrincipal? ValidateToken(string token);
@@ -25,10 +25,11 @@ public interface IJwtTokenService
 public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> logger) : IJwtTokenService
 {
     private const string ProviderClaimName = "provider";
-    // Must match Template.Shared.Ui.Auth.AppClaims.TenantName (client reads this claim).
+    // Must match Template.Shared.Ui.Auth.AppClaims.* (the client reads these claims).
     private const string TenantNameClaim = "tenant_name";
+    private const string LocaleClaim = "locale";
 
-    public string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null)
+    public string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null)
     {
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email cannot be empty", nameof(email));
@@ -49,6 +50,8 @@ public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> log
         claims.Add(new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(displayName) ? email : displayName));
         if (!string.IsNullOrWhiteSpace(tenantName))
             claims.Add(new Claim(TenantNameClaim, tenantName));
+        if (!string.IsNullOrWhiteSpace(locale))
+            claims.Add(new Claim(LocaleClaim, locale));
 
         var token = new JwtSecurityToken(
             issuer: settings.Issuer,

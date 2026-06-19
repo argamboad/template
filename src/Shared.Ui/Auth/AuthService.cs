@@ -267,6 +267,9 @@ public class AuthService(
     /// <summary>Tenant ("household") name from the JWT.</summary>
     public string? TenantName => Claim(AppClaims.TenantName);
 
+    /// <summary>The user's saved UI locale from the JWT (e.g. "es"), or null if unset.</summary>
+    public string? Locale => Claim(AppClaims.Locale);
+
     private string? Claim(string type)
     {
         if (string.IsNullOrEmpty(_accessToken) || IsTokenExpired(_accessToken))

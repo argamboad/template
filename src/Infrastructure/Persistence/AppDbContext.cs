@@ -65,6 +65,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             u.HasKey(x => x.Id);
             u.Property(x => x.Email).HasMaxLength(256).IsRequired();
             u.Property(x => x.DisplayName).HasMaxLength(256);
+            u.Property(x => x.Locale).HasMaxLength(10);
             u.HasIndex(x => x.Email).IsUnique();
             u.HasMany(x => x.Logins)
              .WithOne(x => x.User)
