@@ -62,6 +62,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IClaimsExtractor, ClaimsExtractor>();
 builder.Services.AddScoped<IPasswordlessService, PasswordlessService>();
 builder.Services.AddScoped<ICookieService, CookieService>();

@@ -40,6 +40,12 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
     public TenantService TenantService() =>
         new(Tenants, UnitOfWork, NullLogger<TenantService>.Instance);
 
+    public JwtTokenService JwtTokenService() =>
+        new(new TestJwtSettings(), NullLogger<JwtTokenService>.Instance);
+
+    public SessionService SessionService() =>
+        new(RefreshTokenService(), JwtTokenService(), Tenants, new TestJwtSettings());
+
     public TenantInvitationService InvitationService(IInvitationSettings? invitation = null) =>
         new(Invitations, Tenants, TokenGen, Hasher, UnitOfWork, new NoopEmailSender(),
             UserService(), new TestAppSettings(), invitation ?? new TestInvitationSettings(),

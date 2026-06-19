@@ -25,7 +25,7 @@ namespace Template.Api.Controllers;
 [Route("api/auth")]
 public class AuthController(
     IUserService userService,
-    IJwtTokenService jwtTokenService,
+    ISessionService sessionService,
     IRefreshTokenService refreshTokenService,
     ICookieService cookieService,
     IClaimsExtractor claimsExtractor,
@@ -33,10 +33,8 @@ public class AuthController(
     ILinkTokenService linkTokenService,
     INativeAuthCodeService nativeAuthCodeService,
     IUserLoginRepository userLoginRepository,
-    ITenantRepository tenantRepository,
     IEmailSender emailSender,
     IErrorResponseFactory errorFactory,
-    IJwtSettings jwtSettings,
     IApplicationSettings appSettings,
     IPasswordlessSettings passwordlessSettings,
     ILogger<AuthController> logger) : ControllerBase
@@ -113,9 +111,7 @@ public class AuthController(
             var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
                 claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User));
 
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ipAddress, provider);
-
+            var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ClientIp, provider);
             cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
 
             // Sign the external carrier cookie out — its job is done.
@@ -162,30 +158,18 @@ public class AuthController(
             if (user == null)
                 return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
-            // Rotate: revoke the used token, issue a new one.
+            // Rotate: revoke the used token, then issue a fresh session.
             await refreshTokenService.RevokeRefreshTokenAsync(validToken.Id);
 
-            var (tenantId, tenantName) = await ResolveTenantAsync(user.Id);
-            var newJwt = jwtTokenService.IssueAccessToken(
-                user.Id, user.Email, validToken.Provider, user.DisplayName, tenantName, user.Locale, tenantId);
+            var session = await sessionService.IssueAsync(user, validToken.Provider, ClientIp, native);
 
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ipAddress, validToken.Provider);
-
-            // Web: rotate the cookie. Native: hand the rotated token back in the body.
+            // Web: rotate the cookie. Native: the rotated token is already on the body.
             if (!native)
-                cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
+                cookieService.SetRefreshTokenCookie(Response, session.RefreshToken, Request);
 
             logger.LogInformation("Token refreshed for user: {UserId}", validToken.UserId);
 
-            return Ok(new TokenResponse
-            {
-                AccessToken = newJwt,
-                ExpiresIn = jwtSettings.ExpiryMinutes * 60,
-                UserId = user.Id,
-                Email = user.Email,
-                RefreshToken = native ? issued.RawToken : null
-            });
+            return Ok(session.Response);
         }
         catch (Exception ex)
         {
@@ -245,7 +229,7 @@ public class AuthController(
         if (user == null)
             return Unauthorized();
 
-        var (_, tenantName) = await ResolveTenantAsync(user.Id);
+        var (_, tenantName) = await sessionService.ResolveTenantAsync(user.Id);
         return Ok(new UserProfileResponse
         {
             UserName = user.DisplayName ?? user.Email,
@@ -405,20 +389,12 @@ public class AuthController(
             return Unauthorized(errorFactory.CreateError(code, "The code is incorrect or has expired."));
         }
 
-        var refreshForBody = await EstablishSessionAsync(result.User.Id, LoginTokenPurpose.Otp);
+        var native = IsNativeClient;
+        var session = await sessionService.IssueAsync(result.User, LoginTokenPurpose.Otp, ClientIp, native);
+        if (!native)
+            cookieService.SetRefreshTokenCookie(Response, session.RefreshToken, Request);
 
-        var (tenantId, tenantName) = await ResolveTenantAsync(result.User.Id);
-        var jwt = jwtTokenService.IssueAccessToken(
-            result.User.Id, result.User.Email, LoginTokenPurpose.Otp, result.User.DisplayName, tenantName, result.User.Locale, tenantId);
-
-        return Ok(new TokenResponse
-        {
-            AccessToken = jwt,
-            ExpiresIn = jwtSettings.ExpiryMinutes * 60,
-            UserId = result.User.Id,
-            Email = result.User.Email,
-            RefreshToken = refreshForBody
-        });
+        return Ok(session.Response);
     }
 
     // ── Native (desktop/mobile) OAuth: loopback / custom-scheme code flow ─────
@@ -518,57 +494,24 @@ public class AuthController(
         if (user is null)
             return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
-        var (tenantId, tenantName) = await ResolveTenantAsync(user.Id);
-        var jwt = jwtTokenService.IssueAccessToken(
-            user.Id, user.Email, grant.Value.Provider, user.DisplayName, tenantName, user.Locale, tenantId);
-
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ip, grant.Value.Provider);
-
-        return Ok(new TokenResponse
-        {
-            AccessToken = jwt,
-            ExpiresIn = jwtSettings.ExpiryMinutes * 60,
-            UserId = user.Id,
-            Email = user.Email,
-            RefreshToken = issued.RawToken
-        });
+        // Native exchange always returns the refresh token in the body.
+        var session = await sessionService.IssueAsync(user, grant.Value.Provider, ClientIp, native: true);
+        return Ok(session.Response);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Resolves the user's tenant name via their membership (the source of truth),
-    /// for the JWT tenant_name claim and the /me profile. Null when the user has no
-    /// membership.
-    /// </summary>
-    private async Task<(Guid? Id, string? Name)> ResolveTenantAsync(Guid userId)
-    {
-        var membership = await tenantRepository.GetMembershipAsync(userId);
-        if (membership is null) return (null, null);
-        var tenant = await tenantRepository.GetByIdAsync(membership.TenantId);
-        return (membership.TenantId, tenant?.Name);
-    }
+    /// <summary>Caller IP for refresh-token auditing; "unknown" when unavailable.</summary>
+    private string ClientIp => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
+    /// <summary>
+    /// Issues a refresh token and sets it as the browser cookie — for web-only paths
+    /// (OAuth callback, magic link) where the client then calls /refresh for its JWT.
+    /// </summary>
     private async Task IssueRefreshCookieAsync(Guid userId, string provider)
     {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var issued = await refreshTokenService.IssueRefreshTokenAsync(userId, ip, provider);
+        var issued = await refreshTokenService.IssueRefreshTokenAsync(userId, ClientIp, provider);
         cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
-    }
-
-    /// <summary>
-    /// Issues a refresh token and delivers it by the caller's transport: a cookie for
-    /// the browser, or the raw token (returned here) for a native client to store.
-    /// </summary>
-    private async Task<string?> EstablishSessionAsync(Guid userId, string provider)
-    {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var issued = await refreshTokenService.IssueRefreshTokenAsync(userId, ip, provider);
-        if (IsNativeClient)
-            return issued.RawToken;
-        cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
-        return null;
     }
 
     /// <summary>True when the request comes from a native (desktop/mobile) client.</summary>
