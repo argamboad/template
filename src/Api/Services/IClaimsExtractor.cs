@@ -9,11 +9,10 @@ namespace Template.Api.Services;
 public interface IClaimsExtractor
 {
     /// <summary>
-    /// Extracts the OAuth provider, provider user ID, and email from the
-    /// claims principal. Provider is detected from the identity's
-    /// authentication type or token issuer.
+    /// Extracts the provider user ID and email from the claims principal. The provider
+    /// itself is known from the callback route, so it isn't derived here.
     /// </summary>
-    (string? Provider, string? ProviderUserId, string? Email) ExtractClaims(ClaimsPrincipal principal);
+    (string? ProviderUserId, string? Email) ExtractClaims(ClaimsPrincipal principal);
 
     /// <summary>The user's display name from the provider, when present.</summary>
     string? ExtractDisplayName(ClaimsPrincipal principal);

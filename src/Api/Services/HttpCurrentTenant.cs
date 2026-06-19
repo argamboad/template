@@ -12,7 +12,7 @@ namespace Template.Api.Services;
 public sealed class HttpCurrentTenant(IHttpContextAccessor accessor) : ICurrentTenant
 {
     public Guid? TenantId =>
-        Guid.TryParse(accessor.HttpContext?.User.FindFirst(JwtTokenService.TenantIdClaim)?.Value, out var id)
+        Guid.TryParse(accessor.HttpContext?.User.FindFirst(JwtClaims.TenantId)?.Value, out var id)
             ? id
             : null;
 }

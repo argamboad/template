@@ -24,14 +24,8 @@ public interface IJwtTokenService
 
 public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> logger) : IJwtTokenService
 {
-    private const string ProviderClaimName = "provider";
-    // Must match Template.Shared.Ui.Auth.AppClaims.* (the client reads these claims).
-    private const string TenantNameClaim = "tenant_name";
-    private const string LocaleClaim = "locale";
-
-    /// <summary>The caller's tenant id. Read server-side by the current-tenant accessor
-    /// to drive tenant query scoping; not consumed by the web client.</summary>
-    public const string TenantIdClaim = "tenant_id";
+    /// <summary>Alias for <see cref="JwtClaims.TenantId"/>, kept for call-site readability.</summary>
+    public const string TenantIdClaim = JwtClaims.TenantId;
 
     public string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null)
     {
@@ -47,17 +41,17 @@ public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> log
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
             new(ClaimTypes.Email, email),
-            new(ProviderClaimName, provider),
+            new(JwtClaims.Provider, provider),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
         // ClaimTypes.Name drives the client's display name; fall back to email.
         claims.Add(new Claim(ClaimTypes.Name, string.IsNullOrWhiteSpace(displayName) ? email : displayName));
         if (!string.IsNullOrWhiteSpace(tenantName))
-            claims.Add(new Claim(TenantNameClaim, tenantName));
+            claims.Add(new Claim(JwtClaims.TenantName, tenantName));
         if (!string.IsNullOrWhiteSpace(locale))
-            claims.Add(new Claim(LocaleClaim, locale));
+            claims.Add(new Claim(JwtClaims.Locale, locale));
         if (tenantId is { } tid)
-            claims.Add(new Claim(TenantIdClaim, tid.ToString()));
+            claims.Add(new Claim(JwtClaims.TenantId, tid.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: settings.Issuer,

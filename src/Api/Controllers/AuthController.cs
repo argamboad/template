@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authentication.Google;
-using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -39,7 +37,6 @@ public class AuthController(
     IPasswordlessSettings passwordlessSettings,
     ILogger<AuthController> logger) : ControllerBase
 {
-    private static readonly string[] SupportedProviders = ["microsoft", "google"];
     private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
 
     /// <summary>
@@ -57,12 +54,10 @@ public class AuthController(
             : $"/api/auth/callback/{provider}?link_token={Uri.EscapeDataString(linkToken)}";
         var properties = new AuthenticationProperties { RedirectUri = redirectUri };
 
-        return provider switch
-        {
-            "google" => Challenge(properties, GoogleDefaults.AuthenticationScheme),
-            "microsoft" => Challenge(properties, MicrosoftAccountDefaults.AuthenticationScheme),
-            _ => Redirect($"{appSettings.ClientUrl}/auth-error")
-        };
+        var scheme = AuthProviders.SchemeFor(provider);
+        return scheme is null
+            ? Redirect($"{appSettings.ClientUrl}/auth-error")
+            : Challenge(properties, scheme);
     }
 
     /// <summary>
@@ -78,13 +73,13 @@ public class AuthController(
         try
         {
             provider = provider.ToLowerInvariant();
-            if (!SupportedProviders.Contains(provider))
+            if (!AuthProviders.IsSupported(provider))
             {
                 logger.LogWarning("OAuth callback for unsupported provider: {Provider}", provider);
                 return Redirect($"{appSettings.ClientUrl}/auth-error");
             }
 
-            var (_, providerUserId, email) = claimsExtractor.ExtractClaims(User);
+            var (providerUserId, email) = claimsExtractor.ExtractClaims(User);
 
             if (string.IsNullOrEmpty(providerUserId) || string.IsNullOrEmpty(email))
             {
@@ -280,7 +275,7 @@ public class AuthController(
     public IActionResult StartLink(string provider)
     {
         provider = provider.ToLowerInvariant();
-        if (!SupportedProviders.Contains(provider))
+        if (!AuthProviders.IsSupported(provider))
             return BadRequest(errorFactory.CreateError("unsupported_provider", "Unknown provider."));
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
@@ -409,7 +404,7 @@ public class AuthController(
         [FromQuery(Name = "link_token")] string? linkToken = null)
     {
         provider = provider.ToLowerInvariant();
-        if (!SupportedProviders.Contains(provider) || !IsAllowedNativeRedirect(redirect))
+        if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
             return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
 
         var callback = $"/api/auth/native/callback/{provider}?redirect={Uri.EscapeDataString(redirect)}";
@@ -417,12 +412,10 @@ public class AuthController(
             callback += $"&link_token={Uri.EscapeDataString(linkToken)}";
         var properties = new AuthenticationProperties { RedirectUri = callback };
 
-        return provider switch
-        {
-            "google" => Challenge(properties, GoogleDefaults.AuthenticationScheme),
-            "microsoft" => Challenge(properties, MicrosoftAccountDefaults.AuthenticationScheme),
-            _ => BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider."))
-        };
+        var scheme = AuthProviders.SchemeFor(provider);
+        return scheme is null
+            ? BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider."))
+            : Challenge(properties, scheme);
     }
 
     /// <summary>
@@ -438,10 +431,10 @@ public class AuthController(
         provider = provider.ToLowerInvariant();
         try
         {
-            if (!SupportedProviders.Contains(provider) || !IsAllowedNativeRedirect(redirect))
+            if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
                 return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
 
-            var (_, providerUserId, email) = claimsExtractor.ExtractClaims(User);
+            var (providerUserId, email) = claimsExtractor.ExtractClaims(User);
             await HttpContext.SignOutAsync(ServiceCollectionExtensions.ExternalScheme);
 
             if (string.IsNullOrEmpty(providerUserId) || string.IsNullOrEmpty(email))
@@ -515,7 +508,7 @@ public class AuthController(
     }
 
     /// <summary>True when the request comes from a native (desktop/mobile) client.</summary>
-    private bool IsNativeClient => Request.Headers["X-Native-Client"] == "true";
+    private bool IsNativeClient => Request.Headers[AuthHeaders.NativeClient] == AuthHeaders.NativeClientValue;
 
     /// <summary>
     /// Whether the native client's redirect target is permitted. Loopback HTTP
