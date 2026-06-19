@@ -26,20 +26,20 @@ public class HouseholdInvitationsController(
     private bool TryGetUserId(out Guid userId) =>
         Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out userId);
 
-    private async Task<TenantMembership?> GetMembershipAsync() =>
-        TryGetUserId(out var uid) ? await tenants.GetMembershipAsync(uid) : null;
+    private async Task<TenantMembership?> GetMembershipAsync(CancellationToken cancellationToken = default) =>
+        TryGetUserId(out var uid) ? await tenants.GetMembershipAsync(uid, cancellationToken) : null;
 
     /// <summary>Creates an invitation (owner only). Returns the raw token once and emails it.</summary>
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateInvitationRequest request)
+    public async Task<IActionResult> Create([FromBody] CreateInvitationRequest request, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can invite members");
 
-        var result = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "");
+        var result = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "", cancellationToken);
         return result.Status switch
         {
             InviteCreateStatus.Created => Created(
@@ -53,29 +53,29 @@ public class HouseholdInvitationsController(
 
     /// <summary>Lists the tenant's pending invitations (owner only). Token is not returned.</summary>
     [HttpGet]
-    public async Task<IActionResult> GetPending()
+    public async Task<IActionResult> GetPending(CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can view invitations");
 
-        var pending = await service.GetPendingAsync(membership.TenantId);
+        var pending = await service.GetPendingAsync(membership.TenantId, cancellationToken);
         return Ok((IReadOnlyList<InvitationResponse>)pending.Select(InvitationResponse.From).ToList());
     }
 
     /// <summary>Regenerates the token for a pending invitation (owner only). Issues a new raw token once.</summary>
     [HttpPost("{id:guid}/regenerate")]
-    public async Task<IActionResult> Regenerate(Guid id)
+    public async Task<IActionResult> Regenerate(Guid id, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can regenerate invitation tokens");
 
-        var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId);
+        var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId, cancellationToken);
         return result.Status switch
         {
             InviteRegenerateStatus.Regenerated => Ok(
@@ -89,15 +89,15 @@ public class HouseholdInvitationsController(
 
     /// <summary>Revokes a pending invitation (owner only).</summary>
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Revoke(Guid id)
+    public async Task<IActionResult> Revoke(Guid id, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can revoke invitations");
 
-        var found = await service.RevokeAsync(membership.TenantId, id);
+        var found = await service.RevokeAsync(membership.TenantId, id, cancellationToken);
         return found
             ? NoContent()
             : NotFound(errorFactory.CreateError("invitation_not_found", "Invitation not found"));
@@ -105,12 +105,12 @@ public class HouseholdInvitationsController(
 
     /// <summary>Accepts an invitation by token, joining the tenant (any member).</summary>
     [HttpPost("accept")]
-    public async Task<IActionResult> Accept([FromBody] AcceptInvitationRequest request)
+    public async Task<IActionResult> Accept([FromBody] AcceptInvitationRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId))
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
 
-        var status = await service.AcceptAsync(userId, request.Token ?? "");
+        var status = await service.AcceptAsync(userId, request.Token ?? "", cancellationToken);
         return status switch
         {
             AcceptStatus.Joined => NoContent(),

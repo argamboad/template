@@ -12,10 +12,10 @@ public record IssuedRefreshToken(string RawToken, RefreshToken Token);
 
 public interface IRefreshTokenService
 {
-    Task<IssuedRefreshToken> IssueRefreshTokenAsync(Guid userId, string ipAddress, string provider);
-    Task<RefreshToken?> ValidateRefreshTokenAsync(string rawToken);
-    Task RevokeRefreshTokenAsync(Guid tokenId);
-    Task RevokeAllUserTokensAsync(Guid userId);
+    Task<IssuedRefreshToken> IssueRefreshTokenAsync(Guid userId, string ipAddress, string provider, CancellationToken cancellationToken = default);
+    Task<RefreshToken?> ValidateRefreshTokenAsync(string rawToken, CancellationToken cancellationToken = default);
+    Task RevokeRefreshTokenAsync(Guid tokenId, CancellationToken cancellationToken = default);
+    Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -28,7 +28,7 @@ public class RefreshTokenService(
     ITokenHasher tokenHasher,
     IRefreshTokenSettings settings) : IRefreshTokenService
 {
-    public async Task<IssuedRefreshToken> IssueRefreshTokenAsync(Guid userId, string ipAddress, string provider)
+    public async Task<IssuedRefreshToken> IssueRefreshTokenAsync(Guid userId, string ipAddress, string provider, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(ipAddress))
             ipAddress = "unknown";
@@ -50,20 +50,20 @@ public class RefreshTokenService(
             Provider = provider
         };
 
-        var created = await repository.CreateAsync(refreshToken);
+        var created = await repository.CreateAsync(refreshToken, cancellationToken);
         return new IssuedRefreshToken(rawToken, created);
     }
 
-    public async Task<RefreshToken?> ValidateRefreshTokenAsync(string rawToken)
+    public async Task<RefreshToken?> ValidateRefreshTokenAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(rawToken))
             return null;
 
         var tokenHash = tokenHasher.HashToken(rawToken);
-        return await repository.GetValidTokenByHashAsync(tokenHash);
+        return await repository.GetValidTokenByHashAsync(tokenHash, cancellationToken);
     }
 
-    public Task RevokeRefreshTokenAsync(Guid tokenId) => repository.RevokeAsync(tokenId);
+    public Task RevokeRefreshTokenAsync(Guid tokenId, CancellationToken cancellationToken = default) => repository.RevokeAsync(tokenId, cancellationToken);
 
-    public Task RevokeAllUserTokensAsync(Guid userId) => repository.RevokeAllForUserAsync(userId);
+    public Task RevokeAllUserTokensAsync(Guid userId, CancellationToken cancellationToken = default) => repository.RevokeAllForUserAsync(userId, cancellationToken);
 }

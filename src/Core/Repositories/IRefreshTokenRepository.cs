@@ -8,8 +8,8 @@ namespace Template.Core.Repositories;
 /// </summary>
 public interface IRefreshTokenRepository
 {
-    Task<RefreshToken> CreateAsync(RefreshToken token);
-    Task<RefreshToken?> GetValidTokenByHashAsync(string tokenHash);
-    Task RevokeAsync(Guid tokenId);
-    Task RevokeAllForUserAsync(Guid userId);
+    Task<RefreshToken> CreateAsync(RefreshToken token, CancellationToken cancellationToken = default);
+    Task<RefreshToken?> GetValidTokenByHashAsync(string tokenHash, CancellationToken cancellationToken = default);
+    Task RevokeAsync(Guid tokenId, CancellationToken cancellationToken = default);
+    Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 }

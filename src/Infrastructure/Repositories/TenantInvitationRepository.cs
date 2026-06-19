@@ -8,26 +8,26 @@ namespace Template.Infrastructure.Repositories;
 /// <summary>EF Core implementation of <see cref="ITenantInvitationRepository"/>.</summary>
 public class TenantInvitationRepository(AppDbContext db) : ITenantInvitationRepository
 {
-    public async Task<TenantInvitation> CreateAsync(TenantInvitation invitation)
+    public async Task<TenantInvitation> CreateAsync(TenantInvitation invitation, CancellationToken cancellationToken = default)
     {
         db.TenantInvitations.Add(invitation);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return invitation;
     }
 
     // Unscoped by design: fetches across tenants so the service can treat a
     // cross-tenant id as "not found" after an explicit TenantId check. Bypasses the
     // global tenant filter.
-    public async Task<TenantInvitation?> GetByIdUnscopedAsync(Guid id) =>
-        await db.TenantInvitations.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.Id == id);
+    public async Task<TenantInvitation?> GetByIdUnscopedAsync(Guid id, CancellationToken cancellationToken = default) =>
+        await db.TenantInvitations.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.Id == id, cancellationToken);
 
-    public async Task<List<TenantInvitation>> GetPendingForTenantAsync(Guid tenantId) =>
+    public async Task<List<TenantInvitation>> GetPendingForTenantAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
         await db.TenantInvitations
             .Where(i => i.TenantId == tenantId && i.Status == InvitationStatuses.Pending)
             .OrderByDescending(i => i.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
-    public async Task<TenantInvitation?> GetPendingByEmailAsync(Guid tenantId, string email)
+    public async Task<TenantInvitation?> GetPendingByEmailAsync(Guid tenantId, string email, CancellationToken cancellationToken = default)
     {
         // InvitedEmail is stored normalized; normalize the input in C# and compare directly
         // (no per-row SQL ToLower(), which is culture-dependent and index-defeating).
@@ -35,15 +35,15 @@ public class TenantInvitationRepository(AppDbContext db) : ITenantInvitationRepo
         return await db.TenantInvitations.FirstOrDefaultAsync(i =>
             i.TenantId == tenantId
             && i.Status == InvitationStatuses.Pending
-            && i.InvitedEmail == normalized);
+            && i.InvitedEmail == normalized, cancellationToken);
     }
 
     // Pre-membership lookup: the accepting user is not yet in the invitation's tenant
     // (their JWT still carries their old tenant), so this must bypass the tenant filter.
-    public async Task<TenantInvitation?> GetByTokenHashAsync(string tokenHash) =>
-        await db.TenantInvitations.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.TokenHash == tokenHash);
+    public async Task<TenantInvitation?> GetByTokenHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+        await db.TenantInvitations.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.TokenHash == tokenHash, cancellationToken);
 
-    public async Task<bool> TryAcceptAsync(Guid id)
+    public async Task<bool> TryAcceptAsync(Guid id, CancellationToken cancellationToken = default)
     {
         // EF InMemory doesn't support ExecuteUpdateAsync; fall back to a tracked entity
         // update. Unit tests are single-threaded so there is no concurrency risk there.
@@ -52,10 +52,10 @@ public class TenantInvitationRepository(AppDbContext db) : ITenantInvitationRepo
         if (!db.Database.IsRelational())
         {
             var inv = await db.TenantInvitations.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(i => i.Id == id && i.Status == InvitationStatuses.Pending);
+                .FirstOrDefaultAsync(i => i.Id == id && i.Status == InvitationStatuses.Pending, cancellationToken);
             if (inv is null) return false;
             inv.Status = InvitationStatuses.Accepted;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
             return true;
         }
 
@@ -63,14 +63,14 @@ public class TenantInvitationRepository(AppDbContext db) : ITenantInvitationRepo
         // concurrent second accept finds 0 rows to update and loses the race.
         var affected = await db.TenantInvitations.IgnoreQueryFilters()
             .Where(i => i.Id == id && i.Status == InvitationStatuses.Pending)
-            .ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, InvitationStatuses.Accepted));
+            .ExecuteUpdateAsync(s => s.SetProperty(i => i.Status, InvitationStatuses.Accepted), cancellationToken);
         return affected == 1;
     }
 
-    public async Task<TenantInvitation> UpdateAsync(TenantInvitation invitation)
+    public async Task<TenantInvitation> UpdateAsync(TenantInvitation invitation, CancellationToken cancellationToken = default)
     {
         db.TenantInvitations.Update(invitation);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return invitation;
     }
 }

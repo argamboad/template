@@ -7,7 +7,7 @@ namespace Template.Core.Repositories;
 /// </summary>
 public interface IUserLoginRepository
 {
-    Task<List<UserLogin>> GetForUserAsync(Guid userId);
-    Task<UserLogin?> GetByProviderForUserAsync(Guid userId, string provider);
-    Task DeleteAsync(UserLogin login);
+    Task<List<UserLogin>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UserLogin?> GetByProviderForUserAsync(Guid userId, string provider, CancellationToken cancellationToken = default);
+    Task DeleteAsync(UserLogin login, CancellationToken cancellationToken = default);
 }

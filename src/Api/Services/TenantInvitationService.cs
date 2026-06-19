@@ -28,21 +28,21 @@ public interface ITenantInvitationService
     /// <summary>Creates (or refreshes an existing pending) invitation. The caller has
     /// already been verified as the tenant's owner. Emails the invite and returns the
     /// saved invitation plus the raw token (one-time reveal — not stored).</summary>
-    Task<InviteCreateResult> CreateAsync(Guid tenantId, Guid inviterUserId, string email);
+    Task<InviteCreateResult> CreateAsync(Guid tenantId, Guid inviterUserId, string email, CancellationToken cancellationToken = default);
 
-    Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId);
+    Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
     /// <summary>Revokes the old hash and issues a fresh token for an existing pending invite.
     /// Emails the new invite and returns the saved invitation plus the new raw token.</summary>
-    Task<InviteRegenerateResult> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId);
+    Task<InviteRegenerateResult> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>Revokes a pending invite owned by the tenant. False = not found for this
     /// tenant (controller → 404).</summary>
-    Task<bool> RevokeAsync(Guid tenantId, Guid invitationId);
+    Task<bool> RevokeAsync(Guid tenantId, Guid invitationId, CancellationToken cancellationToken = default);
 
     /// <summary>Redeems a token for the signed-in user, moving their membership to the
     /// inviting tenant.</summary>
-    Task<AcceptStatus> AcceptAsync(Guid userId, string token);
+    Task<AcceptStatus> AcceptAsync(Guid userId, string token, CancellationToken cancellationToken = default);
 }
 
 public class TenantInvitationService(
@@ -60,7 +60,7 @@ public class TenantInvitationService(
 {
     private TimeSpan InvitationTtl => TimeSpan.FromDays(invitationSettings.LifespanDays);
 
-    public async Task<InviteCreateResult> CreateAsync(Guid tenantId, Guid inviterUserId, string email)
+    public async Task<InviteCreateResult> CreateAsync(Guid tenantId, Guid inviterUserId, string email, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(email) || !MailAddress.TryCreate(email.Trim(), out _))
             return new InviteCreateResult(InviteCreateStatus.InvalidEmail);
@@ -68,7 +68,7 @@ public class TenantInvitationService(
         var normalized = email.Trim().ToLowerInvariant();
 
         // Can't invite someone who's already a member of this tenant.
-        if (await tenants.IsEmailMemberAsync(tenantId, normalized))
+        if (await tenants.IsEmailMemberAsync(tenantId, normalized, cancellationToken))
             return new InviteCreateResult(InviteCreateStatus.AlreadyMember);
 
         var now = clock.GetUtcNow();
@@ -76,7 +76,7 @@ public class TenantInvitationService(
         var tokenHash = tokenHasher.HashToken(rawToken);
 
         // A pending invite for the same (tenant, email) is refreshed, not duplicated.
-        var existing = await invitations.GetPendingByEmailAsync(tenantId, normalized);
+        var existing = await invitations.GetPendingByEmailAsync(tenantId, normalized, cancellationToken);
         TenantInvitation invitation;
         if (existing != null)
         {
@@ -84,7 +84,7 @@ public class TenantInvitationService(
             existing.InvitedByUserId = inviterUserId;
             existing.CreatedAt = now;
             existing.ExpiresAt = now + InvitationTtl;
-            await invitations.UpdateAsync(existing);
+            await invitations.UpdateAsync(existing, cancellationToken);
             logger.LogInformation("Refreshed pending invitation {Id} for tenant {TenantId}", existing.Id, tenantId);
             invitation = existing;
         }
@@ -100,17 +100,17 @@ public class TenantInvitationService(
                 TokenHash = tokenHash,
                 CreatedAt = now,
                 ExpiresAt = now + InvitationTtl
-            });
+            }, cancellationToken);
             logger.LogInformation("Created invitation {Id} for tenant {TenantId}", invitation.Id, tenantId);
         }
 
-        await SendInvitationEmailAsync(normalized, rawToken, inviterUserId);
+        await SendInvitationEmailAsync(normalized, rawToken, inviterUserId, cancellationToken);
         return new InviteCreateResult(InviteCreateStatus.Created, invitation, rawToken);
     }
 
-    public async Task<InviteRegenerateResult> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId)
+    public async Task<InviteRegenerateResult> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId, CancellationToken cancellationToken = default)
     {
-        var invitation = await invitations.GetByIdUnscopedAsync(invitationId);
+        var invitation = await invitations.GetByIdUnscopedAsync(invitationId, cancellationToken);
         // Cross-tenant treated as not-found — no existence oracle on opaque IDs.
         if (invitation == null || invitation.TenantId != tenantId)
             return new InviteRegenerateResult(InviteRegenerateStatus.NotFound);
@@ -123,39 +123,39 @@ public class TenantInvitationService(
         invitation.InvitedByUserId = userId;
         invitation.CreatedAt = now;
         invitation.ExpiresAt = now + InvitationTtl;
-        await invitations.UpdateAsync(invitation);
+        await invitations.UpdateAsync(invitation, cancellationToken);
         logger.LogInformation("Regenerated token for invitation {Id} (tenant {TenantId})", invitation.Id, tenantId);
 
-        await SendInvitationEmailAsync(invitation.InvitedEmail, rawToken, userId);
+        await SendInvitationEmailAsync(invitation.InvitedEmail, rawToken, userId, cancellationToken);
         return new InviteRegenerateResult(InviteRegenerateStatus.Regenerated, invitation, rawToken);
     }
 
-    public Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId) =>
-        invitations.GetPendingForTenantAsync(tenantId);
+    public Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        invitations.GetPendingForTenantAsync(tenantId, cancellationToken);
 
-    public async Task<bool> RevokeAsync(Guid tenantId, Guid invitationId)
+    public async Task<bool> RevokeAsync(Guid tenantId, Guid invitationId, CancellationToken cancellationToken = default)
     {
-        var invitation = await invitations.GetByIdUnscopedAsync(invitationId);
+        var invitation = await invitations.GetByIdUnscopedAsync(invitationId, cancellationToken);
         // Cross-tenant treated as not-found — no existence oracle on opaque IDs.
         if (invitation == null || invitation.TenantId != tenantId) return false;
 
         if (invitation.Status == InvitationStatuses.Pending)
         {
             invitation.Status = InvitationStatuses.Revoked;
-            await invitations.UpdateAsync(invitation);
+            await invitations.UpdateAsync(invitation, cancellationToken);
             logger.LogInformation("Revoked invitation {Id}", invitationId);
         }
         return true;
     }
 
-    public async Task<AcceptStatus> AcceptAsync(Guid userId, string token)
+    public async Task<AcceptStatus> AcceptAsync(Guid userId, string token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token))
             return AcceptStatus.InvalidToken;
 
         // Hash the presented token before lookup; never compare raw values.
         var tokenHash = tokenHasher.HashToken(token);
-        var invitation = await invitations.GetByTokenHashAsync(tokenHash);
+        var invitation = await invitations.GetByTokenHashAsync(tokenHash, cancellationToken);
         var now = clock.GetUtcNow();
 
         // Unknown / revoked / accepted / past-expiry → invalid (don't leak which).
@@ -164,7 +164,7 @@ public class TenantInvitationService(
             || invitation.ExpiresAt <= now)
             return AcceptStatus.InvalidToken;
 
-        var membership = await tenants.GetMembershipAsync(userId);
+        var membership = await tenants.GetMembershipAsync(userId, cancellationToken);
         if (membership is null)
             return AcceptStatus.NoHousehold;
 
@@ -172,7 +172,7 @@ public class TenantInvitationService(
             return AcceptStatus.AlreadyMember;
 
         var oldTenantId = membership.TenantId;
-        var members = await tenants.GetMembersAsync(oldTenantId);
+        var members = await tenants.GetMembersAsync(oldTenantId, cancellationToken);
         var isOwner = string.Equals(membership.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase);
         var soloOwner = isOwner && members.Count == 1;
 
@@ -184,42 +184,42 @@ public class TenantInvitationService(
         var dissolveOld = false;
         if (soloOwner)
         {
-            if (await tenants.HasDataAsync(oldTenantId))
+            if (await tenants.HasDataAsync(oldTenantId, cancellationToken))
                 return AcceptStatus.WouldAbandonData;
             dissolveOld = true; // empty solo tenant-of-one is dissolved on join
         }
 
         // Move membership + consume token + dissolve old solo tenant atomically.
-        await using var scope = await unitOfWork.BeginTransactionAsync();
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
 
         membership.TenantId = invitation.TenantId;
         membership.Role = TenantRoles.Member;
         membership.JoinedAt = now;
-        await tenants.UpdateMemberAsync(membership);
+        await tenants.UpdateMemberAsync(membership, cancellationToken);
 
         // Conditional flip — only one concurrent accept can update the row. If another
         // accept already won the race, the scope disposes without CommitAsync and the
         // membership move rolls back.
-        if (!await invitations.TryAcceptAsync(invitation.Id))
+        if (!await invitations.TryAcceptAsync(invitation.Id, cancellationToken))
             return AcceptStatus.InvalidToken;
 
         if (dissolveOld)
-            await tenants.DeleteTenantAsync(oldTenantId);
+            await tenants.DeleteTenantAsync(oldTenantId, cancellationToken);
 
-        await scope.CommitAsync();
+        await scope.CommitAsync(cancellationToken);
 
         logger.LogInformation("User {UserId} accepted invitation {Id} -> tenant {TenantId}",
             userId, invitation.Id, invitation.TenantId);
         return AcceptStatus.Joined;
     }
 
-    private async Task SendInvitationEmailAsync(string email, string rawToken, Guid inviterUserId)
+    private async Task SendInvitationEmailAsync(string email, string rawToken, Guid inviterUserId, CancellationToken cancellationToken = default)
     {
         var joinUrl = $"{appSettings.ClientUrl}/join?token={Uri.EscapeDataString(rawToken)}";
         try
         {
             // Invites go out in the inviter's saved language (the recipient may have no account).
-            var inviter = await userService.GetUserByIdAsync(inviterUserId);
+            var inviter = await userService.GetUserByIdAsync(inviterUserId, cancellationToken);
             var emailBody = BrandedEmail.Invitation(joinUrl, rawToken, BrandedEmail.ResolveCulture(inviter?.Locale));
             await emailSender.SendAsync(email, emailBody.Subject, emailBody.Html, emailBody.InlineImages);
         }

@@ -27,10 +27,10 @@ public interface ISessionService
     /// body; false leaves the body token null (the caller sets the cookie from
     /// <see cref="AccessSession.RefreshToken"/>).
     /// </summary>
-    Task<AccessSession> IssueAsync(User user, string provider, string ipAddress, bool native);
+    Task<AccessSession> IssueAsync(User user, string provider, string ipAddress, bool native, CancellationToken cancellationToken = default);
 
     /// <summary>Resolves the user's tenant id + name via their membership (null when none).</summary>
-    Task<(Guid? Id, string? Name)> ResolveTenantAsync(Guid userId);
+    Task<(Guid? Id, string? Name)> ResolveTenantAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
 public class SessionService(
@@ -39,10 +39,10 @@ public class SessionService(
     ITenantRepository tenants,
     IJwtSettings jwtSettings) : ISessionService
 {
-    public async Task<AccessSession> IssueAsync(User user, string provider, string ipAddress, bool native)
+    public async Task<AccessSession> IssueAsync(User user, string provider, string ipAddress, bool native, CancellationToken cancellationToken = default)
     {
-        var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ipAddress, provider);
-        var (tenantId, tenantName) = await ResolveTenantAsync(user.Id);
+        var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ipAddress, provider, cancellationToken);
+        var (tenantId, tenantName) = await ResolveTenantAsync(user.Id, cancellationToken);
 
         var accessToken = jwtTokenService.IssueAccessToken(
             user.Id, user.Email, provider, user.DisplayName, tenantName, user.Locale, tenantId);
@@ -59,11 +59,11 @@ public class SessionService(
         return new AccessSession(response, issued.RawToken);
     }
 
-    public async Task<(Guid? Id, string? Name)> ResolveTenantAsync(Guid userId)
+    public async Task<(Guid? Id, string? Name)> ResolveTenantAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var membership = await tenants.GetMembershipAsync(userId);
+        var membership = await tenants.GetMembershipAsync(userId, cancellationToken);
         if (membership is null) return (null, null);
-        var tenant = await tenants.GetByIdAsync(membership.TenantId);
+        var tenant = await tenants.GetByIdAsync(membership.TenantId, cancellationToken);
         return (membership.TenantId, tenant?.Name);
     }
 }

@@ -11,41 +11,41 @@ namespace Template.Infrastructure.Repositories;
 /// </summary>
 public class UserRepository(AppDbContext db) : IUserRepository
 {
-    public async Task<User?> GetByLoginAsync(string provider, string providerUserId)
+    public async Task<User?> GetByLoginAsync(string provider, string providerUserId, CancellationToken cancellationToken = default)
     {
         return await db.UserLogins
             .Where(l => l.Provider == provider && l.ProviderUserId == providerUserId)
             .Select(l => l.User)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<User?> GetByEmailAsync(string email)
+    public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        return await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        return await db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
     }
 
-    public async Task<User?> GetByIdAsync(Guid userId)
+    public async Task<User?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        return await db.Users.FindAsync(userId);
+        return await db.Users.FindAsync([userId], cancellationToken);
     }
 
-    public async Task<User> CreateAsync(User user)
+    public async Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
         db.Users.Add(user);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return user;
     }
 
-    public async Task<User> UpdateAsync(User user)
+    public async Task<User> UpdateAsync(User user, CancellationToken cancellationToken = default)
     {
         db.Users.Update(user);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return user;
     }
 
-    public async Task AddLoginAsync(UserLogin login)
+    public async Task AddLoginAsync(UserLogin login, CancellationToken cancellationToken = default)
     {
         db.UserLogins.Add(login);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

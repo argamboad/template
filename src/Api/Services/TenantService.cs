@@ -27,20 +27,20 @@ public enum LeaveOutcome
 public interface ITenantService
 {
     /// <summary>Renames the tenant. False when it doesn't exist.</summary>
-    Task<bool> RenameAsync(Guid tenantId, string name);
+    Task<bool> RenameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Removes a member from the tenant and lands them in a fresh tenant-of-one
     /// (owner) so they are never tenant-less. Their contributed data stays with
     /// the tenant.
     /// </summary>
-    Task<RemoveMemberResult> RemoveMemberAsync(Guid tenantId, Guid targetUserId);
+    Task<RemoveMemberResult> RemoveMemberAsync(Guid tenantId, Guid targetUserId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Transfers ownership to an existing member — the target becomes owner, the
     /// caller becomes member, in one transaction (single-owner invariant).
     /// </summary>
-    Task<TransferResult> TransferOwnershipAsync(Guid tenantId, Guid currentOwnerUserId, Guid targetUserId);
+    Task<TransferResult> TransferOwnershipAsync(Guid tenantId, Guid currentOwnerUserId, Guid targetUserId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Leaves the caller's tenant. A non-owner member leaves (data stays); an owner
@@ -49,7 +49,7 @@ public interface ITenantService
     /// <paramref name="confirmDissolve"/> (else <see cref="LeaveOutcome.ConfirmationRequired"/>).
     /// In every non-refused case the user lands in a fresh empty tenant-of-one.
     /// </summary>
-    Task<LeaveOutcome> LeaveAsync(Guid userId, bool confirmDissolve);
+    Task<LeaveOutcome> LeaveAsync(Guid userId, bool confirmDissolve, CancellationToken cancellationToken = default);
 }
 
 public class TenantService(
@@ -60,58 +60,58 @@ public class TenantService(
     // The tenant a re-homed user lands in (UI label is "Household").
     private const string ReHomeTenantName = "My Household";
 
-    public async Task<bool> RenameAsync(Guid tenantId, string name)
+    public async Task<bool> RenameAsync(Guid tenantId, string name, CancellationToken cancellationToken = default)
     {
-        var tenant = await tenants.GetByIdAsync(tenantId);
+        var tenant = await tenants.GetByIdAsync(tenantId, cancellationToken);
         if (tenant == null) return false;
         tenant.Name = name.Trim();
-        await tenants.UpdateTenantAsync(tenant);
+        await tenants.UpdateTenantAsync(tenant, cancellationToken);
         logger.LogInformation("Tenant {TenantId} renamed", tenantId);
         return true;
     }
 
-    public async Task<RemoveMemberResult> RemoveMemberAsync(Guid tenantId, Guid targetUserId)
+    public async Task<RemoveMemberResult> RemoveMemberAsync(Guid tenantId, Guid targetUserId, CancellationToken cancellationToken = default)
     {
-        var membership = await tenants.GetMembershipAsync(targetUserId);
+        var membership = await tenants.GetMembershipAsync(targetUserId, cancellationToken);
         if (membership == null || membership.TenantId != tenantId)
             return RemoveMemberResult.NotAMember;
 
         // Drop the membership and re-home the user atomically.
-        await using var scope = await unitOfWork.BeginTransactionAsync();
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
 
-        await tenants.RemoveMemberAsync(membership);
-        await ReHomeAsync(targetUserId);
-        await scope.CommitAsync();
+        await tenants.RemoveMemberAsync(membership, cancellationToken);
+        await ReHomeAsync(targetUserId, cancellationToken);
+        await scope.CommitAsync(cancellationToken);
 
         logger.LogInformation("Member {UserId} removed from tenant {TenantId}; re-homed",
             targetUserId, tenantId);
         return RemoveMemberResult.Removed;
     }
 
-    public async Task<TransferResult> TransferOwnershipAsync(Guid tenantId, Guid currentOwnerUserId, Guid targetUserId)
+    public async Task<TransferResult> TransferOwnershipAsync(Guid tenantId, Guid currentOwnerUserId, Guid targetUserId, CancellationToken cancellationToken = default)
     {
-        var members = await tenants.GetMembersAsync(tenantId);
+        var members = await tenants.GetMembersAsync(tenantId, cancellationToken);
         if (members.All(m => m.UserId != targetUserId)) return TransferResult.TargetNotMember;
 
         // Conditional update guards the single-owner invariant under concurrency.
-        await using var scope = await unitOfWork.BeginTransactionAsync();
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
 
-        if (!await tenants.TryTransferOwnershipAsync(tenantId, currentOwnerUserId, targetUserId))
+        if (!await tenants.TryTransferOwnershipAsync(tenantId, currentOwnerUserId, targetUserId, cancellationToken))
             return TransferResult.ConcurrentModification;
 
-        await scope.CommitAsync();
+        await scope.CommitAsync(cancellationToken);
 
         logger.LogInformation("Tenant {TenantId} ownership transferred {From} -> {To}",
             tenantId, currentOwnerUserId, targetUserId);
         return TransferResult.Transferred;
     }
 
-    public async Task<LeaveOutcome> LeaveAsync(Guid userId, bool confirmDissolve)
+    public async Task<LeaveOutcome> LeaveAsync(Guid userId, bool confirmDissolve, CancellationToken cancellationToken = default)
     {
-        var membership = await tenants.GetMembershipAsync(userId)
+        var membership = await tenants.GetMembershipAsync(userId, cancellationToken)
             ?? throw new InvalidOperationException("User has no tenant");
         var tenantId = membership.TenantId;
-        var members = await tenants.GetMembersAsync(tenantId);
+        var members = await tenants.GetMembersAsync(tenantId, cancellationToken);
 
         // Sole member (necessarily the owner) → dissolution.
         if (members.Count == 1)
@@ -119,10 +119,10 @@ public class TenantService(
             if (!confirmDissolve) return LeaveOutcome.ConfirmationRequired;
 
             // Wipe + re-home atomically — a partial wipe is impossible.
-            await using var scope = await unitOfWork.BeginTransactionAsync();
-            await tenants.WipeDataAsync(tenantId);
-            await ReHomeAsync(userId);
-            await scope.CommitAsync();
+            await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            await tenants.WipeDataAsync(tenantId, cancellationToken);
+            await ReHomeAsync(userId, cancellationToken);
+            await scope.CommitAsync(cancellationToken);
 
             logger.LogInformation("Tenant {TenantId} dissolved by sole owner {UserId}", tenantId, userId);
             return LeaveOutcome.Dissolved;
@@ -133,11 +133,11 @@ public class TenantService(
             return LeaveOutcome.MustTransferFirst;
 
         // Non-owner member leaves; the tenant + its data stay.
-        await using (var scope = await unitOfWork.BeginTransactionAsync())
+        await using (var scope = await unitOfWork.BeginTransactionAsync(cancellationToken))
         {
-            await tenants.RemoveMemberAsync(membership);
-            await ReHomeAsync(userId);
-            await scope.CommitAsync();
+            await tenants.RemoveMemberAsync(membership, cancellationToken);
+            await ReHomeAsync(userId, cancellationToken);
+            await scope.CommitAsync(cancellationToken);
         }
 
         logger.LogInformation("Member {UserId} left tenant {TenantId}", userId, tenantId);
@@ -146,7 +146,7 @@ public class TenantService(
 
     // Lands a departing user in a fresh empty tenant-of-one (owner) so they are
     // never tenant-less.
-    private async Task ReHomeAsync(Guid userId)
+    private async Task ReHomeAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
         var newTenantId = Guid.CreateVersion7();
@@ -156,7 +156,7 @@ public class TenantService(
             Name = ReHomeTenantName,
             CreatedAt = now,
             UpdatedAt = now
-        });
+        }, cancellationToken);
         await tenants.AddMemberAsync(new TenantMembership
         {
             Id = Guid.CreateVersion7(),
@@ -164,6 +164,6 @@ public class TenantService(
             UserId = userId,
             Role = TenantRoles.Owner,
             JoinedAt = now
-        });
+        }, cancellationToken);
     }
 }

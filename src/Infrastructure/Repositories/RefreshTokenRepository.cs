@@ -11,36 +11,36 @@ namespace Template.Infrastructure.Repositories;
 /// </summary>
 public class RefreshTokenRepository(AppDbContext db) : IRefreshTokenRepository
 {
-    public async Task<RefreshToken> CreateAsync(RefreshToken token)
+    public async Task<RefreshToken> CreateAsync(RefreshToken token, CancellationToken cancellationToken = default)
     {
         db.RefreshTokens.Add(token);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return token;
     }
 
-    public async Task<RefreshToken?> GetValidTokenByHashAsync(string tokenHash)
+    public async Task<RefreshToken?> GetValidTokenByHashAsync(string tokenHash, CancellationToken cancellationToken = default)
     {
         return await db.RefreshTokens.FirstOrDefaultAsync(t =>
             t.TokenHash == tokenHash &&
             !t.IsRevoked &&
-            t.ExpiresAt > DateTime.UtcNow);
+            t.ExpiresAt > DateTime.UtcNow, cancellationToken);
     }
 
-    public async Task RevokeAsync(Guid tokenId)
+    public async Task RevokeAsync(Guid tokenId, CancellationToken cancellationToken = default)
     {
-        var token = await db.RefreshTokens.FindAsync(tokenId);
+        var token = await db.RefreshTokens.FindAsync([tokenId], cancellationToken);
         if (token != null)
         {
             token.IsRevoked = true;
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 
-    public async Task RevokeAllForUserAsync(Guid userId)
+    public async Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var tokens = await db.RefreshTokens
             .Where(t => t.UserId == userId && !t.IsRevoked)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         foreach (var token in tokens)
         {
@@ -49,7 +49,7 @@ public class RefreshTokenRepository(AppDbContext db) : IRefreshTokenRepository
 
         if (tokens.Count > 0)
         {
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 }

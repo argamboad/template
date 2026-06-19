@@ -27,8 +27,8 @@ public class HouseholdController(
     private bool TryGetUserId(out Guid userId) =>
         Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out userId);
 
-    private async Task<TenantMembership?> GetMembershipAsync() =>
-        TryGetUserId(out var uid) ? await tenants.GetMembershipAsync(uid) : null;
+    private async Task<TenantMembership?> GetMembershipAsync(CancellationToken cancellationToken = default) =>
+        TryGetUserId(out var uid) ? await tenants.GetMembershipAsync(uid, cancellationToken) : null;
 
     private static bool IsOwner(TenantMembership m) =>
         string.Equals(m.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase);
@@ -38,17 +38,17 @@ public class HouseholdController(
 
     /// <summary>Tenant + caller role + member roster (any member).</summary>
     [HttpGet]
-    public async Task<IActionResult> Get()
+    public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
 
-        var tenant = await tenants.GetByIdAsync(membership.TenantId);
+        var tenant = await tenants.GetByIdAsync(membership.TenantId, cancellationToken);
         if (tenant == null)
             return NotFound(errorFactory.CreateError("household_not_found", "Household not found"));
 
-        var members = await tenants.GetMemberDetailsAsync(membership.TenantId);
+        var members = await tenants.GetMemberDetailsAsync(membership.TenantId, cancellationToken);
         return Ok(new TenantResponse
         {
             Id = tenant.Id,
@@ -60,9 +60,9 @@ public class HouseholdController(
 
     /// <summary>Renames the tenant (owner only).</summary>
     [HttpPut]
-    public async Task<IActionResult> Rename([FromBody] RenameTenantRequest request)
+    public async Task<IActionResult> Rename([FromBody] RenameTenantRequest request, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
         if (!IsOwner(membership))
@@ -71,12 +71,12 @@ public class HouseholdController(
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(errorFactory.CreateError("invalid_request", "Name is required"));
 
-        var renamed = await service.RenameAsync(membership.TenantId, request.Name);
+        var renamed = await service.RenameAsync(membership.TenantId, request.Name, cancellationToken);
         if (!renamed)
             return NotFound(errorFactory.CreateError("household_not_found", "Household not found"));
 
-        var tenant = await tenants.GetByIdAsync(membership.TenantId);
-        var members = await tenants.GetMemberDetailsAsync(membership.TenantId);
+        var tenant = await tenants.GetByIdAsync(membership.TenantId, cancellationToken);
+        var members = await tenants.GetMemberDetailsAsync(membership.TenantId, cancellationToken);
         return Ok(new TenantResponse
         {
             Id = tenant!.Id,
@@ -88,9 +88,9 @@ public class HouseholdController(
 
     /// <summary>Removes a member (owner only). Cannot remove self.</summary>
     [HttpDelete("members/{userId:guid}")]
-    public async Task<IActionResult> RemoveMember(Guid userId)
+    public async Task<IActionResult> RemoveMember(Guid userId, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
         if (!IsOwner(membership))
@@ -101,7 +101,7 @@ public class HouseholdController(
             return BadRequest(errorFactory.CreateError("invalid_request",
                 "You cannot remove yourself — transfer ownership or leave instead"));
 
-        var result = await service.RemoveMemberAsync(membership.TenantId, userId);
+        var result = await service.RemoveMemberAsync(membership.TenantId, userId, cancellationToken);
         return result == RemoveMemberResult.Removed
             ? NoContent()
             : NotFound(errorFactory.CreateError("member_not_found", "That user is not a member of this household"));
@@ -109,9 +109,9 @@ public class HouseholdController(
 
     /// <summary>Transfers ownership to an existing member (owner only).</summary>
     [HttpPost("transfer-ownership")]
-    public async Task<IActionResult> TransferOwnership([FromBody] TransferOwnershipRequest request)
+    public async Task<IActionResult> TransferOwnership([FromBody] TransferOwnershipRequest request, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
         if (!IsOwner(membership))
@@ -122,7 +122,7 @@ public class HouseholdController(
         if (targetUserId == membership.UserId)
             return BadRequest(errorFactory.CreateError("invalid_request", "You already own this household"));
 
-        var result = await service.TransferOwnershipAsync(membership.TenantId, membership.UserId, targetUserId);
+        var result = await service.TransferOwnershipAsync(membership.TenantId, membership.UserId, targetUserId, cancellationToken);
         return result switch
         {
             TransferResult.Transferred => NoContent(),
@@ -135,12 +135,12 @@ public class HouseholdController(
     /// <summary>Leaves the tenant. A sole owner must confirm dissolution; an owner
     /// with members must transfer first.</summary>
     [HttpPost("leave")]
-    public async Task<IActionResult> Leave([FromBody] LeaveTenantRequest? request)
+    public async Task<IActionResult> Leave([FromBody] LeaveTenantRequest? request, CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId))
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
 
-        var outcome = await service.LeaveAsync(userId, request?.ConfirmDissolve ?? false);
+        var outcome = await service.LeaveAsync(userId, request?.ConfirmDissolve ?? false, cancellationToken);
         return outcome switch
         {
             LeaveOutcome.Left or LeaveOutcome.Dissolved => NoContent(),

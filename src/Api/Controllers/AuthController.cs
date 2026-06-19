@@ -68,7 +68,7 @@ public class AuthController(
     /// </summary>
     [HttpGet("callback/{provider}")]
     [Authorize(AuthenticationSchemes = ServiceCollectionExtensions.ExternalScheme)]
-    public async Task<IActionResult> Callback(string provider, [FromQuery(Name = "link_token")] string? linkToken = null)
+    public async Task<IActionResult> Callback(string provider, CancellationToken cancellationToken, [FromQuery(Name = "link_token")] string? linkToken = null)
     {
         try
         {
@@ -96,7 +96,7 @@ public class AuthController(
                 if (linkUserId is null)
                     return Redirect($"{appSettings.ClientUrl}/settings?link_error=expired");
 
-                var linkResult = await userService.LinkLoginAsync(linkUserId.Value, provider, providerUserId);
+                var linkResult = await userService.LinkLoginAsync(linkUserId.Value, provider, providerUserId, cancellationToken);
                 logger.LogInformation("Link {Provider} to user {UserId}: {Result}", provider, linkUserId, linkResult);
                 return linkResult == LinkLoginResult.OwnedByAnotherAccount
                     ? Redirect($"{appSettings.ClientUrl}/settings?link_error=in_use")
@@ -104,9 +104,9 @@ public class AuthController(
             }
 
             var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
-                claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User));
+                claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User), cancellationToken);
 
-            var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ClientIp, provider);
+            var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ClientIp, provider, cancellationToken);
             cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
 
             // Sign the external carrier cookie out — its job is done.
@@ -136,6 +136,7 @@ public class AuthController(
     /// </summary>
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(
+        CancellationToken cancellationToken,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? req = null)
     {
         try
@@ -145,18 +146,18 @@ public class AuthController(
             if (string.IsNullOrEmpty(rawToken))
                 return Unauthorized(errorFactory.CreateError("no_refresh_token", "Refresh token not found"));
 
-            var validToken = await refreshTokenService.ValidateRefreshTokenAsync(rawToken);
+            var validToken = await refreshTokenService.ValidateRefreshTokenAsync(rawToken, cancellationToken);
             if (validToken == null)
                 return Unauthorized(errorFactory.CreateError("invalid_refresh_token", "Refresh token is invalid or expired"));
 
-            var user = await userService.GetUserByIdAsync(validToken.UserId);
+            var user = await userService.GetUserByIdAsync(validToken.UserId, cancellationToken);
             if (user == null)
                 return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
             // Rotate: revoke the used token, then issue a fresh session.
-            await refreshTokenService.RevokeRefreshTokenAsync(validToken.Id);
+            await refreshTokenService.RevokeRefreshTokenAsync(validToken.Id, cancellationToken);
 
-            var session = await sessionService.IssueAsync(user, validToken.Provider, ClientIp, native);
+            var session = await sessionService.IssueAsync(user, validToken.Provider, ClientIp, native, cancellationToken);
 
             // Web: rotate the cookie. Native: the rotated token is already on the body.
             if (!native)
@@ -180,6 +181,7 @@ public class AuthController(
     /// </summary>
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(
+        CancellationToken cancellationToken,
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? req = null)
     {
         try
@@ -188,10 +190,10 @@ public class AuthController(
             var rawToken = native ? req?.RefreshToken : cookieService.GetRefreshTokenFromCookies(Request);
             if (!string.IsNullOrEmpty(rawToken))
             {
-                var token = await refreshTokenService.ValidateRefreshTokenAsync(rawToken);
+                var token = await refreshTokenService.ValidateRefreshTokenAsync(rawToken, cancellationToken);
                 if (token != null)
                 {
-                    await refreshTokenService.RevokeAllUserTokensAsync(token.UserId);
+                    await refreshTokenService.RevokeAllUserTokensAsync(token.UserId, cancellationToken);
                     logger.LogInformation("User logout: {UserId}", token.UserId);
                 }
             }
@@ -214,17 +216,17 @@ public class AuthController(
     /// </summary>
     [HttpGet("me")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> Me()
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdValue, out var userId))
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
 
-        var user = await userService.GetUserByIdAsync(userId);
+        var user = await userService.GetUserByIdAsync(userId, cancellationToken);
         if (user == null)
             return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
-        var (_, tenantName) = await sessionService.ResolveTenantAsync(user.Id);
+        var (_, tenantName) = await sessionService.ResolveTenantAsync(user.Id, cancellationToken);
         return Ok(new UserProfileResponse
         {
             UserName = user.DisplayName ?? user.Email,
@@ -238,7 +240,7 @@ public class AuthController(
     /// </summary>
     [HttpPut("locale")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> SetLocale([FromBody] LocaleRequest req)
+    public async Task<IActionResult> SetLocale([FromBody] LocaleRequest req, CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
@@ -246,7 +248,7 @@ public class AuthController(
         if (string.IsNullOrEmpty(locale) || !SupportedLocales.Contains(locale))
             return BadRequest(errorFactory.CreateError("unsupported_locale", "Unsupported locale."));
 
-        await userService.UpdateLocaleAsync(userId, locale);
+        await userService.UpdateLocaleAsync(userId, locale, cancellationToken);
         return Ok();
     }
 
@@ -257,11 +259,11 @@ public class AuthController(
     /// </summary>
     [HttpGet("logins")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> Logins()
+    public async Task<IActionResult> Logins(CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
-        var logins = await userLoginRepository.GetForUserAsync(userId);
+        var logins = await userLoginRepository.GetForUserAsync(userId, cancellationToken);
         return Ok(logins.Select(l => new { provider = l.Provider, linkedAt = l.CreatedAt }));
     }
 
@@ -293,15 +295,15 @@ public class AuthController(
     /// </summary>
     [HttpDelete("logins/{provider}")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> Unlink(string provider)
+    public async Task<IActionResult> Unlink(string provider, CancellationToken cancellationToken)
     {
         provider = provider.ToLowerInvariant();
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
-        var login = await userLoginRepository.GetByProviderForUserAsync(userId, provider);
+        var login = await userLoginRepository.GetByProviderForUserAsync(userId, provider, cancellationToken);
         if (login is null) return NotFound();
 
-        await userLoginRepository.DeleteAsync(login);
+        await userLoginRepository.DeleteAsync(login, cancellationToken);
         logger.LogInformation("Unlinked {Provider} from user {UserId}", provider, userId);
         return Ok();
     }
@@ -313,13 +315,13 @@ public class AuthController(
     /// whether an account exists for the address.
     /// </summary>
     [HttpPost("magic-link/send")]
-    public async Task<IActionResult> SendMagicLink([FromBody] EmailRequest req)
+    public async Task<IActionResult> SendMagicLink([FromBody] EmailRequest req, CancellationToken cancellationToken)
     {
         if (!IsLikelyEmail(req.Email))
             return BadRequest(errorFactory.CreateError("invalid_email", "A valid email address is required."));
 
         var email = req.Email.Trim();
-        var token = await passwordless.IssueMagicLinkTokenAsync(email);
+        var token = await passwordless.IssueMagicLinkTokenAsync(email, cancellationToken);
         var link = $"{Request.Scheme}://{Request.Host}/api/auth/magic-link/verify" +
                    $"?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(email)}";
 
@@ -335,13 +337,13 @@ public class AuthController(
     /// bounces to the client callback. The JWT is never put in the URL.
     /// </summary>
     [HttpGet("magic-link/verify")]
-    public async Task<IActionResult> VerifyMagicLink([FromQuery] string token, [FromQuery] string email)
+    public async Task<IActionResult> VerifyMagicLink([FromQuery] string token, [FromQuery] string email, CancellationToken cancellationToken)
     {
-        var user = await passwordless.RedeemMagicLinkAsync(email, token);
+        var user = await passwordless.RedeemMagicLinkAsync(email, token, cancellationToken);
         if (user is null)
             return Redirect($"{appSettings.ClientUrl}/login?error=invalid_link");
 
-        await IssueRefreshCookieAsync(user.Id, LoginTokenPurpose.MagicLink);
+        await IssueRefreshCookieAsync(user.Id, LoginTokenPurpose.MagicLink, cancellationToken);
         return Redirect($"{appSettings.ClientUrl}/auth-callback");
     }
 
@@ -349,13 +351,13 @@ public class AuthController(
 
     /// <summary>Emails a single-use numeric code. Always returns 200 (no enumeration).</summary>
     [HttpPost("otp/send")]
-    public async Task<IActionResult> SendOtp([FromBody] EmailRequest req)
+    public async Task<IActionResult> SendOtp([FromBody] EmailRequest req, CancellationToken cancellationToken)
     {
         if (!IsLikelyEmail(req.Email))
             return BadRequest(errorFactory.CreateError("invalid_email", "A valid email address is required."));
 
         var email = req.Email.Trim();
-        var code = await passwordless.IssueOtpAsync(email);
+        var code = await passwordless.IssueOtpAsync(email, cancellationToken);
 
         var emailBody = BrandedEmail.Otp(code, passwordlessSettings.OtpLifespanMinutes,
             BrandedEmail.ResolveCulture(req.Culture));
@@ -370,9 +372,9 @@ public class AuthController(
     /// token in the body to persist in its OS secure store. Both get the access token.
     /// </summary>
     [HttpPost("otp/verify")]
-    public async Task<IActionResult> VerifyOtp([FromBody] OtpVerifyRequest req)
+    public async Task<IActionResult> VerifyOtp([FromBody] OtpVerifyRequest req, CancellationToken cancellationToken)
     {
-        var result = await passwordless.RedeemOtpAsync(req.Email, req.Code);
+        var result = await passwordless.RedeemOtpAsync(req.Email, req.Code, cancellationToken);
         if (result.Status != OtpStatus.Success || result.User is null)
         {
             var code = result.Status switch
@@ -385,7 +387,7 @@ public class AuthController(
         }
 
         var native = IsNativeClient;
-        var session = await sessionService.IssueAsync(result.User, LoginTokenPurpose.Otp, ClientIp, native);
+        var session = await sessionService.IssueAsync(result.User, LoginTokenPurpose.Otp, ClientIp, native, cancellationToken);
         if (!native)
             cookieService.SetRefreshTokenCookie(Response, session.RefreshToken, Request);
 
@@ -426,7 +428,7 @@ public class AuthController(
     [HttpGet("native/callback/{provider}")]
     [Authorize(AuthenticationSchemes = ServiceCollectionExtensions.ExternalScheme)]
     public async Task<IActionResult> NativeCallback(string provider, [FromQuery] string redirect,
-        [FromQuery(Name = "link_token")] string? linkToken = null)
+        CancellationToken cancellationToken, [FromQuery(Name = "link_token")] string? linkToken = null)
     {
         provider = provider.ToLowerInvariant();
         try
@@ -447,7 +449,7 @@ public class AuthController(
                 if (linkUserId is null)
                     return Redirect(AppendQuery(redirect, "error", "expired"));
 
-                var linkResult = await userService.LinkLoginAsync(linkUserId.Value, provider, providerUserId);
+                var linkResult = await userService.LinkLoginAsync(linkUserId.Value, provider, providerUserId, cancellationToken);
                 logger.LogInformation("Native link {Provider} to user {UserId}: {Result}", provider, linkUserId, linkResult);
                 return linkResult == LinkLoginResult.OwnedByAnotherAccount
                     ? Redirect(AppendQuery(redirect, "error", "in_use"))
@@ -455,7 +457,7 @@ public class AuthController(
             }
 
             var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
-                claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User));
+                claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User), cancellationToken);
 
             var code = nativeAuthCodeService.Issue(user.Id, provider);
             logger.LogInformation("Native OAuth callback successful for {Email} via {Provider}", email, provider);
@@ -477,18 +479,18 @@ public class AuthController(
     /// (both in the body). The code is consumed on first use.
     /// </summary>
     [HttpPost("native/exchange")]
-    public async Task<IActionResult> NativeExchange([FromBody] NativeExchangeRequest req)
+    public async Task<IActionResult> NativeExchange([FromBody] NativeExchangeRequest req, CancellationToken cancellationToken)
     {
         var grant = nativeAuthCodeService.Redeem(req.Code);
         if (grant is null)
             return Unauthorized(errorFactory.CreateError("invalid_code", "The code is invalid or has expired."));
 
-        var user = await userService.GetUserByIdAsync(grant.Value.UserId);
+        var user = await userService.GetUserByIdAsync(grant.Value.UserId, cancellationToken);
         if (user is null)
             return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
         // Native exchange always returns the refresh token in the body.
-        var session = await sessionService.IssueAsync(user, grant.Value.Provider, ClientIp, native: true);
+        var session = await sessionService.IssueAsync(user, grant.Value.Provider, ClientIp, native: true, cancellationToken);
         return Ok(session.Response);
     }
 
@@ -501,9 +503,9 @@ public class AuthController(
     /// Issues a refresh token and sets it as the browser cookie — for web-only paths
     /// (OAuth callback, magic link) where the client then calls /refresh for its JWT.
     /// </summary>
-    private async Task IssueRefreshCookieAsync(Guid userId, string provider)
+    private async Task IssueRefreshCookieAsync(Guid userId, string provider, CancellationToken cancellationToken = default)
     {
-        var issued = await refreshTokenService.IssueRefreshTokenAsync(userId, ClientIp, provider);
+        var issued = await refreshTokenService.IssueRefreshTokenAsync(userId, ClientIp, provider, cancellationToken);
         cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
     }
 
