@@ -115,4 +115,48 @@
   <data name="Settings_ErrLoad" xml:space="preserve"><value>No se pudieron cargar las cuentas vinculadas.</value></data>
   <data name="Settings_ErrStartLinking" xml:space="preserve"><value>No se pudo iniciar la vinculación. Inténtalo de nuevo.</value></data>
   <data name="Settings_ErrUnlink" xml:space="preserve"><value>No se pudo desvincular. Inténtalo de nuevo.</value></data>
+  <data name="Household_HaveInvite" xml:space="preserve"><value>¿Tienes una invitación?</value></data>
+  <data name="Household_Subtitle" xml:space="preserve"><value>Gestiona quién comparte este hogar.</value></data>
+  <data name="Household_NameLabel" xml:space="preserve"><value>Nombre del hogar</value></data>
+  <data name="Household_Rename" xml:space="preserve"><value>Renombrar</value></data>
+  <data name="Household_Members" xml:space="preserve"><value>Miembros</value></data>
+  <data name="Household_RoleOwner" xml:space="preserve"><value>Propietario</value></data>
+  <data name="Household_RoleMember" xml:space="preserve"><value>Miembro</value></data>
+  <data name="Household_Remove" xml:space="preserve"><value>Eliminar</value></data>
+  <data name="Household_Invitations" xml:space="preserve"><value>Invitaciones</value></data>
+  <data name="Household_Invite" xml:space="preserve"><value>Invitar</value></data>
+  <data name="Household_InviteTokenFor" xml:space="preserve"><value>Token de invitación para {0} (se muestra una sola vez):</value></data>
+  <data name="Household_Copy" xml:space="preserve"><value>Copiar</value></data>
+  <data name="Household_EmailedJoinLink" xml:space="preserve"><value>También enviamos un enlace de acceso al invitado.</value></data>
+  <data name="Household_NoPending" xml:space="preserve"><value>No hay invitaciones pendientes.</value></data>
+  <data name="Household_Expires" xml:space="preserve"><value>Caduca el {0}</value></data>
+  <data name="Household_Regenerate" xml:space="preserve"><value>Regenerar</value></data>
+  <data name="Household_Revoke" xml:space="preserve"><value>Revocar</value></data>
+  <data name="Household_TransferOwnership" xml:space="preserve"><value>Transferir la propiedad</value></data>
+  <data name="Household_ChooseMember" xml:space="preserve"><value>Elige un miembro…</value></data>
+  <data name="Household_Transfer" xml:space="preserve"><value>Transferir</value></data>
+  <data name="Household_MustTransfer" xml:space="preserve"><value>Debes transferir la propiedad antes de poder salir de este hogar.</value></data>
+  <data name="Household_LeaveDissolve" xml:space="preserve"><value>Salir y disolver</value></data>
+  <data name="Household_DissolveWarning" xml:space="preserve"><value>Eres el único miembro. Si sales, este hogar y sus datos se eliminarán permanentemente.</value></data>
+  <data name="Household_LeaveAndDelete" xml:space="preserve"><value>Salir y eliminar</value></data>
+  <data name="Household_LeaveTitle" xml:space="preserve"><value>Salir del hogar</value></data>
+  <data name="Household_LeaveAsMemberNote" xml:space="preserve"><value>El hogar compartido permanece intacto; tendrás un hogar propio nuevo.</value></data>
+  <data name="Household_Leave" xml:space="preserve"><value>Salir</value></data>
+  <data name="Household_StatusRenamed" xml:space="preserve"><value>Hogar renombrado.</value></data>
+  <data name="Household_ErrRename" xml:space="preserve"><value>No se pudo renombrar el hogar.</value></data>
+  <data name="Household_ErrEmailAlreadyMember" xml:space="preserve"><value>Ese correo ya es miembro.</value></data>
+  <data name="Household_ErrSendInvite" xml:space="preserve"><value>No se pudo enviar la invitación.</value></data>
+  <data name="Household_ErrRegenerate" xml:space="preserve"><value>No se pudo regenerar el token.</value></data>
+  <data name="Household_StatusRevoked" xml:space="preserve"><value>Invitación revocada.</value></data>
+  <data name="Household_ErrRevoke" xml:space="preserve"><value>No se pudo revocar la invitación.</value></data>
+  <data name="Household_StatusMemberRemoved" xml:space="preserve"><value>Miembro eliminado.</value></data>
+  <data name="Household_ErrRemoveMember" xml:space="preserve"><value>No se pudo eliminar al miembro.</value></data>
+  <data name="Household_StatusOwnershipTransferred" xml:space="preserve"><value>Propiedad transferida.</value></data>
+  <data name="Household_ErrTransfer" xml:space="preserve"><value>No se pudo transferir la propiedad.</value></data>
+  <data name="Household_ErrLeave" xml:space="preserve"><value>No se pudo salir del hogar.</value></data>
+  <data name="Household_ErrDissolve" xml:space="preserve"><value>No se pudo disolver el hogar.</value></data>
+  <data name="Household_ErrLoad" xml:space="preserve"><value>No se pudo cargar el hogar.</value></data>
+  <data name="Household_ConfirmRemove" xml:space="preserve"><value>¿Eliminar a {0} de este hogar?</value></data>
+  <data name="Household_ConfirmLeave" xml:space="preserve"><value>¿Salir de este hogar?</value></data>
+  <data name="Household_ConfirmDissolve" xml:space="preserve"><value>Esto eliminará permanentemente el hogar y sus datos. ¿Continuar?</value></data>
 </root>

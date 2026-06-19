@@ -5,15 +5,16 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Household</PageTitle>
+<PageTitle>@Localizer["Nav_Household"]</PageTitle>
 
 <div class="household-wrapper">
     <div class="d-flex align-items-center justify-content-between mb-1">
-        <h1 class="h4 fw-bold mb-0">Household</h1>
-        <a class="btn btn-outline-secondary btn-sm" href="/join">Have an invite?</a>
+        <h1 class="h4 fw-bold mb-0">@Localizer["Nav_Household"]</h1>
+        <a class="btn btn-outline-secondary btn-sm" href="/join">@Localizer["Household_HaveInvite"]</a>
     </div>
-    <p class="text-muted mb-4">Manage who shares this household.</p>
+    <p class="text-muted mb-4">@Localizer["Household_Subtitle"]</p>
 
     @if (!string.IsNullOrEmpty(_status))
     {
@@ -23,7 +24,7 @@
     @if (_loading)
     {
         <div class="p-4 text-center text-muted">
-            <span class="spinner-border spinner-border-sm me-2"></span> Loading…
+            <span class="spinner-border spinner-border-sm me-2"></span> @Localizer["Common_Loading"]
         </div>
     }
     else if (_household is not null)
@@ -33,12 +34,12 @@
                 @* ── Name ── *@
                 @if (IsOwner)
                 {
-                    <label class="form-label fw-medium">Household name</label>
+                    <label class="form-label fw-medium">@Localizer["Household_NameLabel"]</label>
                     <div class="d-flex gap-2 flex-wrap">
                         <input class="form-control" style="max-width:320px" @bind="_name" />
                         <button class="btn btn-primary"
                                 disabled="@(_busy || string.IsNullOrWhiteSpace(_name) || _name.Trim() == _household.Name)"
-                                @onclick="SaveName">Rename</button>
+                                @onclick="SaveName">@Localizer["Household_Rename"]</button>
                     </div>
                 }
                 else
@@ -51,7 +52,7 @@
         @* ── Members ── *@
         <div class="card shadow-sm mb-3">
             <div class="card-body">
-                <h2 class="h6 fw-bold mb-3">Members</h2>
+                <h2 class="h6 fw-bold mb-3">@Localizer["Household_Members"]</h2>
                 <ul class="list-group list-group-flush">
                     @foreach (var m in _household.Members)
                     {
@@ -66,16 +67,16 @@
                             <div class="d-flex align-items-center gap-3">
                                 @if (m.Role == "owner")
                                 {
-                                    <span class="badge bg-primary-subtle text-primary-emphasis">Owner</span>
+                                    <span class="badge bg-primary-subtle text-primary-emphasis">@Localizer["Household_RoleOwner"]</span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">Member</span>
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">@Localizer["Household_RoleMember"]</span>
                                 }
                                 @if (IsOwner && m.UserId != _myUserId)
                                 {
                                     <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => RemoveMember(m)">Remove</button>
+                                            @onclick="() => RemoveMember(m)">@Localizer["Household_Remove"]</button>
                                 }
                             </div>
                         </li>
@@ -89,29 +90,29 @@
         {
             <div class="card shadow-sm mb-3">
                 <div class="card-body">
-                    <h2 class="h6 fw-bold mb-3">Invitations</h2>
+                    <h2 class="h6 fw-bold mb-3">@Localizer["Household_Invitations"]</h2>
                     <div class="d-flex gap-2 flex-wrap mb-3">
                         <input class="form-control" style="max-width:320px" type="email"
                                placeholder="email@example.com" @bind="_inviteEmail" />
                         <button class="btn btn-outline-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_inviteEmail))"
-                                @onclick="SendInvite">Invite</button>
+                                @onclick="SendInvite">@Localizer["Household_Invite"]</button>
                     </div>
 
                     @if (_revealedToken is not null)
                     {
                         <div class="alert alert-success py-2">
-                            <div class="fw-medium mb-1">Invitation token for @(_revealedEmail) (shown once):</div>
+                            <div class="fw-medium mb-1">@Localizer["Household_InviteTokenFor", _revealedEmail ?? ""]</div>
                             <div class="d-flex align-items-center gap-2">
                                 <code class="text-break">@_revealedToken</code>
-                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => CopyToken(_revealedToken)">Copy</button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => CopyToken(_revealedToken)">@Localizer["Household_Copy"]</button>
                             </div>
-                            <div class="small text-muted mt-1">We also emailed a join link to the invitee.</div>
+                            <div class="small text-muted mt-1">@Localizer["Household_EmailedJoinLink"]</div>
                         </div>
                     }
 
                     @if (_pending.Count == 0)
                     {
-                        <p class="text-muted small mb-0">No pending invitations.</p>
+                        <p class="text-muted small mb-0">@Localizer["Household_NoPending"]</p>
                     }
                     else
                     {
@@ -121,13 +122,13 @@
                                 <li class="list-group-item d-flex align-items-center justify-content-between px-0">
                                     <div>
                                         <div class="fw-medium">@inv.InvitedEmail</div>
-                                        <div class="small text-muted">Expires @inv.ExpiresAt.ToLocalTime().ToString("MMM d, yyyy")</div>
+                                        <div class="small text-muted">@Localizer["Household_Expires", inv.ExpiresAt.ToLocalTime().ToString("d")]</div>
                                     </div>
                                     <div class="d-flex gap-2">
                                         <button class="btn btn-outline-secondary btn-sm" disabled="@_busy"
-                                                @onclick="() => RegenerateInvite(inv)">Regenerate</button>
+                                                @onclick="() => RegenerateInvite(inv)">@Localizer["Household_Regenerate"]</button>
                                         <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
-                                                @onclick="() => RevokeInvite(inv)">Revoke</button>
+                                                @onclick="() => RevokeInvite(inv)">@Localizer["Household_Revoke"]</button>
                                     </div>
                                 </li>
                             }
@@ -142,31 +143,31 @@
             <div class="card-body">
                 @if (IsOwner && OtherMembers.Count > 0)
                 {
-                    <h2 class="h6 fw-bold mb-3">Transfer ownership</h2>
+                    <h2 class="h6 fw-bold mb-3">@Localizer["Household_TransferOwnership"]</h2>
                     <div class="d-flex gap-2 flex-wrap">
                         <select class="form-select" style="max-width:320px" @bind="_transferTargetId">
-                            <option value="">Choose a member…</option>
+                            <option value="">@Localizer["Household_ChooseMember"]</option>
                             @foreach (var m in OtherMembers)
                             {
                                 <option value="@m.UserId">@(string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName)</option>
                             }
                         </select>
                         <button class="btn btn-outline-primary" disabled="@(_busy || string.IsNullOrEmpty(_transferTargetId))"
-                                @onclick="TransferOwnership">Transfer</button>
+                                @onclick="TransferOwnership">@Localizer["Household_Transfer"]</button>
                     </div>
-                    <p class="small text-muted mt-2 mb-0">You must transfer ownership before you can leave this household.</p>
+                    <p class="small text-muted mt-2 mb-0">@Localizer["Household_MustTransfer"]</p>
                 }
                 else if (IsOwner)
                 {
-                    <h2 class="h6 fw-bold mb-2 text-danger">Leave &amp; dissolve</h2>
-                    <p class="small text-muted">You're the only member. Leaving permanently deletes this household and its data.</p>
-                    <button class="btn btn-danger" disabled="@_busy" @onclick="DissolveAndLeave">Leave and delete</button>
+                    <h2 class="h6 fw-bold mb-2 text-danger">@Localizer["Household_LeaveDissolve"]</h2>
+                    <p class="small text-muted">@Localizer["Household_DissolveWarning"]</p>
+                    <button class="btn btn-danger" disabled="@_busy" @onclick="DissolveAndLeave">@Localizer["Household_LeaveAndDelete"]</button>
                 }
                 else
                 {
-                    <h2 class="h6 fw-bold mb-2">Leave household</h2>
-                    <p class="small text-muted">The shared household stays intact; you'll get a fresh household of your own.</p>
-                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick="LeaveAsMember">Leave</button>
+                    <h2 class="h6 fw-bold mb-2">@Localizer["Household_LeaveTitle"]</h2>
+                    <p class="small text-muted">@Localizer["Household_LeaveAsMemberNote"]</p>
+                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick="LeaveAsMember">@Localizer["Household_Leave"]</button>
                 }
             </div>
         </div>
@@ -216,7 +217,7 @@
         }
         catch
         {
-            SetStatus("Couldn't load the household.", false);
+            SetStatus(Localizer["Household_ErrLoad"], false);
         }
         finally
         {
@@ -236,11 +237,11 @@
             var resp = await Http.PutAsJsonAsync("/api/household", new { name = _name.Trim() });
             if (resp.IsSuccessStatusCode)
             {
-                SetStatus("Household renamed.", true);
+                SetStatus(Localizer["Household_StatusRenamed"], true);
                 await RefreshHeaderAsync();
                 await Reload();
             }
-            else { SetStatus("Couldn't rename the household.", false); }
+            else { SetStatus(Localizer["Household_ErrRename"], false); }
         }
         finally { _busy = false; }
     }
@@ -263,9 +264,9 @@
             }
             else if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
-                SetStatus("That email is already a member.", false);
+                SetStatus(Localizer["Household_ErrEmailAlreadyMember"], false);
             }
-            else { SetStatus("Couldn't send the invitation.", false); }
+            else { SetStatus(Localizer["Household_ErrSendInvite"], false); }
         }
         finally { _busy = false; }
     }
@@ -284,7 +285,7 @@
                 _revealedEmail = inv.InvitedEmail;
                 await Reload();
             }
-            else { SetStatus("Couldn't regenerate the token.", false); }
+            else { SetStatus(Localizer["Household_ErrRegenerate"], false); }
         }
         finally { _busy = false; }
     }
@@ -298,10 +299,10 @@
             var resp = await Http.DeleteAsync($"/api/household/invitations/{inv.InvitationId}");
             if (resp.IsSuccessStatusCode)
             {
-                SetStatus("Invitation revoked.", true);
+                SetStatus(Localizer["Household_StatusRevoked"], true);
                 await Reload();
             }
-            else { SetStatus("Couldn't revoke the invitation.", false); }
+            else { SetStatus(Localizer["Household_ErrRevoke"], false); }
         }
         finally { _busy = false; }
     }
@@ -309,7 +310,7 @@
     private async Task RemoveMember(Member m)
     {
         var name = string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName;
-        if (!await Confirm($"Remove {name} from this household?")) return;
+        if (!await Confirm(Localizer["Household_ConfirmRemove", name])) return;
 
         _busy = true;
         try
@@ -317,10 +318,10 @@
             var resp = await Http.DeleteAsync($"/api/household/members/{m.UserId}");
             if (resp.IsSuccessStatusCode)
             {
-                SetStatus("Member removed.", true);
+                SetStatus(Localizer["Household_StatusMemberRemoved"], true);
                 await Reload();
             }
-            else { SetStatus("Couldn't remove the member.", false); }
+            else { SetStatus(Localizer["Household_ErrRemoveMember"], false); }
         }
         finally { _busy = false; }
     }
@@ -335,17 +336,17 @@
             if (resp.IsSuccessStatusCode)
             {
                 _transferTargetId = null;
-                SetStatus("Ownership transferred.", true);
+                SetStatus(Localizer["Household_StatusOwnershipTransferred"], true);
                 await Reload();
             }
-            else { SetStatus("Couldn't transfer ownership.", false); }
+            else { SetStatus(Localizer["Household_ErrTransfer"], false); }
         }
         finally { _busy = false; }
     }
 
     private async Task LeaveAsMember()
     {
-        if (!await Confirm("Leave this household?")) return;
+        if (!await Confirm(Localizer["Household_ConfirmLeave"])) return;
         _busy = true;
         try
         {
@@ -355,14 +356,14 @@
                 await RefreshHeaderAsync();
                 Nav.NavigateTo("/", forceLoad: true);
             }
-            else { SetStatus("Couldn't leave the household.", false); }
+            else { SetStatus(Localizer["Household_ErrLeave"], false); }
         }
         finally { _busy = false; }
     }
 
     private async Task DissolveAndLeave()
     {
-        if (!await Confirm("This permanently deletes the household and its data. Continue?")) return;
+        if (!await Confirm(Localizer["Household_ConfirmDissolve"])) return;
         _busy = true;
         try
         {
@@ -372,7 +373,7 @@
                 await RefreshHeaderAsync();
                 Nav.NavigateTo("/", forceLoad: true);
             }
-            else { SetStatus("Couldn't dissolve the household.", false); }
+            else { SetStatus(Localizer["Household_ErrDissolve"], false); }
         }
         finally { _busy = false; }
     }
