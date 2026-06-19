@@ -24,7 +24,7 @@ horizontal layer in isolation.
   epic (not all upfront).
 
 **Slice lifecycle**
-1. Pick the next slice (from `ROADMAP.md` once it exists).
+1. Pick the next slice (from the project roadmap / backlog, if one exists).
 2. Write/refine the user story/stories for it (see template below) under `docs/stories/`.
 3. **Write the tests first (TDD).** Unit tests for Core logic; E2E tests for the user-facing flow.
 4. Branch, implement until all tests are green; refactor.

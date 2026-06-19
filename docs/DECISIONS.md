@@ -38,6 +38,8 @@ economy/portability.
 
 **ADR-C8 — Auth is ASP.NET Core Identity; tenant scoping layered on top.**
 *Rationale:* built-in user/auth; tenant association sits above Identity as a query concern.
+> **Superseded by ADR-002 (2026-06-19):** the template ships a custom JWT + refresh-token auth
+> stack instead of ASP.NET Core Identity.
 
 **ADR-C9 — Non-web clients (mobile + Win/macOS desktop) are MAUI Blazor Hybrid, DEFERRED.**
 Web first. *Rationale:* reuses the Blazor UI via the RCL, not just the API; deferred until that
@@ -68,6 +70,14 @@ with Gherkin acceptance criteria; Conventional Commits for branches/commits/PR t
 `.github/pull_request_template.md`. Full detail in `docs/WAYS_OF_WORKING.md`. *Rationale:* a
 lightweight defined process keeps solo + Claude Code work consistent and mergeable.
 
+**ADR-C13 — Local dev infrastructure via Docker Compose: PostgreSQL 17 + Mailpit. (2026-06-17)**
+`docker-compose.yml` at repo root; configuration via `.env` (gitignored; copy from `.env.example`).
+All ports are environment-variable-driven so multiple projects can run simultaneously without
+conflicts. Both services expose healthchecks; API containers should declare `depends_on: db:
+condition: service_healthy`. No pgAdmin in the template — devs use their own DB client.
+*Rationale:* PostgreSQL is always needed; Mailpit traps passwordless + invitation email in dev with
+zero config; env-var ports prevent port clashes across projects.
+
 **ADR-C14 — Testing: 100% TDD; unit tests (xUnit) + E2E (Playwright/NUnit). (2026-06-17)**
 All production code is test-driven (red-green-refactor). Unit tests (xUnit) in `Core.Tests` and
 `Api.Tests` cover domain logic, derived rules, and API behavior. E2E tests (Playwright 1.60,
@@ -91,14 +101,10 @@ in the auth story slice to keep it app-specific.
 *Rationale:* provider-agnostic OAuth avoids re-architecting for new providers; magic links remove
 password friction on web; OTP framework is in place without committing to an SMS provider;
 abstracting `IEmailSender` keeps Core independent of sending infrastructure.
-
-**ADR-C13 — Local dev infrastructure via Docker Compose: PostgreSQL 17 + Mailpit. (2026-06-17)**
-`docker-compose.yml` at repo root; configuration via `.env` (gitignored; copy from `.env.example`).
-All ports are environment-variable-driven so multiple projects can run simultaneously without
-conflicts. Both services expose healthchecks; API containers should declare `depends_on: db:
-condition: service_healthy`. No pgAdmin in the template — devs use their own DB client.
-*Rationale:* PostgreSQL is always needed; Mailpit covers Identity email flows (confirm account,
-password reset) with zero config; env-var ports prevent port clashes across projects.
+> **Superseded by ADR-002 (2026-06-19):** auth is a custom JWT + `LoginToken`/`PasswordlessService`
+> stack, not Identity token providers / `MagicLinkTokenProvider` / `AddDefaultTokenProviders`. The
+> TOTP/authenticator support described here was never implemented (email OTP is). Secrets moved to
+> `.env` per ADR-001.
 
 **ADR-001 — Local-dev secrets/config consolidated in `.env` (DotNetEnv); supersedes user-secrets. (2026-06-19)**
 All local-dev secrets and config (`Jwt__Secret`, `Authentication__{Google,Microsoft}__*`,
@@ -113,3 +119,24 @@ come from real environment variables, never a committed file. This **supersedes 
 existed for docker-compose, so the app secrets join it. Trade-off vs user-secrets: secrets now
 sit in the working tree (mitigated by `.gitignore`) rather than the user profile — accepted for
 this workflow.
+
+**ADR-002 — Auth is a custom JWT + rotating-refresh-token stack, not ASP.NET Core Identity. (2026-06-19)**
+Supersedes ADR-C8 and the Identity parts of ADR-C15. The template implements its own auth on custom
+`User` / `UserLogin` / `RefreshToken` / `LoginToken` entities: JWT access tokens (60 min) + rotating,
+hashed refresh tokens (single-use, replay-protected); OAuth (Google + Microsoft) account-linking with
+an unverified-email takeover guard; passwordless magic-link + email OTP via `PasswordlessService`
+(hashed, single-use, time-limited `LoginToken`s). There is **no** `IdentityUser`, `UserManager`,
+`MagicLinkTokenProvider`, or `AddDefaultTokenProviders`; JWT Bearer is configured in `Program.cs`.
+*Rationale:* the Identity + cookie approach hit a persistent Blazor WASM client failure; the proven
+JWT model (ported and hardened) was chosen over more Identity debugging, and it also gives native
+(MAUI) clients clean body-token transport.
+
+**ADR-003 — Tenancy is membership-based and enforced by a global query filter. (2026-06-19)**
+A user's tenant lives in a **`TenantMembership`** join entity (unique on `UserId` — one tenant at a
+time; `Role` owner/member), **not** a `tenant_id` column on `User`. Tenant-owned entities implement
+`ITenantScoped`; `AppDbContext` applies a global EF query filter scoping them to the JWT's `tenant_id`
+claim (fail-closed when absent). Genuinely cross-tenant / pre-auth lookups (invitation accept by token
+hash) opt out with `IgnoreQueryFilters()`.
+*Rationale:* membership models "a user moves between tenants" and the always-in-exactly-one-tenant
+invariant cleanly; the global filter turns "never leak across tenants" (ADR-C2) from a per-query
+convention into a structural guarantee, so feature slices can't forget to scope.

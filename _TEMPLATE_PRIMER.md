@@ -50,7 +50,8 @@ rules, and domain logic are designed fresh. Only the items under "Frozen decisio
 - **Tenant-scoped data; per-user preferences only.** App data belongs to the tenant and is shared
   among its users. Only individual preferences (e.g. display settings) are per-user. Never leak
   one tenant's data to another.
-- **Web first.** Mobile and desktop are deferred but planned (see architecture).
+- **Web first for features.** MAUI mobile + Win/macOS desktop shells ship with the template (auth
+  wired); build each feature on web first.
 
 ### Tech stack (target latest STABLE, never previews — verify versions at session time)
 - **Backend:** ASP.NET Core Web API, behind a **clean API boundary** (no UI-to-DB direct access).
@@ -59,19 +60,19 @@ rules, and domain logic are designed fresh. Only the items under "Frozen decisio
   app. This is the rule that makes future non-web clients cheap.
 - **Database:** PostgreSQL.
 - **ORM:** Entity Framework Core (Npgsql provider).
-- **Auth:** ASP.NET Core Identity; tenant scoping layered on top as a query concern.
-- **Baseline version line:** .NET 10 (LTS) and its matching ASP.NET Core / Blazor / EF Core /
-  Identity. **Re-verify the current stable versions at the start of each project** (this primer
-  ages).
+- **Auth:** custom JWT access tokens + rotating refresh tokens — the template ships this (**not**
+  ASP.NET Core Identity); tenant scoping layered on top as a query concern.
+- **Baseline version line:** .NET 10 (LTS) and its matching ASP.NET Core / Blazor / EF Core.
+  **Re-verify the current stable versions at the start of each project** (this primer ages).
 
 ### Architecture principles
 - **The API is the durable asset.** Every client (web now; mobile + desktop later) is just
   another consumer of the same API. New client types are *additive*, never a rearchitecture.
 - **RCL discipline** (above) — shared UI components across web + future clients.
-- **Non-web clients (deferred):** .NET MAUI **Blazor Hybrid** is the intended path for **mobile
-  and Windows/macOS desktop**, reusing the RCL. Not built during MVP. Linux desktop is out of
-  scope; if ever required, tilt toward Uno Platform or Avalonia. Final commitment deferred until
-  that work begins (re-check MAUI's maturity then).
+- **Non-web clients:** .NET MAUI **Blazor Hybrid** shells for **mobile and Windows/macOS desktop**
+  ship with the template (auth wired, reusing the RCL — see `docs/MOBILE_TESTING.md`). Build app
+  features web-first and extend the native shells once they work. Linux desktop is out of scope;
+  if ever required, tilt toward Uno Platform or Avalonia.
 
 ### Working method & docs
 - The document set and ADR methodology described in the instructions above are constant.

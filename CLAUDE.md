@@ -21,15 +21,18 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
   them is incomplete.
 
 ## Golden rules — constant (do not violate)
-1. **Tenant-scoped, not user-scoped.** App data belongs to the tenant; enforce `tenant_id`
-   filtering on every query; never leak across tenants. Only preferences are per-user.
+1. **Tenant-scoped, not user-scoped.** App data belongs to the tenant; never leak across tenants.
+   Tenant entities implement `ITenantScoped` and are filtered automatically by a global EF query
+   filter (see ADR-003); genuinely cross-tenant/pre-auth lookups opt out with
+   `IgnoreQueryFilters()`. Only preferences are per-user.
 2. **Clean API boundary.** The UI is a client of the API and never accesses the DB directly.
 3. **Blazor UI components live in the shared RCL**, not inline in the web app — keeps non-web
    clients cheap.
 4. **Derived values are computed, never stored** as stale flags (confirm the app's specific
    derived rules in `docs/DATA_MODEL.md`).
-5. **Don't build non-web clients now.** Mobile + desktop (MAUI Blazor Hybrid) are deferred; web
-   first.
+5. **Web-first for features.** The template ships MAUI desktop + Android shells with auth wired
+   (see `docs/MOBILE_TESTING.md`); build each app feature on web first and extend the native
+   shells only once it works there.
 6. **Latest stable versions only, never previews.**
 7. **Test-Driven Development — always.** Write the failing test before the production code on
    every slice. Unit tests (xUnit) in `Core.Tests` / `Api.Tests`; E2E tests (Playwright/NUnit)
@@ -44,11 +47,12 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 _TODO_
 
 ## Tech stack (see `docs/TECH_STACK.md`)
-- **Versions:** latest stable on the current .NET line — **re-verified 2026-06-17: .NET SDK 10.0.301, ASP.NET Core / EF Core / Identity 10.0.9, Npgsql.EF 10.0.2, PostgreSQL 17.**
+- **Versions:** latest stable on the current .NET line — **re-verified 2026-06-17: .NET SDK 10.0.301, ASP.NET Core / EF Core 10.0.9, Npgsql.EF 10.0.2, PostgreSQL 17.**
 - **Backend:** ASP.NET Core Web API behind a clean API boundary.
 - **Web frontend:** Blazor WebAssembly; UI components in a shared **RCL** (hard rule).
 - **DB:** PostgreSQL via **EF Core (Npgsql)**; schema/migrations generated from `docs/DATA_MODEL.md`.
-- **Auth:** ASP.NET Core Identity; tenant scoping layered on top.
+- **Auth:** custom JWT access tokens + rotating refresh tokens — **not** ASP.NET Core Identity
+  (see ADR-002); tenant scoping layered on top via a global query filter.
 - **Non-web clients:** MAUI Blazor Hybrid (mobile + Win/macOS desktop) — *deferred, don't build now.*
 
 ## Auth rules (constant)
@@ -58,27 +62,29 @@ _TODO_
   `.env.example` (committed) documents them. Never commit `.env`.
 - **New OAuth provider = one line.** Add `.AddXxx()` in `ServiceCollectionExtensions`. Don't
   restructure anything else.
-- **Magic links use `MagicLinkTokenProvider`.** Purpose constant: `MagicLinkTokenProvider.Purpose`.
-  Token lifetime is in config (`Auth:MagicLink:TokenLifespanMinutes`).
+- **Passwordless sign-in uses the `LoginToken` entity + `PasswordlessService`** (NOT Identity
+  token providers). Magic links and email OTP are single-use, hashed, and time-limited; lifetimes
+  are in config (`Auth:MagicLink:TokenLifespanMinutes`, `Auth:Otp:*`).
 - **`IEmailSender` (Core abstraction) is the only way to send email.** Never reference MailKit
   directly outside `Infrastructure/Email/`.
-- **JWT Bearer auth is not pre-configured.** Add it in the auth story slice — scheme choice is
-  app-specific.
+- **JWT Bearer auth is configured** in `Program.cs` (validates the app-issued access token, scheme
+  `JwtBearerDefaults.AuthenticationScheme`). The token carries a `tenant_id` claim that drives
+  tenant query scoping.
 
 ## Scope discipline
 Before building anything, check the **"OUT" list in `docs/PROJECT_BRIEF.md`**. Don't implement
 deferred items without an explicit decision.
 
 ## Conventions
-- Code term for the tenant is **tenant** (app-facing label: _TODO_).
+- Code term for the tenant is **tenant**; the reference implementation's app-facing label is
+  **Household** (`/api/household`, `HouseholdController`). Rename per app — see `docs/REBRANDING.md`.
 - _TODO: app-specific conventions (naming, lookup tables, etc.)_
 
 ## Status / not yet decided
 - Seed data (if any) — _TODO_.
 - Concrete schema (EF Core migrations) — generated from `docs/DATA_MODEL.md`.
 - **User stories: generated per-epic at build time**, under `docs/stories/` (one file per epic).
-- Deferred sub-decisions: non-web framework commitment, hosting, Identity details (see
-  `docs/TECH_STACK.md`).
+- Deferred sub-decisions: non-web framework commitment, hosting (see `docs/TECH_STACK.md`).
 
 ## Doc map
 | File | Purpose |

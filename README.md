@@ -1,8 +1,8 @@
 # Multi-Tenant SaaS Project Template
 
 A reusable starting point for new multi-tenant SaaS apps on a fixed stack
-(ASP.NET Core API + Blazor WASM + shared RCL + PostgreSQL/EF Core + ASP.NET Core Identity, with
-MAUI Blazor Hybrid for mobile + Win/macOS desktop deferred). It lets a new project skip
+(ASP.NET Core API + Blazor WASM + shared RCL + PostgreSQL/EF Core + custom JWT auth, with
+MAUI Blazor Hybrid shells for mobile + Win/macOS desktop). It lets a new project skip
 re-deciding the stack and jump straight to discussing **what the app does**.
 
 ## What's in here
@@ -15,7 +15,7 @@ docs/                   ← doc skeletons (constant parts filled, app-specific =
   FEATURES.md
   DATA_MODEL.md
   TECH_STACK.md         ← almost entirely reusable; only re-verify versions
-  DECISIONS.md          ← pre-seeded with constant ADRs (C1–C11); add app ADRs from 001
+  DECISIONS.md          ← pre-seeded with constant ADRs (C1–C15); add app ADRs from 001
   stories/
 src/ , tests/           ← ready-to-scaffold solution layout (Claude Code fills these)
 ```
@@ -40,7 +40,7 @@ slice — writing per-epic user stories into `docs/stories/` as it goes.
 
 - **Constant (don't re-decide):** the stack, the clean-API-boundary + RCL architecture,
   multi-tenancy (Tenant ≠ User, tenant-scoped data, per-user preferences), the doc/ADR method,
-  the "latest stable, never previews" version policy, and MAUI-deferred for non-web clients.
+  the "latest stable, never previews" version policy, and MAUI Blazor Hybrid for non-web clients.
 - **Per-project (designed fresh):** the concept, features, data model entities, domain-specific
   derived rules, the tenant's real-world label, scope, seed data, and hosting.
 

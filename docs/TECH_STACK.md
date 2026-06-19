@@ -13,8 +13,8 @@
 | UI components | Shared **Razor Class Library (RCL)** | Committed (discipline rule) |
 | Database | PostgreSQL | Committed |
 | ORM | Entity Framework Core (Npgsql) | Committed |
-| Auth | ASP.NET Core Identity | Committed |
-| Non-web clients (mobile + desktop) | .NET MAUI **Blazor Hybrid**, reusing the RCL | **Deferred** (intended direction) |
+| Auth | Custom JWT + rotating refresh tokens (no ASP.NET Core Identity) | Committed (ADR-002) |
+| Non-web clients (mobile + desktop) | .NET MAUI **Blazor Hybrid**, reusing the RCL | Implemented (auth wired); feature parity web-first |
 | Hosting | TBD (cheap .NET API + static WASM + Postgres) | Deferred |
 
 ## Target versions
@@ -22,7 +22,7 @@
 > ⚠️ **RE-VERIFY at project start.** Versions move; search for current stable before committing.
 > Policy: **target the latest _stable_ release, never previews.**
 >
-> **Verified 2026-06-17:** .NET SDK 10.0.301 · ASP.NET Core / EF Core / Identity **10.0.9** ·
+> **Verified 2026-06-17:** .NET SDK 10.0.301 · ASP.NET Core / EF Core **10.0.9** ·
 > Npgsql.EntityFrameworkCore.PostgreSQL **10.0.2** · PostgreSQL server **17**.
 > Note: `Guid.CreateVersion7()` (time-ordered UUIDv7) is supported in .NET 9+ — already used in
 > `Tenant.cs`. PostgreSQL 18 adds a native `uuidv7()` SQL function but is not required for this.
@@ -37,7 +37,7 @@ client (MAUI mobile/desktop, etc.) consumes the same API.
             ┌─────────────────────────┐
             │  ASP.NET Core Web API    │
             │  + EF Core (Npgsql)      │──── PostgreSQL
-            │  + ASP.NET Core Identity │
+            │  + custom JWT auth       │
             └────────────┬────────────┘
                          │ HTTP (API boundary)
         ┌────────────────┴───────────────────┐
@@ -67,7 +67,8 @@ differ) but captures the majority of the UI. Cheap now, expensive to retrofit �
 - **Tenant ≠ User.** A Tenant (org/household/team — label is app-specific) owns the data; Users
   belong to a Tenant; multiple Users per Tenant.
 - **Tenant-scoped data, per-user preferences only.** Enforce tenant scoping on every query; never
-  leak across tenants. ASP.NET Core Identity handles users; tenant association sits on top.
+  leak across tenants. Users are custom entities authenticated by app-issued JWTs; tenant
+  association sits on top and is enforced by a global EF query filter.
 
 ## Why these choices (rationale, constant)
 
@@ -78,17 +79,17 @@ differ) but captures the majority of the UI. Cheap now, expensive to retrofit �
 - **PostgreSQL** — free, portable, cheap to host; capable. Chosen over SQL Server for
   economy/portability.
 - **EF Core (Npgsql)** — default .NET ORM; first-class Postgres; maps the data model to migrations.
-- **ASP.NET Core Identity** — built-in user/auth; tenant scoping layers on top.
+- **Custom JWT + rotating refresh tokens** (not ASP.NET Core Identity) — a hardened auth stack the
+  template ships: passwordless (magic link + email OTP) and OAuth account-linking on custom
+  `User`/`UserLogin`/`LoginToken`/`RefreshToken` entities. Tenant scoping layers on top. See ADR-002.
 - **MAUI Blazor Hybrid (deferred)** — reuses the C# Blazor UI (via RCL) across mobile + Win/macOS
   desktop, not just the API. Deferred until non-web work begins; re-check MAUI maturity then.
   Alternatives if MAUI disappoints: Uno Platform, Avalonia, or a JS frontend against the same API.
 
 ## Deferred sub-decisions (revisit when relevant)
 
-- Final non-web-client framework commitment (MAUI intended).
 - Hosting specifics (pick near deploy; undemanding profile).
-- JWT Bearer auth scheme — configured in the auth story slice (scheme choice is app-specific).
-- SMS OTP provider (Twilio etc.) — deferred until mobile client work begins.
+- SMS OTP provider (Twilio etc.) — deferred until phone-based OTP is needed.
 
 ## Local dev environment (constant)
 
@@ -96,7 +97,7 @@ Spun up via `docker compose up -d`. Copy `.env.example` → `.env` and adjust be
 
 | Service | Image | Default port(s) | Purpose |
 |---------|-------|-----------------|---------|
-| `db` | `postgres:17` | `${DB_PORT:-5432}` | PostgreSQL — matches production DB engine |
+| `db` | `postgres:17` | `${DB_PORT:-5432}` (committed `.env.example` sets **5433**) | PostgreSQL — matches production DB engine |
 | `mail` | `axllent/mailpit:latest` | SMTP `${MAIL_SMTP_PORT:-1025}`, UI `${MAIL_UI_PORT:-8025}` | Local SMTP trap for Identity email flows |
 
 Both services have healthchecks. When the API container is added to compose (per-project), it should declare `depends_on: db: condition: service_healthy`.

@@ -797,6 +797,5 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   directly into executable E2E scenarios — keep the two in sync as automation grows.
 - When you add an app-specific domain feature on top of this template, add a matching suite here and
   a row in the traceability matrix (§15) so "entire functionality" stays honest.
-- `docs/FEATURES.md` still carries the original template (Identity-based) flow descriptions; the
-  behavior tested here reflects the **actual** JWT-based implementation. Treat this plan as the
-  current source of truth for observable behavior until `FEATURES.md` is reconciled.
+- `docs/FEATURES.md` describes the same JWT-based flows at the design level; this plan is their
+  step-by-step verification. Keep the two in sync when behavior changes.
