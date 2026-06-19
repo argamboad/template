@@ -16,7 +16,7 @@ public interface IJwtTokenService
     /// name becomes a 'name' claim and the tenant name becomes a tenant_name claim
     /// (both surfaced in the client top bar).
     /// </summary>
-    string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null);
+    string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null);
 
     /// <summary>Validates a JWT token and returns its claims if valid.</summary>
     ClaimsPrincipal? ValidateToken(string token);
@@ -29,7 +29,11 @@ public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> log
     private const string TenantNameClaim = "tenant_name";
     private const string LocaleClaim = "locale";
 
-    public string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null)
+    /// <summary>The caller's tenant id. Read server-side by the current-tenant accessor
+    /// to drive tenant query scoping; not consumed by the web client.</summary>
+    public const string TenantIdClaim = "tenant_id";
+
+    public string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null)
     {
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email cannot be empty", nameof(email));
@@ -52,6 +56,8 @@ public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> log
             claims.Add(new Claim(TenantNameClaim, tenantName));
         if (!string.IsNullOrWhiteSpace(locale))
             claims.Add(new Claim(LocaleClaim, locale));
+        if (tenantId is { } tid)
+            claims.Add(new Claim(TenantIdClaim, tid.ToString()));
 
         var token = new JwtSecurityToken(
             issuer: settings.Issuer,

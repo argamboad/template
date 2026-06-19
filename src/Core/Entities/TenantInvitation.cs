@@ -6,7 +6,7 @@ namespace Template.Core.Entities;
 /// (identity is the login, not the bare email). Only the SHA-256 hash of the
 /// token is stored — the raw token is revealed once at creation.
 /// </summary>
-public class TenantInvitation
+public class TenantInvitation : ITenantScoped
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid TenantId { get; set; }

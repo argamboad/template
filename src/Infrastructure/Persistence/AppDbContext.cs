@@ -1,12 +1,21 @@
+using System.Reflection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Template.Core.Abstractions;
 using Template.Core.Entities;
 
 namespace Template.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options)
+public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant currentTenant)
     : DbContext(options), IDataProtectionKeyContext
 {
+    /// <summary>
+    /// Tenant the global query filter scopes to. <see cref="Guid.Empty"/> when there is
+    /// no current tenant — it matches no real (UUIDv7) row, so unauthenticated/tenant-less
+    /// callers see no tenant-scoped data (fail closed).
+    /// </summary>
+    public Guid CurrentTenantId => currentTenant.TenantId ?? Guid.Empty;
+
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
@@ -104,5 +113,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             t.Ignore(x => x.IsExpired);
             t.Ignore(x => x.IsValid);
         });
+
+        // Tenant isolation as a structural guarantee: every ITenantScoped entity is
+        // filtered to CurrentTenantId by default, so feature/domain queries can't forget
+        // to scope. Genuinely cross-tenant or pre-auth lookups opt out with
+        // IgnoreQueryFilters(). This is a query-time filter only — no schema change.
+        foreach (var entityType in builder.Model.GetEntityTypes())
+        {
+            if (typeof(ITenantScoped).IsAssignableFrom(entityType.ClrType))
+                ApplyTenantFilterMethod
+                    .MakeGenericMethod(entityType.ClrType)
+                    .Invoke(this, [builder]);
+        }
     }
+
+    private static readonly MethodInfo ApplyTenantFilterMethod =
+        typeof(AppDbContext).GetMethod(nameof(ApplyTenantFilter),
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+    private void ApplyTenantFilter<TEntity>(ModelBuilder builder) where TEntity : class, ITenantScoped
+        => builder.Entity<TEntity>().HasQueryFilter(e => e.TenantId == CurrentTenantId);
 }

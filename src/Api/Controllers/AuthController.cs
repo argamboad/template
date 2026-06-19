@@ -165,9 +165,9 @@ public class AuthController(
             // Rotate: revoke the used token, issue a new one.
             await refreshTokenService.RevokeRefreshTokenAsync(validToken.Id);
 
-            var tenantName = await ResolveTenantNameAsync(user.Id);
+            var (tenantId, tenantName) = await ResolveTenantAsync(user.Id);
             var newJwt = jwtTokenService.IssueAccessToken(
-                user.Id, user.Email, validToken.Provider, user.DisplayName, tenantName, user.Locale);
+                user.Id, user.Email, validToken.Provider, user.DisplayName, tenantName, user.Locale, tenantId);
 
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ipAddress, validToken.Provider);
@@ -245,7 +245,7 @@ public class AuthController(
         if (user == null)
             return Unauthorized();
 
-        var tenantName = await ResolveTenantNameAsync(user.Id);
+        var (_, tenantName) = await ResolveTenantAsync(user.Id);
         return Ok(new UserProfileResponse
         {
             UserName = user.DisplayName ?? user.Email,
@@ -407,9 +407,9 @@ public class AuthController(
 
         var refreshForBody = await EstablishSessionAsync(result.User.Id, LoginTokenPurpose.Otp);
 
-        var tenantName = await ResolveTenantNameAsync(result.User.Id);
+        var (tenantId, tenantName) = await ResolveTenantAsync(result.User.Id);
         var jwt = jwtTokenService.IssueAccessToken(
-            result.User.Id, result.User.Email, LoginTokenPurpose.Otp, result.User.DisplayName, tenantName, result.User.Locale);
+            result.User.Id, result.User.Email, LoginTokenPurpose.Otp, result.User.DisplayName, tenantName, result.User.Locale, tenantId);
 
         return Ok(new TokenResponse
         {
@@ -518,9 +518,9 @@ public class AuthController(
         if (user is null)
             return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
-        var tenantName = await ResolveTenantNameAsync(user.Id);
+        var (tenantId, tenantName) = await ResolveTenantAsync(user.Id);
         var jwt = jwtTokenService.IssueAccessToken(
-            user.Id, user.Email, grant.Value.Provider, user.DisplayName, tenantName, user.Locale);
+            user.Id, user.Email, grant.Value.Provider, user.DisplayName, tenantName, user.Locale, tenantId);
 
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ip, grant.Value.Provider);
@@ -542,12 +542,12 @@ public class AuthController(
     /// for the JWT tenant_name claim and the /me profile. Null when the user has no
     /// membership.
     /// </summary>
-    private async Task<string?> ResolveTenantNameAsync(Guid userId)
+    private async Task<(Guid? Id, string? Name)> ResolveTenantAsync(Guid userId)
     {
         var membership = await tenantRepository.GetMembershipAsync(userId);
-        if (membership is null) return null;
+        if (membership is null) return (null, null);
         var tenant = await tenantRepository.GetByIdAsync(membership.TenantId);
-        return tenant?.Name;
+        return (membership.TenantId, tenant?.Name);
     }
 
     private async Task IssueRefreshCookieAsync(Guid userId, string provider)

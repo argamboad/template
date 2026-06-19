@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Template.Api.Configuration;
 using Template.Api.Services;
+using Template.Core.Abstractions;
 using Template.Infrastructure;
 using Template.Infrastructure.Persistence;
 
@@ -71,7 +72,10 @@ builder.Services.AddSingleton<ILinkTokenService, LinkTokenService>();
 builder.Services.AddSingleton<INativeAuthCodeService, NativeAuthCodeService>();
 
 // Tenant ("household") management services.
-builder.Services.AddScoped<ITenantContext, TenantContext>();
+// Current-tenant accessor — reads the JWT tenant_id claim; drives the global tenant
+// query filter in AppDbContext and is the slice-facing tenancy entry point.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 

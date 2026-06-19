@@ -1,8 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using Template.Core.Abstractions;
 using Template.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
 namespace Template.Api.Tests.Infrastructure;
+
+/// <summary>Test double for the request's current tenant. Settable so a test can run
+/// "as" a given tenant and exercise the global query filter.</summary>
+public sealed class TestCurrentTenant : ICurrentTenant
+{
+    public Guid? TenantId { get; set; }
+}
 
 /// <summary>
 /// Spins up a real PostgreSQL instance in a throwaway container for the whole test
@@ -29,13 +37,17 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 
-    /// <summary>A fresh context bound to the container. The caller disposes it.</summary>
-    public AppDbContext CreateContext()
+    /// <summary>
+    /// A fresh context bound to the container, acting as <paramref name="tenantId"/>
+    /// (null = no current tenant, so tenant-scoped rows are filtered out). The caller
+    /// disposes it.
+    /// </summary>
+    public AppDbContext CreateContext(Guid? tenantId = null)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString)
             .Options;
-        return new AppDbContext(options);
+        return new AppDbContext(options, new TestCurrentTenant { TenantId = tenantId });
     }
 
     /// <summary>
