@@ -13,6 +13,7 @@ using Template.Core.Abstractions;
 using Template.Core.Entities;
 using Template.Core.Repositories;
 using Template.Infrastructure;
+using Template.Infrastructure.Email;
 
 namespace Template.Api.Controllers;
 
@@ -324,12 +325,8 @@ public class AuthController(
         var link = $"{Request.Scheme}://{Request.Host}/api/auth/magic-link/verify" +
                    $"?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(email)}";
 
-        await emailSender.SendAsync(email, "Your sign-in link",
-            $"""
-             <p>Click the link below to sign in. It expires in {passwordlessSettings.MagicLinkLifespanMinutes} minutes.</p>
-             <p><a href="{link}">Sign in</a></p>
-             <p>If you didn't request this, you can safely ignore this email.</p>
-             """);
+        var emailBody = BrandedEmail.MagicLink(link, passwordlessSettings.MagicLinkLifespanMinutes);
+        await emailSender.SendAsync(email, "Your sign-in link", emailBody.Html, emailBody.InlineImages);
 
         return Ok();
     }
@@ -361,12 +358,8 @@ public class AuthController(
         var email = req.Email.Trim();
         var code = await passwordless.IssueOtpAsync(email);
 
-        await emailSender.SendAsync(email, "Your verification code",
-            $"""
-             <p>Your verification code is:</p>
-             <p style="font-size:24px;font-weight:bold;letter-spacing:3px">{code}</p>
-             <p>It expires in {passwordlessSettings.OtpLifespanMinutes} minutes.</p>
-             """);
+        var emailBody = BrandedEmail.Otp(code, passwordlessSettings.OtpLifespanMinutes);
+        await emailSender.SendAsync(email, "Your verification code", emailBody.Html, emailBody.InlineImages);
 
         return Ok();
     }

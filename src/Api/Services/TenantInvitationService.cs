@@ -3,6 +3,7 @@ using Template.Api.Configuration;
 using Template.Core.Abstractions;
 using Template.Core.Entities;
 using Template.Core.Repositories;
+using Template.Infrastructure.Email;
 
 namespace Template.Api.Services;
 
@@ -212,13 +213,9 @@ public class TenantInvitationService(
         var joinUrl = $"{appSettings.ClientUrl}/join?token={Uri.EscapeDataString(rawToken)}";
         try
         {
+            var emailBody = BrandedEmail.Invitation(joinUrl, rawToken);
             await emailSender.SendAsync(email, "You've been invited to a household",
-                $"""
-                 <p>You've been invited to join a household.</p>
-                 <p><a href="{joinUrl}">Accept the invitation</a></p>
-                 <p>Or use this token to join: <code>{rawToken}</code></p>
-                 <p>If you didn't expect this, you can safely ignore this email.</p>
-                 """);
+                emailBody.Html, emailBody.InlineImages);
         }
         catch (Exception ex)
         {

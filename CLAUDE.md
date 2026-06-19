@@ -15,6 +15,10 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 - Wondering *why* something is the way it is → check **`docs/DECISIONS.md`** before changing it.
 - Changing a settled decision → add a new dated ADR in `docs/DECISIONS.md`; don't silently
   reverse it.
+- Rebranding (name, logo, colours, tagline) → follow **`docs/REBRANDING.md`** and complete every
+  item. It explicitly covers the **transactional email templates** (`src/Infrastructure/Email/` —
+  `BrandedEmail.cs` + `Assets/logo.png`), which are inline and easy to miss; a rebrand that skips
+  them is incomplete.
 
 ## Golden rules — constant (do not violate)
 1. **Tenant-scoped, not user-scoped.** App data belongs to the tenant; enforce `tenant_id`
@@ -84,6 +88,8 @@ deferred items without an explicit decision.
 | `docs/TECH_STACK.md` | Stack choices + rationale |
 | `docs/DECISIONS.md` | ADR log (the "why") |
 | `docs/WAYS_OF_WORKING.md` | Slices, story format, commit/PR conventions |
+| `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
+| `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
 | `docs/stories/` | User stories per epic — generated at build time |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `SCHEMA.sql` / migrations | Concrete schema — generated from DATA_MODEL.md |
