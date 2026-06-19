@@ -85,8 +85,9 @@ public class PasswordlessService(
         if (record is null)
             return new OtpResult(OtpStatus.Expired, null); // none active → expired or never issued
 
-        // Constant-time-ish comparison via hash equality.
-        if (tokenHasher.HashToken(code) == record.CodeHash)
+        // Timing-safe comparison — the OTP code is low-entropy, so don't leak it via
+        // early-exit string equality.
+        if (tokenHasher.Verify(code, record.CodeHash))
         {
             record.ConsumedAt = DateTimeOffset.UtcNow;
             await repository.UpdateAsync(record);
