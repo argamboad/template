@@ -114,15 +114,19 @@ Port variables allow multiple projects to run simultaneously without conflicts.
 **Adding a new OAuth provider:** install the provider package, add `.AddXxx(options => ...)` in
 `ServiceCollectionExtensions.AddInfrastructure()`. No structural changes needed.
 
-**OAuth credentials in dev:** use `dotnet user-secrets` — never put client IDs/secrets in
-`appsettings.json` or `appsettings.Development.json`.
+**Secrets in dev:** all local secrets/config live in the gitignored repo-root `.env` (loaded by
+the API via DotNetEnv — see ADR-001); never put them in `appsettings*.json`. Copy `.env.example`
+to `.env` and fill in. Keys use the .NET env-var form (`__` = section nesting):
 ```sh
-cd src/Api
-dotnet user-secrets set "Authentication:Google:ClientId" "..."
-dotnet user-secrets set "Authentication:Google:ClientSecret" "..."
-dotnet user-secrets set "Authentication:Microsoft:ClientId" "..."
-dotnet user-secrets set "Authentication:Microsoft:ClientSecret" "..."
+# .env  (repo root)
+Jwt__Secret=...
+Authentication__Google__ClientId=...
+Authentication__Google__ClientSecret=...
+Authentication__Microsoft__ClientId=...
+Authentication__Microsoft__ClientSecret=...
+# Email__Smtp__* — optional; unset = Mailpit trap in dev
 ```
+Production reads the same keys from real environment variables, never a committed file.
 
 ## App-specific notes
 <!-- Fill per project: anything this app needs beyond the constant stack — extra libraries,

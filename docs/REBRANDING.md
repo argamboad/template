@@ -21,7 +21,7 @@ Backstop after working through the list: `git grep -i perezosoft` and a search f
 - **Localization resources (every language!)** — the brand name + product copy live in
   `src/Shared.Ui/Resources/AppStrings.*.resx` and `src/Infrastructure/Email/EmailStrings.*.resx`.
   Update "Perezosoft" in each `.resx` you have (en, es, …). See `docs/LOCALIZATION.md`.
-- **Email sender name** — `Email:Smtp:FromName` (user-secrets in dev / env in prod), currently "Perezosoft"
+- **Email sender name** — `Email__Smtp__FromName` (in `.env` for dev / env vars in prod), currently "Perezosoft"
 
 ## 2. Tagline — "Lazy reputation. Efficient engineering." → yours
 - `src/Shared.Ui/wwwroot/brand/lockup_light.svg` — the wordmark-lockup text

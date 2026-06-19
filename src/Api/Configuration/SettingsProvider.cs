@@ -15,7 +15,7 @@ public class JwtSettings : IJwtSettings
     public JwtSettings(IConfiguration config)
     {
         SecretKey = config["Jwt:Secret"]
-            ?? throw new InvalidOperationException("Jwt:Secret not configured (set it via user-secrets in dev)");
+            ?? throw new InvalidOperationException("Jwt:Secret not configured (set Jwt__Secret in .env for dev)");
         Issuer = config["Jwt:Issuer"] ?? "Template";
         ExpiryMinutes = config.GetValue("Jwt:ExpiryMinutes", 60);
 

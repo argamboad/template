@@ -51,7 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         // External OAuth — to add a new provider, append .AddXxx(...) below.
-        // Credentials come from config; use user-secrets in dev (never commit secrets).
+        // Credentials come from config; set them in .env for dev (never commit secrets).
         var auth = services.AddAuthentication();
 
         // Temporary carrier cookie for the external principal during the OAuth round-trip.
@@ -76,7 +76,7 @@ public static class ServiceCollectionExtensions
         }
 
         // Only register an OAuth provider when credentials are present.
-        // Configure via user-secrets in dev; environment variables in production.
+        // Configure via .env in dev; environment variables in production.
         if (!string.IsNullOrEmpty(configuration["Authentication:Google:ClientId"]))
             auth.AddGoogle(google =>
             {

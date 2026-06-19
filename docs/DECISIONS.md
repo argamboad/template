@@ -99,3 +99,17 @@ conflicts. Both services expose healthchecks; API containers should declare `dep
 condition: service_healthy`. No pgAdmin in the template — devs use their own DB client.
 *Rationale:* PostgreSQL is always needed; Mailpit covers Identity email flows (confirm account,
 password reset) with zero config; env-var ports prevent port clashes across projects.
+
+**ADR-001 — Local-dev secrets/config consolidated in `.env` (DotNetEnv); supersedes user-secrets. (2026-06-19)**
+All local-dev secrets and config (`Jwt__Secret`, `Authentication__{Google,Microsoft}__*`,
+`Email__Smtp__*`) live in the repo-root **`.env`** alongside the existing docker-compose vars —
+one file. The API loads it at startup via **DotNetEnv** (`Env.TraversePath().Load()` before the
+host builder; a no-op when absent, e.g. production). Keys use the .NET env-var form (`__` =
+section nesting) so they bind to the same config keys. `.env` stays gitignored; `.env.example`
+(committed) documents every key with placeholders. **Production is unchanged** — the same keys
+come from real environment variables, never a committed file. This **supersedes the
+`dotnet user-secrets`** approach noted in ADR-C15.
+*Rationale:* a single, visible local-config file was the explicit preference; `.env` already
+existed for docker-compose, so the app secrets join it. Trade-off vs user-secrets: secrets now
+sit in the working tree (mitigated by `.gitignore`) rather than the user profile — accepted for
+this workflow.

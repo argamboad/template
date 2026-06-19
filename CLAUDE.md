@@ -52,8 +52,10 @@ _TODO_
 - **Non-web clients:** MAUI Blazor Hybrid (mobile + Win/macOS desktop) — *deferred, don't build now.*
 
 ## Auth rules (constant)
-- **OAuth credentials are never in appsettings.** Use `dotnet user-secrets` in dev; environment
-  variables in production. See `docs/TECH_STACK.md` for the commands.
+- **Secrets are never in appsettings.** In dev they live in the gitignored repo-root **`.env`**
+  (loaded by the API via DotNetEnv; the single local source of truth — see ADR-001); in
+  production they come from real environment variables. Keys use the `Section__Sub` form.
+  `.env.example` (committed) documents them. Never commit `.env`.
 - **New OAuth provider = one line.** Add `.AddXxx()` in `ServiceCollectionExtensions`. Don't
   restructure anything else.
 - **Magic links use `MagicLinkTokenProvider`.** Purpose constant: `MagicLinkTokenProvider.Purpose`.

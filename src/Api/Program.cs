@@ -7,6 +7,11 @@ using Template.Api.Services;
 using Template.Infrastructure;
 using Template.Infrastructure.Persistence;
 
+// Local dev: load secrets/config from the repo-root .env (the single local source of truth —
+// see docs/DECISIONS.md). TraversePath walks up to find it regardless of the working dir; the
+// try/catch makes it a no-op when there's no .env (e.g. production, which uses real env vars).
+try { DotNetEnv.Env.TraversePath().Load(); } catch { /* no .env present */ }
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
