@@ -1,10 +1,6 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using Template.Api.Models;
 using Template.Api.Services;
-using Template.Core.Entities;
 using Template.Core.Repositories;
 
 namespace Template.Api.Controllers;
@@ -18,37 +14,24 @@ namespace Template.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/household")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class HouseholdController(
     ITenantService service,
     ITenantRepository tenants,
-    IErrorResponseFactory errorFactory) : ControllerBase
+    IErrorResponseFactory errorFactory) : TenantApiControllerBase(tenants, errorFactory)
 {
-    private bool TryGetUserId(out Guid userId) =>
-        Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out userId);
-
-    private async Task<TenantMembership?> GetMembershipAsync(CancellationToken cancellationToken = default) =>
-        TryGetUserId(out var uid) ? await tenants.GetMembershipAsync(uid, cancellationToken) : null;
-
-    private static bool IsOwner(TenantMembership m) =>
-        string.Equals(m.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase);
-
-    private IActionResult Forbid403(string message) =>
-        StatusCode(StatusCodes.Status403Forbidden, errorFactory.CreateError("forbidden", message));
-
     /// <summary>Tenant + caller role + member roster (any member).</summary>
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken cancellationToken)
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
 
-        var tenant = await tenants.GetByIdAsync(membership.TenantId, cancellationToken);
+        var tenant = await Tenants.GetByIdAsync(membership.TenantId, cancellationToken);
         if (tenant == null)
-            return NotFound(errorFactory.CreateError("household_not_found", "Household not found"));
+            return NotFound(ErrorFactory.CreateError("household_not_found", "Household not found"));
 
-        var members = await tenants.GetMemberDetailsAsync(membership.TenantId, cancellationToken);
+        var members = await Tenants.GetMemberDetailsAsync(membership.TenantId, cancellationToken);
         return Ok(new TenantResponse
         {
             Id = tenant.Id,
@@ -64,19 +47,19 @@ public class HouseholdController(
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can rename the household");
 
         if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest(errorFactory.CreateError("invalid_request", "Name is required"));
+            return BadRequest(ErrorFactory.CreateError("invalid_request", "Name is required"));
 
         var renamed = await service.RenameAsync(membership.TenantId, request.Name, cancellationToken);
         if (!renamed)
-            return NotFound(errorFactory.CreateError("household_not_found", "Household not found"));
+            return NotFound(ErrorFactory.CreateError("household_not_found", "Household not found"));
 
-        var tenant = await tenants.GetByIdAsync(membership.TenantId, cancellationToken);
-        var members = await tenants.GetMemberDetailsAsync(membership.TenantId, cancellationToken);
+        var tenant = await Tenants.GetByIdAsync(membership.TenantId, cancellationToken);
+        var members = await Tenants.GetMemberDetailsAsync(membership.TenantId, cancellationToken);
         return Ok(new TenantResponse
         {
             Id = tenant!.Id,
@@ -92,19 +75,19 @@ public class HouseholdController(
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can remove members");
 
         // The owner leaves/transfers via the leave/transfer endpoints, not this one.
         if (userId == membership.UserId)
-            return BadRequest(errorFactory.CreateError("invalid_request",
+            return BadRequest(ErrorFactory.CreateError("invalid_request",
                 "You cannot remove yourself — transfer ownership or leave instead"));
 
         var result = await service.RemoveMemberAsync(membership.TenantId, userId, cancellationToken);
         return result == RemoveMemberResult.Removed
             ? NoContent()
-            : NotFound(errorFactory.CreateError("member_not_found", "That user is not a member of this household"));
+            : NotFound(ErrorFactory.CreateError("member_not_found", "That user is not a member of this household"));
     }
 
     /// <summary>Transfers ownership to an existing member (owner only).</summary>
@@ -113,22 +96,22 @@ public class HouseholdController(
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can transfer ownership");
 
         if (request.UserId is not { } targetUserId)
-            return BadRequest(errorFactory.CreateError("invalid_request", "user_id is required"));
+            return BadRequest(ErrorFactory.CreateError("invalid_request", "user_id is required"));
         if (targetUserId == membership.UserId)
-            return BadRequest(errorFactory.CreateError("invalid_request", "You already own this household"));
+            return BadRequest(ErrorFactory.CreateError("invalid_request", "You already own this household"));
 
         var result = await service.TransferOwnershipAsync(membership.TenantId, membership.UserId, targetUserId, cancellationToken);
         return result switch
         {
             TransferResult.Transferred => NoContent(),
-            TransferResult.TargetNotMember => NotFound(errorFactory.CreateError("member_not_found", "That user is not a member of this household")),
-            TransferResult.ConcurrentModification => Conflict(errorFactory.CreateError("concurrent_modification", "Ownership was modified by a concurrent request — please retry")),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, errorFactory.CreateError("internal_error", "Unexpected transfer result"))
+            TransferResult.TargetNotMember => NotFound(ErrorFactory.CreateError("member_not_found", "That user is not a member of this household")),
+            TransferResult.ConcurrentModification => Conflict(ErrorFactory.CreateError("concurrent_modification", "Ownership was modified by a concurrent request — please retry")),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, ErrorFactory.CreateError("internal_error", "Unexpected transfer result"))
         };
     }
 
@@ -137,21 +120,21 @@ public class HouseholdController(
     [HttpPost("leave")]
     public async Task<IActionResult> Leave([FromBody] LeaveTenantRequest? request, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+        if (CurrentUserId is not { } userId)
+            return InvalidToken();
 
         var outcome = await service.LeaveAsync(userId, request?.ConfirmDissolve ?? false, cancellationToken);
         return outcome switch
         {
             LeaveOutcome.Left or LeaveOutcome.Dissolved => NoContent(),
-            LeaveOutcome.MustTransferFirst => BadRequest(errorFactory.CreateError(
+            LeaveOutcome.MustTransferFirst => BadRequest(ErrorFactory.CreateError(
                 "must_transfer_first", "Transfer ownership before leaving — other members remain")),
-            LeaveOutcome.ConfirmationRequired => Conflict(errorFactory.CreateError(
+            LeaveOutcome.ConfirmationRequired => Conflict(ErrorFactory.CreateError(
                 "confirmation_required",
                 "Leaving dissolves this household and permanently deletes its data and pending "
                 + "invitations. Re-send with confirm_dissolve=true to proceed.")),
             _ => StatusCode(StatusCodes.Status500InternalServerError,
-                errorFactory.CreateError("internal_error", "Unexpected leave outcome"))
+                ErrorFactory.CreateError("internal_error", "Unexpected leave outcome"))
         };
     }
 }

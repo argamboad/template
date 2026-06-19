@@ -1,10 +1,6 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using Template.Api.Models;
 using Template.Api.Services;
-using Template.Core.Entities;
 using Template.Core.Repositories;
 
 namespace Template.Api.Controllers;
@@ -17,25 +13,18 @@ namespace Template.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/household/invitations")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class HouseholdInvitationsController(
     ITenantInvitationService service,
     ITenantRepository tenants,
-    IErrorResponseFactory errorFactory) : ControllerBase
+    IErrorResponseFactory errorFactory) : TenantApiControllerBase(tenants, errorFactory)
 {
-    private bool TryGetUserId(out Guid userId) =>
-        Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out userId);
-
-    private async Task<TenantMembership?> GetMembershipAsync(CancellationToken cancellationToken = default) =>
-        TryGetUserId(out var uid) ? await tenants.GetMembershipAsync(uid, cancellationToken) : null;
-
     /// <summary>Creates an invitation (owner only). Returns the raw token once and emails it.</summary>
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateInvitationRequest request, CancellationToken cancellationToken)
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can invite members");
 
@@ -46,8 +35,8 @@ public class HouseholdInvitationsController(
                 $"/api/household/invitations/{result.Invitation!.Id}",
                 CreateInvitationResponse.From(result.Invitation, result.RawToken!)),
             InviteCreateStatus.AlreadyMember => Conflict(
-                errorFactory.CreateError("already_member", "That email is already a member of this household")),
-            _ => BadRequest(errorFactory.CreateError("invalid_request", "A valid email is required")),
+                ErrorFactory.CreateError("already_member", "That email is already a member of this household")),
+            _ => BadRequest(ErrorFactory.CreateError("invalid_request", "A valid email is required")),
         };
     }
 
@@ -57,7 +46,7 @@ public class HouseholdInvitationsController(
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can view invitations");
 
@@ -71,7 +60,7 @@ public class HouseholdInvitationsController(
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can regenerate invitation tokens");
 
@@ -81,9 +70,9 @@ public class HouseholdInvitationsController(
             InviteRegenerateStatus.Regenerated => Ok(
                 CreateInvitationResponse.From(result.Invitation!, result.RawToken!)),
             InviteRegenerateStatus.NotFound => NotFound(
-                errorFactory.CreateError("invitation_not_found", "Invitation not found")),
+                ErrorFactory.CreateError("invitation_not_found", "Invitation not found")),
             _ => BadRequest(
-                errorFactory.CreateError("invitation_not_pending", "Only pending invitations can be regenerated")),
+                ErrorFactory.CreateError("invitation_not_pending", "Only pending invitations can be regenerated")),
         };
     }
 
@@ -93,43 +82,37 @@ public class HouseholdInvitationsController(
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return InvalidToken();
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can revoke invitations");
 
         var found = await service.RevokeAsync(membership.TenantId, id, cancellationToken);
         return found
             ? NoContent()
-            : NotFound(errorFactory.CreateError("invitation_not_found", "Invitation not found"));
+            : NotFound(ErrorFactory.CreateError("invitation_not_found", "Invitation not found"));
     }
 
     /// <summary>Accepts an invitation by token, joining the tenant (any member).</summary>
     [HttpPost("accept")]
     public async Task<IActionResult> Accept([FromBody] AcceptInvitationRequest request, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+        if (CurrentUserId is not { } userId)
+            return InvalidToken();
 
         var status = await service.AcceptAsync(userId, request.Token ?? "", cancellationToken);
         return status switch
         {
             AcceptStatus.Joined => NoContent(),
             AcceptStatus.AlreadyMember => Conflict(
-                errorFactory.CreateError("already_member", "You are already a member of this household")),
+                ErrorFactory.CreateError("already_member", "You are already a member of this household")),
             AcceptStatus.MustTransferFirst => BadRequest(
-                errorFactory.CreateError("must_transfer_first", "Transfer ownership before joining another household")),
+                ErrorFactory.CreateError("must_transfer_first", "Transfer ownership before joining another household")),
             AcceptStatus.WouldAbandonData => BadRequest(
-                errorFactory.CreateError("would_abandon_data", "Your household has data — transfer or remove it before joining another")),
+                ErrorFactory.CreateError("would_abandon_data", "Your household has data — transfer or remove it before joining another")),
             AcceptStatus.NoHousehold => BadRequest(
-                errorFactory.CreateError("invalid_request", "Caller has no household")),
+                ErrorFactory.CreateError("invalid_request", "Caller has no household")),
             _ => BadRequest(
-                errorFactory.CreateError("invitation_invalid", "Invitation is invalid or has expired")),
+                ErrorFactory.CreateError("invitation_invalid", "Invitation is invalid or has expired")),
         };
     }
-
-    private static bool IsOwner(TenantMembership m) =>
-        string.Equals(m.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase);
-
-    private IActionResult Forbid403(string message) =>
-        StatusCode(StatusCodes.Status403Forbidden, errorFactory.CreateError("forbidden", message));
 }
