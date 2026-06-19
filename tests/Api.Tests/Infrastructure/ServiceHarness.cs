@@ -29,7 +29,7 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
     public ITokenGenerator TokenGen { get; } = new TokenGenerator();
     public ITokenHasher Hasher { get; } = new TokenHasher();
 
-    public UserService UserService() => new(Users, Db, NullLogger<UserService>.Instance);
+    public UserService UserService() => new(Users, Tenants, UnitOfWork, NullLogger<UserService>.Instance);
 
     public RefreshTokenService RefreshTokenService(int expiryDays = 30) =>
         new(RefreshTokens, TokenGen, Hasher, new TestRefreshSettings(expiryDays));

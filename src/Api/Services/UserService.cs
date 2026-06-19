@@ -1,6 +1,5 @@
 using Template.Core.Entities;
 using Template.Core.Repositories;
-using Template.Infrastructure.Persistence;
 
 namespace Template.Api.Services;
 
@@ -54,7 +53,11 @@ public enum LinkLoginResult
     OwnedByAnotherAccount
 }
 
-public class UserService(IUserRepository repository, AppDbContext db, ILogger<UserService> logger) : IUserService
+public class UserService(
+    IUserRepository repository,
+    ITenantRepository tenants,
+    IUnitOfWork unitOfWork,
+    ILogger<UserService> logger) : IUserService
 {
     public async Task<User> GetOrCreateUserAsync(string email, string providerUserId, string provider,
         string? displayName = null, bool emailVerified = false)
@@ -189,10 +192,13 @@ public class UserService(IUserRepository repository, AppDbContext db, ILogger<Us
             JoinedAt = now
         };
 
-        db.Tenants.Add(tenant);
-        db.Users.Add(newUser);
-        db.TenantMemberships.Add(membership);
-        await db.SaveChangesAsync();
+        // Tenant + user (+ its OAuth login via the Logins navigation) + owner membership in
+        // one transaction so a half-provisioned account can never persist.
+        await using var scope = await unitOfWork.BeginTransactionAsync();
+        await tenants.CreateAsync(tenant);
+        await repository.CreateAsync(newUser);
+        await tenants.AddMemberAsync(membership);
+        await scope.CommitAsync();
         return newUser;
     }
 
