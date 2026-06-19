@@ -49,6 +49,7 @@ public class TenantInvitationService(
     ITokenHasher tokenHasher,
     IUnitOfWork unitOfWork,
     IEmailSender emailSender,
+    IUserService userService,
     IApplicationSettings appSettings,
     IInvitationSettings invitationSettings,
     TimeProvider clock,
@@ -100,7 +101,7 @@ public class TenantInvitationService(
             logger.LogInformation("Created invitation {Id} for tenant {TenantId}", invitation.Id, tenantId);
         }
 
-        await SendInvitationEmailAsync(normalized, rawToken);
+        await SendInvitationEmailAsync(normalized, rawToken, inviterUserId);
         return (invitation, rawToken);
     }
 
@@ -121,7 +122,7 @@ public class TenantInvitationService(
         await invitations.UpdateAsync(invitation);
         logger.LogInformation("Regenerated token for invitation {Id} (tenant {TenantId})", invitation.Id, tenantId);
 
-        await SendInvitationEmailAsync(invitation.InvitedEmail, rawToken);
+        await SendInvitationEmailAsync(invitation.InvitedEmail, rawToken, userId);
         return (invitation, rawToken);
     }
 
@@ -208,14 +209,15 @@ public class TenantInvitationService(
             userId, invitation.Id, invitation.TenantId);
     }
 
-    private async Task SendInvitationEmailAsync(string email, string rawToken)
+    private async Task SendInvitationEmailAsync(string email, string rawToken, Guid inviterUserId)
     {
         var joinUrl = $"{appSettings.ClientUrl}/join?token={Uri.EscapeDataString(rawToken)}";
         try
         {
-            var emailBody = BrandedEmail.Invitation(joinUrl, rawToken);
-            await emailSender.SendAsync(email, "You've been invited to a household",
-                emailBody.Html, emailBody.InlineImages);
+            // Invites go out in the inviter's saved language (the recipient may have no account).
+            var inviter = await userService.GetUserByIdAsync(inviterUserId);
+            var emailBody = BrandedEmail.Invitation(joinUrl, rawToken, BrandedEmail.ResolveCulture(inviter?.Locale));
+            await emailSender.SendAsync(email, emailBody.Subject, emailBody.Html, emailBody.InlineImages);
         }
         catch (Exception ex)
         {

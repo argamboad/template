@@ -1,16 +1,24 @@
+using System.Globalization;
 using System.Reflection;
+using System.Resources;
 using Template.Core.Abstractions;
 
 namespace Template.Infrastructure.Email;
 
-/// <summary>The rendered HTML of a branded email plus the inline images it references.</summary>
-public sealed record EmailBody(string Html, IReadOnlyList<EmailInlineImage> InlineImages);
+/// <summary>A rendered branded email: localized subject, HTML, and the inline images it references.</summary>
+public sealed record EmailBody(string Subject, string Html, IReadOnlyList<EmailInlineImage> InlineImages);
 
 /// <summary>
 /// Builds the Perezosoft-branded HTML for transactional emails. Email HTML is its own
 /// world — table-based layout, inline styles, web-safe fonts only — so this does NOT reuse
 /// the app's CSS. The logo is embedded via CID (multipart/related), the one approach Gmail
 /// and Outlook render reliably (they block data-URI images).
+/// <para>
+/// Localized per <paramref name="culture"/> from <c>EmailStrings.resx</c>: emails are sent
+/// server-side in an explicit culture (the requester's UI language for OTP/magic link, the
+/// inviter's saved locale for invites), so it uses <see cref="ResourceManager"/> keyed by
+/// culture rather than the ambient thread culture.
+/// </para>
 /// </summary>
 public static class BrandedEmail
 {
@@ -27,51 +35,72 @@ public static class BrandedEmail
     private const string Muted = "#5a6b62";
     private const string Font = "'Segoe UI',Helvetica,Arial,sans-serif";
 
+    private static readonly ResourceManager Rm =
+        new("Template.Infrastructure.Email.EmailStrings", typeof(BrandedEmail).Assembly);
+    private static readonly CultureInfo DefaultCulture = CultureInfo.GetCultureInfo("en");
+
+    /// <summary>Resolves a locale code (e.g. "es") to a culture, defaulting to English.</summary>
+    public static CultureInfo ResolveCulture(string? locale)
+    {
+        if (string.IsNullOrWhiteSpace(locale)) return DefaultCulture;
+        try { return CultureInfo.GetCultureInfo(locale.Trim()); }
+        catch (CultureNotFoundException) { return DefaultCulture; }
+    }
+
+    private static string T(string key, CultureInfo culture, params object[] args)
+    {
+        var value = Rm.GetString(key, culture) ?? key;
+        return args.Length == 0 ? value : string.Format(culture, value, args);
+    }
+
     /// <summary>The logo as an inline image; reference it from HTML as <c>cid:perezosoft-logo</c>.</summary>
     public static EmailInlineImage Logo() => new(LogoCid, "logo.png", LoadLogo(), "image/png");
 
     /// <summary>"Email me a 6-digit code" — the OTP code email.</summary>
-    public static EmailBody Otp(string code, int lifespanMinutes) => Compose(
-        preheader: $"Your Perezosoft code: {code}",
-        inner: $"""
-            {Heading("Your verification code")}
-            {Paragraph($"Enter this code to finish signing in. It expires in {lifespanMinutes} minutes.")}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 4px;">
-              <div style="display:inline-block;background:{Surface};border:1px solid {Border};border-radius:10px;padding:16px 26px;font-family:{Font};font-size:30px;font-weight:700;letter-spacing:.35em;color:{Green};">{code}</div>
-            </td></tr></table>
-            {IgnoreNote()}
-            """);
+    public static EmailBody Otp(string code, int lifespanMinutes, CultureInfo culture) => Compose(
+        T("Otp_Subject", culture),
+        T("Otp_Preheader", culture, code),
+        $"""
+         {Heading(T("Otp_Heading", culture))}
+         {Paragraph(T("Otp_Body", culture, lifespanMinutes))}
+         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 4px;">
+           <div style="display:inline-block;background:{Surface};border:1px solid {Border};border-radius:10px;padding:16px 26px;font-family:{Font};font-size:30px;font-weight:700;letter-spacing:.35em;color:{Green};">{code}</div>
+         </td></tr></table>
+         {IgnoreNote(T("Common_IgnoreNote", culture))}
+         """);
 
     /// <summary>"Email me a magic link" — the passwordless sign-in link.</summary>
-    public static EmailBody MagicLink(string link, int lifespanMinutes) => Compose(
-        preheader: "Your sign-in link for Perezosoft",
-        inner: $"""
-            {Heading("Sign in to Perezosoft")}
-            {Paragraph($"Click the button below to sign in. This link expires in {lifespanMinutes} minutes.")}
-            {Button("Sign in", link)}
-            {Paragraph("Or paste this link into your browser:", small: true)}
-            <p style="margin:0 0 8px;font-family:{Font};font-size:12px;line-height:1.5;color:{Sage};word-break:break-all;">{link}</p>
-            {IgnoreNote()}
-            """);
+    public static EmailBody MagicLink(string link, int lifespanMinutes, CultureInfo culture) => Compose(
+        T("MagicLink_Subject", culture),
+        T("MagicLink_Preheader", culture),
+        $"""
+         {Heading(T("MagicLink_Heading", culture))}
+         {Paragraph(T("MagicLink_Body", culture, lifespanMinutes))}
+         {Button(T("MagicLink_Button", culture), link)}
+         {Paragraph(T("MagicLink_OrPaste", culture), small: true)}
+         <p style="margin:0 0 8px;font-family:{Font};font-size:12px;line-height:1.5;color:{Sage};word-break:break-all;">{link}</p>
+         {IgnoreNote(T("Common_IgnoreNote", culture))}
+         """);
 
     /// <summary>Household invitation — join link plus the raw token fallback.</summary>
-    public static EmailBody Invitation(string joinUrl, string token) => Compose(
-        preheader: "You've been invited to a household on Perezosoft",
-        inner: $"""
-            {Heading("You've been invited")}
-            {Paragraph("Someone invited you to join their household on Perezosoft. Accept below to get started.")}
-            {Button("Accept invitation", joinUrl)}
-            {Paragraph("Or use this token to join manually:", small: true)}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 4px;">
-              <div style="display:inline-block;background:{Surface};border:1px solid {Border};border-radius:8px;padding:10px 16px;font-family:'Courier New',monospace;font-size:13px;color:{Green};word-break:break-all;">{token}</div>
-            </td></tr></table>
-            {IgnoreNote("If you didn't expect this, you can safely ignore this email.")}
-            """);
+    public static EmailBody Invitation(string joinUrl, string token, CultureInfo culture) => Compose(
+        T("Invitation_Subject", culture),
+        T("Invitation_Preheader", culture),
+        $"""
+         {Heading(T("Invitation_Heading", culture))}
+         {Paragraph(T("Invitation_Body", culture))}
+         {Button(T("Invitation_Button", culture), joinUrl)}
+         {Paragraph(T("Invitation_OrToken", culture), small: true)}
+         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:0 0 4px;">
+           <div style="display:inline-block;background:{Surface};border:1px solid {Border};border-radius:8px;padding:10px 16px;font-family:'Courier New',monospace;font-size:13px;color:{Green};word-break:break-all;">{token}</div>
+         </td></tr></table>
+         {IgnoreNote(T("Common_IgnoreNoteUnexpected", culture))}
+         """);
 
     // ── shell + pieces ────────────────────────────────────────────────────────
 
-    private static EmailBody Compose(string preheader, string inner) =>
-        new(Wrap(preheader, inner), [Logo()]);
+    private static EmailBody Compose(string subject, string preheader, string inner) =>
+        new(subject, Wrap(preheader, inner), [Logo()]);
 
     private static string Wrap(string preheader, string inner) => $"""
         <!DOCTYPE html>
@@ -118,7 +147,7 @@ public static class BrandedEmail
         </tr></table>
         """;
 
-    private static string IgnoreNote(string text = "If you didn't request this, you can safely ignore this email.") =>
+    private static string IgnoreNote(string text) =>
         $"""<p style="margin:24px 0 0;font-family:{Font};font-size:13px;line-height:1.5;color:{SageLight};">{text}</p>""";
 
     private static byte[]? _logoCache;

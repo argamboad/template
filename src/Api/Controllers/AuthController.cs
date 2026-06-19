@@ -344,8 +344,9 @@ public class AuthController(
         var link = $"{Request.Scheme}://{Request.Host}/api/auth/magic-link/verify" +
                    $"?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(email)}";
 
-        var emailBody = BrandedEmail.MagicLink(link, passwordlessSettings.MagicLinkLifespanMinutes);
-        await emailSender.SendAsync(email, "Your sign-in link", emailBody.Html, emailBody.InlineImages);
+        var emailBody = BrandedEmail.MagicLink(link, passwordlessSettings.MagicLinkLifespanMinutes,
+            BrandedEmail.ResolveCulture(req.Culture));
+        await emailSender.SendAsync(email, emailBody.Subject, emailBody.Html, emailBody.InlineImages);
 
         return Ok();
     }
@@ -377,8 +378,9 @@ public class AuthController(
         var email = req.Email.Trim();
         var code = await passwordless.IssueOtpAsync(email);
 
-        var emailBody = BrandedEmail.Otp(code, passwordlessSettings.OtpLifespanMinutes);
-        await emailSender.SendAsync(email, "Your verification code", emailBody.Html, emailBody.InlineImages);
+        var emailBody = BrandedEmail.Otp(code, passwordlessSettings.OtpLifespanMinutes,
+            BrandedEmail.ResolveCulture(req.Culture));
+        await emailSender.SendAsync(email, emailBody.Subject, emailBody.Html, emailBody.InlineImages);
 
         return Ok();
     }
@@ -594,7 +596,7 @@ public class AuthController(
         !string.IsNullOrWhiteSpace(email) && email.Contains('@') && email.Contains('.');
 }
 
-public record EmailRequest(string Email);
+public record EmailRequest(string Email, string? Culture = null);
 
 public record OtpVerifyRequest(string Email, string Code);
 
