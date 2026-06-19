@@ -43,13 +43,6 @@ public interface ITenantRepository
     /// tenant-of-one is dissolved as its owner joins another.</summary>
     Task DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// True if the tenant has any real app data the owner would abandon by joining
-    /// another tenant. The template has no domain tables yet, so this is always
-    /// false; hook real domain tables in here once they exist.
-    /// </summary>
-    Task<bool> HasDataAsync(Guid tenantId, CancellationToken cancellationToken = default);
-
     /// <summary>The tenant's members joined to their user display info.</summary>
     Task<List<TenantMemberDetail>> GetMemberDetailsAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
@@ -58,10 +51,10 @@ public interface ITenantRepository
     Task RemoveMemberAsync(TenantMembership member, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Irreversibly wipes a tenant and all its app data in one transaction. The
-    /// template has no domain tables yet, so this only removes invitations,
-    /// memberships, and the tenant row; hook real domain tables in here once they
-    /// exist. User-scoped data (logins, tokens) is untouched.
+    /// Core tenant teardown in one transaction: removes invitations, memberships, and the
+    /// tenant row. Feature/domain data is wiped separately by each
+    /// <see cref="Template.Core.Abstractions.ITenantDataContributor"/>; user-scoped data
+    /// (logins, tokens) is untouched.
     /// </summary>
     Task WipeDataAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }

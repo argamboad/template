@@ -81,10 +81,6 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    // TODO: the template has no domain tables yet. When real tenant-scoped tables
-    // exist, return true here if any of them hold data for the tenant.
-    public Task<bool> HasDataAsync(Guid tenantId, CancellationToken cancellationToken = default) => Task.FromResult(false);
-
     public async Task<List<TenantMemberDetail>> GetMemberDetailsAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
         await (from m in db.TenantMemberships
                join u in db.Users on m.UserId equals u.Id
@@ -107,8 +103,8 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
 
     public async Task WipeDataAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        // TODO: the template has no domain tables yet. When real tenant-scoped tables
-        // exist, RemoveRange them here (dependents first) so the wipe is exhaustive.
+        // Core teardown only. Feature/domain tables are wiped by their ITenantDataContributor
+        // (called first, in the same transaction) — nothing to edit here per new feature.
         db.TenantInvitations.RemoveRange(db.TenantInvitations.Where(i => i.TenantId == tenantId));
         db.TenantMemberships.RemoveRange(db.TenantMemberships.Where(m => m.TenantId == tenantId));
 

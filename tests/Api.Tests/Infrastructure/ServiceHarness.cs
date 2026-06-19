@@ -38,7 +38,7 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
         new(LoginTokens, UserService(), TokenGen, Hasher, settings ?? new TestPasswordlessSettings());
 
     public TenantService TenantService() =>
-        new(Tenants, UnitOfWork, NullLogger<TenantService>.Instance);
+        new(Tenants, UnitOfWork, [], NullLogger<TenantService>.Instance);
 
     public JwtTokenService JwtTokenService() =>
         new(new TestJwtSettings(), NullLogger<JwtTokenService>.Instance);
@@ -49,7 +49,7 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
     public TenantInvitationService InvitationService(IInvitationSettings? invitation = null) =>
         new(Invitations, Tenants, TokenGen, Hasher, UnitOfWork, new NoopEmailSender(),
             UserService(), new TestAppSettings(), invitation ?? new TestInvitationSettings(),
-            Clock, NullLogger<TenantInvitationService>.Instance);
+            [], Clock, NullLogger<TenantInvitationService>.Instance);
 }
 
 internal sealed class TestRefreshSettings(int expiryDays = 30) : IRefreshTokenSettings

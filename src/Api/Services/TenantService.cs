@@ -1,3 +1,4 @@
+using Template.Core.Abstractions;
 using Template.Core.Entities;
 using Template.Core.Repositories;
 
@@ -55,6 +56,7 @@ public interface ITenantService
 public class TenantService(
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
+    IEnumerable<ITenantDataContributor> dataContributors,
     ILogger<TenantService> logger) : ITenantService
 {
     // The tenant a re-homed user lands in (UI label is "Household").
@@ -118,8 +120,11 @@ public class TenantService(
         {
             if (!confirmDissolve) return LeaveOutcome.ConfirmationRequired;
 
-            // Wipe + re-home atomically — a partial wipe is impossible.
+            // Wipe + re-home atomically — a partial wipe is impossible. Each feature's
+            // domain data goes first (its contributor), then the platform's core teardown.
             await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            foreach (var contributor in dataContributors)
+                await contributor.WipeAsync(tenantId, cancellationToken);
             await tenants.WipeDataAsync(tenantId, cancellationToken);
             await ReHomeAsync(userId, cancellationToken);
             await scope.CommitAsync(cancellationToken);

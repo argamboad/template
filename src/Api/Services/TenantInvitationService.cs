@@ -55,6 +55,7 @@ public class TenantInvitationService(
     IUserService userService,
     IApplicationSettings appSettings,
     IInvitationSettings invitationSettings,
+    IEnumerable<ITenantDataContributor> dataContributors,
     TimeProvider clock,
     ILogger<TenantInvitationService> logger) : ITenantInvitationService
 {
@@ -184,7 +185,7 @@ public class TenantInvitationService(
         var dissolveOld = false;
         if (soloOwner)
         {
-            if (await tenants.HasDataAsync(oldTenantId, cancellationToken))
+            if (await TenantHasDataAsync(oldTenantId, cancellationToken))
                 return AcceptStatus.WouldAbandonData;
             dissolveOld = true; // empty solo tenant-of-one is dissolved on join
         }
@@ -211,6 +212,15 @@ public class TenantInvitationService(
         logger.LogInformation("User {UserId} accepted invitation {Id} -> tenant {TenantId}",
             userId, invitation.Id, invitation.TenantId);
         return AcceptStatus.Joined;
+    }
+
+    // Any feature contributor holding data for the tenant blocks a silent abandon.
+    private async Task<bool> TenantHasDataAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        foreach (var contributor in dataContributors)
+            if (await contributor.HasDataAsync(tenantId, cancellationToken))
+                return true;
+        return false;
     }
 
     private async Task SendInvitationEmailAsync(string email, string rawToken, Guid inviterUserId, CancellationToken cancellationToken = default)
