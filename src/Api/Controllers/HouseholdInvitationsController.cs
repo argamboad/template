@@ -39,15 +39,16 @@ public class HouseholdInvitationsController(
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can invite members");
 
-        try
+        var result = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "");
+        return result.Status switch
         {
-            var (invitation, rawToken) = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "");
-            return Created($"/api/household/invitations/{invitation.Id}", CreateInvitationResponse.From(invitation, rawToken));
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+            InviteCreateStatus.Created => Created(
+                $"/api/household/invitations/{result.Invitation!.Id}",
+                CreateInvitationResponse.From(result.Invitation, result.RawToken!)),
+            InviteCreateStatus.AlreadyMember => Conflict(
+                errorFactory.CreateError("already_member", "That email is already a member of this household")),
+            _ => BadRequest(errorFactory.CreateError("invalid_request", "A valid email is required")),
+        };
     }
 
     /// <summary>Lists the tenant's pending invitations (owner only). Token is not returned.</summary>
@@ -74,18 +75,16 @@ public class HouseholdInvitationsController(
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can regenerate invitation tokens");
 
-        try
+        var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId);
+        return result.Status switch
         {
-            var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId);
-            if (result is null)
-                return NotFound(errorFactory.CreateError("invitation_not_found", "Invitation not found"));
-            var (invitation, rawToken) = result.Value;
-            return Ok(CreateInvitationResponse.From(invitation, rawToken));
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+            InviteRegenerateStatus.Regenerated => Ok(
+                CreateInvitationResponse.From(result.Invitation!, result.RawToken!)),
+            InviteRegenerateStatus.NotFound => NotFound(
+                errorFactory.CreateError("invitation_not_found", "Invitation not found")),
+            _ => BadRequest(
+                errorFactory.CreateError("invitation_not_pending", "Only pending invitations can be regenerated")),
+        };
     }
 
     /// <summary>Revokes a pending invitation (owner only).</summary>
@@ -98,17 +97,10 @@ public class HouseholdInvitationsController(
         if (!IsOwner(membership))
             return Forbid403("Only the household owner can revoke invitations");
 
-        try
-        {
-            var found = await service.RevokeAsync(membership.TenantId, id);
-            return found
-                ? NoContent()
-                : NotFound(errorFactory.CreateError("invitation_not_found", "Invitation not found"));
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+        var found = await service.RevokeAsync(membership.TenantId, id);
+        return found
+            ? NoContent()
+            : NotFound(errorFactory.CreateError("invitation_not_found", "Invitation not found"));
     }
 
     /// <summary>Accepts an invitation by token, joining the tenant (any member).</summary>
@@ -118,15 +110,21 @@ public class HouseholdInvitationsController(
         if (!TryGetUserId(out var userId))
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
 
-        try
+        var status = await service.AcceptAsync(userId, request.Token ?? "");
+        return status switch
         {
-            await service.AcceptAsync(userId, request.Token ?? "");
-            return NoContent();
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+            AcceptStatus.Joined => NoContent(),
+            AcceptStatus.AlreadyMember => Conflict(
+                errorFactory.CreateError("already_member", "You are already a member of this household")),
+            AcceptStatus.MustTransferFirst => BadRequest(
+                errorFactory.CreateError("must_transfer_first", "Transfer ownership before joining another household")),
+            AcceptStatus.WouldAbandonData => BadRequest(
+                errorFactory.CreateError("would_abandon_data", "Your household has data — transfer or remove it before joining another")),
+            AcceptStatus.NoHousehold => BadRequest(
+                errorFactory.CreateError("invalid_request", "Caller has no household")),
+            _ => BadRequest(
+                errorFactory.CreateError("invitation_invalid", "Invitation is invalid or has expired")),
+        };
     }
 
     private static bool IsOwner(TenantMembership m) =>
@@ -134,11 +132,4 @@ public class HouseholdInvitationsController(
 
     private IActionResult Forbid403(string message) =>
         StatusCode(StatusCodes.Status403Forbidden, errorFactory.CreateError("forbidden", message));
-
-    private IActionResult MapError(InvitationException ex) =>
-        ex.Error == "forbidden"
-            ? Forbid403(ex.Message)
-            : ex.Conflict
-                ? Conflict(errorFactory.CreateError(ex.Error, ex.Message))
-                : BadRequest(errorFactory.CreateError(ex.Error, ex.Message));
 }

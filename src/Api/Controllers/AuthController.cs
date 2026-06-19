@@ -218,11 +218,11 @@ public class AuthController(
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdValue, out var userId))
-            return Unauthorized();
+            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
 
         var user = await userService.GetUserByIdAsync(userId);
         if (user == null)
-            return Unauthorized();
+            return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
         var (_, tenantName) = await sessionService.ResolveTenantAsync(user.Id);
         return Ok(new UserProfileResponse

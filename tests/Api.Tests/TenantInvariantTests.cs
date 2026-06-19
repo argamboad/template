@@ -89,26 +89,24 @@ public class TenantInvariantTests(PostgresFixture fixture)
     }
 
     [Fact]
-    public async Task Invite_ExistingMember_Throws()
+    public async Task Invite_ExistingMember_ReturnsAlreadyMember()
     {
         var (oId, oTenant, _) = await TwoMemberHouseholdAsync();
 
         await using var db = fixture.CreateContext(oTenant);
-        var ex = await Assert.ThrowsAsync<InvitationException>(() =>
-            new ServiceHarness(db).InvitationService().CreateAsync(oTenant, oId, "member@example.com"));
-        Assert.Equal("already_member", ex.Error);
+        var result = await new ServiceHarness(db).InvitationService().CreateAsync(oTenant, oId, "member@example.com");
+        Assert.Equal(InviteCreateStatus.AlreadyMember, result.Status);
     }
 
     [Fact]
-    public async Task Accept_InvalidToken_Throws()
+    public async Task Accept_InvalidToken_ReturnsInvalidToken()
     {
         await fixture.ResetAsync();
         var (uId, _) = await ProvisionAsync("u@example.com");
 
         await using var db = fixture.CreateContext();
-        var ex = await Assert.ThrowsAsync<InvitationException>(() =>
-            new ServiceHarness(db).InvitationService().AcceptAsync(uId, "garbage-token"));
-        Assert.Equal("invitation_invalid", ex.Error);
+        Assert.Equal(AcceptStatus.InvalidToken,
+            await new ServiceHarness(db).InvitationService().AcceptAsync(uId, "garbage-token"));
     }
 
     [Fact]
@@ -122,17 +120,14 @@ public class TenantInvariantTests(PostgresFixture fixture)
         await using (var db = fixture.CreateContext(oTenant))
         {
             var svc = new ServiceHarness(db).InvitationService();
-            var (inv, raw) = await svc.CreateAsync(oTenant, oId, "invitee@example.com");
-            token = raw;
-            Assert.True(await svc.RevokeAsync(oTenant, inv.Id));
+            var created = await svc.CreateAsync(oTenant, oId, "invitee@example.com");
+            token = created.RawToken!;
+            Assert.True(await svc.RevokeAsync(oTenant, created.Invitation!.Id));
         }
 
         await using (var db = fixture.CreateContext())
-        {
-            var ex = await Assert.ThrowsAsync<InvitationException>(() =>
-                new ServiceHarness(db).InvitationService().AcceptAsync(mId, token));
-            Assert.Equal("invitation_invalid", ex.Error);
-        }
+            Assert.Equal(AcceptStatus.InvalidToken,
+                await new ServiceHarness(db).InvitationService().AcceptAsync(mId, token));
     }
 
     [Fact]
@@ -146,21 +141,19 @@ public class TenantInvariantTests(PostgresFixture fixture)
         await using (var db = fixture.CreateContext(oTenant))
         {
             var svc = new ServiceHarness(db).InvitationService();
-            var (inv, raw) = await svc.CreateAsync(oTenant, oId, "join@example.com");
-            oldToken = raw;
-            var regen = await svc.RegenerateAsync(oTenant, inv.Id, oId);
-            newToken = regen!.Value.RawToken;
+            var created = await svc.CreateAsync(oTenant, oId, "join@example.com");
+            oldToken = created.RawToken!;
+            var regen = await svc.RegenerateAsync(oTenant, created.Invitation!.Id, oId);
+            newToken = regen.RawToken!;
         }
 
         await using (var db = fixture.CreateContext())
-        {
-            var ex = await Assert.ThrowsAsync<InvitationException>(() =>
-                new ServiceHarness(db).InvitationService().AcceptAsync(mId, oldToken));
-            Assert.Equal("invitation_invalid", ex.Error);
-        }
+            Assert.Equal(AcceptStatus.InvalidToken,
+                await new ServiceHarness(db).InvitationService().AcceptAsync(mId, oldToken));
 
         await using (var db = fixture.CreateContext())
-            await new ServiceHarness(db).InvitationService().AcceptAsync(mId, newToken);
+            Assert.Equal(AcceptStatus.Joined,
+                await new ServiceHarness(db).InvitationService().AcceptAsync(mId, newToken));
 
         await using var read = fixture.CreateContext();
         Assert.Equal(oTenant, (await read.TenantMemberships.SingleAsync(m => m.UserId == mId)).TenantId);
@@ -186,12 +179,13 @@ public class TenantInvariantTests(PostgresFixture fixture)
         string token;
         await using (var db = fixture.CreateContext(oTenant))
             token = (await new ServiceHarness(db).InvitationService()
-                .CreateAsync(oTenant, oId, "member@example.com")).RawToken;
+                .CreateAsync(oTenant, oId, "member@example.com")).RawToken!;
 
         // Accept runs while the member's JWT still holds their old tenant — the
         // invitation lookups must bypass the global filter (proves Phase 1's exemption).
         await using (var db = fixture.CreateContext())
-            await new ServiceHarness(db).InvitationService().AcceptAsync(mId, token);
+            Assert.Equal(AcceptStatus.Joined,
+                await new ServiceHarness(db).InvitationService().AcceptAsync(mId, token));
 
         return (oId, oTenant, mId);
     }
