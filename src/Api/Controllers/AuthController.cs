@@ -529,7 +529,7 @@ public class AuthController(
         Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
     private static bool IsLikelyEmail(string? email) =>
-        !string.IsNullOrWhiteSpace(email) && email.Contains('@') && email.Contains('.');
+        !string.IsNullOrWhiteSpace(email) && System.Net.Mail.MailAddress.TryCreate(email.Trim(), out _);
 }
 
 public record EmailRequest(string Email, string? Culture = null);

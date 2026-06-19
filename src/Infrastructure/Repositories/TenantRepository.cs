@@ -41,10 +41,13 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
 
     public async Task<bool> IsEmailMemberAsync(Guid tenantId, string email)
     {
-        var lowered = email.ToLower();
+        // Emails are stored normalized (ToLowerInvariant on write); normalize the input the
+        // same way in C# and compare to the column directly — no per-row SQL ToLower() (which
+        // is culture-dependent and defeats the index).
+        var normalized = email.ToLowerInvariant();
         return await (from m in db.TenantMemberships
                       join u in db.Users on m.UserId equals u.Id
-                      where m.TenantId == tenantId && u.Email.ToLower() == lowered
+                      where m.TenantId == tenantId && u.Email == normalized
                       select m.Id).AnyAsync();
     }
 

@@ -29,11 +29,13 @@ public class TenantInvitationRepository(AppDbContext db) : ITenantInvitationRepo
 
     public async Task<TenantInvitation?> GetPendingByEmailAsync(Guid tenantId, string email)
     {
-        var lowered = email.ToLower();
+        // InvitedEmail is stored normalized; normalize the input in C# and compare directly
+        // (no per-row SQL ToLower(), which is culture-dependent and index-defeating).
+        var normalized = email.ToLowerInvariant();
         return await db.TenantInvitations.FirstOrDefaultAsync(i =>
             i.TenantId == tenantId
             && i.Status == InvitationStatuses.Pending
-            && i.InvitedEmail.ToLower() == lowered);
+            && i.InvitedEmail == normalized);
     }
 
     // Pre-membership lookup: the accepting user is not yet in the invitation's tenant
