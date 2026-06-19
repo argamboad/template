@@ -1,0 +1,36 @@
+@using System.Globalization
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject IStringLocalizer<AppStrings> Localizer
+
+<select class="form-select form-select-sm lang-switcher" value="@_current"
+        @onchange="OnChange" aria-label="@Localizer["Language"]">
+    @foreach (var c in Cultures)
+    {
+        <option value="@c.Code">@c.Name</option>
+    }
+</select>
+
+@code {
+    // Native language names — these stay constant regardless of the selected culture.
+    private static readonly (string Code, string Name)[] Cultures =
+    [
+        ("en", "English"),
+        ("es", "Español"),
+    ];
+
+    private string _current = "en";
+
+    protected override void OnInitialized() =>
+        _current = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        var code = e.Value?.ToString() ?? "en";
+        if (code == _current) return;
+        // Persist the choice and reload so the culture is applied at startup. (Per-user
+        // server-side persistence is wired in a later slice; this is the device-local store.)
+        await JS.InvokeVoidAsync("localStorage.setItem", "app_culture", code);
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+}

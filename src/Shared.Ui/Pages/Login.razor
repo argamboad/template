@@ -4,8 +4,9 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject HttpClient Http
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Sign in</PageTitle>
+<PageTitle>@Localizer["Login_Title"]</PageTitle>
 
 <div class="login-wrapper">
     <div class="login-card card shadow-sm">
@@ -14,8 +15,8 @@
             <div class="text-center mb-4">
                 <img src="_content/Template.Shared.Ui/brand/lockup_light.svg" alt="Perezosoft"
                      class="login-lockup mb-3" />
-                <h1 class="h5 fw-bold mb-0">Sign in</h1>
-                <p class="text-muted small mt-1">Choose how you'd like to continue</p>
+                <h1 class="h5 fw-bold mb-0">@Localizer["Login_Title"]</h1>
+                <p class="text-muted small mt-1">@Localizer["Login_Subtitle"]</p>
             </div>
 
             @if (!string.IsNullOrEmpty(Error))
@@ -30,35 +31,35 @@
                 {
                     <button type="button" class="btn btn-oauth btn-google"
                             @onclick='() => SignInWithOAuth("Google")' disabled="@_oauthBusy">
-                        @GoogleIcon Continue with Google
+                        @GoogleIcon @Localizer["Login_ContinueWith", "Google"]
                     </button>
                     <button type="button" class="btn btn-oauth btn-microsoft"
                             @onclick='() => SignInWithOAuth("Microsoft")' disabled="@_oauthBusy">
-                        @MicrosoftIcon Continue with Microsoft
+                        @MicrosoftIcon @Localizer["Login_ContinueWith", "Microsoft"]
                     </button>
                 }
                 else
                 {
                     <a href="@($"{ApiBase}/api/auth/login/Google")" class="btn btn-oauth btn-google">
-                        @GoogleIcon Continue with Google
+                        @GoogleIcon @Localizer["Login_ContinueWith", "Google"]
                     </a>
                     <a href="@($"{ApiBase}/api/auth/login/Microsoft")" class="btn btn-oauth btn-microsoft">
-                        @MicrosoftIcon Continue with Microsoft
+                        @MicrosoftIcon @Localizer["Login_ContinueWith", "Microsoft"]
                     </a>
                 }
             </div>
 
-            <div class="divider-text my-4"><span>or sign in with email</span></div>
+            <div class="divider-text my-4"><span>@Localizer["Login_OrWithEmail"]</span></div>
 
             @if (_mode == Mode.Idle)
             {
                 <div class="mb-3">
-                    <label for="email" class="form-label fw-medium">Email address</label>
+                    <label for="email" class="form-label fw-medium">@Localizer["Login_EmailLabel"]</label>
                     <input id="email" type="email" class="form-control @(_emailError ? "is-invalid" : "")"
                            placeholder="you@example.com" @bind="_email" @bind:event="oninput" disabled="@_busy" />
                     @if (_emailError)
                     {
-                        <div class="invalid-feedback">Enter a valid email address.</div>
+                        <div class="invalid-feedback">@Localizer["Login_EmailInvalid"]</div>
                     }
                 </div>
                 @if (!string.IsNullOrEmpty(_error))
@@ -75,7 +76,7 @@
                             {
                                 <span class="spinner-border spinner-border-sm me-2"></span>
                             }
-                            Email me a magic link
+                            @Localizer["Login_SendMagicLink"]
                         </button>
                     }
                     <button class="btn @(Auth.IsNative ? "btn-primary" : "btn-outline-primary")"
@@ -84,7 +85,7 @@
                         {
                             <span class="spinner-border spinner-border-sm me-2"></span>
                         }
-                        Email me a 6-digit code
+                        @Localizer["Login_SendOtp"]
                     </button>
                 </div>
             }
@@ -93,15 +94,15 @@
                 <div class="alert alert-success d-flex align-items-start gap-2 mb-0">
                     <span class="mt-1">&#10003;</span>
                     <div>
-                        <strong>Check your inbox.</strong><br/>
-                        A sign-in link was sent to <strong>@_email</strong>. It expires in 15 minutes.
+                        <strong>@Localizer["Login_InboxTitle"]</strong><br/>
+                        @Localizer["Login_MagicLinkSent", _email]
                     </div>
                 </div>
-                <button class="btn btn-link btn-sm mt-2 p-0" @onclick="Reset">Use a different email</button>
+                <button class="btn btn-link btn-sm mt-2 p-0" @onclick="Reset">@Localizer["Login_UseDifferentEmail"]</button>
             }
             else if (_mode == Mode.OtpSent)
             {
-                <p class="text-muted small mb-2">Enter the 6-digit code sent to <strong>@_email</strong>.</p>
+                <p class="text-muted small mb-2">@Localizer["Login_OtpPrompt", _email]</p>
                 <div class="mb-2">
                     <input type="text" inputmode="numeric" maxlength="6"
                            class="form-control text-center @(_otpError ? "is-invalid" : "")"
@@ -119,11 +120,15 @@
                         {
                             <span class="spinner-border spinner-border-sm me-2"></span>
                         }
-                        Verify code
+                        @Localizer["Login_VerifyCode"]
                     </button>
                 </div>
-                <button class="btn btn-link btn-sm mt-2 p-0" @onclick="Reset">Use a different email</button>
+                <button class="btn btn-link btn-sm mt-2 p-0" @onclick="Reset">@Localizer["Login_UseDifferentEmail"]</button>
             }
+
+            <div class="d-flex justify-content-center mt-4">
+                <div style="max-width:170px;width:100%"><LanguageSwitcher /></div>
+            </div>
 
         </div>
     </div>
@@ -137,10 +142,10 @@
 
     private string? ErrorMessage => Error switch
     {
-        "external_failed" => "Sign-in with the external provider failed. Please try again.",
-        "email_unverified" => "Your provider hasn't verified this email address, so it can't be attached to an existing account.",
-        "invalid_link" => "This sign-in link has expired or was already used. Request a new one.",
-        _ => "Something went wrong. Please try again."
+        "external_failed" => Localizer["Login_ErrExternalFailed"],
+        "email_unverified" => Localizer["Login_ErrEmailUnverified"],
+        "invalid_link" => Localizer["Login_ErrInvalidLink"],
+        _ => Localizer["Login_ErrSomethingWrong"]
     };
 
     private string ApiBase => Http.BaseAddress?.ToString().TrimEnd('/') ?? string.Empty;
@@ -175,9 +180,9 @@
         {
             var res = await Http.PostAsJsonAsync("/api/auth/magic-link/send", new { email = _email.Trim() });
             if (res.IsSuccessStatusCode) _mode = Mode.MagicLinkSent;
-            else _error = "Couldn't send the link. Please try again.";
+            else _error = Localizer["Login_ErrCouldntSendLink"];
         }
-        catch { _error = "Couldn't send the link. Please try again."; }
+        catch { _error = Localizer["Login_ErrCouldntSendLink"]; }
         finally { _busy = false; _pending = Mode.Idle; }
     }
 
@@ -190,9 +195,9 @@
         {
             var res = await Http.PostAsJsonAsync("/api/auth/otp/send", new { email = _email.Trim() });
             if (res.IsSuccessStatusCode) { _mode = Mode.OtpSent; _otpCode = string.Empty; }
-            else _error = "Couldn't send the code. Please try again.";
+            else _error = Localizer["Login_ErrCouldntSendCode"];
         }
-        catch { _error = "Couldn't send the code. Please try again."; }
+        catch { _error = Localizer["Login_ErrCouldntSendCode"]; }
         finally { _busy = false; _pending = Mode.Idle; }
     }
 
@@ -201,7 +206,7 @@
         _error = null; _otpError = false;
         if (string.IsNullOrWhiteSpace(_otpCode))
         {
-            _otpError = true; _error = "Enter the code from your email."; return;
+            _otpError = true; _error = Localizer["Login_ErrEnterCode"]; return;
         }
         _busy = true;
         try
@@ -215,7 +220,7 @@
                     return;
                 }
                 _otpError = true;
-                _error = "That code is incorrect or has expired.";
+                _error = Localizer["Login_ErrCodeIncorrect"];
                 return;
             }
 
@@ -229,10 +234,10 @@
             }
             _otpError = true;
             _error = res.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                ? "That code is incorrect or has expired."
-                : "Verification failed. Please try again.";
+                ? Localizer["Login_ErrCodeIncorrect"]
+                : Localizer["Login_ErrVerificationFailed"];
         }
-        catch { _error = "Verification failed. Please try again."; }
+        catch { _error = Localizer["Login_ErrVerificationFailed"]; }
         finally { _busy = false; }
     }
 
@@ -249,7 +254,7 @@
                 Nav.NavigateTo("/");
                 return;
             }
-            _error = "Sign-in was cancelled or didn't complete. Please try again.";
+            _error = Localizer["Login_ErrOAuthCancelled"];
         }
         finally { _oauthBusy = false; }
     }

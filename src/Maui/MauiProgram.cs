@@ -36,6 +36,10 @@ public static class MauiProgram
 
 		builder.Services.AddMauiBlazorWebView();
 
+		// Localization — IStringLocalizer<AppStrings> resolves the RCL's .resx resources.
+		// Uses the OS culture for now; device-local switching is wired in a later slice.
+		builder.Services.AddLocalization();
+
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
