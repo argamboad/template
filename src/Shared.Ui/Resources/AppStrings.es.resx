@@ -74,4 +74,45 @@
   <data name="Login_ErrVerificationFailed" xml:space="preserve"><value>La verificación falló. Inténtalo de nuevo.</value></data>
   <data name="Login_ErrEnterCode" xml:space="preserve"><value>Introduce el código de tu correo.</value></data>
   <data name="Login_ErrOAuthCancelled" xml:space="preserve"><value>El inicio de sesión se canceló o no se completó. Inténtalo de nuevo.</value></data>
+  <data name="Common_Loading" xml:space="preserve"><value>Cargando…</value></data>
+  <data name="Common_Working" xml:space="preserve"><value>Procesando…</value></data>
+  <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
+  <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
+  <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>
+  <data name="Nav_SignOut" xml:space="preserve"><value>Cerrar sesión</value></data>
+  <data name="Home_WelcomeBack" xml:space="preserve"><value>¡Bienvenido de nuevo, {0}!</value></data>
+  <data name="Home_SignedInTo" xml:space="preserve"><value>Has iniciado sesión en el hogar {0}.</value></data>
+  <data name="Home_HeroSubtitle" xml:space="preserve"><value>Inicia sesión para empezar con tu hogar.</value></data>
+  <data name="Home_SignInCta" xml:space="preserve"><value>Iniciar sesión</value></data>
+  <data name="AuthCallback_Processing" xml:space="preserve"><value>Procesando el inicio de sesión…</value></data>
+  <data name="AuthError_Title" xml:space="preserve"><value>Error de inicio de sesión</value></data>
+  <data name="AuthError_Heading" xml:space="preserve"><value>Error de autenticación</value></data>
+  <data name="AuthError_Body" xml:space="preserve"><value>No pudimos iniciar tu sesión. Inténtalo de nuevo.</value></data>
+  <data name="AuthError_BackToSignIn" xml:space="preserve"><value>Volver al inicio de sesión</value></data>
+  <data name="Join_Title" xml:space="preserve"><value>Unirse al hogar</value></data>
+  <data name="Join_Working" xml:space="preserve"><value>Uniéndote al hogar…</value></data>
+  <data name="Join_InvitedTitle" xml:space="preserve"><value>Te han invitado</value></data>
+  <data name="Join_NeedsSignIn" xml:space="preserve"><value>Inicia sesión para aceptar; te traeremos de vuelta aquí.</value></data>
+  <data name="Join_SignInToAccept" xml:space="preserve"><value>Iniciar sesión para aceptar</value></data>
+  <data name="Join_SuccessTitle" xml:space="preserve"><value>¡Ya estás dentro!</value></data>
+  <data name="Join_SuccessBody" xml:space="preserve"><value>Te has unido al hogar.</value></data>
+  <data name="Join_GoToHousehold" xml:space="preserve"><value>Ir al hogar</value></data>
+  <data name="Join_InvalidTitle" xml:space="preserve"><value>Enlace no válido</value></data>
+  <data name="Join_MissingToken" xml:space="preserve"><value>A este enlace de invitación le falta el token.</value></data>
+  <data name="Join_ErrorTitle" xml:space="preserve"><value>No se pudo unir</value></data>
+  <data name="Join_BackToHousehold" xml:space="preserve"><value>Volver al hogar</value></data>
+  <data name="Join_DefaultError" xml:space="preserve"><value>La invitación no es válida o ha caducado.</value></data>
+  <data name="Settings_Title" xml:space="preserve"><value>Configuración de la cuenta</value></data>
+  <data name="Settings_Subtitle" xml:space="preserve"><value>Vincula proveedores de inicio de sesión a esta cuenta. Todos te conectan al mismo hogar.</value></data>
+  <data name="Settings_Connected" xml:space="preserve"><value>Conectado</value></data>
+  <data name="Settings_Link" xml:space="preserve"><value>Vincular</value></data>
+  <data name="Settings_Unlink" xml:space="preserve"><value>Desvincular</value></data>
+  <data name="Settings_LinkedSuccess" xml:space="preserve"><value>{0} se vinculó correctamente.</value></data>
+  <data name="Settings_LinkErrInUse" xml:space="preserve"><value>Esa cuenta de proveedor ya está vinculada a otro usuario.</value></data>
+  <data name="Settings_LinkErrExpired" xml:space="preserve"><value>La solicitud de vinculación caducó; inténtalo de nuevo.</value></data>
+  <data name="Settings_LinkCancelled" xml:space="preserve"><value>La vinculación se canceló.</value></data>
+  <data name="Settings_LinkFailed" xml:space="preserve"><value>No se pudo vincular ese proveedor. Inténtalo de nuevo.</value></data>
+  <data name="Settings_ErrLoad" xml:space="preserve"><value>No se pudieron cargar las cuentas vinculadas.</value></data>
+  <data name="Settings_ErrStartLinking" xml:space="preserve"><value>No se pudo iniciar la vinculación. Inténtalo de nuevo.</value></data>
+  <data name="Settings_ErrUnlink" xml:space="preserve"><value>No se pudo desvincular. Inténtalo de nuevo.</value></data>
 </root>

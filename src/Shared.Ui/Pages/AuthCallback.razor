@@ -2,14 +2,15 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Signing in…</PageTitle>
+<PageTitle>@Localizer["AuthCallback_Processing"]</PageTitle>
 
 <div class="auth-callback text-center py-5">
     <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading…</span>
+        <span class="visually-hidden">@Localizer["Common_Loading"]</span>
     </div>
-    <p class="text-muted mt-3">Processing sign-in…</p>
+    <p class="text-muted mt-3">@Localizer["AuthCallback_Processing"]</p>
 </div>
 
 @code {

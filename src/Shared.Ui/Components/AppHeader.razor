@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject AuthService Auth
 @inject NavigationManager Nav
+@inject IStringLocalizer<AppStrings> Localizer
 
 <nav class="navbar navbar-expand-lg navbar-dark app-header">
     <div class="container-fluid">
@@ -23,7 +24,7 @@
         <div class="collapse navbar-collapse @(_menuOpen ? "show" : "")">
             <ul class="navbar-nav me-auto ms-lg-4 mt-2 mt-lg-0">
                 <li class="nav-item">
-                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Home</NavLink>
+                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">@Localizer["Nav_Home"]</NavLink>
                 </li>
                 <!-- TODO: add app-specific nav links here -->
             </ul>
@@ -33,9 +34,9 @@
                     <span class="tenant-badge">@Auth.TenantName</span>
                     <span class="user-name text-white-50 small">@Auth.DisplayName</span>
                 </div>
-                <NavLink class="btn btn-outline-light btn-sm" href="/household">Household</NavLink>
-                <NavLink class="btn btn-outline-light btn-sm" href="/settings">Settings</NavLink>
-                <button class="btn btn-outline-light btn-sm" @onclick="SignOutAsync">Sign out</button>
+                <NavLink class="btn btn-outline-light btn-sm" href="/household">@Localizer["Nav_Household"]</NavLink>
+                <NavLink class="btn btn-outline-light btn-sm" href="/settings">@Localizer["Nav_Settings"]</NavLink>
+                <button class="btn btn-outline-light btn-sm" @onclick="SignOutAsync">@Localizer["Nav_SignOut"]</button>
             </div>
         </div>
 

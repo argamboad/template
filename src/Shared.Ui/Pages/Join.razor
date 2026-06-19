@@ -4,39 +4,40 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Join household</PageTitle>
+<PageTitle>@Localizer["Join_Title"]</PageTitle>
 
 <div class="join-wrapper text-center py-5">
     @if (_state == State.Working)
     {
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Working…</span>
+            <span class="visually-hidden">@Localizer["Common_Working"]</span>
         </div>
-        <p class="text-muted mt-3">Joining the household…</p>
+        <p class="text-muted mt-3">@Localizer["Join_Working"]</p>
     }
     else if (_state == State.NeedsSignIn)
     {
-        <h1 class="h5 fw-bold mb-2">You've been invited</h1>
-        <p class="text-muted">Sign in to accept — we'll bring you right back here.</p>
-        <a class="btn btn-primary" href="/login">Sign in to accept</a>
+        <h1 class="h5 fw-bold mb-2">@Localizer["Join_InvitedTitle"]</h1>
+        <p class="text-muted">@Localizer["Join_NeedsSignIn"]</p>
+        <a class="btn btn-primary" href="/login">@Localizer["Join_SignInToAccept"]</a>
     }
     else if (_state == State.Success)
     {
-        <h1 class="h5 fw-bold mb-2 text-success">You're in!</h1>
-        <p class="text-muted">You've joined the household.</p>
-        <button class="btn btn-primary" @onclick="@(() => Nav.NavigateTo("/household", forceLoad: true))">Go to household</button>
+        <h1 class="h5 fw-bold mb-2 text-success">@Localizer["Join_SuccessTitle"]</h1>
+        <p class="text-muted">@Localizer["Join_SuccessBody"]</p>
+        <button class="btn btn-primary" @onclick="@(() => Nav.NavigateTo("/household", forceLoad: true))">@Localizer["Join_GoToHousehold"]</button>
     }
     else if (_state == State.MissingToken)
     {
-        <h1 class="h5 fw-bold mb-2">Invalid link</h1>
-        <p class="text-muted">This invite link is missing its token.</p>
+        <h1 class="h5 fw-bold mb-2">@Localizer["Join_InvalidTitle"]</h1>
+        <p class="text-muted">@Localizer["Join_MissingToken"]</p>
     }
     else if (_state == State.Error)
     {
-        <h1 class="h5 fw-bold mb-2 text-danger">Couldn't join</h1>
-        <p class="text-muted">@_error</p>
-        <a class="btn btn-outline-secondary" href="/household">Back to household</a>
+        <h1 class="h5 fw-bold mb-2 text-danger">@Localizer["Join_ErrorTitle"]</h1>
+        <p class="text-muted">@Localizer["Join_DefaultError"]</p>
+        <a class="btn btn-outline-secondary" href="/household">@Localizer["Join_BackToHousehold"]</a>
     }
 </div>
 
@@ -45,7 +46,6 @@
 
     private enum State { Working, NeedsSignIn, Success, MissingToken, Error }
     private State _state = State.Working;
-    private string _error = "The invitation is invalid or has expired.";
 
     protected override async Task OnInitializedAsync()
     {

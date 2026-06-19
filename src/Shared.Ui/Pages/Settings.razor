@@ -4,12 +4,13 @@
 @inject AuthService Auth
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Settings</PageTitle>
+<PageTitle>@Localizer["Nav_Settings"]</PageTitle>
 
 <div class="settings-wrapper">
-    <h1 class="h4 fw-bold mb-1">Account settings</h1>
-    <p class="text-muted mb-4">Link sign-in providers to this account. They all sign you into the same household.</p>
+    <h1 class="h4 fw-bold mb-1">@Localizer["Settings_Title"]</h1>
+    <p class="text-muted mb-4">@Localizer["Settings_Subtitle"]</p>
 
     @if (_banner is not null)
     {
@@ -21,7 +22,7 @@
             @if (_loading)
             {
                 <div class="p-4 text-center text-muted">
-                    <span class="spinner-border spinner-border-sm me-2"></span> Loading…
+                    <span class="spinner-border spinner-border-sm me-2"></span> @Localizer["Common_Loading"]
                 </div>
             }
             else
@@ -35,15 +36,15 @@
                             @if (linked)
                             {
                                 <span class="d-flex align-items-center gap-3">
-                                    <span class="badge bg-success-subtle text-success-emphasis">Connected</span>
+                                    <span class="badge bg-success-subtle text-success-emphasis">@Localizer["Settings_Connected"]</span>
                                     <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => Unlink(p.Key)">Unlink</button>
+                                            @onclick="() => Unlink(p.Key)">@Localizer["Settings_Unlink"]</button>
                                 </span>
                             }
                             else
                             {
                                 <button class="btn btn-outline-primary btn-sm" disabled="@_busy"
-                                        @onclick="() => Link(p.Key)">Link</button>
+                                        @onclick="() => Link(p.Key)">@Localizer["Settings_Link"]</button>
                             }
                         </li>
                     }
@@ -89,11 +90,11 @@
     private void SetBannerFromQuery()
     {
         if (!string.IsNullOrEmpty(Linked))
-            _banner = ($"{Label(Linked)} linked successfully.", true);
+            _banner = (Localizer["Settings_LinkedSuccess", Label(Linked)], true);
         else if (LinkError == "in_use")
-            _banner = ("That provider account is already linked to a different user.", false);
+            _banner = (Localizer["Settings_LinkErrInUse"], false);
         else if (LinkError == "expired")
-            _banner = ("The link request expired — please try again.", false);
+            _banner = (Localizer["Settings_LinkErrExpired"], false);
     }
 
     private async Task LoadLogins()
@@ -108,7 +109,7 @@
         }
         catch
         {
-            _error = "Couldn't load linked accounts.";
+            _error = Localizer["Settings_ErrLoad"];
         }
         _loading = false;
     }
@@ -121,7 +122,7 @@
             var res = await Http.PostAsync($"/api/auth/link/{key}", null);
             if (!res.IsSuccessStatusCode)
             {
-                _error = "Couldn't start linking. Please try again.";
+                _error = Localizer["Settings_ErrStartLinking"];
                 return;
             }
             var payload = await res.Content.ReadFromJsonAsync<LinkStart>();
@@ -132,19 +133,19 @@
                 // in the app (a full-page navigation would leave the BlazorWebView).
                 if (string.IsNullOrEmpty(payload?.Token))
                 {
-                    _error = "Couldn't start linking. Please try again.";
+                    _error = Localizer["Settings_ErrStartLinking"];
                     return;
                 }
                 var err = await Auth.LinkProviderAsync(key, payload.Token);
                 _banner = err is null
-                    ? ($"{Label(key)} linked successfully.", true)
-                    : (err switch
+                    ? (Localizer["Settings_LinkedSuccess", Label(key)], true)
+                    : ((string)(err switch
                     {
-                        "in_use" => "That provider account is already linked to a different user.",
-                        "expired" => "The link request expired — please try again.",
-                        "cancelled" => "Linking was cancelled.",
-                        _ => "Couldn't link that provider. Please try again."
-                    }, false);
+                        "in_use" => Localizer["Settings_LinkErrInUse"],
+                        "expired" => Localizer["Settings_LinkErrExpired"],
+                        "cancelled" => Localizer["Settings_LinkCancelled"],
+                        _ => Localizer["Settings_LinkFailed"]
+                    }), false);
                 if (err is null) await LoadLogins();
                 return;
             }
@@ -155,9 +156,9 @@
                 Nav.NavigateTo(payload.Url, forceLoad: true);
                 return;
             }
-            _error = "Couldn't start linking. Please try again.";
+            _error = Localizer["Settings_ErrStartLinking"];
         }
-        catch { _error = "Couldn't start linking. Please try again."; }
+        catch { _error = Localizer["Settings_ErrStartLinking"]; }
         finally { _busy = false; }
     }
 
@@ -168,9 +169,9 @@
         {
             var res = await Http.DeleteAsync($"/api/auth/logins/{key}");
             if (res.IsSuccessStatusCode) await LoadLogins();
-            else _error = "Couldn't unlink. Please try again.";
+            else _error = Localizer["Settings_ErrUnlink"];
         }
-        catch { _error = "Couldn't unlink. Please try again."; }
+        catch { _error = Localizer["Settings_ErrUnlink"]; }
         finally { _busy = false; }
     }
 
