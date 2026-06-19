@@ -50,6 +50,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantInvitationRepository, TenantInvitationRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
+        // Generic repository for feature/domain entities (vertical slices). Platform/auth
+        // entities use their dedicated repositories above.
+        services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+
         // External OAuth — to add a new provider, append .AddXxx(...) below.
         // Credentials come from config; set them in .env for dev (never commit secrets).
         var auth = services.AddAuthentication();

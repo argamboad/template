@@ -59,24 +59,8 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
 
     public async Task<bool> TryTransferOwnershipAsync(Guid tenantId, Guid currentOwnerUserId, Guid targetUserId, CancellationToken cancellationToken = default)
     {
-        // EF InMemory doesn't support ExecuteUpdateAsync; fall back to tracked entity
-        // updates. Unit tests are single-threaded so there is no concurrency risk there.
-        if (!db.Database.IsRelational())
-        {
-            var currentOwner = await db.TenantMemberships.FirstOrDefaultAsync(
-                m => m.TenantId == tenantId && m.UserId == currentOwnerUserId && m.Role == TenantRoles.Owner, cancellationToken);
-            if (currentOwner is null) return false;
-            var target = await db.TenantMemberships.FirstOrDefaultAsync(
-                m => m.TenantId == tenantId && m.UserId == targetUserId, cancellationToken);
-            if (target is null) return false;
-            currentOwner.Role = TenantRoles.Member;
-            target.Role = TenantRoles.Owner;
-            await db.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-
-        // Relational path: guard on the current owner's role first.
-        // If 0 rows are affected, someone else already changed the owner (race lost).
+        // Guard on the current owner's role first. If 0 rows are affected, someone else
+        // already changed the owner (race lost).
         var affected = await db.TenantMemberships
             .Where(m => m.TenantId == tenantId && m.UserId == currentOwnerUserId && m.Role == TenantRoles.Owner)
             .ExecuteUpdateAsync(s => s.SetProperty(m => m.Role, TenantRoles.Member), cancellationToken);
