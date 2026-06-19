@@ -1,0 +1,84 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Template.Api.Configuration;
+using Template.Api.Services;
+using Template.Core.Abstractions;
+using Template.Core.Entities;
+using Template.Core.Repositories;
+using Template.Infrastructure.Persistence;
+using Template.Infrastructure.Repositories;
+
+namespace Template.Api.Tests.Infrastructure;
+
+/// <summary>
+/// Wires the real repositories + services around a single <see cref="AppDbContext"/>
+/// (so they share one transaction/change-tracker, as in production) with lightweight
+/// test doubles for settings, email, and the clock. Construct one per logical actor:
+/// the context's current tenant drives the global query filter.
+/// </summary>
+public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
+{
+    public AppDbContext Db { get; } = db;
+    public TimeProvider Clock { get; } = clock ?? TimeProvider.System;
+
+    public IUserRepository Users { get; } = new UserRepository(db);
+    public ILoginTokenRepository LoginTokens { get; } = new LoginTokenRepository(db);
+    public IRefreshTokenRepository RefreshTokens { get; } = new RefreshTokenRepository(db);
+    public ITenantRepository Tenants { get; } = new TenantRepository(db);
+    public ITenantInvitationRepository Invitations { get; } = new TenantInvitationRepository(db);
+    public IUnitOfWork UnitOfWork { get; } = new EfUnitOfWork(db);
+    public ITokenGenerator TokenGen { get; } = new TokenGenerator();
+    public ITokenHasher Hasher { get; } = new TokenHasher();
+
+    public UserService UserService() => new(Users, Db, NullLogger<UserService>.Instance);
+
+    public RefreshTokenService RefreshTokenService(int expiryDays = 30) =>
+        new(RefreshTokens, TokenGen, Hasher, new TestRefreshSettings(expiryDays));
+
+    public PasswordlessService PasswordlessService(IPasswordlessSettings? settings = null) =>
+        new(LoginTokens, UserService(), TokenGen, Hasher, settings ?? new TestPasswordlessSettings());
+
+    public TenantService TenantService() =>
+        new(Tenants, UnitOfWork, NullLogger<TenantService>.Instance);
+
+    public TenantInvitationService InvitationService(IInvitationSettings? invitation = null) =>
+        new(Invitations, Tenants, TokenGen, Hasher, UnitOfWork, new NoopEmailSender(),
+            UserService(), new TestAppSettings(), invitation ?? new TestInvitationSettings(),
+            Clock, NullLogger<TenantInvitationService>.Instance);
+}
+
+internal sealed class TestRefreshSettings(int expiryDays = 30) : IRefreshTokenSettings
+{
+    public int ExpiryDays => expiryDays;
+}
+
+internal sealed class TestPasswordlessSettings : IPasswordlessSettings
+{
+    public int MagicLinkLifespanMinutes { get; init; } = 15;
+    public int OtpLifespanMinutes { get; init; } = 10;
+    public int OtpLength { get; init; } = 6;
+    public int OtpMaxAttempts { get; init; } = 5;
+}
+
+internal sealed class TestAppSettings : IApplicationSettings
+{
+    public string ClientUrl => "https://localhost:7008";
+    public string NativeCallbackScheme => string.Empty;
+}
+
+internal sealed class TestInvitationSettings(int lifespanDays = 7) : IInvitationSettings
+{
+    public int LifespanDays => lifespanDays;
+}
+
+internal sealed class TestJwtSettings : IJwtSettings
+{
+    public string SecretKey => "test-secret-key-at-least-32-chars-long-000";
+    public string Issuer => "TemplateTests";
+    public int ExpiryMinutes => 60;
+}
+
+internal sealed class NoopEmailSender : IEmailSender
+{
+    public Task SendAsync(string to, string subject, string htmlBody,
+        IReadOnlyList<EmailInlineImage>? inlineImages = null) => Task.CompletedTask;
+}
