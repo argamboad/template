@@ -7,16 +7,28 @@ namespace Template.Shared.Ui.Auth;
 
 /// <summary>
 /// Client-side authentication with refresh-token support.
-/// The access token is held in memory only — never persisted to localStorage.
-/// Sessions survive reloads/restarts via the HttpOnly refresh cookie: on startup
-/// we silently exchange it for a fresh access token.
+/// The access token is held in memory only — never persisted.
+/// Sessions survive reloads/restarts via the refresh token: on startup we silently
+/// exchange it for a fresh access token. Where that refresh token lives is the only
+/// per-host difference, abstracted behind <see cref="ISessionStore"/> — an HttpOnly
+/// cookie on the web, the OS secure store on native (MAUI).
 /// </summary>
-public class AuthService(HttpClient httpClient, ILogger<AuthService> logger)
+public class AuthService(
+    HttpClient httpClient,
+    ILogger<AuthService> logger,
+    ISessionStore sessionStore,
+    IOAuthInitiator? oauth = null)
 {
     private string? _accessToken;
     private Task<bool>? _refreshInFlight;
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && !IsTokenExpired(_accessToken);
+
+    /// <summary>
+    /// True on native hosts (MAUI). The Login page uses it to swap the web's full-page
+    /// OAuth navigation for the native browser flow and to drop the web-only magic link.
+    /// </summary>
+    public bool IsNative => sessionStore.UsesBodyTransport;
 
     /// <summary>The current JWT access token, or null when not signed in.</summary>
     public string? AccessToken => _accessToken;
@@ -56,31 +68,48 @@ public class AuthService(HttpClient httpClient, ILogger<AuthService> logger)
     {
         try
         {
-            // The CookieHandler in the HTTP pipeline includes browser credentials
-            // (the cross-origin HttpOnly refresh cookie) on every request.
-            var response = await httpClient.PostAsync("/api/auth/refresh", null);
+            HttpResponseMessage response;
+            if (sessionStore.UsesBodyTransport)
+            {
+                // Native: the refresh token lives in the OS secure store; send it in the
+                // body. No stored token means simply "not signed in" — skip the call.
+                var stored = await sessionStore.GetRefreshTokenAsync();
+                if (string.IsNullOrEmpty(stored))
+                {
+                    _accessToken = null;
+                    return false;
+                }
+                response = await httpClient.PostAsJsonAsync("/api/auth/refresh",
+                    new { refresh_token = stored });
+            }
+            else
+            {
+                // Web: the CookieHandler attaches the HttpOnly refresh cookie; no body.
+                response = await httpClient.PostAsync("/api/auth/refresh", null);
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("Token refresh failed: {StatusCode}", response.StatusCode);
-                _accessToken = null;
+                await ClearSessionAsync();
                 return false;
             }
 
             var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
             if (!string.IsNullOrEmpty(payload?.AccessToken))
             {
-                _accessToken = payload.AccessToken;
+                await AcceptTokensAsync(payload);
                 return true;
             }
 
             logger.LogWarning("Refresh response missing access_token");
-            _accessToken = null;
+            await ClearSessionAsync();
             return false;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to refresh access token");
-            _accessToken = null;
+            await ClearSessionAsync();
             return false;
         }
         finally
@@ -90,18 +119,134 @@ public class AuthService(HttpClient httpClient, ILogger<AuthService> logger)
         }
     }
 
+    /// <summary>
+    /// Completes native OAuth: runs the platform browser flow, exchanges the returned
+    /// one-time code for tokens, and stores them. Returns true on success. Web hosts
+    /// sign in by full-page navigation and never call this.
+    /// </summary>
+    public async Task<bool> SignInWithOAuthAsync(string provider)
+    {
+        if (oauth is null)
+        {
+            logger.LogError("SignInWithOAuthAsync called with no IOAuthInitiator registered");
+            return false;
+        }
+        try
+        {
+            var result = await oauth.RunBrowserFlowAsync(provider);
+            var code = result is not null && result.TryGetValue("code", out var c) ? c : null;
+            if (string.IsNullOrEmpty(code))
+                return false;
+
+            var response = await httpClient.PostAsJsonAsync("/api/auth/native/exchange", new { code });
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Native OAuth exchange failed: {StatusCode}", response.StatusCode);
+                return false;
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
+            if (string.IsNullOrEmpty(payload?.AccessToken))
+                return false;
+
+            await AcceptTokensAsync(payload);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Native OAuth sign-in failed for {Provider}", provider);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Links an OAuth provider to the current account on native hosts, carrying the
+    /// caller-issued <paramref name="linkToken"/> through the system-browser flow.
+    /// Returns null on success, or an error key ("in_use", "expired", "cancelled",
+    /// "link_failed") for the UI.
+    /// </summary>
+    public async Task<string?> LinkProviderAsync(string provider, string linkToken)
+    {
+        if (oauth is null)
+            return "unsupported";
+        try
+        {
+            var result = await oauth.RunBrowserFlowAsync(provider, linkToken);
+            if (result is null)
+                return "cancelled";
+            if (result.TryGetValue("error", out var error))
+                return string.IsNullOrEmpty(error) ? "link_failed" : error;
+            return result.ContainsKey("linked") ? null : "link_failed";
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Native provider link failed for {Provider}", provider);
+            return "link_failed";
+        }
+    }
+
+    /// <summary>
+    /// Verifies an OTP code and establishes the session from the tokens in the response
+    /// body. Used by native hosts (the web Login page keeps its cookie + callback flow).
+    /// </summary>
+    public async Task<bool> VerifyOtpAsync(string email, string code)
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/auth/otp/verify",
+                new { email, code });
+            if (!response.IsSuccessStatusCode)
+                return false;
+
+            var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
+            if (string.IsNullOrEmpty(payload?.AccessToken))
+                return false;
+
+            await AcceptTokensAsync(payload);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "OTP verification failed");
+            return false;
+        }
+    }
+
     public async Task LogoutAsync()
     {
         try
         {
-            await httpClient.PostAsync("/api/auth/logout", null);
+            if (sessionStore.UsesBodyTransport)
+            {
+                var stored = await sessionStore.GetRefreshTokenAsync();
+                await httpClient.PostAsJsonAsync("/api/auth/logout", new { refresh_token = stored });
+            }
+            else
+            {
+                await httpClient.PostAsync("/api/auth/logout", null);
+            }
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to call logout endpoint");
         }
 
+        await ClearSessionAsync();
+    }
+
+    /// <summary>Sets the in-memory access token and persists the rotated refresh token (native).</summary>
+    private async Task AcceptTokensAsync(TokenResponse payload)
+    {
+        _accessToken = payload.AccessToken;
+        if (sessionStore.UsesBodyTransport && !string.IsNullOrEmpty(payload.RefreshToken))
+            await sessionStore.SaveRefreshTokenAsync(payload.RefreshToken);
+    }
+
+    private async Task ClearSessionAsync()
+    {
         _accessToken = null;
+        if (sessionStore.UsesBodyTransport)
+            await sessionStore.ClearAsync();
     }
 
     /// <summary>
@@ -155,5 +300,9 @@ public class AuthService(HttpClient httpClient, ILogger<AuthService> logger)
     {
         [System.Text.Json.Serialization.JsonPropertyName("access_token")]
         public string? AccessToken { get; init; }
+
+        // Present only for native clients; the web flow keeps the token in the cookie.
+        [System.Text.Json.Serialization.JsonPropertyName("refresh_token")]
+        public string? RefreshToken { get; init; }
     }
 }

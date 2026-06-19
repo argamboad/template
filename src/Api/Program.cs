@@ -63,6 +63,7 @@ builder.Services.AddScoped<IErrorResponseFactory, ErrorResponseFactory>();
 builder.Services.AddScoped<ITokenGenerator, TokenGenerator>();
 builder.Services.AddScoped<ITokenHasher, TokenHasher>();
 builder.Services.AddSingleton<ILinkTokenService, LinkTokenService>();
+builder.Services.AddSingleton<INativeAuthCodeService, NativeAuthCodeService>();
 
 // Tenant ("household") management services.
 builder.Services.AddScoped<ITenantContext, TenantContext>();
@@ -130,7 +131,12 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// HTTPS redirect is a production concern. In Development we deliberately skip it so the
+// Android emulator can talk cleartext HTTP to the host (http://10.0.2.2:5238) without the
+// request being 307'd to a port/cert it can't reach. Native auth uses body tokens (no
+// cookies), so none of the web client's HTTPS/SameSite requirements apply to that leg.
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 if (allowedOrigins.Length > 0)
     app.UseCors("BlazorClient");

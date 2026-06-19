@@ -40,10 +40,12 @@ public class RefreshTokenSettings : IRefreshTokenSettings
 public class ApplicationSettings : IApplicationSettings
 {
     public string ClientUrl { get; }
+    public string NativeCallbackScheme { get; }
 
     public ApplicationSettings(IConfiguration config)
     {
         ClientUrl = config["Auth:AppBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7008";
+        NativeCallbackScheme = config["Auth:Native:CallbackScheme"] ?? string.Empty;
     }
 }
 

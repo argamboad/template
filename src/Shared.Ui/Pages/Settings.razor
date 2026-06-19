@@ -119,14 +119,41 @@
         try
         {
             var res = await Http.PostAsync($"/api/auth/link/{key}", null);
-            if (res.IsSuccessStatusCode)
+            if (!res.IsSuccessStatusCode)
             {
-                var payload = await res.Content.ReadFromJsonAsync<LinkUrl>();
-                if (!string.IsNullOrEmpty(payload?.Url))
+                _error = "Couldn't start linking. Please try again.";
+                return;
+            }
+            var payload = await res.Content.ReadFromJsonAsync<LinkStart>();
+
+            if (Auth.IsNative)
+            {
+                // Native: run the link through the system-browser loopback flow and stay
+                // in the app (a full-page navigation would leave the BlazorWebView).
+                if (string.IsNullOrEmpty(payload?.Token))
                 {
-                    Nav.NavigateTo(payload.Url, forceLoad: true); // full-page → provider round-trip
+                    _error = "Couldn't start linking. Please try again.";
                     return;
                 }
+                var err = await Auth.LinkProviderAsync(key, payload.Token);
+                _banner = err is null
+                    ? ($"{Label(key)} linked successfully.", true)
+                    : (err switch
+                    {
+                        "in_use" => "That provider account is already linked to a different user.",
+                        "expired" => "The link request expired — please try again.",
+                        "cancelled" => "Linking was cancelled.",
+                        _ => "Couldn't link that provider. Please try again."
+                    }, false);
+                if (err is null) await LoadLogins();
+                return;
+            }
+
+            // Web: full-page navigate to the provider round-trip.
+            if (!string.IsNullOrEmpty(payload?.Url))
+            {
+                Nav.NavigateTo(payload.Url, forceLoad: true);
+                return;
             }
             _error = "Couldn't start linking. Please try again.";
         }
@@ -156,8 +183,9 @@
         public DateTimeOffset LinkedAt { get; init; }
     }
 
-    private sealed record LinkUrl
+    private sealed record LinkStart
     {
         public string? Url { get; init; }
+        public string? Token { get; init; }
     }
 }

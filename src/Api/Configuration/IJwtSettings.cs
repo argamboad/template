@@ -25,6 +25,14 @@ public interface IApplicationSettings
 {
     /// <summary>Base URL of the Blazor client (used for redirects after the OAuth round-trip).</summary>
     string ClientUrl { get; }
+
+    /// <summary>
+    /// Custom URL scheme a native (mobile) client registers for the OAuth callback,
+    /// e.g. "perezosoft". Empty when unused. Desktop uses loopback HTTP instead, so
+    /// this stays empty until the Android slice. Validated as an allowed native
+    /// redirect target alongside loopback addresses.
+    /// </summary>
+    string NativeCallbackScheme { get; }
 }
 
 /// <summary>

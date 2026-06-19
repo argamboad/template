@@ -1,6 +1,13 @@
 .app-header {
     background: var(--bs-primary);
-    height: var(--header-height, 60px);
+    /* min-height (not height): on phones the collapsed menu expands below the bar and
+       must not be clipped. Stays 60px tall when closed / on wide screens. */
+    min-height: var(--header-height, 60px);
+    /* Clear the mobile status bar / camera cutout. Android 15+ renders the WebView
+       edge-to-edge, so without this the bar (and the hamburger's tap area) sits UNDER
+       the status bar and taps hit the system instead of the button. Needs the host's
+       viewport-fit=cover (set in the MAUI index.html); resolves to 0 on web/desktop. */
+    padding-top: env(safe-area-inset-top, 0px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, .20);
     position: sticky;
     top: 0;
@@ -17,8 +24,13 @@
 }
 
 .brand-icon {
-    font-size: .9rem;
-    opacity: .8;
+    height: 32px;
+    width: auto;
+    display: block;
+}
+
+.brand-text {
+    line-height: 1;
 }
 
 .tenant-badge {

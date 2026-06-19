@@ -1,0 +1,90 @@
+﻿using Microsoft.Extensions.Logging;
+using Template.Maui.Auth;
+using Template.Shared.Ui.Auth;
+
+namespace Template.Maui;
+
+public static class MauiProgram
+{
+	// Base address for the API, per platform.
+	//  - Windows desktop reaches localhost directly over HTTPS (machine-trusted dev cert).
+	//  - Android uses http://localhost:5238 via `adb reverse tcp:5238 tcp:5238`, which maps
+	//    the device's localhost to the host. Using "localhost" (not 10.0.2.2) is what makes
+	//    OAuth work: Google/Microsoft accept localhost as a redirect host but reject raw IPs,
+	//    so the provider redirect_uri http://localhost:5238/signin-google is valid (and is
+	//    the same one already registered for the desktop/web flow). See docs/MOBILE_TESTING.md.
+	private static string ApiBaseUrl =>
+#if ANDROID
+		"http://localhost:5238";
+#else
+		"https://localhost:7160";
+#endif
+
+	// Custom URL scheme the Android app registers for the OAuth callback (perezosoft://auth).
+	// Must match the API's Auth:Native:CallbackScheme and the manifest intent filter.
+	private const string CallbackScheme = "perezosoft";
+
+	public static MauiApp CreateMauiApp()
+	{
+		var builder = MauiApp.CreateBuilder();
+		builder
+			.UseMauiApp<App>()
+			.ConfigureFonts(fonts =>
+			{
+				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+			});
+
+		builder.Services.AddMauiBlazorWebView();
+
+#if DEBUG
+		builder.Services.AddBlazorWebViewDeveloperTools();
+		builder.Logging.AddDebug();
+#endif
+
+		// Refresh token lives in the OS secure store (the native equivalent of the web's
+		// HttpOnly cookie). OAuth is platform-specific: desktop captures the callback via a
+		// loopback HTTP listener; Android via a custom-scheme WebAuthenticator. Both sit
+		// behind IOAuthInitiator so AuthService and the Login page stay platform-agnostic.
+		builder.Services.AddSingleton<ISessionStore, SecureStorageSessionStore>();
+#if ANDROID
+		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
+			new AndroidOAuthInitiator(ApiBaseUrl, CallbackScheme, sp.GetRequiredService<ILogger<AndroidOAuthInitiator>>()));
+#elif WINDOWS
+		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
+			new LoopbackOAuthInitiator(ApiBaseUrl, sp.GetRequiredService<ILogger<LoopbackOAuthInitiator>>()));
+#endif
+
+		// Two clients, mirroring the Web host (Api / ApiAuth) to avoid a DI cycle:
+		//
+		//  - AuthService gets its OWN client with NO Bearer handler. refresh/logout/otp/
+		//    exchange are anonymous or carry the body refresh token — they need no Bearer,
+		//    and this is what the handler below would depend on, so keep them separate.
+		//  - The default HttpClient (what the RCL pages inject) attaches the in-memory JWT
+		//    as a Bearer header so [Authorize] endpoints (household, linked logins) work.
+		//
+		// The X-Native-Client header on both selects the API's body-token transport.
+		builder.Services.AddSingleton(sp =>
+		{
+			var authClient = new HttpClient { BaseAddress = new Uri(ApiBaseUrl) };
+			authClient.DefaultRequestHeaders.Add("X-Native-Client", "true");
+			return new AuthService(
+				authClient,
+				sp.GetRequiredService<ILogger<AuthService>>(),
+				sp.GetRequiredService<ISessionStore>(),
+				sp.GetRequiredService<IOAuthInitiator>());
+		});
+
+		builder.Services.AddSingleton(sp =>
+		{
+			var handler = new NativeAuthHeaderHandler(sp.GetRequiredService<AuthService>())
+			{
+				InnerHandler = new HttpClientHandler()
+			};
+			var client = new HttpClient(handler) { BaseAddress = new Uri(ApiBaseUrl) };
+			client.DefaultRequestHeaders.Add("X-Native-Client", "true");
+			return client;
+		});
+
+		return builder.Build();
+	}
+}

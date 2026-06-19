@@ -32,12 +32,16 @@ builder.Services.AddHttpClient("ApiAuth", client => client.BaseAddress = new Uri
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
+// Web session store: the browser owns the HttpOnly refresh cookie, so this is a no-op.
+builder.Services.AddSingleton<ISessionStore, CookieSessionStore>();
+
 // Auth. AuthService is a SINGLETON: IHttpClientFactory resolves message handlers
 // (AuthHeaderHandler) in a separate DI scope, so a scoped AuthService would give the
 // handler a different instance with no token — and the Bearer header would never be
 // attached. Singleton guarantees the app and the handler share one token store.
 builder.Services.AddSingleton(sp => new AuthService(
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiAuth"),
-    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AuthService>>()));
+    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AuthService>>(),
+    sp.GetRequiredService<ISessionStore>()));
 
 await builder.Build().RunAsync();

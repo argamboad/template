@@ -9,6 +9,9 @@
   <Folder Name="/src/Infrastructure/">
     <Project Path="src/Infrastructure/Template.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Maui/">
+    <Project Path="src/Maui/Template.Maui.csproj" />
+  </Folder>
   <Folder Name="/src/Shared.Ui/">
     <Project Path="src/Shared.Ui/Template.Shared.Ui.csproj" />
   </Folder>

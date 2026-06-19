@@ -12,9 +12,10 @@
     border: 1px solid var(--app-border, #E0E7EF);
 }
 
-.login-brand-icon {
-    font-size: 2rem;
-    color: var(--bs-primary);
+.login-lockup {
+    width: 100%;
+    max-width: 240px;
+    height: auto;
 }
 
 /* OAuth buttons */
@@ -35,7 +36,7 @@
 
 .btn-oauth:hover {
     border-color: var(--bs-primary);
-    box-shadow: 0 0 0 3px rgba(21, 101, 192, .12);
+    box-shadow: 0 0 0 3px rgba(var(--bs-primary-rgb), .12);
     color: #344054;
 }
 

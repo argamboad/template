@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Template.Api.Configuration;
 using Template.Api.Models;
 using Template.Api.Services;
@@ -29,6 +30,7 @@ public class AuthController(
     IClaimsExtractor claimsExtractor,
     IPasswordlessService passwordless,
     ILinkTokenService linkTokenService,
+    INativeAuthCodeService nativeAuthCodeService,
     IUserLoginRepository userLoginRepository,
     ITenantRepository tenantRepository,
     IEmailSender emailSender,
@@ -133,15 +135,20 @@ public class AuthController(
     }
 
     /// <summary>
-    /// Exchanges the refresh-token cookie for a fresh access token, rotating the
-    /// refresh token so a stolen cookie can only be replayed once.
+    /// Exchanges a refresh token for a fresh access token, rotating the refresh token
+    /// so a stolen one can only be replayed once. Transport depends on the client:
+    /// the browser sends/receives the token via the HttpOnly cookie; a native client
+    /// (header <c>X-Native-Client: true</c>) sends it in the body and gets the rotated
+    /// token back in the body — it never had a cookie to begin with.
     /// </summary>
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh()
+    public async Task<IActionResult> Refresh(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? req = null)
     {
         try
         {
-            var rawToken = cookieService.GetRefreshTokenFromCookies(Request);
+            var native = IsNativeClient;
+            var rawToken = native ? req?.RefreshToken : cookieService.GetRefreshTokenFromCookies(Request);
             if (string.IsNullOrEmpty(rawToken))
                 return Unauthorized(errorFactory.CreateError("no_refresh_token", "Refresh token not found"));
 
@@ -163,7 +170,9 @@ public class AuthController(
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ipAddress, validToken.Provider);
 
-            cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
+            // Web: rotate the cookie. Native: hand the rotated token back in the body.
+            if (!native)
+                cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
 
             logger.LogInformation("Token refreshed for user: {UserId}", validToken.UserId);
 
@@ -172,7 +181,8 @@ public class AuthController(
                 AccessToken = newJwt,
                 ExpiresIn = jwtSettings.ExpiryMinutes * 60,
                 UserId = user.Id,
-                Email = user.Email
+                Email = user.Email,
+                RefreshToken = native ? issued.RawToken : null
             });
         }
         catch (Exception ex)
@@ -188,11 +198,13 @@ public class AuthController(
     /// even with an expired access token. Idempotent.
     /// </summary>
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] RefreshRequest? req = null)
     {
         try
         {
-            var rawToken = cookieService.GetRefreshTokenFromCookies(Request);
+            var native = IsNativeClient;
+            var rawToken = native ? req?.RefreshToken : cookieService.GetRefreshTokenFromCookies(Request);
             if (!string.IsNullOrEmpty(rawToken))
             {
                 var token = await refreshTokenService.ValidateRefreshTokenAsync(rawToken);
@@ -203,7 +215,9 @@ public class AuthController(
                 }
             }
 
-            cookieService.DeleteRefreshTokenCookie(Response);
+            // Native clients have no cookie to clear; they drop the token from secure storage.
+            if (!native)
+                cookieService.DeleteRefreshTokenCookie(Response);
             return Ok(new { message = "Logged out successfully" });
         }
         catch (Exception ex)
@@ -269,7 +283,9 @@ public class AuthController(
         var token = linkTokenService.Issue(userId);
         var url = $"{Request.Scheme}://{Request.Host}/api/auth/login/{provider}" +
                   $"?link_token={Uri.EscapeDataString(token)}";
-        return Ok(new { url });
+        // url: web full-page navigates to it. token: native carries it through the
+        // loopback OAuth flow (native/login?...&link_token=) instead.
+        return Ok(new { url, token });
     }
 
     /// <summary>
@@ -356,8 +372,9 @@ public class AuthController(
     }
 
     /// <summary>
-    /// Verifies an OTP code. On success sets the refresh cookie (web) and also
-    /// returns the access token (mobile/API clients that hold the JWT directly).
+    /// Verifies an OTP code and establishes the session. The browser gets a refresh
+    /// cookie; a native client (header <c>X-Native-Client: true</c>) gets the refresh
+    /// token in the body to persist in its OS secure store. Both get the access token.
     /// </summary>
     [HttpPost("otp/verify")]
     public async Task<IActionResult> VerifyOtp([FromBody] OtpVerifyRequest req)
@@ -374,7 +391,7 @@ public class AuthController(
             return Unauthorized(errorFactory.CreateError(code, "The code is incorrect or has expired."));
         }
 
-        await IssueRefreshCookieAsync(result.User.Id, LoginTokenPurpose.Otp);
+        var refreshForBody = await EstablishSessionAsync(result.User.Id, LoginTokenPurpose.Otp);
 
         var tenantName = await ResolveTenantNameAsync(result.User.Id);
         var jwt = jwtTokenService.IssueAccessToken(
@@ -385,7 +402,122 @@ public class AuthController(
             AccessToken = jwt,
             ExpiresIn = jwtSettings.ExpiryMinutes * 60,
             UserId = result.User.Id,
-            Email = result.User.Email
+            Email = result.User.Email,
+            RefreshToken = refreshForBody
+        });
+    }
+
+    // ── Native (desktop/mobile) OAuth: loopback / custom-scheme code flow ─────
+
+    /// <summary>
+    /// Starts OAuth for a native client. The app opens this URL in the system browser
+    /// (passing a loopback <paramref name="redirect"/> it's listening on); the provider
+    /// round-trip lands on the native callback, which hands back a one-time code.
+    /// </summary>
+    [HttpGet("native/login/{provider}")]
+    public IActionResult NativeLogin(string provider, [FromQuery] string redirect,
+        [FromQuery(Name = "link_token")] string? linkToken = null)
+    {
+        provider = provider.ToLowerInvariant();
+        if (!SupportedProviders.Contains(provider) || !IsAllowedNativeRedirect(redirect))
+            return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
+
+        var callback = $"/api/auth/native/callback/{provider}?redirect={Uri.EscapeDataString(redirect)}";
+        if (!string.IsNullOrEmpty(linkToken))
+            callback += $"&link_token={Uri.EscapeDataString(linkToken)}";
+        var properties = new AuthenticationProperties { RedirectUri = callback };
+
+        return provider switch
+        {
+            "google" => Challenge(properties, GoogleDefaults.AuthenticationScheme),
+            "microsoft" => Challenge(properties, MicrosoftAccountDefaults.AuthenticationScheme),
+            _ => BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider."))
+        };
+    }
+
+    /// <summary>
+    /// Native OAuth callback. Resolves/creates the account, mints a single-use code,
+    /// and redirects to the app's loopback/scheme URL carrying ONLY that code — tokens
+    /// never travel in the URL. The app exchanges the code at /native/exchange.
+    /// </summary>
+    [HttpGet("native/callback/{provider}")]
+    [Authorize(AuthenticationSchemes = ServiceCollectionExtensions.ExternalScheme)]
+    public async Task<IActionResult> NativeCallback(string provider, [FromQuery] string redirect,
+        [FromQuery(Name = "link_token")] string? linkToken = null)
+    {
+        provider = provider.ToLowerInvariant();
+        try
+        {
+            if (!SupportedProviders.Contains(provider) || !IsAllowedNativeRedirect(redirect))
+                return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
+
+            var (_, providerUserId, email) = claimsExtractor.ExtractClaims(User);
+            await HttpContext.SignOutAsync(ServiceCollectionExtensions.ExternalScheme);
+
+            if (string.IsNullOrEmpty(providerUserId) || string.IsNullOrEmpty(email))
+                return Redirect(AppendQuery(redirect, "error", "auth_failed"));
+
+            // LINK MODE: attach this identity to the initiating account, don't sign in.
+            if (!string.IsNullOrEmpty(linkToken))
+            {
+                var linkUserId = linkTokenService.Redeem(linkToken);
+                if (linkUserId is null)
+                    return Redirect(AppendQuery(redirect, "error", "expired"));
+
+                var linkResult = await userService.LinkLoginAsync(linkUserId.Value, provider, providerUserId);
+                logger.LogInformation("Native link {Provider} to user {UserId}: {Result}", provider, linkUserId, linkResult);
+                return linkResult == LinkLoginResult.OwnedByAnotherAccount
+                    ? Redirect(AppendQuery(redirect, "error", "in_use"))
+                    : Redirect(AppendQuery(redirect, "linked", provider));
+            }
+
+            var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
+                claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User));
+
+            var code = nativeAuthCodeService.Issue(user.Id, provider);
+            logger.LogInformation("Native OAuth callback successful for {Email} via {Provider}", email, provider);
+            return Redirect(AppendQuery(redirect, "code", code));
+        }
+        catch (UnverifiedEmailConflictException)
+        {
+            return Redirect(AppendQuery(redirect, "error", "email_unverified"));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Native OAuth callback failed");
+            return Redirect(AppendQuery(redirect, "error", "auth_failed"));
+        }
+    }
+
+    /// <summary>
+    /// Exchanges a single-use native-auth code for an access token + refresh token
+    /// (both in the body). The code is consumed on first use.
+    /// </summary>
+    [HttpPost("native/exchange")]
+    public async Task<IActionResult> NativeExchange([FromBody] NativeExchangeRequest req)
+    {
+        var grant = nativeAuthCodeService.Redeem(req.Code);
+        if (grant is null)
+            return Unauthorized(errorFactory.CreateError("invalid_code", "The code is invalid or has expired."));
+
+        var user = await userService.GetUserByIdAsync(grant.Value.UserId);
+        if (user is null)
+            return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
+
+        var tenantName = await ResolveTenantNameAsync(user.Id);
+        var jwt = jwtTokenService.IssueAccessToken(
+            user.Id, user.Email, grant.Value.Provider, user.DisplayName, tenantName);
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ip, grant.Value.Provider);
+
+        return Ok(new TokenResponse
+        {
+            AccessToken = jwt,
+            ExpiresIn = jwtSettings.ExpiryMinutes * 60,
+            UserId = user.Id,
+            Email = user.Email,
+            RefreshToken = issued.RawToken
         });
     }
 
@@ -411,6 +543,38 @@ public class AuthController(
         cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
     }
 
+    /// <summary>
+    /// Issues a refresh token and delivers it by the caller's transport: a cookie for
+    /// the browser, or the raw token (returned here) for a native client to store.
+    /// </summary>
+    private async Task<string?> EstablishSessionAsync(Guid userId, string provider)
+    {
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var issued = await refreshTokenService.IssueRefreshTokenAsync(userId, ip, provider);
+        if (IsNativeClient)
+            return issued.RawToken;
+        cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
+        return null;
+    }
+
+    /// <summary>True when the request comes from a native (desktop/mobile) client.</summary>
+    private bool IsNativeClient => Request.Headers["X-Native-Client"] == "true";
+
+    /// <summary>
+    /// Whether the native client's redirect target is permitted. Loopback HTTP
+    /// (127.0.0.1 / localhost, any port) is always allowed — the desktop pattern
+    /// (RFC 8252 §7.3). A configured custom scheme (mobile) is allowed too. Anything
+    /// else is rejected to prevent the callback being used as an open redirect.
+    /// </summary>
+    private bool IsAllowedNativeRedirect(string? redirect) =>
+        NativeRedirectPolicy.IsAllowed(redirect, appSettings.NativeCallbackScheme);
+
+    private static string AppendQuery(string url, string key, string value)
+    {
+        var separator = url.Contains('?') ? '&' : '?';
+        return $"{url}{separator}{key}={Uri.EscapeDataString(value)}";
+    }
+
     private bool TryGetUserId(out Guid userId) =>
         Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
@@ -421,3 +585,9 @@ public class AuthController(
 public record EmailRequest(string Email);
 
 public record OtpVerifyRequest(string Email, string Code);
+
+public record RefreshRequest(
+    [property: System.Text.Json.Serialization.JsonPropertyName("refresh_token")] string? RefreshToken);
+
+public record NativeExchangeRequest(
+    [property: System.Text.Json.Serialization.JsonPropertyName("code")] string Code);
