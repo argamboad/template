@@ -37,6 +37,17 @@ dotnet run --project src/Api --launch-profile https    # binds https:7160 (web/d
   (a reachable API with no session) — *not* a connection error.
 - **Mailpit UI: <http://localhost:8025>** — this is the dev mail trap. Every magic link, OTP code,
   and invitation email lands here. Keep it open in a tab throughout testing.
+  > ⚠️ **Email only reaches Mailpit if SMTP points at it.** If your repo-root `.env` has the
+  > `Email__Smtp__*` lines set to a real provider (e.g. Brevo), the API sends auth emails there and
+  > **Mailpit stays empty** — every email-based case below will appear to "fail." For QA, route mail
+  > to Mailpit by **either**:
+  > - commenting out the `Email__Smtp__*` lines in `.env` (unset → defaults to Mailpit `localhost:1025`), **or**
+  > - leaving `.env` untouched and overriding on the command line (command-line config beats `.env`):
+  >   ```bash
+  >   dotnet run --project src/Api --launch-profile https -- \
+  >     --Email:Smtp:Host=localhost --Email:Smtp:Port=1025 --Email:Smtp:Username= --Email:Smtp:Password=
+  >   ```
+  > Verify by triggering one OTP (QA-SMK-01) and confirming it appears in Mailpit before running the suite.
 - Web app: `dotnet run --project src/Web --launch-profile https` → **<https://localhost:7008>**.
   > ⚠️ Always use the **https** profile for both web and API. Chrome treats `http://localhost` and
   > `https://localhost` as different sites, so the refresh cookie is dropped over http and sign-in
@@ -792,9 +803,11 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
 ---
 
 ## 17. Notes for maintainers
-- This plan is the manual counterpart to the automated `tests/E2E.Tests` (Playwright/NUnit) suite,
-  which is currently a stub (`BasePage` only). The Gherkin blocks here are written to be lifted
-  directly into executable E2E scenarios — keep the two in sync as automation grows.
+- This plan is the manual counterpart to the automated `tests/E2E.Tests` (Playwright/NUnit) suite.
+  That suite now covers the OTP auth happy-path and guards (`AuthFlowTests` over `LoginPage`, reading
+  codes from Mailpit via the `Mailpit` REST client) — see `tests/E2E.Tests/README.md` for the run
+  procedure (it documents the same Mailpit SMTP override noted in §1.1). The Gherkin blocks here are
+  written to be lifted directly into new E2E scenarios — keep the two in sync as automation grows.
 - When you add an app-specific domain feature on top of this template, add a matching suite here and
   a row in the traceability matrix (§15) so "entire functionality" stays honest.
 - `docs/FEATURES.md` describes the same JWT-based flows at the design level; this plan is their
