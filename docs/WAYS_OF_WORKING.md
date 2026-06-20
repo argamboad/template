@@ -31,6 +31,38 @@ horizontal layer in isolation.
 5. Open a PR using the PR template; self-review against acceptance criteria.
 6. Merge; app remains in a working state. Add ADRs to `DECISIONS.md` for any decisions made.
 
+## Code organization — clean platform + vertical feature slices
+
+Two senses of "vertical" apply, and they're complementary:
+
+- **Delivery-vertical slices (above):** the *unit of build work* — each increment cuts through the
+  layers it needs and leaves the app working.
+- **Organization-vertical feature folders:** *where the code lives*. The reusable **platform** stays
+  horizontal / clean-layered (Core, Infrastructure, and the auth/tenancy controllers), while each
+  **app feature** lives in one self-contained folder: `src/Api/Features/<Feature>/`.
+
+This hybrid is pinned in **ADR-004**. The platform is the durable chassis (JWT auth, membership
+tenancy, the global tenant query filter, email, persistence); features bolt on and *reuse* it.
+
+**A feature slice** (`src/Api/Features/<Feature>/`) typically contains:
+- `<Feature>Endpoints.cs` — a minimal-API `MapGroup("/api/<feature>").RequireAuthorization(...)`,
+  registered with `app.Map<Feature>()` in `Program.cs`. Features are minimal-API groups; the
+  platform stays controllers.
+- `<Feature>Handler.cs` — the orchestration/logic; injects `IRepository<T>` (whose `Query()` is
+  already tenant-filtered), `ICurrentTenant`, `IUnitOfWork`, and platform services as needed.
+- `<Feature>Models.cs` — request/response DTOs + validation, co-located.
+- `<Feature>DataContributor.cs` — an `ITenantDataContributor` so the feature's data participates in
+  tenant dissolve (registered in DI; no central wipe method to edit).
+- The **entity** lives in `src/Core/Entities/` (it's the EF model + migration source) and implements
+  **`ITenantScoped`** so the global query filter scopes it automatically.
+
+**A feature must NOT** reach into another feature's folder, edit a central "has data / wipe data"
+method, author a bespoke per-entity repository (use `IRepository<T>`), or inline UI in the Web app
+(UI components go in the Shared.Ui RCL).
+
+**Reference:** `src/Api/Features/Notes` is a complete, working example (marked "🗑️ DELETE-ME").
+Copy its shape; delete it when you ship your first real feature.
+
 ## User stories
 
 Stories live in `docs/stories/`, **one file per epic** (e.g. `docs/stories/inventory.md`),
@@ -151,13 +183,16 @@ without a test that drove it.
 | Layer | Project | Framework | What it covers |
 |-------|---------|-----------|----------------|
 | Unit | `tests/Core.Tests` | xUnit | Domain logic, derived rules, entity invariants |
-| Unit | `tests/Api.Tests` | xUnit | API endpoints, request/response shape, auth guards |
+| Unit / Integration | `tests/Api.Tests` | xUnit (+ Postgres Testcontainer) | Services, repositories, feature slices, tenancy invariants |
 | E2E | `tests/E2E.Tests` | Playwright (NUnit) | Critical user flows through a real browser |
 
 ### Unit tests (`Core.Tests`, `Api.Tests` — xUnit)
 - One test class per production class; file mirrors the source tree.
 - Cover every derived rule, happy path, unhappy path, and tenant-scoping boundary.
-- No real database in unit tests — use in-memory EF or mocks at the repository boundary.
+- Tests that exercise relational behavior (EF global query filters, `ExecuteUpdate`/`ExecuteDelete`,
+  transactions/savepoints) run against a real **PostgreSQL Testcontainer** — see
+  `tests/Api.Tests/Infrastructure/PostgresFixture.cs` and `ServiceHarness.cs`. The EF in-memory
+  provider can't model these, so don't use it. Pure logic with no DB needs no container.
 
 ### E2E tests (`E2E.Tests` — Playwright/NUnit)
 - One test file per epic, mirroring `docs/stories/`.

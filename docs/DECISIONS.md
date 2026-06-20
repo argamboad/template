@@ -140,3 +140,19 @@ hash) opt out with `IgnoreQueryFilters()`.
 *Rationale:* membership models "a user moves between tenants" and the always-in-exactly-one-tenant
 invariant cleanly; the global filter turns "never leak across tenants" (ADR-C2) from a per-query
 convention into a structural guarantee, so feature slices can't forget to scope.
+
+**ADR-004 — Clean platform baseline + vertical-slice features (hybrid). (2026-06-19)**
+The reusable **platform** stays clean-layered / horizontal — Core, Infrastructure, and the
+auth/tenancy controllers (the durable chassis: JWT auth, membership tenancy, the global query
+filter, email, persistence). App **features** are organized as **vertical slices**: one
+self-contained folder per feature in `src/Api/Features/<Feature>/` — a minimal-API `MapGroup`, a
+handler, co-located models, and an `ITenantDataContributor` — reusing the platform via
+`IRepository<T>`, `ICurrentTenant`, and `IUnitOfWork`. Feature endpoints are minimal-API groups; the
+platform stays controllers. The entity lives in `Core` and implements `ITenantScoped` so tenant
+scoping is automatic. Full convention in `docs/WAYS_OF_WORKING.md`; reference slice at
+`src/Api/Features/Notes` (marked DELETE-ME).
+*Rationale:* the platform is cross-cutting, stable, and shared by every feature — it benefits from
+clean layering. Features are independent and churn-y — co-locating each one's endpoint/handler/
+models/data makes them easy to add, understand, and delete without touching central code. The
+generic repository + global tenant filter let a slice be added without authoring a repository pair
+or remembering to scope. This is the architectural convention for app work on top of the template.

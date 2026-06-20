@@ -12,6 +12,9 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 - Implementing a screen or flow → read **`docs/FEATURES.md`** first.
 - Starting a build slice → read **`docs/WAYS_OF_WORKING.md`** (slices, story format, PR/commit
   conventions).
+- Adding an app feature → follow the **clean-platform + vertical-slice convention** in
+  `docs/WAYS_OF_WORKING.md` (and ADR-004); copy `src/Api/Features/Notes` as the reference, then
+  delete the Notes sample.
 - Wondering *why* something is the way it is → check **`docs/DECISIONS.md`** before changing it.
 - Changing a settled decision → add a new dated ADR in `docs/DECISIONS.md`; don't silently
   reverse it.
