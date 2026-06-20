@@ -198,8 +198,10 @@ without a test that drove it.
 - One test file per epic, mirroring `docs/stories/`.
 - Tests inherit from Playwright's `PageTest`; use Page Object Model (`tests/E2E.Tests/Pages/`).
 - Cover the Gherkin happy path + key unhappy paths through the real running UI.
-- Run against the full stack: `docker compose up -d`, then start API and Web before running.
-- Base URL configured via `PLAYWRIGHT_BASE_URL` env var or `playwright.runsettings`.
+- Run against the full stack: `docker compose up -d`, then start the API and Web. OTP-based
+  tests read codes from **Mailpit**, so the API must send to Mailpit (the dev default) — see
+  **`tests/E2E.Tests/README.md`** for the exact commands (incl. overriding a real-SMTP `.env`).
+- Base URL defaults to `https://localhost:7008`; override with `PLAYWRIGHT_BASE_URL`.
 
 ### First-time Playwright setup
 ```sh
@@ -210,9 +212,9 @@ pwsh tests/E2E.Tests/bin/Debug/net10.0/playwright.ps1 install
 ### Running tests
 ```sh
 dotnet test tests/Core.Tests
-dotnet test tests/Api.Tests
-# E2E — requires docker compose + servers running
-dotnet test tests/E2E.Tests -- RunSettings=tests/E2E.Tests/playwright.runsettings
+dotnet test tests/Api.Tests   # spins up a Postgres Testcontainer; Docker must be running
+# E2E — requires docker compose + the API & Web running (see tests/E2E.Tests/README.md)
+dotnet test tests/E2E.Tests
 ```
 
 ## How Claude Code should use this

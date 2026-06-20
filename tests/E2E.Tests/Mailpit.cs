@@ -1,0 +1,53 @@
+using System.Net.Http.Json;
+using System.Text.RegularExpressions;
+
+namespace Template.E2E.Tests;
+
+/// <summary>
+/// Minimal client for the dev Mailpit REST API (http://localhost:8025) so E2E tests can read
+/// the OTP code / magic link the app "sends" — the same trick a manual tester uses.
+/// </summary>
+public static class Mailpit
+{
+    private static readonly HttpClient Http = new()
+    {
+        BaseAddress = new Uri(Environment.GetEnvironmentVariable("MAILPIT_BASE_URL") ?? "http://localhost:8025"),
+    };
+
+    /// <summary>Deletes all trapped messages (call before triggering a fresh email).</summary>
+    public static Task ClearAsync() => Http.DeleteAsync("/api/v1/messages");
+
+    /// <summary>
+    /// Polls until an OTP email addressed to <paramref name="toEmail"/> arrives and returns its
+    /// 6-digit code. Throws on timeout.
+    /// </summary>
+    public static async Task<string> WaitForOtpAsync(string toEmail, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var code = await TryGetLatestCodeAsync(toEmail);
+            if (code is not null) return code;
+            await Task.Delay(500);
+        }
+        throw new TimeoutException($"No OTP email for {toEmail} within {timeout.TotalSeconds:0}s.");
+    }
+
+    private static async Task<string?> TryGetLatestCodeAsync(string toEmail)
+    {
+        var list = await Http.GetFromJsonAsync<MessageList>("/api/v1/messages?limit=50");
+        var summary = list?.Messages?
+            .FirstOrDefault(m => m.To.Any(a => string.Equals(a.Address, toEmail, StringComparison.OrdinalIgnoreCase)));
+        if (summary is null) return null;
+
+        var detail = await Http.GetFromJsonAsync<MessageDetail>($"/api/v1/message/{summary.ID}");
+        var body = $"{detail?.Text} {detail?.HTML}";
+        var match = Regex.Match(body, @"(?<!\d)(\d{6})(?!\d)");
+        return match.Success ? match.Groups[1].Value : null;
+    }
+
+    private sealed record MessageList(List<MessageSummary>? Messages);
+    private sealed record MessageSummary(string ID, List<EmailAddress> To);
+    private sealed record EmailAddress(string Address);
+    private sealed record MessageDetail(string? Text, string? HTML);
+}

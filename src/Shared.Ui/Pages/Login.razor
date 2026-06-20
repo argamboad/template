@@ -56,7 +56,7 @@
             {
                 <div class="mb-3">
                     <label for="email" class="form-label fw-medium">@Localizer["Login_EmailLabel"]</label>
-                    <input id="email" type="email" class="form-control @(_emailError ? "is-invalid" : "")"
+                    <input id="email" data-testid="login-email" type="email" class="form-control @(_emailError ? "is-invalid" : "")"
                            placeholder="you@example.com" @bind="_email" @bind:event="oninput" disabled="@_busy" />
                     @if (_emailError)
                     {
@@ -81,6 +81,7 @@
                         </button>
                     }
                     <button class="btn @(Auth.IsNative ? "btn-primary" : "btn-outline-primary")"
+                            data-testid="login-send-otp"
                             @onclick="SendOtp" disabled="@_busy">
                         @if (_busy && _pending == Mode.OtpSent)
                         {
@@ -106,6 +107,7 @@
                 <p class="text-muted small mb-2">@Localizer["Login_OtpPrompt", _email]</p>
                 <div class="mb-2">
                     <input type="text" inputmode="numeric" maxlength="6"
+                           data-testid="login-otp-code"
                            class="form-control text-center @(_otpError ? "is-invalid" : "")"
                            style="letter-spacing:.4rem;font-size:1.25rem"
                            placeholder="------" @bind="_otpCode" @bind:event="oninput"
@@ -116,7 +118,7 @@
                     <div class="alert alert-danger py-2">@_error</div>
                 }
                 <div class="d-grid">
-                    <button class="btn btn-primary" @onclick="VerifyOtp" disabled="@_busy">
+                    <button class="btn btn-primary" data-testid="login-verify-otp" @onclick="VerifyOtp" disabled="@_busy">
                         @if (_busy)
                         {
                             <span class="spinner-border spinner-border-sm me-2"></span>
