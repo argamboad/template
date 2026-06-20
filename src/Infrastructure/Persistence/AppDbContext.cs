@@ -25,6 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<LoginToken> LoginTokens => Set<LoginToken>();
 
+    // 🗑️ DELETE-ME: sample feature set (remove with the Features/Notes slice).
+    public DbSet<Note> Notes => Set<Note>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -112,6 +115,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             t.Ignore(x => x.IsConsumed);
             t.Ignore(x => x.IsExpired);
             t.Ignore(x => x.IsValid);
+        });
+
+        // 🗑️ DELETE-ME: sample feature (remove with the Features/Notes slice). Implements
+        // ITenantScoped, so the global query filter below covers it automatically.
+        builder.Entity<Note>(n =>
+        {
+            n.HasKey(x => x.Id);
+            n.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            n.HasIndex(x => x.TenantId);
         });
 
         // Tenant isolation as a structural guarantee: every ITenantScoped entity is

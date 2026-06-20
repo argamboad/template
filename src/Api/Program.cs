@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Template.Api.Configuration;
+using Template.Api.Features.Notes;
 using Template.Api.Services;
 using Template.Core.Abstractions;
 using Template.Infrastructure;
@@ -80,6 +81,11 @@ builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 
+// 🗑️ DELETE-ME: sample feature slice (Features/Notes) — the reference for how a vertical
+// slice wires up: a handler + a tenant-data contributor, with endpoints mapped below.
+builder.Services.AddScoped<NotesHandler>();
+builder.Services.AddScoped<ITenantDataContributor, NotesDataContributor>();
+
 // Caches + session (LinkTokenService uses IMemoryCache; session backed by distributed cache).
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
@@ -155,5 +161,8 @@ app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// 🗑️ DELETE-ME: sample feature slice endpoints (remove with Features/Notes).
+app.MapNotes();
 
 app.Run();
