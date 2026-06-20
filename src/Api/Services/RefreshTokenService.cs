@@ -26,7 +26,8 @@ public class RefreshTokenService(
     IRefreshTokenRepository repository,
     ITokenGenerator tokenGenerator,
     ITokenHasher tokenHasher,
-    IRefreshTokenSettings settings) : IRefreshTokenService
+    IRefreshTokenSettings settings,
+    TimeProvider clock) : IRefreshTokenService
 {
     public async Task<IssuedRefreshToken> IssueRefreshTokenAsync(Guid userId, string ipAddress, string provider, CancellationToken cancellationToken = default)
     {
@@ -37,14 +38,15 @@ public class RefreshTokenService(
 
         var rawToken = tokenGenerator.GenerateToken();
         var tokenHash = tokenHasher.HashToken(rawToken);
+        var now = clock.GetUtcNow().UtcDateTime;
 
         var refreshToken = new RefreshToken
         {
             Id = Guid.CreateVersion7(),
             UserId = userId,
             TokenHash = tokenHash,
-            IssuedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddDays(settings.ExpiryDays),
+            IssuedAt = now,
+            ExpiresAt = now.AddDays(settings.ExpiryDays),
             IsRevoked = false,
             IssuedFromIp = ipAddress,
             Provider = provider

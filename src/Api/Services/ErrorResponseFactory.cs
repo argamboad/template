@@ -5,8 +5,5 @@ namespace Template.Api.Services;
 /// </summary>
 public class ErrorResponseFactory : IErrorResponseFactory
 {
-    public object CreateError(string errorCode, string message)
-    {
-        return new { error = errorCode, message };
-    }
+    public ErrorResponse CreateError(string errorCode, string message) => new(errorCode, message);
 }

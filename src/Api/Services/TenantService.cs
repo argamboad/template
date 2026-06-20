@@ -57,6 +57,7 @@ public class TenantService(
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
     IEnumerable<ITenantDataContributor> dataContributors,
+    TimeProvider clock,
     ILogger<TenantService> logger) : ITenantService
 {
     // The tenant a re-homed user lands in (UI label is "Household").
@@ -153,7 +154,7 @@ public class TenantService(
     // never tenant-less.
     private async Task ReHomeAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var newTenantId = Guid.CreateVersion7();
         await tenants.CreateAsync(new Tenant
         {

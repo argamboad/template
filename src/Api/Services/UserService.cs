@@ -57,6 +57,7 @@ public class UserService(
     IUserRepository repository,
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
+    TimeProvider clock,
     ILogger<UserService> logger) : IUserService
 {
     public async Task<User> GetOrCreateUserAsync(string email, string providerUserId, string provider,
@@ -168,7 +169,7 @@ public class UserService(
     /// </summary>
     private async Task<User> CreateUserWithTenantAsync(User newUser, string? trimmedName, CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var tenantLabel = trimmedName is { Length: > 0 }
             ? trimmedName.Split(' ')[0]
             : newUser.Email.Split('@')[0];
@@ -209,7 +210,7 @@ public class UserService(
         var user = await repository.GetByIdAsync(userId, cancellationToken);
         if (user is null) return;
         user.Locale = locale;
-        user.UpdatedAt = DateTime.UtcNow;
+        user.UpdatedAt = clock.GetUtcNow();
         await repository.UpdateAsync(user, cancellationToken);
     }
 
@@ -242,7 +243,7 @@ public class UserService(
         if (trimmed != null && trimmed != user.DisplayName)
         {
             user.DisplayName = trimmed;
-            user.UpdatedAt = DateTimeOffset.UtcNow;
+            user.UpdatedAt = clock.GetUtcNow();
             await repository.UpdateAsync(user, cancellationToken);
         }
     }

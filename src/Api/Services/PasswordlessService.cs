@@ -36,7 +36,8 @@ public class PasswordlessService(
     IUserService userService,
     ITokenGenerator tokenGenerator,
     ITokenHasher tokenHasher,
-    IPasswordlessSettings settings) : IPasswordlessService
+    IPasswordlessSettings settings,
+    TimeProvider clock) : IPasswordlessService
 {
     public async Task<string> IssueMagicLinkTokenAsync(string email, CancellationToken cancellationToken = default)
     {
@@ -59,7 +60,7 @@ public class PasswordlessService(
         if (record is null)
             return null;
 
-        record.ConsumedAt = DateTimeOffset.UtcNow;
+        record.ConsumedAt = clock.GetUtcNow();
         await repository.UpdateAsync(record, cancellationToken);
 
         return await userService.GetOrCreateByEmailAsync(email, cancellationToken: cancellationToken);
@@ -89,7 +90,7 @@ public class PasswordlessService(
         // early-exit string equality.
         if (tokenHasher.Verify(code, record.CodeHash))
         {
-            record.ConsumedAt = DateTimeOffset.UtcNow;
+            record.ConsumedAt = clock.GetUtcNow();
             await repository.UpdateAsync(record, cancellationToken);
             var user = await userService.GetOrCreateByEmailAsync(email, cancellationToken: cancellationToken);
             return new OtpResult(OtpStatus.Success, user);
@@ -99,7 +100,7 @@ public class PasswordlessService(
         record.AttemptCount++;
         if (record.AttemptCount >= settings.OtpMaxAttempts)
         {
-            record.ConsumedAt = DateTimeOffset.UtcNow;
+            record.ConsumedAt = clock.GetUtcNow();
             await repository.UpdateAsync(record, cancellationToken);
             return new OtpResult(OtpStatus.TooManyAttempts, null);
         }
@@ -114,8 +115,8 @@ public class PasswordlessService(
         Email = email,
         CodeHash = tokenHasher.HashToken(raw),
         Purpose = purpose,
-        ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(lifespanMinutes),
-        CreatedAt = DateTimeOffset.UtcNow
+        ExpiresAt = clock.GetUtcNow().AddMinutes(lifespanMinutes),
+        CreatedAt = clock.GetUtcNow()
     };
 
     private static string Normalize(string email) => (email ?? string.Empty).Trim().ToLowerInvariant();

@@ -29,16 +29,16 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
     public ITokenGenerator TokenGen { get; } = new TokenGenerator();
     public ITokenHasher Hasher { get; } = new TokenHasher();
 
-    public UserService UserService() => new(Users, Tenants, UnitOfWork, NullLogger<UserService>.Instance);
+    public UserService UserService() => new(Users, Tenants, UnitOfWork, Clock, NullLogger<UserService>.Instance);
 
     public RefreshTokenService RefreshTokenService(int expiryDays = 30) =>
-        new(RefreshTokens, TokenGen, Hasher, new TestRefreshSettings(expiryDays));
+        new(RefreshTokens, TokenGen, Hasher, new TestRefreshSettings(expiryDays), Clock);
 
     public PasswordlessService PasswordlessService(IPasswordlessSettings? settings = null) =>
-        new(LoginTokens, UserService(), TokenGen, Hasher, settings ?? new TestPasswordlessSettings());
+        new(LoginTokens, UserService(), TokenGen, Hasher, settings ?? new TestPasswordlessSettings(), Clock);
 
     public TenantService TenantService() =>
-        new(Tenants, UnitOfWork, [], NullLogger<TenantService>.Instance);
+        new(Tenants, UnitOfWork, [], Clock, NullLogger<TenantService>.Instance);
 
     public JwtTokenService JwtTokenService() =>
         new(new TestJwtSettings(), NullLogger<JwtTokenService>.Instance);
