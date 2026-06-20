@@ -38,7 +38,7 @@ namespace Template.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DataProtectionKeys");
+                    b.ToTable("DataProtectionKeys", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.LoginToken", b =>
@@ -78,7 +78,7 @@ namespace Template.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email", "Purpose");
 
-                    b.ToTable("LoginTokens");
+                    b.ToTable("LoginTokens", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.Note", b =>
@@ -109,7 +109,7 @@ namespace Template.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId");
 
-                    b.ToTable("Notes");
+                    b.ToTable("Notes", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.RefreshToken", b =>
@@ -151,7 +151,7 @@ namespace Template.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("RefreshTokens", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.Tenant", b =>
@@ -173,7 +173,7 @@ namespace Template.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Tenants");
+                    b.ToTable("Tenants", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.TenantInvitation", b =>
@@ -215,7 +215,7 @@ namespace Template.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "Status");
 
-                    b.ToTable("TenantInvitations");
+                    b.ToTable("TenantInvitations", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.TenantMembership", b =>
@@ -245,7 +245,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("TenantMemberships");
+                    b.ToTable("TenantMemberships", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.User", b =>
@@ -281,7 +281,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.UserLogin", b =>
@@ -313,7 +313,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.HasIndex("Provider", "ProviderUserId")
                         .IsUnique();
 
-                    b.ToTable("UserLogins");
+                    b.ToTable("UserLogins", (string)null);
                 });
 
             modelBuilder.Entity("Template.Core.Entities.TenantInvitation", b =>

@@ -38,7 +38,7 @@ public class RefreshTokenService(
 
         var rawToken = tokenGenerator.GenerateToken();
         var tokenHash = tokenHasher.HashToken(rawToken);
-        var now = clock.GetUtcNow().UtcDateTime;
+        var now = clock.GetUtcNow();
 
         var refreshToken = new RefreshToken
         {

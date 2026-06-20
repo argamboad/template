@@ -23,7 +23,7 @@ public class RefreshTokenRepository(AppDbContext db) : IRefreshTokenRepository
         return await db.RefreshTokens.FirstOrDefaultAsync(t =>
             t.TokenHash == tokenHash &&
             !t.IsRevoked &&
-            t.ExpiresAt > DateTime.UtcNow, cancellationToken);
+            t.ExpiresAt > DateTimeOffset.UtcNow, cancellationToken);
     }
 
     public async Task RevokeAsync(Guid tokenId, CancellationToken cancellationToken = default)

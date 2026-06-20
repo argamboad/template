@@ -42,6 +42,7 @@ public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> log
             new(ClaimTypes.NameIdentifier, userId.ToString()),
             new(ClaimTypes.Email, email),
             new(JwtClaims.Provider, provider),
+            // jti is an opaque uniqueness token, not a DB key — random Guid, not UUIDv7.
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
         };
         // ClaimTypes.Name drives the client's display name; fall back to email.
