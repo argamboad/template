@@ -310,7 +310,7 @@
     private async Task RemoveMember(Member m)
     {
         var name = string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName;
-        if (!await Confirm(Localizer["Household_ConfirmRemove", name])) return;
+        if (!await JS.ConfirmAsync(Localizer["Household_ConfirmRemove", name])) return;
 
         _busy = true;
         try
@@ -346,7 +346,7 @@
 
     private async Task LeaveAsMember()
     {
-        if (!await Confirm(Localizer["Household_ConfirmLeave"])) return;
+        if (!await JS.ConfirmAsync(Localizer["Household_ConfirmLeave"])) return;
         _busy = true;
         try
         {
@@ -363,7 +363,7 @@
 
     private async Task DissolveAndLeave()
     {
-        if (!await Confirm(Localizer["Household_ConfirmDissolve"])) return;
+        if (!await JS.ConfirmAsync(Localizer["Household_ConfirmDissolve"])) return;
         _busy = true;
         try
         {
@@ -383,12 +383,6 @@
         if (token is null) return;
         try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", token); }
         catch { /* clipboard may be unavailable; the token is still visible */ }
-    }
-
-    private async Task<bool> Confirm(string message)
-    {
-        try { return await JS.InvokeAsync<bool>("confirm", message); }
-        catch { return true; }
     }
 
     private void SetStatus(string? text, bool ok)

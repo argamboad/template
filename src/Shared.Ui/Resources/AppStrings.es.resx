@@ -107,6 +107,7 @@
   <data name="Settings_Connected" xml:space="preserve"><value>Conectado</value></data>
   <data name="Settings_Link" xml:space="preserve"><value>Vincular</value></data>
   <data name="Settings_Unlink" xml:space="preserve"><value>Desvincular</value></data>
+  <data name="Settings_ConfirmUnlink" xml:space="preserve"><value>¿Desvincular este método de inicio de sesión?</value></data>
   <data name="Settings_LinkedSuccess" xml:space="preserve"><value>{0} se vinculó correctamente.</value></data>
   <data name="Settings_LinkErrInUse" xml:space="preserve"><value>Esa cuenta de proveedor ya está vinculada a otro usuario.</value></data>
   <data name="Settings_LinkErrExpired" xml:space="preserve"><value>La solicitud de vinculación caducó; inténtalo de nuevo.</value></data>

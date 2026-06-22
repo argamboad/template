@@ -107,6 +107,7 @@
   <data name="Settings_Connected" xml:space="preserve"><value>Connected</value></data>
   <data name="Settings_Link" xml:space="preserve"><value>Link</value></data>
   <data name="Settings_Unlink" xml:space="preserve"><value>Unlink</value></data>
+  <data name="Settings_ConfirmUnlink" xml:space="preserve"><value>Unlink this sign-in method?</value></data>
   <data name="Settings_LinkedSuccess" xml:space="preserve"><value>{0} linked successfully.</value></data>
   <data name="Settings_LinkErrInUse" xml:space="preserve"><value>That provider account is already linked to a different user.</value></data>
   <data name="Settings_LinkErrExpired" xml:space="preserve"><value>The link request expired — please try again.</value></data>

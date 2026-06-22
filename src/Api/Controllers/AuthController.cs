@@ -178,7 +178,8 @@ public class AuthController(
 
             return Ok(session.Response);
         }
-        catch (Exception ex)
+        // Let client-disconnect cancellation propagate (request aborted) instead of masking it as a 500.
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Token refresh failed");
             return StatusCode(500, errorFactory.CreateError("refresh_failed", "Failed to refresh token"));
@@ -214,7 +215,7 @@ public class AuthController(
                 cookieService.DeleteRefreshTokenCookie(Response);
             return Ok(new { message = "Logged out successfully" });
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Logout failed");
             return StatusCode(500, errorFactory.CreateError("logout_failed", "Failed to logout"));

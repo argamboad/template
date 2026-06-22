@@ -41,14 +41,20 @@ else
         // before @Body renders. No page triggers its own refresh → no rotation race.
         await Auth.InitializeAsync();
 
-        // First load on a new device: if the user's saved locale differs from the active
-        // UI culture, apply it and reload once so the server preference follows the user.
+        // First load on a new device: if the user's saved locale differs from the active UI
+        // culture, apply it IN-PROCESS (and persist for the next cold start) before @Body renders —
+        // the layout then renders in the new culture with no full-page reload (MITI-5).
         if (Auth.IsAuthenticated && !string.IsNullOrEmpty(Auth.Locale) &&
             !string.Equals(Auth.Locale, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, StringComparison.OrdinalIgnoreCase))
         {
-            await JS.InvokeVoidAsync("localStorage.setItem", "app_culture", Auth.Locale);
-            Nav.NavigateTo(Nav.Uri, forceLoad: true);
-            return;
+            try
+            {
+                var culture = new CultureInfo(Auth.Locale);
+                CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = culture;
+                CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = culture;
+                await JS.InvokeVoidAsync("localStorage.setItem", "app_culture", Auth.Locale);
+            }
+            catch (CultureNotFoundException) { /* unknown locale — keep the current culture */ }
         }
 
         _initialized = true;

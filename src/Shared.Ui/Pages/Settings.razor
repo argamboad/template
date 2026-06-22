@@ -4,6 +4,7 @@
 @inject AuthService Auth
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @inject IStringLocalizer<AppStrings> Localizer
 
 <PageTitle>@Localizer["Nav_Settings"]</PageTitle>
@@ -164,6 +165,9 @@
 
     private async Task Unlink(string key)
     {
+        // Destructive: confirm first, failing closed if the browser dialog can't run.
+        if (!await JS.ConfirmAsync(Localizer["Settings_ConfirmUnlink"])) return;
+
         _error = null; _busy = true;
         try
         {
