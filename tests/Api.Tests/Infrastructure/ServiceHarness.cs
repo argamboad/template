@@ -63,6 +63,7 @@ internal sealed class TestPasswordlessSettings : IPasswordlessSettings
     public int OtpLifespanMinutes { get; init; } = 10;
     public int OtpLength { get; init; } = 6;
     public int OtpMaxAttempts { get; init; } = 5;
+    public int OtpLockoutWindowMinutes { get; init; } = 15;
 }
 
 internal sealed class TestAppSettings : IApplicationSettings

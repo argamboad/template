@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.RateLimiting;
 using Template.Api.Configuration;
 using Template.Api.Models;
 using Template.Api.Services;
@@ -325,6 +326,7 @@ public class AuthController(
     /// whether an account exists for the address.
     /// </summary>
     [HttpPost("magic-link/send")]
+    [EnableRateLimiting(RateLimiting.PasswordlessPolicy)]
     public async Task<IActionResult> SendMagicLink([FromBody] EmailRequest req, CancellationToken cancellationToken)
     {
         if (!IsLikelyEmail(req.Email))
@@ -361,6 +363,7 @@ public class AuthController(
 
     /// <summary>Emails a single-use numeric code. Always returns 200 (no enumeration).</summary>
     [HttpPost("otp/send")]
+    [EnableRateLimiting(RateLimiting.PasswordlessPolicy)]
     public async Task<IActionResult> SendOtp([FromBody] EmailRequest req, CancellationToken cancellationToken)
     {
         if (!IsLikelyEmail(req.Email))
@@ -382,17 +385,15 @@ public class AuthController(
     /// token in the body to persist in its OS secure store. Both get the access token.
     /// </summary>
     [HttpPost("otp/verify")]
+    [EnableRateLimiting(RateLimiting.PasswordlessPolicy)]
     public async Task<IActionResult> VerifyOtp([FromBody] OtpVerifyRequest req, CancellationToken cancellationToken)
     {
         var result = await passwordless.RedeemOtpAsync(req.Email, req.Code, cancellationToken);
         if (result.Status != OtpStatus.Success || result.User is null)
         {
-            var code = result.Status switch
-            {
-                OtpStatus.TooManyAttempts => "too_many_attempts",
-                OtpStatus.Expired => "code_expired",
-                _ => "invalid_code"
-            };
+            // Collapse "no active code" and "wrong code" to one client error so the response can't
+            // be used to probe whether an address has an outstanding OTP (CONF-6).
+            var code = OtpErrors.ClientCode(result.Status);
             return Unauthorized(errorFactory.CreateError(code, "The code is incorrect or has expired."));
         }
 

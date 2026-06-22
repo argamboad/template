@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
 using Template.Api.Services;
 using Template.Api.Tests.Infrastructure;
 using Template.Infrastructure.Persistence;
@@ -71,8 +72,8 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
         Assert.Equal(OtpStatus.Invalid, (await sut.RedeemOtpAsync("lock@example.com", wrong)).Status);
         Assert.Equal(OtpStatus.TooManyAttempts, (await sut.RedeemOtpAsync("lock@example.com", wrong)).Status);
 
-        // Locked out: even the correct code no longer works (the record was consumed).
-        Assert.Equal(OtpStatus.Expired, (await sut.RedeemOtpAsync("lock@example.com", code)).Status);
+        // Locked out for the window: even the correct code is refused (cumulative lockout, CONF-5).
+        Assert.Equal(OtpStatus.TooManyAttempts, (await sut.RedeemOtpAsync("lock@example.com", code)).Status);
     }
 
     [Fact]
@@ -86,6 +87,56 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
         await ExpireTokensAsync(db, "otpexp@example.com");
 
         Assert.Equal(OtpStatus.Expired, (await sut.RedeemOtpAsync("otpexp@example.com", code)).Status);
+    }
+
+    [Fact]
+    public async Task Otp_ResendAfterLockout_DoesNotResetTheAttemptBudget()
+    {
+        // The brute-force defense must be CUMULATIVE per email/window, not per code: requesting a
+        // fresh code after exhausting the budget must NOT hand the attacker another N guesses (CONF-5).
+        await fixture.ResetAsync();
+        await using var db = fixture.CreateContext();
+        var settings = new TestPasswordlessSettings { OtpMaxAttempts = 5, OtpLockoutWindowMinutes = 15 };
+        var sut = new ServiceHarness(db).PasswordlessService(settings);
+        const string email = "brute@example.com";
+
+        var code = await sut.IssueOtpAsync(email);
+        var wrong = WrongVariant(code);
+
+        // Burn the whole budget on the first code.
+        for (var i = 0; i < 4; i++)
+            Assert.Equal(OtpStatus.Invalid, (await sut.RedeemOtpAsync(email, wrong)).Status);
+        Assert.Equal(OtpStatus.TooManyAttempts, (await sut.RedeemOtpAsync(email, wrong)).Status);
+
+        // Resend mints a brand-new AttemptCount=0 code...
+        var fresh = await sut.IssueOtpAsync(email);
+
+        // ...but the email is still locked for the window — even the CORRECT new code is refused.
+        Assert.Equal(OtpStatus.TooManyAttempts, (await sut.RedeemOtpAsync(email, fresh)).Status);
+    }
+
+    [Fact]
+    public async Task Otp_LockoutClearsAfterWindowElapses()
+    {
+        await fixture.ResetAsync();
+        await using var db = fixture.CreateContext();
+        // Anchor in the real future: the repository's "active token" filter still uses wall-clock
+        // (ambient UtcNow), so the issued code must not look expired to it while we drive the
+        // service's lockout window via the fake clock.
+        var clock = new FakeTimeProvider(new DateTimeOffset(2100, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var settings = new TestPasswordlessSettings { OtpMaxAttempts = 5, OtpLockoutWindowMinutes = 15 };
+        var sut = new ServiceHarness(db, clock).PasswordlessService(settings);
+        const string email = "cooldown@example.com";
+
+        var code = await sut.IssueOtpAsync(email);
+        var wrong = WrongVariant(code);
+        for (var i = 0; i < 5; i++) await sut.RedeemOtpAsync(email, wrong);
+        Assert.Equal(OtpStatus.TooManyAttempts, (await sut.RedeemOtpAsync(email, wrong)).Status);
+
+        // After the window passes, the old failures age out and a fresh code works again.
+        clock.Advance(TimeSpan.FromMinutes(16));
+        var fresh = await sut.IssueOtpAsync(email);
+        Assert.Equal(OtpStatus.Success, (await sut.RedeemOtpAsync(email, fresh)).Status);
     }
 
     // Drive the stored token's expiry into the past — the "active" repo queries filter

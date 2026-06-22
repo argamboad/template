@@ -55,6 +55,7 @@ public class PasswordlessSettings : IPasswordlessSettings
     public int OtpLifespanMinutes { get; }
     public int OtpLength { get; }
     public int OtpMaxAttempts { get; }
+    public int OtpLockoutWindowMinutes { get; }
 
     public PasswordlessSettings(IConfiguration config)
     {
@@ -62,6 +63,7 @@ public class PasswordlessSettings : IPasswordlessSettings
         OtpLifespanMinutes = config.GetValue("Auth:Otp:CodeLifespanMinutes", 10);
         OtpLength = config.GetValue("Auth:Otp:Length", 6);
         OtpMaxAttempts = config.GetValue("Auth:Otp:MaxAttempts", 5);
+        OtpLockoutWindowMinutes = config.GetValue("Auth:Otp:LockoutWindowMinutes", 15);
     }
 }
 

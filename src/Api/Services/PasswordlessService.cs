@@ -10,6 +10,21 @@ public enum OtpStatus { Success, Invalid, Expired, TooManyAttempts }
 public record OtpResult(OtpStatus Status, User? User);
 
 /// <summary>
+/// Maps the internal <see cref="OtpStatus"/> to the client-facing error code for OTP verify.
+/// "No active code" (<see cref="OtpStatus.Expired"/>) and "wrong code"
+/// (<see cref="OtpStatus.Invalid"/>) collapse to the SAME <c>invalid_code</c> so a caller can't
+/// probe whether an address has an outstanding OTP (CONF-6); the full status stays server-side.
+/// </summary>
+public static class OtpErrors
+{
+    public static string ClientCode(OtpStatus status) => status switch
+    {
+        OtpStatus.TooManyAttempts => "too_many_attempts",
+        _ => "invalid_code", // Invalid AND Expired (no active code) are indistinguishable to the client
+    };
+}
+
+/// <summary>
 /// Issues and redeems passwordless credentials: magic-link tokens (long random
 /// values delivered as a URL) and OTP codes (short numeric values). Credentials
 /// are single-use, time-limited, and stored only as hashes. The account is
@@ -82,6 +97,15 @@ public class PasswordlessService(
         if (string.IsNullOrWhiteSpace(code))
             return new OtpResult(OtpStatus.Invalid, null);
 
+        // Cumulative, resend-proof lockout: count failed attempts across EVERY code issued to this
+        // email in the window, not just the current one. Issuing a fresh code (AttemptCount=0) can't
+        // hand the attacker another budget, and the lock holds even against the correct code until
+        // the window elapses (CONF-5).
+        var windowStart = clock.GetUtcNow().AddMinutes(-settings.OtpLockoutWindowMinutes);
+        var failuresInWindow = await repository.CountFailedAttemptsSinceAsync(email, LoginTokenPurpose.Otp, windowStart, cancellationToken);
+        if (failuresInWindow >= settings.OtpMaxAttempts)
+            return new OtpResult(OtpStatus.TooManyAttempts, null);
+
         var record = await repository.GetLatestActiveAsync(email, LoginTokenPurpose.Otp, cancellationToken);
         if (record is null)
             return new OtpResult(OtpStatus.Expired, null); // none active → expired or never issued
@@ -96,9 +120,9 @@ public class PasswordlessService(
             return new OtpResult(OtpStatus.Success, user);
         }
 
-        // Wrong code — count the attempt and lock the code out after the limit.
+        // Wrong code — count the attempt. Lock out once the cumulative window total hits the cap.
         record.AttemptCount++;
-        if (record.AttemptCount >= settings.OtpMaxAttempts)
+        if (failuresInWindow + 1 >= settings.OtpMaxAttempts)
         {
             record.ConsumedAt = clock.GetUtcNow();
             await repository.UpdateAsync(record, cancellationToken);

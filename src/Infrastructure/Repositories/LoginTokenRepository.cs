@@ -30,6 +30,12 @@ public class LoginTokenRepository(AppDbContext db) : ILoginTokenRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<int> CountFailedAttemptsSinceAsync(string email, string purpose, DateTimeOffset since, CancellationToken cancellationToken = default) =>
+        // (int?) + ?? 0 so SUM over zero rows yields 0 rather than throwing on a NULL aggregate.
+        await db.LoginTokens
+            .Where(t => t.Email == email && t.Purpose == purpose && t.CreatedAt >= since)
+            .SumAsync(t => (int?)t.AttemptCount, cancellationToken) ?? 0;
+
     public async Task UpdateAsync(LoginToken token, CancellationToken cancellationToken = default)
     {
         db.LoginTokens.Update(token);

@@ -110,6 +110,9 @@ builder.Services.AddAuthentication()
 
 builder.Services.AddAuthorization();
 
+// Throttle the unauthenticated passwordless endpoints (email-bomb / brute-force surface) — CONF-5.
+builder.Services.AddPasswordlessRateLimiter();
+
 // CORS — allow the Blazor WASM client to send credentialed requests (cookies).
 var allowedOrigins = builder.Configuration
     .GetSection("Auth:AllowedOrigins")
@@ -149,6 +152,7 @@ if (allowedOrigins.Length > 0)
 app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 // 🗑️ DELETE-ME: sample feature slice endpoints (remove with Features/Notes).
