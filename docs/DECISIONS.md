@@ -41,9 +41,10 @@ economy/portability.
 > **Superseded by ADR-002 (2026-06-19):** the template ships a custom JWT + refresh-token auth
 > stack instead of ASP.NET Core Identity.
 
-**ADR-C9 — Non-web clients (mobile + Win/macOS desktop) are MAUI Blazor Hybrid, DEFERRED.**
-Web first. *Rationale:* reuses the Blazor UI via the RCL, not just the API; deferred until that
-work begins (re-check MAUI maturity then). Linux desktop out of scope; if required, tilt to Uno
+**ADR-C9 — Non-web clients (mobile + Win/macOS desktop) are MAUI Blazor Hybrid: shells scaffolded with auth wired, feature parity DEFERRED (web-first).**
+The template ships MAUI desktop + Android shells with auth already wired (see `docs/MOBILE_TESTING.md`);
+build each feature on web first and extend the shells once it works there. *Rationale:* reuses the
+Blazor UI via the RCL, not just the API; feature work deferred until it begins (re-check MAUI maturity then). Linux desktop out of scope; if required, tilt to Uno
 Platform or Avalonia. The API being client-agnostic means worst case only the frontend is affected.
 
 **ADR-C10 — Target latest STABLE release, never previews.**
@@ -51,8 +52,9 @@ Re-verify current stable versions at each project's start. *Rationale:* avoids b
 shifting preview ground; prefer LTS where it coincides with latest stable.
 
 **ADR-C11 — Doc set + per-epic user stories methodology.**
-Docs: PROJECT_BRIEF, FEATURES, DATA_MODEL, TECH_STACK, DECISIONS, CLAUDE.md. User stories
-generated per-epic at build time, not upfront. *Rationale:* lean, persistent context for solo +
+Docs: PROJECT_BRIEF, FEATURES, DATA_MODEL, TECH_STACK, DECISIONS, WAYS_OF_WORKING, REBRANDING,
+LOCALIZATION, MOBILE_TESTING, QA_TEST_PLAN, CLAUDE.md, plus per-epic stories under `docs/stories/`.
+User stories generated per-epic at build time, not upfront. *Rationale:* lean, persistent context for solo +
 Claude Code; stories stay grounded in real screens.
 
 ---
@@ -72,8 +74,8 @@ lightweight defined process keeps solo + Claude Code work consistent and mergeab
 
 **ADR-C13 — Local dev infrastructure via Docker Compose: PostgreSQL 17 + Mailpit. (2026-06-17)**
 `docker-compose.yml` at repo root; configuration via `.env` (gitignored; copy from `.env.example`).
-All ports are environment-variable-driven so multiple projects can run simultaneously without
-conflicts. Both services expose healthchecks; API containers should declare `depends_on: db:
+All **Compose service** ports (DB, Mailpit) are environment-variable-driven so multiple projects can
+run simultaneously without conflicts (the API/Web app ports are fixed in their launch profiles). Both services expose healthchecks; API containers should declare `depends_on: db:
 condition: service_healthy`. No pgAdmin in the template — devs use their own DB client.
 *Rationale:* PostgreSQL is always needed; Mailpit traps passwordless + invitation email in dev with
 zero config; env-var ports prevent port clashes across projects.
@@ -111,7 +113,7 @@ All local-dev secrets and config (`Jwt__Secret`, `Authentication__{Google,Micros
 `Email__Smtp__*`) live in the repo-root **`.env`** alongside the existing docker-compose vars —
 one file. The API loads it at startup via **DotNetEnv** (`Env.TraversePath().Load()` before the
 host builder; a no-op when absent, e.g. production). Keys use the .NET env-var form (`__` =
-section nesting) so they bind to the same config keys. `.env` stays gitignored; `.env.example`
+section nesting, so `Section__Sub` ≡ the `Section:Sub` config key) so they bind to the same config keys. `.env` stays gitignored; `.env.example`
 (committed) documents every key with placeholders. **Production is unchanged** — the same keys
 come from real environment variables, never a committed file. This **supersedes the
 `dotnet user-secrets`** approach noted in ADR-C15.

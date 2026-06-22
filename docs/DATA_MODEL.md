@@ -53,7 +53,7 @@ can't forge sessions.
 ### LoginToken *(passwordless: magic link + email OTP)*
 A single-use, hashed, time-limited credential. The account is resolved/created at redemption, so a
 typo'd or probed email leaves no account behind.
-- `id` (UUIDv7), `email`, `code_hash` (SHA-256), `purpose` (`magic_link` | `otp`)
+- `id` (UUIDv7), `email`, `code_hash` (SHA-256), `purpose` (`magic-link` | `otp`)
 - `created_at`, `expires_at`, `consumed_at` (nullable), `attempt_count` (OTP lockout)
 - **Derived (computed, never stored):** `is_expired`, `is_consumed`, `is_valid`
 

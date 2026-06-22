@@ -47,7 +47,7 @@ Notes:
 Flow:
 1. User requests a link: `POST /api/auth/magic-link/send` (always 200 — no account is created yet,
    so the response can't be used to probe for accounts).
-2. `PasswordlessService` stores a single-use, hashed `LoginToken` (`purpose = magic_link`, 15 min
+2. `PasswordlessService` stores a single-use, hashed `LoginToken` (`purpose = magic-link`, 15 min
    default) and emails the URL via `IEmailSender` (Mailpit in dev).
 3. User clicks it → `GET /api/auth/magic-link/verify`; the token is validated and **consumed**
    (`consumed_at`). The account is resolved/created now (`GetOrCreateByEmailAsync`, marked

@@ -105,4 +105,4 @@ deferred items without an explicit decision.
 | `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web/desktop/Android (smoke + regression) |
 | `docs/stories/` | User stories per epic — generated at build time |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
-| `SCHEMA.sql` / migrations | Concrete schema — generated from DATA_MODEL.md |
+| `src/Infrastructure/Persistence/Migrations/` | Concrete schema — EF Core migrations generated from DATA_MODEL.md |

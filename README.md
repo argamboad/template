@@ -28,7 +28,7 @@ conceptualization session — clarifying questions, recommendations, ADRs, scope
 fills in the doc skeletons. The stack is already decided, so the conversation is about the app.
 
 **Step 2 — Create the repo (when the thinking layer is done).**
-Once concept + features + data model + decisions are settled, clone this `saas-template/` tree as
+Once concept + features + data model + decisions are settled, clone this template tree as
 your new repo (it already has `CLAUDE.md` at root, `docs/`, and the `src/`+`tests/` layout).
 
 **Step 3 — Build (in Claude Code).**
