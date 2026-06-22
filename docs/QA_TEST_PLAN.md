@@ -52,6 +52,10 @@ dotnet run --project src/Api --launch-profile https    # binds https:7160 (web/d
   > ⚠️ Always use the **https** profile for both web and API. Chrome treats `http://localhost` and
   > `https://localhost` as different sites, so the refresh cookie is dropped over http and sign-in
   > silently fails to persist. (See `docs/DECISIONS.md` / the schemeful-same-site note.)
+  > ⚠️ **The passwordless endpoints are rate-limited** (default **5 requests/minute per IP** on
+  > `/otp/send`, `/magic-link/send`, and `/otp/verify`). If you fire many code/link requests or
+  > verify attempts in quick succession you may get **HTTP 429** — that's the abuse guard working
+  > (QA-AUTH-11), **not** a bug. Pace requests, or wait ~1 minute for the window to reset.
 
 ### 1.2 Test accounts & data
 
@@ -211,19 +215,45 @@ Then I see an "incorrect code" error and remain on the code-entry screen
 3. **Expected:** inline error ("code is incorrect / verification failed"); you stay on the
    code-entry view and can retry. You are **not** signed in.
 
-### QA-AUTH-04 — OTP code expires / max attempts 🟢 (Web)
+### QA-AUTH-04 — OTP cumulative lockout & code expiry 🟢 (Web)
 **Gherkin**
 ```gherkin
 Given I requested an OTP code
-When the code has expired (default 10 minutes) or I exceed the max attempts
-Then submitting it is rejected and I must request a new code
+When I submit wrong codes up to the cumulative limit (default 5 failures per email within a 15-min window)
+Then the email is locked — further attempts, INCLUDING a freshly requested code, are rejected until the window elapses
+And separately, an unused code is rejected once it passes its lifespan (default 10 minutes)
 ```
 **Walkthrough**
-1. Request an OTP; wait past the lifespan (default 10 min, `Auth:Otp:CodeLifespanMinutes`), or enter
-   a wrong code more than the max-attempts times (default 5).
-2. Enter the (now stale) code.
-3. **Expected:** rejected with an error; requesting a fresh code works. *(Long-wait case — run only
-   when explicitly regression-testing expiry; the config values can be lowered to speed this up.)*
+1. Request an OTP for an email; enter a **wrong** 6-digit code until you hit the cumulative limit
+   (default 5, `Auth:Otp:MaxAttempts`, counted **per email across the `Auth:Otp:LockoutWindowMinutes`
+   = 15-min window**, not per code).
+2. **Expected:** after the limit, a "too many attempts" lockout error.
+3. Now request a **fresh** code and submit it — even the **correct** one.
+4. **Expected:** still rejected — requesting a new code does **NOT** reset the budget (this is the
+   brute-force defense; a resend can't hand the attacker another N guesses). The lock clears after the
+   15-min window.
+5. **Expiry sub-case:** separately, request a code and wait past `Auth:Otp:CodeLifespanMinutes`
+   (default 10) — the stale code is rejected.
+> **Note (enumeration):** OTP verify returns the **same** generic "invalid code" error whether the
+> code was wrong or there is no active code — it never reveals whether an address has an outstanding
+> OTP. *(Long-wait cases — lower the config to test fast. Mind the per-IP rate limit, QA-AUTH-11:
+> 5 wrong verifies in a minute also trips the 429 throttle.)*
+
+### QA-AUTH-11 — Passwordless endpoints are rate-limited 🟠 (Web)
+**Gherkin**
+```gherkin
+Given I rapidly request codes/links (or verify attempts) for the same client
+When I exceed the per-IP limit (default 5 per minute)
+Then further requests are rejected with HTTP 429 until the window resets
+```
+**Walkthrough**
+1. From `/login`, request an OTP (or magic link) repeatedly in quick succession — more than 5 within
+   a minute.
+2. **Expected:** after the limit the request is throttled (**HTTP 429**, surfaced as a "try again
+   shortly" / send-failed state). The same throttle applies to **OTP verify**.
+3. Wait ~1 minute; requests succeed again.
+> Protects against email-bombing and OTP brute-forcing. Expected behavior, not a defect — see the
+> §1.1 pacing note.
 
 ### QA-AUTH-05 — Magic link is single-use 🟢 (Web)
 **Gherkin**
@@ -514,11 +544,14 @@ token lifetime.)*
 **Gherkin**
 ```gherkin
 Given two providers are linked to my account
-When I click Unlink on one
+When I click Unlink on one and confirm the dialog
 Then it returns to a "Link" state
 ```
-**Walkthrough:** with two providers connected, **Unlink** one. **Expected:** the row reverts to
-**Link**.
+**Walkthrough:** with two providers connected, click **Unlink** on one. **Expected:** a confirm
+dialog ("Unlink this sign-in method?"); on **confirm** the row reverts to **Link**. **Cancelling**
+the dialog leaves it **Connected** — no change. *(The confirm fails closed: if the browser dialog
+can't run, the unlink is cancelled, never silently performed. The same guarded confirm protects
+remove-member / leave / dissolve in §7.)*
 
 ### QA-SET-05 — Unlinking your only provider never locks you out 🟢 (Web)
 **Gherkin**
@@ -761,6 +794,18 @@ Then I am not able to access it — I am sent to /login
 (`NativeRedirectPolicyTests`); no manual action needed unless probing the API directly — record as
 **covered by automated tests**.
 
+### QA-SEC-05 — Server-side hardening (automated) 🟢
+**Context/Expected:** several invariants are enforced at the API/data layer and verified by
+`tests/Api.Tests`, not by manual UI steps — record as **covered by automated tests** unless probing
+the API directly:
+- **Tenant write-stamping** — a new tenant-scoped row is stamped with the caller's tenant and a
+  foreign-tenant write is rejected (`TenantStampingInterceptorTests`), so reads *and* writes are
+  tenant-isolated.
+- **Refresh-token reuse detection** — replaying an already-rotated refresh token revokes all the
+  user's sessions (`RefreshTokenServiceTests`). Manually observable only by capturing and replaying a
+  refresh cookie/token; out of scope for routine QA.
+- **Unverified-email takeover guard** fails closed (`ClaimsExtractorTests` / `UserServiceTests`).
+
 ---
 
 ## 15. Traceability matrix (feature → cases → API)
@@ -770,8 +815,9 @@ Then I am not able to access it — I am sent to /login
 | OAuth sign-in (Google/MS) | SMK-02, AUTH-02, DSK-02, AND-02 | `GET /api/auth/login/{provider}`, `GET /api/auth/callback/{provider}`, native `login`/`callback`/`exchange` |
 | Magic link (web) | AUTH-01, 05, 06, MAIL-02 | `POST /api/auth/magic-link/send`, `GET /api/auth/magic-link/verify` |
 | Email OTP | SMK-01/05/06, AUTH-03/04, DSK-01, AND-01, MAIL-01 | `POST /api/auth/otp/send`, `POST /api/auth/otp/verify` |
+| Rate limiting / abuse guard | AUTH-11 | `POST /api/auth/otp/send`, `…/magic-link/send`, `…/otp/verify` (429) |
 | Session / refresh / sign-out | SMK-03/04, DSK-03/06, AND-03, SEC-03 | `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me` |
-| Enumeration / error handling | AUTH-07/08/09 | (send endpoints; `/login` query states) |
+| Enumeration / error handling | AUTH-04/07/08/09 | (send + verify endpoints; `/login` query states) |
 | Onboarding (auto tenant) | ONB-01/02, SMK-01 | (provisioned on first auth) |
 | Household view/rename | HH-01/02 | `GET /api/household`, `PUT /api/household` |
 | Members (remove/leave/transfer/dissolve) | HH-03..08 | `DELETE /api/household/members/{id}`, `POST /api/household/leave`, `POST /api/household/transfer-ownership` |
@@ -780,7 +826,7 @@ Then I am not able to access it — I am sent to /login
 | Linked accounts | SET-01..06, DSK-05 | `GET /api/auth/logins`, `POST /api/auth/link/{provider}`, `DELETE /api/auth/logins/{provider}` |
 | Localization | I18N-01..04 | `PUT /api/auth/locale` (+ resx) |
 | Emails / branding | MAIL-01..04, I18N-04 | (SMTP via Mailpit) |
-| Tenant isolation / auth guards | SEC-01..04 | (all `[Authorize]` endpoints) |
+| Tenant isolation / auth guards | SEC-01..05 | (all `[Authorize]` endpoints; write-stamping + reuse detection are automated) |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -812,3 +858,8 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   a row in the traceability matrix (§15) so "entire functionality" stays honest.
 - `docs/FEATURES.md` describes the same JWT-based flows at the design level; this plan is their
   step-by-step verification. Keep the two in sync when behavior changes.
+- **Updated 2026-06-22** for the security/quality remediation: OTP lockout is now **cumulative per
+  email** and resend-proof (QA-AUTH-04); passwordless send/verify are **rate-limited** (QA-AUTH-11);
+  the Settings **Unlink** now requires a fail-closed confirmation (QA-SET-04); and server-side
+  hardening (write-stamping, refresh-reuse detection, fail-closed takeover guard) is captured as
+  automated coverage (QA-SEC-05).
