@@ -1,21 +1,16 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-
 namespace Template.Api.Features.Notes;
 
 /// <summary>
 /// 🗑️ DELETE-ME: sample feature endpoints. A vertical slice registers its own routes via
-/// a <c>MapGroup</c> (call <c>app.MapNotes()</c> in <c>Program.cs</c>) instead of a
-/// controller — features are minimal-API groups, the platform stays controllers.
+/// <c>MapTenantFeatureGroup</c> (call <c>app.MapNotes()</c> in <c>Program.cs</c>) instead of a
+/// controller — features are minimal-API groups, the platform stays controllers. The helper
+/// applies the shared tenant-API auth policy, so the slice never re-spells (or forgets) authz.
 /// </summary>
 public static class NotesEndpoints
 {
     public static IEndpointRouteBuilder MapNotes(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/notes")
-            .RequireAuthorization(new Microsoft.AspNetCore.Authorization.AuthorizeAttribute
-            {
-                AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme
-            });
+        var group = app.MapTenantFeatureGroup("/api/notes");
 
         group.MapGet("/", async (NotesHandler handler, CancellationToken ct) =>
             Results.Ok(await handler.ListAsync(ct)));

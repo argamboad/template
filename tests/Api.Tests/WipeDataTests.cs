@@ -24,7 +24,7 @@ public class WipeDataTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 
         // Seed the target tenant + a pending invitation under a system (no current tenant)
         // context so the write isn't tenant-restricted.
-        await using (var seed = fixture.CreateContext())
+        await using (var seed = Fixture.CreateContext())
         {
             seed.Tenants.Add(new Tenant { Id = target, Name = "target", CreatedAt = now, UpdatedAt = now });
             seed.TenantInvitations.Add(new TenantInvitation
@@ -43,10 +43,10 @@ public class WipeDataTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 
         // Dissolve the target while a DIFFERENT tenant is current — the read filter would
         // otherwise hide the target's invitation from the delete.
-        await using (var asOther = fixture.CreateContext(other))
+        await using (var asOther = Fixture.CreateContext(other))
             await new TenantRepository(asOther).WipeDataAsync(target);
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         Assert.Empty(await read.TenantInvitations.IgnoreQueryFilters().Where(i => i.TenantId == target).ToListAsync());
         Assert.False(await read.Tenants.AnyAsync(t => t.Id == target));
     }

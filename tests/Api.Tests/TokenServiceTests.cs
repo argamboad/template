@@ -59,7 +59,7 @@ public class RefreshTokenServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task IssueThenValidate_ReturnsToken()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).RefreshTokenService();
         var userId = Guid.CreateVersion7();
 
@@ -73,7 +73,7 @@ public class RefreshTokenServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task RevokedToken_NoLongerValidates()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).RefreshTokenService();
 
         var issued = await sut.IssueRefreshTokenAsync(Guid.CreateVersion7(), "127.0.0.1", "google");
@@ -85,7 +85,7 @@ public class RefreshTokenServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task ValidateRefreshToken_Garbage_ReturnsNull()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).RefreshTokenService();
 
         Assert.Null(await sut.ValidateRefreshTokenAsync("nope"));
@@ -94,7 +94,7 @@ public class RefreshTokenServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Inspect_ValidToken_ReturnsValid()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).RefreshTokenService();
 
         var issued = await sut.IssueRefreshTokenAsync(Guid.CreateVersion7(), "127.0.0.1", "google");
@@ -107,7 +107,7 @@ public class RefreshTokenServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Inspect_UnknownToken_ReturnsUnknown_NotReuse()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).RefreshTokenService();
 
         var inspection = await sut.InspectRefreshTokenAsync("never-issued-token");
@@ -118,7 +118,7 @@ public class RefreshTokenServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Inspect_ExpiredToken_ReturnsExpired()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 6, 22, 0, 0, 0, TimeSpan.Zero));
         var sut = new ServiceHarness(db, clock).RefreshTokenService(expiryDays: 30);
 
@@ -132,7 +132,7 @@ public class RefreshTokenServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Inspect_ReplayedRotatedToken_IsReuse_AndRevokingAllKillsTheLiveToken()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).RefreshTokenService();
         var userId = Guid.CreateVersion7();
 

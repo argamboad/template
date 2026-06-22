@@ -20,14 +20,14 @@ public class TenantStampingInterceptorTests(PostgresFixture fixture) : PostgresT
     {
         var tenant = Guid.CreateVersion7();
 
-        await using (var db = fixture.CreateContext(tenant))
+        await using (var db = Fixture.CreateContext(tenant))
         {
             // TenantId deliberately left default — the interceptor must stamp it.
             db.Notes.Add(new Note { Title = "no tenant set" });
             await db.SaveChangesAsync();
         }
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         var note = await read.Notes.IgnoreQueryFilters().SingleAsync();
         Assert.Equal(tenant, note.TenantId);
     }
@@ -38,13 +38,13 @@ public class TenantStampingInterceptorTests(PostgresFixture fixture) : PostgresT
         var current = Guid.CreateVersion7();
         var foreignTenant = Guid.CreateVersion7();
 
-        await using (var db = fixture.CreateContext(current))
+        await using (var db = Fixture.CreateContext(current))
         {
             db.Notes.Add(new Note { Title = "wrong tenant", TenantId = foreignTenant });
             await Assert.ThrowsAnyAsync<InvalidOperationException>(() => db.SaveChangesAsync());
         }
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         Assert.Empty(await read.Notes.IgnoreQueryFilters().ToListAsync());
     }
 
@@ -53,13 +53,13 @@ public class TenantStampingInterceptorTests(PostgresFixture fixture) : PostgresT
     {
         var tenant = Guid.CreateVersion7();
 
-        await using (var db = fixture.CreateContext(tenant))
+        await using (var db = Fixture.CreateContext(tenant))
         {
             db.Notes.Add(new Note { Title = "explicit but correct", TenantId = tenant });
             await db.SaveChangesAsync();
         }
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         Assert.Equal(tenant, (await read.Notes.IgnoreQueryFilters().SingleAsync()).TenantId);
     }
 }

@@ -18,7 +18,7 @@ public class TenantScopeFilterTests(PostgresFixture fixture) : PostgresTestBase(
     {
         var (tenantA, tenantB) = await SeedTwoTenantsEachWithAnInviteAsync();
 
-        await using var asA = fixture.CreateContext(tenantA);
+        await using var asA = Fixture.CreateContext(tenantA);
         var visible = await asA.TenantInvitations.ToListAsync();
 
         Assert.Single(visible);
@@ -30,7 +30,7 @@ public class TenantScopeFilterTests(PostgresFixture fixture) : PostgresTestBase(
     {
         await SeedTwoTenantsEachWithAnInviteAsync();
 
-        await using var asA = fixture.CreateContext(Guid.CreateVersion7()); // arbitrary current tenant
+        await using var asA = Fixture.CreateContext(Guid.CreateVersion7()); // arbitrary current tenant
         var all = await asA.TenantInvitations.IgnoreQueryFilters().ToListAsync();
 
         Assert.Equal(2, all.Count);
@@ -41,7 +41,7 @@ public class TenantScopeFilterTests(PostgresFixture fixture) : PostgresTestBase(
     {
         await SeedTwoTenantsEachWithAnInviteAsync();
 
-        await using var anon = fixture.CreateContext(tenantId: null); // fail closed
+        await using var anon = Fixture.CreateContext(tenantId: null); // fail closed
         Assert.Empty(await anon.TenantInvitations.ToListAsync());
     }
 
@@ -52,7 +52,7 @@ public class TenantScopeFilterTests(PostgresFixture fixture) : PostgresTestBase(
         var tenantB = Guid.CreateVersion7();
 
         // Seed with an unscoped context so both tenants' rows are written.
-        await using var seed = fixture.CreateContext();
+        await using var seed = Fixture.CreateContext();
         seed.Tenants.AddRange(
             new Tenant { Id = tenantA, Name = "A", CreatedAt = now, UpdatedAt = now },
             new Tenant { Id = tenantB, Name = "B", CreatedAt = now, UpdatedAt = now });

@@ -108,7 +108,8 @@ builder.Services.AddAuthentication()
         options.TokenValidationParameters = jwtSettings.CreateParameters();
     });
 
-builder.Services.AddAuthorization();
+// Single tenant-API authorization policy, shared by the platform controllers and feature groups.
+builder.Services.AddTenantApiAuthorization();
 
 // Throttle the unauthenticated passwordless endpoints (email-bomb / brute-force surface) — CONF-5.
 builder.Services.AddPasswordlessRateLimiter();

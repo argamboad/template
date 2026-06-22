@@ -15,14 +15,14 @@ public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtur
     [Fact]
     public async Task GetOrCreateUser_BrandNew_ProvisionsUserTenantAndOwnerMembership()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
         var user = await sut.GetOrCreateUserAsync("New@Example.com", "g-1", "google", "New User", emailVerified: true);
 
         Assert.Equal("new@example.com", user.Email); // normalized to lower-case
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         var membership = await read.TenantMemberships.SingleAsync(m => m.UserId == user.Id);
         Assert.Equal(TenantRoles.Owner, membership.Role);
         Assert.True(await read.Tenants.AnyAsync(t => t.Id == membership.TenantId));
@@ -32,7 +32,7 @@ public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtur
     [Fact]
     public async Task GetOrCreateUser_UnverifiedEmailMatchingExisting_RefusesTakeover()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
         // Existing account, established with a verified Google login.
@@ -43,14 +43,14 @@ public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtur
         await Assert.ThrowsAsync<UnverifiedEmailConflictException>(() =>
             sut.GetOrCreateUserAsync("victim@example.com", "ms-2", "microsoft", emailVerified: false));
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         Assert.False(await read.UserLogins.AnyAsync(l => l.Provider == "microsoft"));
     }
 
     [Fact]
     public async Task GetOrCreateUser_VerifiedEmailMatchingExisting_LinksNewProvider()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
         var first = await sut.GetOrCreateUserAsync("user@example.com", "g-1", "google", emailVerified: true);
@@ -58,7 +58,7 @@ public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtur
 
         Assert.Equal(first.Id, second.Id); // same account
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         var logins = await read.UserLogins.Where(l => l.UserId == first.Id)
             .Select(l => l.Provider).ToListAsync();
         Assert.Contains("google", logins);
@@ -68,20 +68,20 @@ public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtur
     [Fact]
     public async Task GetOrCreateByEmail_New_MarksVerifiedAndProvisionsTenant()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
         var user = await sut.GetOrCreateByEmailAsync("pwl@example.com");
 
         Assert.True(user.EmailVerified); // ownership proven by redeeming the link/code
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         Assert.True(await read.TenantMemberships.AnyAsync(m => m.UserId == user.Id && m.Role == TenantRoles.Owner));
     }
 
     [Fact]
     public async Task GetOrCreateByEmail_Existing_ReturnsSameUserRegardlessOfCasing()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
         var a = await sut.GetOrCreateByEmailAsync("dup@example.com");

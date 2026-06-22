@@ -20,14 +20,14 @@ public class RepositoryScopingTests(PostgresFixture fixture) : PostgresTestBase(
         var tenantA = Guid.CreateVersion7();
         var tenantB = Guid.CreateVersion7();
 
-        await using (var seed = fixture.CreateContext())
+        await using (var seed = Fixture.CreateContext())
         {
             seed.Notes.Add(new Note { Id = Guid.CreateVersion7(), TenantId = tenantA, Title = "A" });
             seed.Notes.Add(new Note { Id = Guid.CreateVersion7(), TenantId = tenantB, Title = "B" });
             await seed.SaveChangesAsync();
         }
 
-        await using var asA = fixture.CreateContext(tenantA);
+        await using var asA = Fixture.CreateContext(tenantA);
         var repo = new EfRepository<Note>(asA);
 
         // Scoped surface: only the current tenant's row.

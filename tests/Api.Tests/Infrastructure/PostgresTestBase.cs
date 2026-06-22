@@ -9,6 +9,9 @@ namespace Template.Api.Tests.Infrastructure;
 /// </summary>
 public abstract class PostgresTestBase(PostgresFixture fixture) : IAsyncLifetime
 {
-    public Task InitializeAsync() => fixture.ResetAsync();
+    /// <summary>The shared container fixture — derived tests build contexts from it.</summary>
+    protected PostgresFixture Fixture { get; } = fixture;
+
+    public Task InitializeAsync() => Fixture.ResetAsync();
     public Task DisposeAsync() => Task.CompletedTask;
 }

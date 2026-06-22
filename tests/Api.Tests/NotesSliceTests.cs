@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
 using Template.Api.Features.Notes;
 using Template.Api.Tests.Infrastructure;
 using Template.Core.Entities;
@@ -14,8 +16,8 @@ namespace Template.Api.Tests;
 [Collection(PostgresCollection.Name)]
 public class NotesSliceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
-    private static NotesHandler Handler(Template.Infrastructure.Persistence.AppDbContext db, Guid tenantId) =>
-        new(new EfRepository<Note>(db), new TestCurrentTenant { TenantId = tenantId });
+    private static NotesHandler Handler(Template.Infrastructure.Persistence.AppDbContext db, Guid tenantId, TimeProvider? clock = null) =>
+        new(new EfRepository<Note>(db), new TestCurrentTenant { TenantId = tenantId }, clock ?? TimeProvider.System);
 
     [Fact]
     public async Task Notes_AreVisibleOnlyToTheirTenant()
@@ -23,14 +25,29 @@ public class NotesSliceTests(PostgresFixture fixture) : PostgresTestBase(fixture
         var tenantA = Guid.CreateVersion7();
         var tenantB = Guid.CreateVersion7();
 
-        await using (var db = fixture.CreateContext(tenantA))
+        await using (var db = Fixture.CreateContext(tenantA))
             Assert.NotNull(await Handler(db, tenantA).CreateAsync(new CreateNoteRequest("A's note", "hi"), default));
 
-        await using (var db = fixture.CreateContext(tenantB))
+        await using (var db = Fixture.CreateContext(tenantB))
             Assert.Empty(await Handler(db, tenantB).ListAsync(default));   // B sees nothing
 
-        await using (var db = fixture.CreateContext(tenantA))
+        await using (var db = Fixture.CreateContext(tenantA))
             Assert.Single(await Handler(db, tenantA).ListAsync(default));  // A sees its own
+    }
+
+    [Fact]
+    public async Task Create_StampsCreatedAt_FromInjectedClock()
+    {
+        var tenant = Guid.CreateVersion7();
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 6, 22, 9, 30, 0, TimeSpan.Zero));
+
+        await using var db = Fixture.CreateContext(tenant);
+        var created = await Handler(db, tenant, clock).CreateAsync(new CreateNoteRequest("clocked", null), default);
+
+        Assert.NotNull(created);
+        var stored = await db.Notes.IgnoreQueryFilters().SingleAsync();
+        Assert.Equal(clock.GetUtcNow(), stored.CreatedAt);
+        Assert.Equal(clock.GetUtcNow(), stored.UpdatedAt);
     }
 
     [Fact]
@@ -38,7 +55,7 @@ public class NotesSliceTests(PostgresFixture fixture) : PostgresTestBase(fixture
     {
         var tenant = Guid.CreateVersion7();
 
-        await using var db = fixture.CreateContext(tenant);
+        await using var db = Fixture.CreateContext(tenant);
         Assert.Null(await Handler(db, tenant).CreateAsync(new CreateNoteRequest("  ", null), default));
     }
 
@@ -47,11 +64,11 @@ public class NotesSliceTests(PostgresFixture fixture) : PostgresTestBase(fixture
     {
         var tenant = Guid.CreateVersion7();
 
-        await using (var db = fixture.CreateContext(tenant))
+        await using (var db = Fixture.CreateContext(tenant))
             await Handler(db, tenant).CreateAsync(new CreateNoteRequest("keep", null), default);
 
         // The contributor runs for arbitrary tenants (dissolve), so it ignores the filter.
-        await using (var db = fixture.CreateContext())
+        await using (var db = Fixture.CreateContext())
         {
             var contributor = new NotesDataContributor(new EfRepository<Note>(db));
             Assert.True(await contributor.HasDataAsync(tenant));

@@ -16,7 +16,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task MagicLink_IssueThenRedeem_SignsInAndIsSingleUse()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
         var token = await sut.IssueMagicLinkTokenAsync("ml@example.com");
@@ -32,7 +32,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task MagicLink_Expired_IsRejected()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
         var token = await sut.IssueMagicLinkTokenAsync("exp@example.com");
@@ -44,7 +44,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Otp_CorrectCode_Succeeds()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
         var code = await sut.IssueOtpAsync("otp@example.com");
@@ -57,7 +57,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Otp_WrongCode_LocksOutAfterMaxAttempts()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var settings = new TestPasswordlessSettings { OtpMaxAttempts = 3 };
         var sut = new ServiceHarness(db).PasswordlessService(settings);
 
@@ -75,7 +75,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Otp_Expired_ReturnsExpired()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
         var code = await sut.IssueOtpAsync("otpexp@example.com");
@@ -89,7 +89,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBas
     {
         // The brute-force defense must be CUMULATIVE per email/window, not per code: requesting a
         // fresh code after exhausting the budget must NOT hand the attacker another N guesses (CONF-5).
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var settings = new TestPasswordlessSettings { OtpMaxAttempts = 5, OtpLockoutWindowMinutes = 15 };
         var sut = new ServiceHarness(db).PasswordlessService(settings);
         const string email = "brute@example.com";
@@ -112,7 +112,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBas
     [Fact]
     public async Task Otp_LockoutClearsAfterWindowElapses()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 6, 22, 0, 0, 0, TimeSpan.Zero));
         var settings = new TestPasswordlessSettings { OtpMaxAttempts = 5, OtpLockoutWindowMinutes = 15 };
         var sut = new ServiceHarness(db, clock).PasswordlessService(settings);

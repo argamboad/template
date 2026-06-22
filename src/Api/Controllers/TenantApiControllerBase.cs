@@ -1,7 +1,7 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Template.Api.Configuration;
 using Template.Api.Services;
 using Template.Core.Entities;
 using Template.Core.Repositories;
@@ -14,7 +14,7 @@ namespace Template.Api.Controllers;
 /// feature slice doesn't re-copy them. The <c>[Authorize]</c> here is inherited by
 /// derived controllers.
 /// </summary>
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+[Authorize(AuthPolicies.TenantApi)]
 public abstract class TenantApiControllerBase(
     ITenantRepository tenants,
     IErrorResponseFactory errorFactory) : ControllerBase

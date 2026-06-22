@@ -14,7 +14,7 @@ namespace Template.Api.Features.Notes;
 /// to platform code. This is the shape every real feature slice copies.
 /// </para>
 /// </summary>
-public class NotesHandler(IRepository<Note> notes, ICurrentTenant tenant)
+public class NotesHandler(IRepository<Note> notes, ICurrentTenant tenant, TimeProvider clock)
 {
     public async Task<IReadOnlyList<NoteResponse>> ListAsync(CancellationToken cancellationToken)
     {
@@ -30,7 +30,7 @@ public class NotesHandler(IRepository<Note> notes, ICurrentTenant tenant)
         if (tenant.TenantId is not { } tenantId) return null; // no tenant on the token
         if (string.IsNullOrWhiteSpace(request.Title)) return null; // endpoint maps null → 400
 
-        var now = DateTimeOffset.UtcNow;
+        var now = clock.GetUtcNow();
         var note = new Note
         {
             Id = Guid.CreateVersion7(),

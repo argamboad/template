@@ -14,7 +14,7 @@ public class SessionServiceTests(PostgresFixture fixture) : PostgresTestBase(fix
     [Fact]
     public async Task IssueAsync_Web_JwtHasTenantClaim_AndRefreshTokenIsNotOnBody()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var harness = new ServiceHarness(db);
         var user = await harness.UserService().GetOrCreateByEmailAsync("sess@example.com");
         var tenantId = (await db.TenantMemberships.SingleAsync(m => m.UserId == user.Id)).TenantId;
@@ -33,7 +33,7 @@ public class SessionServiceTests(PostgresFixture fixture) : PostgresTestBase(fix
     [Fact]
     public async Task IssueAsync_Native_PutsRefreshTokenOnBody()
     {
-        await using var db = fixture.CreateContext();
+        await using var db = Fixture.CreateContext();
         var harness = new ServiceHarness(db);
         var user = await harness.UserService().GetOrCreateByEmailAsync("native@example.com");
 

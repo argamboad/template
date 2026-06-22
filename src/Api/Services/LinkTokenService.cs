@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Template.Api.Services;
@@ -18,28 +17,9 @@ public interface ILinkTokenService
 
 public class LinkTokenService(IMemoryCache cache) : ILinkTokenService
 {
-    private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(5);
+    private readonly SingleUseCacheToken<Guid> _tokens = new(cache, "link-token", TimeSpan.FromMinutes(5));
 
-    public string Issue(Guid userId)
-    {
-        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
-        cache.Set(CacheKey(token), userId, Lifetime);
-        return token;
-    }
+    public string Issue(Guid userId) => _tokens.Issue(userId);
 
-    public Guid? Redeem(string token)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-            return null;
-
-        var key = CacheKey(token);
-        if (!cache.TryGetValue(key, out Guid userId))
-            return null;
-
-        cache.Remove(key);   // single-use
-        return userId;
-    }
-
-    private static string CacheKey(string token) => $"link-token:{token}";
+    public Guid? Redeem(string token) => _tokens.TryConsume(token, out var userId) ? userId : null;
 }

@@ -21,7 +21,7 @@ public class HarnessSmokeTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         var tenantId = Guid.CreateVersion7();
         var userId = Guid.CreateVersion7();
 
-        await using (var db = fixture.CreateContext())
+        await using (var db = Fixture.CreateContext())
         {
             db.Tenants.Add(new Tenant { Id = tenantId, Name = "QA House", CreatedAt = now, UpdatedAt = now });
             db.Users.Add(new User { Id = userId, Email = "harness@example.com", DisplayName = "Harness", CreatedAt = now, UpdatedAt = now });
@@ -36,7 +36,7 @@ public class HarnessSmokeTests(PostgresFixture fixture) : PostgresTestBase(fixtu
             await db.SaveChangesAsync();
         }
 
-        await using var read = fixture.CreateContext();
+        await using var read = Fixture.CreateContext();
         var membership = await read.TenantMemberships.SingleAsync(m => m.UserId == userId);
 
         Assert.Equal(tenantId, membership.TenantId);
