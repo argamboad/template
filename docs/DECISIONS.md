@@ -141,6 +141,23 @@ hash) opt out with `IgnoreQueryFilters()`.
 invariant cleanly; the global filter turns "never leak across tenants" (ADR-C2) from a per-query
 convention into a structural guarantee, so feature slices can't forget to scope.
 
+*Amendment (2026-06-22) — scoping is now structural on BOTH read and write.* The original query
+filter scoped reads only; nothing stamped or validated `TenantId` on insert, so a slice that forgot
+the stamp (or bound it from request input) could persist a row under the wrong tenant — and the read
+filter would then hide that row from its true owner, an invisible data-integrity bug (audit CONF-1).
+A **write-side `TenantStampingInterceptor`** (`src/Infrastructure/Persistence/`, wired via
+`AppDbContext.OnConfiguring` so every context — including tests — enforces it) now closes that gap:
+for each `Added` `ITenantScoped` entity *while a tenant is current*, an unset `TenantId` is stamped
+with the current tenant, and a `TenantId` belonging to a **different** tenant **throws** (fail
+closed). A context with **no** current tenant (`CurrentTenantId == Guid.Empty`) is a system/seed/
+cross-tenant context and is not enforced — the same trust level that may bypass the read filter.
+The audited cross-tenant **escape hatch** is named and greppable: `IRepository<T>.QueryAllTenants()`
+for reads (replacing ad-hoc `Query().IgnoreQueryFilters()` in feature code; used by dissolve
+`ITenantDataContributor`s), and `IgnoreQueryFilters()` on the platform's own teardown
+(`TenantRepository.WipeDataAsync`, which targets its argument tenant regardless of who is current).
+A build-time ban on `IgnoreQueryFilters` inside `src/Api/Features/**` is planned (audit B9-1) to make
+the escape hatch unreachable from slice code.
+
 **ADR-004 — Clean platform baseline + vertical-slice features (hybrid). (2026-06-19)**
 The reusable **platform** stays clean-layered / horizontal — Core, Infrastructure, and the
 auth/tenancy controllers (the durable chassis: JWT auth, membership tenancy, the global query

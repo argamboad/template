@@ -105,12 +105,21 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
     {
         // Core teardown only. Feature/domain tables are wiped by their ITenantDataContributor
         // (called first, in the same transaction) — nothing to edit here per new feature.
-        db.TenantInvitations.RemoveRange(db.TenantInvitations.Where(i => i.TenantId == tenantId));
-        db.TenantMemberships.RemoveRange(db.TenantMemberships.Where(m => m.TenantId == tenantId));
-
-        var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
-        if (tenant != null) db.Tenants.Remove(tenant);
-
-        await db.SaveChangesAsync(cancellationToken); // one transaction → all-or-nothing
+        //
+        // Target the ARGUMENT tenant explicitly and filter-independently: TenantInvitation is
+        // ITenantScoped, so a plain Where() would also be narrowed by the global read filter and
+        // miss the target's rows whenever a *different* tenant is current (CONF-2). IgnoreQueryFilters
+        // makes the delete depend on the argument alone, not on who is calling. ExecuteDeleteAsync
+        // enlists in the ambient transaction (db.Database.CurrentTransaction) the dissolve flow opens,
+        // so the wipe stays all-or-nothing.
+        await db.TenantInvitations.IgnoreQueryFilters()
+            .Where(i => i.TenantId == tenantId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await db.TenantMemberships.IgnoreQueryFilters()
+            .Where(m => m.TenantId == tenantId)
+            .ExecuteDeleteAsync(cancellationToken);
+        await db.Tenants.IgnoreQueryFilters()
+            .Where(t => t.Id == tenantId)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 }

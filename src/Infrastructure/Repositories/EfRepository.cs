@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Template.Core.Repositories;
 using Template.Infrastructure.Persistence;
 
@@ -11,6 +12,8 @@ namespace Template.Infrastructure.Repositories;
 public class EfRepository<TEntity>(AppDbContext db) : IRepository<TEntity> where TEntity : class
 {
     public IQueryable<TEntity> Query() => db.Set<TEntity>();
+
+    public IQueryable<TEntity> QueryAllTenants() => db.Set<TEntity>().IgnoreQueryFilters();
 
     public async Task AddAsync(TEntity entity, CancellationToken cancellationToken = default) =>
         await db.Set<TEntity>().AddAsync(entity, cancellationToken);

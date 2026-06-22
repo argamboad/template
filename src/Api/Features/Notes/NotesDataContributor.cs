@@ -13,11 +13,12 @@ namespace Template.Api.Features.Notes;
 public class NotesDataContributor(IRepository<Note> notes) : ITenantDataContributor
 {
     public Task<bool> HasDataAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-        // IgnoreQueryFilters: the check runs for a tenant other than the current one.
-        notes.Query().IgnoreQueryFilters().AnyAsync(n => n.TenantId == tenantId, cancellationToken);
+        // QueryAllTenants: dissolve runs for a tenant other than the current one, so this
+        // crosses tenants by design — the audited escape hatch, re-constrained to the target.
+        notes.QueryAllTenants().AnyAsync(n => n.TenantId == tenantId, cancellationToken);
 
     public async Task WipeAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-        await notes.Query().IgnoreQueryFilters()
+        await notes.QueryAllTenants()
             .Where(n => n.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
 }
