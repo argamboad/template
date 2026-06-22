@@ -22,7 +22,7 @@ public interface IJwtTokenService
     ClaimsPrincipal? ValidateToken(string token);
 }
 
-public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> logger) : IJwtTokenService
+public class JwtTokenService(IJwtSettings settings, TimeProvider clock, ILogger<JwtTokenService> logger) : IJwtTokenService
 {
     /// <summary>Alias for <see cref="JwtClaims.TenantId"/>, kept for call-site readability.</summary>
     public const string TenantIdClaim = JwtClaims.TenantId;
@@ -58,7 +58,7 @@ public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> log
             issuer: settings.Issuer,
             audience: settings.Issuer,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(settings.ExpiryMinutes),
+            expires: clock.GetUtcNow().UtcDateTime.AddMinutes(settings.ExpiryMinutes),
             signingCredentials: credentials
         );
 
@@ -72,20 +72,9 @@ public class JwtTokenService(IJwtSettings settings, ILogger<JwtTokenService> log
     {
         try
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SecretKey));
-            var handler = new JwtSecurityTokenHandler();
-
-            var principal = handler.ValidateToken(token, new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = key,
-                ValidateIssuer = true,
-                ValidIssuer = settings.Issuer,
-                ValidateAudience = true,
-                ValidAudience = settings.Issuer,
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            }, out _);
+            // Same validation rules as the JWT-bearer handler — both come from JwtValidation.
+            var principal = new JwtSecurityTokenHandler()
+                .ValidateToken(token, settings.CreateParameters(), out _);
 
             return principal;
         }

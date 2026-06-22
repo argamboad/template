@@ -1,6 +1,4 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Template.Api.Configuration;
 using Template.Api.Features.Notes;
@@ -106,17 +104,8 @@ var jwtSettings = new JwtSettings(builder.Configuration);
 builder.Services.AddAuthentication()
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
-            ValidateIssuer = true,
-            ValidIssuer = jwtSettings.Issuer,
-            ValidateAudience = true,
-            ValidAudience = jwtSettings.Issuer,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
+        // Single validation definition shared with JwtTokenService — see JwtValidation.
+        options.TokenValidationParameters = jwtSettings.CreateParameters();
     });
 
 builder.Services.AddAuthorization();

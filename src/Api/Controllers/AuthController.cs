@@ -128,11 +128,13 @@ public class AuthController(
     }
 
     /// <summary>
-    /// Exchanges a refresh token for a fresh access token, rotating the refresh token
-    /// so a stolen one can only be replayed once. Transport depends on the client:
-    /// the browser sends/receives the token via the HttpOnly cookie; a native client
-    /// (header <c>X-Native-Client: true</c>) sends it in the body and gets the rotated
-    /// token back in the body — it never had a cookie to begin with.
+    /// Exchanges a refresh token for a fresh access token, rotating the refresh token: the used
+    /// token is revoked and a new one issued. If an already-rotated (revoked) token is later
+    /// replayed, that's treated as token theft — every session for the user is revoked and the
+    /// event is audit-logged (the client sees the same generic error as any invalid token, so the
+    /// reuse signal isn't leaked). Transport depends on the client: the browser sends/receives the
+    /// token via the HttpOnly cookie; a native client (header <c>X-Native-Client: true</c>) sends it
+    /// in the body and gets the rotated token back in the body — it never had a cookie to begin with.
     /// </summary>
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(
@@ -146,10 +148,18 @@ public class AuthController(
             if (string.IsNullOrEmpty(rawToken))
                 return Unauthorized(errorFactory.CreateError("no_refresh_token", "Refresh token not found"));
 
-            var validToken = await refreshTokenService.ValidateRefreshTokenAsync(rawToken, cancellationToken);
-            if (validToken == null)
+            var inspection = await refreshTokenService.InspectRefreshTokenAsync(rawToken, cancellationToken);
+            if (inspection.Status == RefreshTokenStatus.Reuse)
+            {
+                // Replay of a rotated-out token ⇒ assume theft: revoke every session for the user.
+                // Client still gets the generic error below, so the reuse signal isn't leaked.
+                await refreshTokenService.RevokeAllUserTokensAsync(inspection.Token!.UserId, cancellationToken);
+                logger.LogWarning("Refresh-token reuse detected for user {UserId}; revoked all sessions", inspection.Token.UserId);
+            }
+            if (inspection.Status != RefreshTokenStatus.Valid)
                 return Unauthorized(errorFactory.CreateError("invalid_refresh_token", "Refresh token is invalid or expired"));
 
+            var validToken = inspection.Token!;
             var user = await userService.GetUserByIdAsync(validToken.UserId, cancellationToken);
             if (user == null)
                 return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));

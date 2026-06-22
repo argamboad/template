@@ -26,6 +26,9 @@ public class RefreshTokenRepository(AppDbContext db) : IRefreshTokenRepository
             t.ExpiresAt > DateTimeOffset.UtcNow, cancellationToken);
     }
 
+    public async Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+        await db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
+
     public async Task RevokeAsync(Guid tokenId, CancellationToken cancellationToken = default)
     {
         var token = await db.RefreshTokens.FindAsync([tokenId], cancellationToken);

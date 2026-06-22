@@ -34,7 +34,12 @@ public class ClaimsExtractor : IClaimsExtractor
     {
         ArgumentNullException.ThrowIfNull(principal);
 
+        // Fail closed: verified ONLY when the provider explicitly asserts email_verified="true".
+        // Absent / empty / any other value ⇒ not verified. An absent claim must not be trusted —
+        // not every provider asserts it (some Microsoft configs omit it), and the template
+        // advertises "new OAuth provider = one line", so a silent absent-⇒-verified default would
+        // hand any such provider the account-takeover merge path (see UserService takeover guard).
         var claim = principal.FindFirst("email_verified")?.Value;
-        return !string.Equals(claim, "false", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(claim, "true", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -18,9 +18,10 @@ public interface IClaimsExtractor
     string? ExtractDisplayName(ClaimsPrincipal principal);
 
     /// <summary>
-    /// False only when the provider explicitly asserts email_verified=false.
-    /// An absent claim is trusted (Microsoft/Google only assert verified emails).
-    /// Guards the email-match merge against account takeover.
+    /// True ONLY when the provider explicitly asserts <c>email_verified="true"</c>; an absent,
+    /// empty, or any other value reads as NOT verified (fail closed). Guards the email-match
+    /// merge in <c>UserService.GetOrCreateUserAsync</c> against account takeover, so a provider
+    /// that omits the claim cannot silently bypass it.
     /// </summary>
     bool IsEmailVerified(ClaimsPrincipal principal);
 }
