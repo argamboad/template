@@ -197,9 +197,20 @@ Given I am on /login
 When I click "Continue with Microsoft" and complete consent
 Then I am returned signed in
 ```
+> **Account resolution (read before testing):** signing in with a provider whose email matches an
+> existing account links the provider to that account rather than creating a duplicate — but only
+> when the email is **verified**. Google asserts this; Microsoft on the **`consumers`** (personal MSA)
+> tenant is trusted to have a verified email even though it omits the claim (`IProviderEmailTrust`).
+> For **work/school** tenants (`organizations`/`common`/a tenant GUID) and any other provider, a
+> same-email auto-link is **refused** (fail-closed takeover guard, audit MITI-3) — the user signs in
+> with their original method and links the provider from **Settings** instead (QA-SET-02). To test
+> the plain first-time path below, use a Microsoft account whose email has **no** prior account.
+
 **Walkthrough**
 1. Click **Continue with Microsoft**; sign in with a **personal** Microsoft account.
-2. **Expected:** returned to the app signed in. (If you see a tenant/reply-URL error, the provider
+2. **Expected:** returned to the app signed in. A brand-new email creates a new account; a personal
+   Microsoft account whose email already exists auto-links to that account (consumers tenant). (If you
+   see a tenant/reply-URL error, the provider
    registration is the cause — out of app scope, note it.)
 
 ### QA-AUTH-03 — OTP wrong code is rejected 🟠 (Web)

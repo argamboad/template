@@ -28,6 +28,7 @@ public class AuthController(
     IRefreshTokenService refreshTokenService,
     ICookieService cookieService,
     IClaimsExtractor claimsExtractor,
+    IProviderEmailTrust providerEmailTrust,
     IPasswordlessService passwordless,
     ILinkTokenService linkTokenService,
     INativeAuthCodeService nativeAuthCodeService,
@@ -105,7 +106,7 @@ public class AuthController(
             }
 
             var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
-                claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User), cancellationToken);
+                claimsExtractor.ExtractDisplayName(User), EmailVerifiedForMerge(provider), cancellationToken);
 
             var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ClientIp, provider, cancellationToken);
             cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
@@ -469,7 +470,7 @@ public class AuthController(
             }
 
             var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
-                claimsExtractor.ExtractDisplayName(User), claimsExtractor.IsEmailVerified(User), cancellationToken);
+                claimsExtractor.ExtractDisplayName(User), EmailVerifiedForMerge(provider), cancellationToken);
 
             var code = nativeAuthCodeService.Issue(user.Id, provider);
             logger.LogInformation("Native OAuth callback successful for {Email} via {Provider}", email, provider);
@@ -532,6 +533,13 @@ public class AuthController(
     /// </summary>
     private bool IsAllowedNativeRedirect(string? redirect) =>
         NativeRedirectPolicy.IsAllowed(redirect, appSettings.NativeCallbackScheme);
+
+    // Whether to treat the provider's email as verified for auto-linking to an existing same-email
+    // account: the explicit email_verified="true" claim (fail-closed default, MITI-3) OR a provider
+    // trusted by IProviderEmailTrust (e.g. Microsoft on the consumers tenant, which verifies the email
+    // but omits the claim). Untrusted/unknown providers still require the claim.
+    private bool EmailVerifiedForMerge(string provider) =>
+        claimsExtractor.IsEmailVerified(User) || providerEmailTrust.TrustsEmailWithoutClaim(provider);
 
     private static string AppendQuery(string url, string key, string value)
     {

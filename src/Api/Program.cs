@@ -63,6 +63,8 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IClaimsExtractor, ClaimsExtractor>();
+// Per-provider email-trust policy (tenant-gated for Microsoft) layered on the fail-closed claim check.
+builder.Services.AddSingleton<IProviderEmailTrust, ProviderEmailTrust>();
 builder.Services.AddScoped<IPasswordlessService, PasswordlessService>();
 builder.Services.AddScoped<ICookieService, CookieService>();
 builder.Services.AddScoped<IErrorResponseFactory, ErrorResponseFactory>();
