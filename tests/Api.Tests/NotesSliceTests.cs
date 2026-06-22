@@ -12,7 +12,7 @@ namespace Template.Api.Tests;
 /// behavior every real feature slice inherits for free.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class NotesSliceTests(PostgresFixture fixture)
+public class NotesSliceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     private static NotesHandler Handler(Template.Infrastructure.Persistence.AppDbContext db, Guid tenantId) =>
         new(new EfRepository<Note>(db), new TestCurrentTenant { TenantId = tenantId });
@@ -20,7 +20,6 @@ public class NotesSliceTests(PostgresFixture fixture)
     [Fact]
     public async Task Notes_AreVisibleOnlyToTheirTenant()
     {
-        await fixture.ResetAsync();
         var tenantA = Guid.CreateVersion7();
         var tenantB = Guid.CreateVersion7();
 
@@ -37,7 +36,6 @@ public class NotesSliceTests(PostgresFixture fixture)
     [Fact]
     public async Task Create_BlankTitle_IsRejected()
     {
-        await fixture.ResetAsync();
         var tenant = Guid.CreateVersion7();
 
         await using var db = fixture.CreateContext(tenant);
@@ -47,7 +45,6 @@ public class NotesSliceTests(PostgresFixture fixture)
     [Fact]
     public async Task Contributor_ReportsAndWipesTenantData()
     {
-        await fixture.ResetAsync();
         var tenant = Guid.CreateVersion7();
 
         await using (var db = fixture.CreateContext(tenant))

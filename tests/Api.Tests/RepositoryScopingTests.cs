@@ -12,12 +12,11 @@ namespace Template.Api.Tests;
 /// dissolve contributors (MITI-1 / B1-3).
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class RepositoryScopingTests(PostgresFixture fixture)
+public class RepositoryScopingTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task Query_IsTenantScoped_QueryAllTenants_SeesEveryTenant()
     {
-        await fixture.ResetAsync();
         var tenantA = Guid.CreateVersion7();
         var tenantB = Guid.CreateVersion7();
 

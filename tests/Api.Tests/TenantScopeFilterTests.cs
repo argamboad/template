@@ -11,7 +11,7 @@ namespace Template.Api.Tests;
 /// lookups can still opt out with IgnoreQueryFilters().
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class TenantScopeFilterTests(PostgresFixture fixture)
+public class TenantScopeFilterTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task ScopedEntity_IsVisibleOnlyToItsOwnTenant()
@@ -47,7 +47,6 @@ public class TenantScopeFilterTests(PostgresFixture fixture)
 
     private async Task<(Guid TenantA, Guid TenantB)> SeedTwoTenantsEachWithAnInviteAsync()
     {
-        await fixture.ResetAsync();
         var now = DateTimeOffset.UtcNow;
         var tenantA = Guid.CreateVersion7();
         var tenantB = Guid.CreateVersion7();

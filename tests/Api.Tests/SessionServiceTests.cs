@@ -9,12 +9,11 @@ namespace Template.Api.Tests;
 /// delivered by the right transport (body for native, cookie-bound for web).
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class SessionServiceTests(PostgresFixture fixture)
+public class SessionServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task IssueAsync_Web_JwtHasTenantClaim_AndRefreshTokenIsNotOnBody()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var harness = new ServiceHarness(db);
         var user = await harness.UserService().GetOrCreateByEmailAsync("sess@example.com");
@@ -34,7 +33,6 @@ public class SessionServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task IssueAsync_Native_PutsRefreshTokenOnBody()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var harness = new ServiceHarness(db);
         var user = await harness.UserService().GetOrCreateByEmailAsync("native@example.com");

@@ -11,12 +11,11 @@ namespace Template.Api.Tests;
 /// controllable clock. These are the two primitives the Phase 2 service tests build on.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class HarnessSmokeTests(PostgresFixture fixture)
+public class HarnessSmokeTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task RealPostgres_PersistsAndReadsBack()
     {
-        await fixture.ResetAsync();
 
         var now = DateTimeOffset.UtcNow;
         var tenantId = Guid.CreateVersion7();

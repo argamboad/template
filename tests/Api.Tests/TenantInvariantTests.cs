@@ -12,7 +12,7 @@ namespace Template.Api.Tests;
 /// invite → accept → revoke → regenerate flow.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class TenantInvariantTests(PostgresFixture fixture)
+public class TenantInvariantTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task TransferOwnership_SwapsRoles()
@@ -71,7 +71,6 @@ public class TenantInvariantTests(PostgresFixture fixture)
     [Fact]
     public async Task Leave_SoleOwner_RequiresConfirmThenDissolves()
     {
-        await fixture.ResetAsync();
         var (oId, oTenant) = await ProvisionAsync("solo@example.com");
 
         await using (var db = fixture.CreateContext(oTenant))
@@ -101,7 +100,6 @@ public class TenantInvariantTests(PostgresFixture fixture)
     [Fact]
     public async Task Accept_InvalidToken_ReturnsInvalidToken()
     {
-        await fixture.ResetAsync();
         var (uId, _) = await ProvisionAsync("u@example.com");
 
         await using var db = fixture.CreateContext();
@@ -112,7 +110,6 @@ public class TenantInvariantTests(PostgresFixture fixture)
     [Fact]
     public async Task Revoke_ThenAccept_IsRejected()
     {
-        await fixture.ResetAsync();
         var (oId, oTenant) = await ProvisionAsync("owner@example.com");
         var (mId, _) = await ProvisionAsync("invitee@example.com");
 
@@ -133,7 +130,6 @@ public class TenantInvariantTests(PostgresFixture fixture)
     [Fact]
     public async Task Regenerate_OldTokenRejected_NewTokenAccepts()
     {
-        await fixture.ResetAsync();
         var (oId, oTenant) = await ProvisionAsync("owner2@example.com");
         var (mId, _) = await ProvisionAsync("join@example.com");
 
@@ -172,7 +168,6 @@ public class TenantInvariantTests(PostgresFixture fixture)
     /// <summary>Owner + one member sharing one tenant (member joined via the real accept flow).</summary>
     private async Task<(Guid OwnerId, Guid TenantId, Guid MemberId)> TwoMemberHouseholdAsync()
     {
-        await fixture.ResetAsync();
         var (oId, oTenant) = await ProvisionAsync("owner@example.com");
         var (mId, _) = await ProvisionAsync("member@example.com");
 

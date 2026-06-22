@@ -13,12 +13,11 @@ namespace Template.Api.Tests;
 /// (CONF-1).
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class TenantStampingInterceptorTests(PostgresFixture fixture)
+public class TenantStampingInterceptorTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task Insert_WithoutTenantId_StampsCurrentTenant()
     {
-        await fixture.ResetAsync();
         var tenant = Guid.CreateVersion7();
 
         await using (var db = fixture.CreateContext(tenant))
@@ -36,7 +35,6 @@ public class TenantStampingInterceptorTests(PostgresFixture fixture)
     [Fact]
     public async Task Insert_WithForeignTenantId_Throws_AndPersistsNothing()
     {
-        await fixture.ResetAsync();
         var current = Guid.CreateVersion7();
         var foreignTenant = Guid.CreateVersion7();
 
@@ -53,7 +51,6 @@ public class TenantStampingInterceptorTests(PostgresFixture fixture)
     [Fact]
     public async Task Insert_WithMatchingTenantId_IsAllowed()
     {
-        await fixture.ResetAsync();
         var tenant = Guid.CreateVersion7();
 
         await using (var db = fixture.CreateContext(tenant))

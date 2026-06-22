@@ -11,12 +11,11 @@ namespace Template.Api.Tests;
 /// wrong-code rejection, attempt lockout, and expiry.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class PasswordlessServiceTests(PostgresFixture fixture)
+public class PasswordlessServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task MagicLink_IssueThenRedeem_SignsInAndIsSingleUse()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
@@ -33,7 +32,6 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task MagicLink_Expired_IsRejected()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
@@ -46,7 +44,6 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task Otp_CorrectCode_Succeeds()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
@@ -60,7 +57,6 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task Otp_WrongCode_LocksOutAfterMaxAttempts()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var settings = new TestPasswordlessSettings { OtpMaxAttempts = 3 };
         var sut = new ServiceHarness(db).PasswordlessService(settings);
@@ -79,7 +75,6 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task Otp_Expired_ReturnsExpired()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).PasswordlessService();
 
@@ -94,7 +89,6 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
     {
         // The brute-force defense must be CUMULATIVE per email/window, not per code: requesting a
         // fresh code after exhausting the budget must NOT hand the attacker another N guesses (CONF-5).
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var settings = new TestPasswordlessSettings { OtpMaxAttempts = 5, OtpLockoutWindowMinutes = 15 };
         var sut = new ServiceHarness(db).PasswordlessService(settings);
@@ -118,7 +112,6 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task Otp_LockoutClearsAfterWindowElapses()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 6, 22, 0, 0, 0, TimeSpan.Zero));
         var settings = new TestPasswordlessSettings { OtpMaxAttempts = 5, OtpLockoutWindowMinutes = 15 };

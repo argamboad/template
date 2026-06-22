@@ -25,9 +25,13 @@ public class TenantInvitation : ITenantScoped
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset ExpiresAt { get; set; }
 
-    // Derived — computed, never stored.
-    public bool IsExpired => DateTimeOffset.UtcNow > ExpiresAt;
-    public bool IsValid => Status == InvitationStatuses.Pending && !IsExpired;
+    // Derived — computed, never stored. The *At(now) overloads are the deterministic core (testable
+    // with an explicit clock); the parameterless properties delegate to them at ambient time.
+    public bool IsExpiredAt(DateTimeOffset now) => now > ExpiresAt;
+    public bool IsValidAt(DateTimeOffset now) => Status == InvitationStatuses.Pending && !IsExpiredAt(now);
+
+    public bool IsExpired => IsExpiredAt(DateTimeOffset.UtcNow);
+    public bool IsValid => IsValidAt(DateTimeOffset.UtcNow);
 }
 
 /// <summary>Status values for <see cref="TenantInvitation.Status"/>.</summary>

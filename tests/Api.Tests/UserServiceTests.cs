@@ -10,12 +10,11 @@ namespace Template.Api.Tests;
 /// atomic user+tenant+owner-membership provisioning.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class UserServiceTests(PostgresFixture fixture)
+public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task GetOrCreateUser_BrandNew_ProvisionsUserTenantAndOwnerMembership()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
@@ -33,7 +32,6 @@ public class UserServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task GetOrCreateUser_UnverifiedEmailMatchingExisting_RefusesTakeover()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
@@ -52,7 +50,6 @@ public class UserServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task GetOrCreateUser_VerifiedEmailMatchingExisting_LinksNewProvider()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
@@ -71,7 +68,6 @@ public class UserServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task GetOrCreateByEmail_New_MarksVerifiedAndProvisionsTenant()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 
@@ -85,7 +81,6 @@ public class UserServiceTests(PostgresFixture fixture)
     [Fact]
     public async Task GetOrCreateByEmail_Existing_ReturnsSameUserRegardlessOfCasing()
     {
-        await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
         var sut = new ServiceHarness(db).UserService();
 

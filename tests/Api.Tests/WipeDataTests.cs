@@ -13,12 +13,11 @@ namespace Template.Api.Tests;
 /// the dissolve (CONF-2). These tests pin teardown to the argument, not the ambient tenant.
 /// </summary>
 [Collection(PostgresCollection.Name)]
-public class WipeDataTests(PostgresFixture fixture)
+public class WipeDataTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
     [Fact]
     public async Task WipeData_FromADifferentCurrentTenant_RemovesTargetTenantsInvitations()
     {
-        await fixture.ResetAsync();
         var now = DateTimeOffset.UtcNow;
         var target = Guid.CreateVersion7();
         var other = Guid.CreateVersion7();
