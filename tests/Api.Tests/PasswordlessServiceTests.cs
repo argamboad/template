@@ -120,10 +120,7 @@ public class PasswordlessServiceTests(PostgresFixture fixture)
     {
         await fixture.ResetAsync();
         await using var db = fixture.CreateContext();
-        // Anchor in the real future: the repository's "active token" filter still uses wall-clock
-        // (ambient UtcNow), so the issued code must not look expired to it while we drive the
-        // service's lockout window via the fake clock.
-        var clock = new FakeTimeProvider(new DateTimeOffset(2100, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 6, 22, 0, 0, 0, TimeSpan.Zero));
         var settings = new TestPasswordlessSettings { OtpMaxAttempts = 5, OtpLockoutWindowMinutes = 15 };
         var sut = new ServiceHarness(db, clock).PasswordlessService(settings);
         const string email = "cooldown@example.com";

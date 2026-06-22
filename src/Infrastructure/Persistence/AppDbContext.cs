@@ -75,7 +75,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
              .WithMany()
              .HasForeignKey(x => x.TenantId)
              .OnDelete(DeleteBehavior.Cascade);
-            i.HasIndex(x => x.TokenHash);
+            // Unique: a hash identifies exactly one invitation (single-row credential lookup).
+            i.HasIndex(x => x.TokenHash).IsUnique();
             i.HasIndex(x => new { x.TenantId, x.Status });
             // Ignore computed properties — derived, never stored.
             i.Ignore(x => x.IsExpired);
@@ -110,7 +111,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             r.Property(x => x.TokenHash).HasMaxLength(256).IsRequired();
             r.Property(x => x.IssuedFromIp).HasMaxLength(64).IsRequired();
             r.Property(x => x.Provider).HasMaxLength(64).IsRequired();
-            r.HasIndex(x => x.TokenHash);
+            // Unique: a hash identifies exactly one refresh token (single-row credential lookup).
+            r.HasIndex(x => x.TokenHash).IsUnique();
             r.HasIndex(x => x.UserId);
         });
 

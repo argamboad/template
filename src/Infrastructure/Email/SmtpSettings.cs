@@ -8,4 +8,7 @@ public class SmtpSettings
     public string? Password { get; init; }
     public required string FromAddress { get; init; }
     public string FromName { get; init; } = "App";
+
+    /// <summary>Per-send SMTP timeout (seconds) — bounds a hung server instead of stalling the request.</summary>
+    public int TimeoutSeconds { get; init; } = 30;
 }

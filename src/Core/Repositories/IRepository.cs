@@ -33,6 +33,10 @@ public interface IRepository<TEntity> where TEntity : class
     void Update(TEntity entity);
     void Remove(TEntity entity);
 
-    /// <summary>Persists pending changes; returns the affected row count.</summary>
+    /// <summary>
+    /// Flushes pending changes on the shared request-scoped context and returns the affected row
+    /// count. This persists ALL tracked changes, not only this entity's — see
+    /// <see cref="IUnitOfWork"/> for the commit/atomicity model.
+    /// </summary>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

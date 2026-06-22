@@ -21,8 +21,8 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
     public TimeProvider Clock { get; } = clock ?? TimeProvider.System;
 
     public IUserRepository Users { get; } = new UserRepository(db);
-    public ILoginTokenRepository LoginTokens { get; } = new LoginTokenRepository(db);
-    public IRefreshTokenRepository RefreshTokens { get; } = new RefreshTokenRepository(db);
+    public ILoginTokenRepository LoginTokens { get; } = new LoginTokenRepository(db, clock ?? TimeProvider.System);
+    public IRefreshTokenRepository RefreshTokens { get; } = new RefreshTokenRepository(db, clock ?? TimeProvider.System);
     public ITenantRepository Tenants { get; } = new TenantRepository(db);
     public ITenantInvitationRepository Invitations { get; } = new TenantInvitationRepository(db);
     public IUnitOfWork UnitOfWork { get; } = new EfUnitOfWork(db);
@@ -87,5 +87,5 @@ internal sealed class TestJwtSettings : IJwtSettings
 internal sealed class NoopEmailSender : IEmailSender
 {
     public Task SendAsync(string to, string subject, string htmlBody,
-        IReadOnlyList<EmailInlineImage>? inlineImages = null) => Task.CompletedTask;
+        IReadOnlyList<EmailInlineImage>? inlineImages = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

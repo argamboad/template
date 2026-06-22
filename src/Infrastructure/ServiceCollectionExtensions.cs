@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Template.Core.Abstractions;
 using Template.Core.Repositories;
 using Template.Infrastructure.Email;
@@ -40,6 +41,10 @@ public static class ServiceCollectionExtensions
         // Email — dev: points to Mailpit via appsettings.Development.json
         services.Configure<SmtpSettings>(configuration.GetSection("Email:Smtp"));
         services.AddTransient<IEmailSender, SmtpEmailSender>();
+
+        // Clock — repositories/services depend on TimeProvider for testable time. The host
+        // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.
+        services.TryAddSingleton(TimeProvider.System);
 
         // Repositories + unit of work
         services.AddScoped<IUserRepository, UserRepository>();
