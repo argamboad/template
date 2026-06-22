@@ -1,0 +1,15 @@
+<Project>
+
+  <!--
+    Solution-wide build hygiene (audit B9-2). Nullable reference types on, and warnings are
+    errors so the invariants the analyzers and the compiler check can't rot into ignored noise.
+    This is half of "solid by construction" — the architecture tests (B9-1) are the other half,
+    and CI (B9-3) runs both.
+  -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

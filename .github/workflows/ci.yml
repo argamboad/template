@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Build the Linux-buildable graph with warnings-as-errors (Directory.Build.props).
+      # The MAUI shells target net10.0-windows / -android and are excluded here; they're
+      # deferred and not part of the gate. Building Web covers Shared.Ui (the RCL).
+      - name: Build (warnings-as-errors)
+        run: |
+          dotnet build src/Api/Template.Api.csproj -c Release
+          dotnet build src/Web/Template.Web.csproj -c Release
+          dotnet build tests/E2E.Tests/Template.E2E.Tests.csproj -c Release
+
+      # Unit + integration tests. Api.Tests includes the architecture invariants (B9-1) and the
+      # migration-drift guard (B6-2); both spin up Postgres via Testcontainers (Docker is
+      # available on ubuntu-latest). E2E.Tests need the full running stack and aren't run here.
+      - name: Test (Core + Api)
+        run: |
+          dotnet test tests/Core.Tests/Template.Core.Tests.csproj -c Release
+          dotnet test tests/Api.Tests/Template.Api.Tests.csproj -c Release
+
+      # Fail the build if the EF model has drifted from the latest migration/snapshot.
+      - name: No pending EF model changes
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet ef migrations has-pending-model-changes \
+            --project src/Infrastructure/Template.Infrastructure.csproj \
+            --startup-project src/Api/Template.Api.csproj
