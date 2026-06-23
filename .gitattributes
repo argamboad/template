@@ -1,0 +1,7 @@
+# Treat PDFs and common binary assets as binary — no line-ending conversion, no text diff.
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary

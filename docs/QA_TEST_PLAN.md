@@ -816,6 +816,13 @@ the API directly:
   user's sessions (`RefreshTokenServiceTests`). Manually observable only by capturing and replaying a
   refresh cookie/token; out of scope for routine QA.
 - **Unverified-email takeover guard** fails closed (`ClaimsExtractorTests` / `UserServiceTests`).
+- **Legacy refresh-cookie self-heal** — a stale `Path=/` refresh cookie left by an older build can
+  shadow the live `Path=/api/auth` cookie and wedge sign-in into a `/refresh` 401 → "Authentication
+  Failed" loop (seen in Firefox, due to cookie send-order). Setting the refresh cookie now also emits
+  an expiry for the orphan, so the next successful sign-in / refresh sweeps it automatically — no
+  manual cookie-clearing, and upgraded deployments self-heal (`CookieServiceTests`). *Manual repro
+  needs a planted `Path=/` cookie; record as covered by automated tests. If a tester hits a stuck
+  `/refresh` 401 loop in Firefox after a deploy, a single re-sign-in clears it.*
 
 ---
 
@@ -827,7 +834,7 @@ the API directly:
 | Magic link (web) | AUTH-01, 05, 06, MAIL-02 | `POST /api/auth/magic-link/send`, `GET /api/auth/magic-link/verify` |
 | Email OTP | SMK-01/05/06, AUTH-03/04, DSK-01, AND-01, MAIL-01 | `POST /api/auth/otp/send`, `POST /api/auth/otp/verify` |
 | Rate limiting / abuse guard | AUTH-11 | `POST /api/auth/otp/send`, `…/magic-link/send`, `…/otp/verify` (429) |
-| Session / refresh / sign-out | SMK-03/04, DSK-03/06, AND-03, SEC-03 | `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me` |
+| Session / refresh / sign-out | SMK-03/04, DSK-03/06, AND-03, SEC-03, SEC-05 (legacy-cookie self-heal) | `POST /api/auth/refresh`, `POST /api/auth/logout`, `GET /api/auth/me` |
 | Enumeration / error handling | AUTH-04/07/08/09 | (send + verify endpoints; `/login` query states) |
 | Onboarding (auto tenant) | ONB-01/02, SMK-01 | (provisioned on first auth) |
 | Household view/rename | HH-01/02 | `GET /api/household`, `PUT /api/household` |
@@ -874,3 +881,7 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   the Settings **Unlink** now requires a fail-closed confirmation (QA-SET-04); and server-side
   hardening (write-stamping, refresh-reuse detection, fail-closed takeover guard) is captured as
   automated coverage (QA-SEC-05).
+- **Updated 2026-06-23:** QA-AUTH-02 now documents the **tenant-gated same-email auto-link** rule
+  (Microsoft trusted only on the `consumers` tenant; work/school + unknown providers fail closed —
+  audit MITI-3); and QA-SEC-05 adds the **legacy refresh-cookie self-heal** as automated coverage
+  (`CookieServiceTests`).
