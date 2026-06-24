@@ -175,3 +175,36 @@ clean layering. Features are independent and churn-y — co-locating each one's 
 models/data makes them easy to add, understand, and delete without touching central code. The
 generic repository + global tenant filter let a slice be added without authoring a repository pair
 or remembering to scope. This is the architectural convention for app work on top of the template.
+
+**ADR-005 — Apple Sign In fits the agnostic provider model; implementation DEFERRED, web-first. (2026-06-24)**
+A third OAuth provider (Apple) was assessed against the provider-agnostic auth stack (ADR-002). The
+verdict: the **backend absorbs it with small, mechanical additions** — `.AddApple(...)` in
+`ServiceCollectionExtensions`, an `Apple` arm in `AuthProviders` (const + `Supported` +
+`SchemeFor`), an `Apple => true` arm in `ProviderEmailTrust` (Apple asserts `email_verified`,
+private-relay addresses included), a button/glyph in `Login.razor` + `Settings.razor`, and config
+keys; `ClaimsExtractor` needs **no** change (`sub`→`NameIdentifier`, `email`→`ClaimTypes.Email`
+already map). The fail-closed takeover guard and tenant scoping require no structural change.
+However, Apple is **NOT** the single-`.AddXxx()` that Google/Microsoft are (so the CLAUDE.md / ADR-C15
+"new provider = one line" claim has a documented exception). The Apple-specific costs are recorded
+here so they are not rediscovered later:
+1. **No built-in handler** — ASP.NET Core ships Google + MicrosoftAccount but not Apple. Needs the
+   community `AspNet.Security.OAuth.Apple` (aspnet-contrib) package; confirm a **stable** .NET 10
+   build exists before adopting (no previews — ADR-C10).
+2. **The "client secret" is a rotating ES256 JWT**, minted from a downloaded `.p8` key + Team ID +
+   Key ID + Service ID, expiring every ≤6 months. This breaks the single-static-secret-in-`.env`
+   shape of ADR-001 (the package can generate/cache the JWT from the key material).
+3. **Apple forbids `localhost` redirect URIs.** Google/MS redirect to `https://localhost:7160` /
+   `http://localhost:5238`, which the QA plan and `MOBILE_TESTING.md` rely on. Apple needs a real
+   **HTTPS domain or tunnel** even for local QA — a workflow asterisk, not a code change.
+4. **`form_post` callback** (because name/email scope is requested) ⇒ the OAuth correlation cookie
+   must be `SameSite=None; Secure`; relevant given the schemeful-same-site cookie history.
+5. **Display name is returned only on the first authorization** — `ExtractDisplayName` gets `null`
+   thereafter (tolerated; capture on first auth if wanted).
+6. **Native (MAUI desktop/Android) Apple is a separate, larger effort** — no native Apple SDK on
+   Win/Android, so it reuses the web flow and inherits #3/#4. Web-first per ADR-C9.
+Decision: keep the design open to Apple; implement **web-first** as the slice in
+`docs/stories/apple-signin.md` when a business need arises; defer until then. External prerequisite:
+**Apple Developer Program enrollment ($99/yr)** + portal setup (App ID, Service ID, Sign-in key).
+*Rationale:* the architecture doesn't fight a third provider — the cost is Apple's protocol and
+account setup, not our code. Recording the constraints now prevents re-scoping later and stops "it's
+just one line" from being assumed for Apple.
