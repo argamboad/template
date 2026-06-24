@@ -74,6 +74,9 @@ SEC = ParagraphStyle("SEC", parent=styles["Heading2"], fontSize=11, spaceBefore=
                      textColor=colors.HexColor("#1a3b5d"))
 CELL = ParagraphStyle("CELL", parent=styles["Normal"], fontSize=8, leading=9.5)
 CELLB = ParagraphStyle("CELLB", parent=CELL, fontName="Helvetica-Bold")
+# Header-row cells sit on the dark-blue band: a TableStyle TEXTCOLOR does NOT
+# recolor a Paragraph flowable, so the text must carry white in its own style.
+CELLH = ParagraphStyle("CELLH", parent=CELLB, textColor=colors.white)
 SMALL = ParagraphStyle("SMALL", parent=styles["Normal"], fontSize=7.5, leading=9.5)
 NOTE = ParagraphStyle("NOTE", parent=styles["Normal"], fontSize=8, leading=11)
 
@@ -149,7 +152,7 @@ for c in cases:
         last_suite = key
         story.append(Spacer(1, 2*mm))
         story.append(Paragraph("§%s &nbsp; %s" % (num, name), SEC))
-        head = [Paragraph(h, CELLB) for h in
+        head = [Paragraph(h, CELLH) for h in
                 ["Case ID", "Title", "Pri", "Client", RESULT_HDR, "Notes / defect link"]]
         rows = [head]
         # accumulate rows per suite then flush — build incrementally
