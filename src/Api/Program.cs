@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Template.Api.Configuration;
@@ -61,6 +62,10 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // OpenTelemetry traces + metrics (OBS-2). Exporter is config-gated (OTLP when configured); see
 // TelemetryExtensions. Spans are tagged with tenant_id/user_id.
 builder.Services.AddAppTelemetry(builder.Configuration);
+
+// Health checks (OBS-3). /health = liveness (process up); /health/ready = readiness (DB reachable).
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
 // Typed settings (read configuration once at startup).
 builder.Services.AddSingleton<IJwtSettings>(new JwtSettings(builder.Configuration));
@@ -200,6 +205,11 @@ app.UseAuthorization();
 app.UseRequestLoggingScope();
 app.UseRateLimiter();
 app.MapControllers();
+
+// Health/readiness (OBS-3). Unauthenticated, status-only (the default writer emits just the status,
+// so no internals leak). Liveness runs no checks; readiness runs the "ready"-tagged DB check.
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
 // 🗑️ DELETE-ME: sample feature slice endpoints (remove with Features/Notes).
 app.MapNotes();
