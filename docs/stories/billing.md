@@ -82,16 +82,19 @@ merged, app working; ADR-006 referenced.
 
 ### BILLING-2 — Subscribe via Stripe Checkout
 
-**Status: ✅ Implemented** (`feat/billing-2-checkout`). Abstraction `src/Core/Abstractions/IBillingProvider.cs`
-(+ `BillingCheckoutRequest`/`BillingCheckoutSession`); `src/Infrastructure/Billing/` —
-`StripeBillingProvider` (Stripe.net 52, subscription-mode Checkout, tenant id in
-`ClientReferenceId`+metadata), `FakeBillingProvider` (offline; also the dev fallback when no Stripe key
-is set), `StripeSettings`; feature slice `src/Api/Features/Billing/` (`/api/billing/checkout`,
-owner-only via `BillingHandler`). Config `Billing__Stripe__SecretKey` + `Billing__Stripe__Prices__pro`
-in `.env.example`. Tests `tests/Api.Tests/Billing/`. **Test-coverage note:** acceptance criteria are
-covered offline by `FakeBillingProvider`; the live SDK round-trip is left to the E2E layer (Stripe
-test mode / stripe-mock) per the DoD — the planned stripe-mock Testcontainer integration test was
-deferred (Testcontainers 4.12 API friction; not worth blocking the slice for bonus coverage), with a
+**Status: ✅ Implemented** (`feat/billing-2-checkout`, placement corrected in `refactor/billing-controller`).
+Abstraction `src/Core/Abstractions/IBillingProvider.cs` (+ `BillingCheckoutRequest`/`BillingCheckoutSession`);
+`src/Infrastructure/Billing/` — `StripeBillingProvider` (Stripe.net 52, subscription-mode Checkout,
+tenant id in `ClientReferenceId`+metadata), `FakeBillingProvider` (offline; also the dev fallback when
+no Stripe key is set), `StripeSettings`. The HTTP surface is a **platform controller**
+`src/Api/Controllers/BillingController.cs` (`POST /api/billing/checkout`, owner-only via
+`TenantApiControllerBase`) + `IBillingService` (`src/Api/Services/`) — **not** a `Features/` slice
+(billing is chassis, not an app feature; see the ADR-006 + ADR-004 amendments). Config
+`Billing__Stripe__SecretKey` + `Billing__Stripe__Prices__pro` in `.env.example`. Tests
+`tests/Api.Tests/Billing/` (service: plan logic; controller: owner gate). **Test-coverage note:**
+acceptance criteria are covered offline (`FakeBillingProvider`); the live SDK round-trip is left to the
+E2E layer (Stripe test mode / stripe-mock) per the DoD — the planned stripe-mock Testcontainer test was
+deferred (Testcontainers 4.12 API friction; not worth blocking for bonus coverage), with a
 deterministic price-resolution guard test kept in its place.
 
 **As a** tenant owner
@@ -283,7 +286,9 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
    - `IBillingProvider` (Core) + `StripeBillingProvider` (`Stripe.net` 52) + `FakeBillingProvider`
      (offline + dev fallback). Registered in `ServiceCollectionExtensions` guarded by
      `Billing:Stripe:SecretKey` presence (same pattern as the OAuth providers); no key ⇒ fake.
-   - `Features/Billing/` slice: `MapTenantFeatureGroup("/api/billing")` + owner-only `BillingHandler`.
+   - **Platform** `BillingController : TenantApiControllerBase` (`/api/billing/checkout`, owner-only
+     via the base gate) + `IBillingService`. Billing is chassis, so it's a controller, not a
+     `Features/` slice (ADR-006/ADR-004 amendments).
    - `.env.example`: `Billing__Stripe__SecretKey`, `Billing__Stripe__Prices__pro`.
      (`Billing__Stripe__WebhookSecret` lands with BILLING-3.)
    - **Tests:** owner-only / member-403 / no-membership / invalid-plan / no-access-until-webhook +
