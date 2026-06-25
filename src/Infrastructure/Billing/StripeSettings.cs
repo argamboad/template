@@ -14,4 +14,11 @@ public sealed class StripeSettings
 
     /// <summary>Plan key → Stripe price id (<c>Billing:Stripe:Prices:{planKey}</c>).</summary>
     public Dictionary<string, string> Prices { get; init; } = new();
+
+    /// <summary>Stripe webhook signing secret (<c>whsec_…</c>) used to verify inbound webhooks (BILLING-3).</summary>
+    public string? WebhookSecret { get; init; }
+
+    /// <summary>Reverse of <see cref="Prices"/>: Stripe price id → plan key, or null if unmapped.</summary>
+    public string? PlanForPrice(string priceId) =>
+        Prices.FirstOrDefault(kv => kv.Value == priceId).Key;
 }

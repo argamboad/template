@@ -2,11 +2,11 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1 + 2
-> shipped** (entitlement gate; Stripe provider + owner-only Checkout); BILLING-3…6 pending. Design
-> decision and constraints in **ADR-006**. Stories use Gherkin acceptance criteria. The inbox
-> prerequisite (`docs/stories/async-jobs.md` / ADR-007) is **done**, so webhook work (BILLING-3) is
-> unblocked — it's the next slice.
+> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1, 2 & 3
+> shipped** (entitlement gate; Stripe provider + owner-only Checkout; webhook → subscription
+> projection). The core loop is closed: completing checkout now grants access via the webhook.
+> BILLING-4 (Customer Portal), 5 (quotas), 6 (trial/dunning) pending. Design decision and constraints
+> in **ADR-006**. Stories use Gherkin acceptance criteria.
 
 **Epic key:** `BILLING`
 
@@ -135,6 +135,16 @@ verified; merged, app working.
 ---
 
 ### BILLING-3 — Webhook keeps the subscription projection current
+
+**Status: ✅ Implemented** (`feat/billing-3-webhook`). Provider gains `IBillingProvider.ParseWebhookEvent`
+(+ `BillingWebhookEvent`/`BillingWebhookSignatureException`); `StripeBillingProvider` verifies via
+`EventUtility.ConstructEvent` and maps the Stripe subscription (tenant id from the metadata stamped at
+checkout, plan from the price, fail-closed status); `FakeBillingProvider` parses a normalized-event JSON
+for offline tests. Flow in `src/Api/Services/BillingWebhookHandler.cs`: **verify → `IInbox.TryClaimAsync`
+dedup (ADR-007) → `EnterTenant` (ADR-003) → upsert `Subscription`** (claim + write in one transaction).
+System endpoint `src/Api/Controllers/BillingWebhookController.cs` (`POST /api/billing/webhook`, anonymous,
+signature-gated). Config `Billing__Stripe__WebhookSecret`. Tests `tests/Api.Tests/Billing/BillingWebhookHandlerTests.cs`.
+**No `IgnoreQueryFilters` in the flow** — the write is tenant-scoped via the entered context.
 
 **As a** the platform
 **I want** Stripe webhooks to drive our subscription state
@@ -294,9 +304,11 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
    - **Tests:** owner-only / member-403 / no-membership / invalid-plan / no-access-until-webhook +
      tenant-id-in-request, all via `FakeBillingProvider`; price-resolution guard for the Stripe impl.
      The `stripe-mock` integration test is deferred to E2E (see the BILLING-2 status note above).
-3. **Webhook + projection (BILLING-3).** Unauthenticated signed endpoint → inbox (JOBS-2) →
-   idempotent apply. **Tests first:** signature reject, dedupe, each transition (drive with
-   `stripe trigger`).
+3. ✅ **Webhook + projection (BILLING-3).** — DONE. Anonymous signed endpoint
+   (`BillingWebhookController`) → verify → inbox dedup (JOBS-2) → `EnterTenant` → upsert via the normal
+   tenant-scoped path (no escape hatch). Tests: signature reject, idempotent dedup, activate, fail-closed
+   cancel, tenant isolation (offline via `FakeBillingProvider`); live verification via `stripe trigger`
+   at E2E.
 4. **Customer Portal (BILLING-4).** Portal redirect; changes reconcile via the webhook from step 3.
 5. **Quotas (BILLING-5).** `IQuotaService` + seat check wired into the invitation path; a
    `BillingDataContributor : ITenantDataContributor` that cancels the Stripe subscription and wipes
