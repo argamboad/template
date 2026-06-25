@@ -105,7 +105,7 @@ deferred items without an explicit decision.
 | `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web/desktop/Android (smoke + regression) |
 | `docs/PLATFORM_BACKLOG.md` | Future foundation slices not yet ADR'd (GDPR, RBAC, files, MFA, webhooks, public API, admin, cache) |
 | `docs/stories/` | User stories per epic — generated at build time |
-| `docs/stories/billing.md` | epic `BILLING` — entitlement gate (BILLING-1 ✅); Stripe/checkout/webhook/quotas pending (ADR-006) |
+| `docs/stories/billing.md` | epic `BILLING` — entitlement gate + Stripe Checkout (BILLING-1,2 ✅); webhook/portal/quotas pending (ADR-006) |
 | `docs/stories/async-jobs.md` | epic `JOBS` ✅ COMPLETE — outbox+dispatcher, inbox, scheduler (ADR-007) |
 | `docs/stories/observability.md` | **DEFERRED** epic `OBS` — logging/OTel/health + tenant audit log (ADR-008) |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |

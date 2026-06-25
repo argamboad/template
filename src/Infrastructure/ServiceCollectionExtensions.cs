@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Template.Core.Abstractions;
 using Template.Core.Repositories;
+using Template.Infrastructure.Billing;
 using Template.Infrastructure.Email;
 using Template.Infrastructure.Inbox;
 using Template.Infrastructure.Outbox;
@@ -70,6 +71,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new ScheduledJobsOptions());
         services.AddScoped<IScheduledJob, ExpiredTokenCleanupJob>();
         services.AddHostedService<ScheduledJobsHost>();
+
+        // Billing provider (ADR-006). Stripe when a secret key is configured; otherwise the in-memory
+        // fake, so the app boots and dev/E2E run with zero Stripe setup and zero real charges.
+        services.Configure<StripeSettings>(configuration.GetSection("Billing:Stripe"));
+        if (!string.IsNullOrEmpty(configuration["Billing:Stripe:SecretKey"]))
+            services.AddScoped<IBillingProvider, StripeBillingProvider>();
+        else
+            services.AddScoped<IBillingProvider, FakeBillingProvider>();
 
         // Clock — repositories/services depend on TimeProvider for testable time. The host
         // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.

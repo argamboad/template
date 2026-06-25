@@ -83,8 +83,10 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 
 // Billing entitlements (ADR-006). Server-side plan gate behind .RequireEntitlement(...); reads the
-// tenant's Subscription projection and fails closed to Free. No payment provider yet (BILLING-2).
+// tenant's Subscription projection and fails closed to Free.
 builder.Services.AddScoped<IEntitlementService, EntitlementService>();
+// Billing checkout handler (BILLING-2). The IBillingProvider (Stripe or fake) is registered in AddInfrastructure.
+builder.Services.AddScoped<Template.Api.Features.Billing.BillingHandler>();
 
 // 🗑️ DELETE-ME: sample feature slice (Features/Notes) — the reference for how a vertical
 // slice wires up: a handler + a tenant-data contributor, with endpoints mapped below.
@@ -178,5 +180,8 @@ app.MapControllers();
 
 // 🗑️ DELETE-ME: sample feature slice endpoints (remove with Features/Notes).
 app.MapNotes();
+
+// Billing feature endpoints (ADR-006).
+Template.Api.Features.Billing.BillingEndpoints.MapBilling(app);
 
 app.Run();
