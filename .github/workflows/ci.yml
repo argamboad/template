@@ -35,6 +35,11 @@ jobs:
 
       # Fail the build if the EF model has drifted from the latest migration/snapshot.
       - name: No pending EF model changes
+        # The design-time factory reads the connection string from this key (no .env in CI).
+        # has-pending-model-changes compares the model to the snapshot and opens no DB
+        # connection, so a placeholder is enough to build the Npgsql model.
+        env:
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=ef_designtime;Username=ci;Password=ci"
         run: |
           dotnet tool install --global dotnet-ef
           dotnet ef migrations has-pending-model-changes \
