@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Template.Api.Configuration;
 using Template.Api.Features.Notes;
+using Template.Api.Observability;
 using Template.Api.Services;
 using Template.Core.Abstractions;
 using Template.Infrastructure;
@@ -14,6 +15,15 @@ using Template.Infrastructure.Persistence;
 try { DotNetEnv.Env.TraversePath().Load(); } catch { /* no .env present */ }
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured logging with per-request scopes (OBS-1, ADR-008): readable single-line console in dev,
+// JSON in prod so a log aggregator can index the tenant_id/user_id scope. Swap in Serilog/OTel-logs
+// later without touching call sites.
+builder.Logging.ClearProviders();
+if (builder.Environment.IsDevelopment())
+    builder.Logging.AddSimpleConsole(o => { o.IncludeScopes = true; o.SingleLine = true; });
+else
+    builder.Logging.AddJsonConsole(o => { o.IncludeScopes = true; o.UseUtcTimestamp = true; });
 
 builder.Services.AddControllers();
 
@@ -182,6 +192,8 @@ if (allowedOrigins.Length > 0)
 app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
+// Enrich every log line with tenant_id/user_id once the principal is resolved (OBS-1).
+app.UseRequestLoggingScope();
 app.UseRateLimiter();
 app.MapControllers();
 

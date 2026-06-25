@@ -107,6 +107,6 @@ deferred items without an explicit decision.
 | `docs/stories/` | User stories per epic — generated at build time |
 | `docs/stories/billing.md` | epic `BILLING` — entitlements + Checkout + webhook + Portal (BILLING-1–4 ✅); quotas/dunning pending (ADR-006) |
 | `docs/stories/async-jobs.md` | epic `JOBS` ✅ COMPLETE — outbox+dispatcher, inbox, scheduler (ADR-007) |
-| `docs/stories/observability.md` | **DEFERRED** epic `OBS` — logging/OTel/health + tenant audit log (ADR-008) |
+| `docs/stories/observability.md` | epic `OBS` — structured logging (OBS-1 ✅); OTel/health/audit pending (ADR-008) |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `src/Infrastructure/Persistence/Migrations/` | Concrete schema — EF Core migrations generated from DATA_MODEL.md |
