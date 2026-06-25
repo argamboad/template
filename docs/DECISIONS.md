@@ -245,6 +245,20 @@ posture (ADR-C9) — there is no app or plan catalog yet (`PROJECT_BRIEF.md` is 
 Stories + slice plan: `docs/stories/billing.md` (epic `BILLING`). Future siblings parked in
 `docs/PLATFORM_BACKLOG.md`.
 
+*Amendment (2026-06-25) — billing HTTP surface is a PLATFORM controller, not a feature slice.* The
+BILLING-1/2 slice plan said "`Features/Billing` slice (`MapTenantFeatureGroup`)", but **billing is
+horizontal platform/chassis** (reusable by every app), and per ADR-004 the platform's HTTP surface is
+**controllers**, while `src/Api/Features/<X>/` minimal-API slices are reserved for the *downstream
+app's* vertical features. BILLING-2 initially (and wrongly) shipped `/api/billing` as a
+`Features/Billing` slice with a hand-rolled owner check; it is now a **`BillingController :
+TenantApiControllerBase`** (`src/Api/Controllers/`) next to the household controllers, reusing the
+base's `GetMembershipAsync`/`IsOwner`/`Forbid403` gate, with the checkout orchestration in
+`IBillingService` (`src/Api/Services/`). The provider/entitlement/catalog/`Subscription` pieces were
+already platform and are unchanged; `.RequireEntitlement(...)` stays as `Features/`-root scaffolding
+(like `MapTenantFeatureGroup`) that the downstream app's slices call. BILLING-3's webhook lands as a
+controller action too. (The only vertical slice in the template remains the `Notes` 🗑️ DELETE-ME
+sample.)
+
 **ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**
 Side effects that must not be lost (email, billing webhooks, future integrations) move off the
 request thread through a **transactional outbox**: an **`OutboxMessage`** is written in the **same EF
