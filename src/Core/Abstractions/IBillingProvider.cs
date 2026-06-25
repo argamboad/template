@@ -14,6 +14,14 @@ public interface IBillingProvider
     /// tenant. Access is NOT granted by completing checkout — only the webhook flips the subscription.
     /// </summary>
     Task<BillingCheckoutSession> CreateCheckoutSessionAsync(BillingCheckoutRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Verifies an inbound webhook's authenticity (signature) and maps it to a provider-agnostic
+    /// <see cref="BillingWebhookEvent"/>, or <c>null</c> for an authentic-but-irrelevant event (the
+    /// caller acknowledges it). Throws <see cref="BillingWebhookSignatureException"/> when the payload
+    /// is not authentic — the caller must reject those (HTTP 400) and apply nothing.
+    /// </summary>
+    BillingWebhookEvent? ParseWebhookEvent(string payload, string? signature);
 }
 
 /// <param name="TenantId">The tenant being subscribed — carried into the session for webhook reconciliation.</param>
@@ -24,3 +32,24 @@ public sealed record BillingCheckoutRequest(Guid TenantId, string PlanKey, strin
 
 /// <summary>The hosted checkout URL the client redirects to.</summary>
 public sealed record BillingCheckoutSession(string Url);
+
+/// <summary>
+/// A provider-agnostic projection of a subscription-lifecycle webhook — what the platform needs to
+/// reconcile a tenant's <c>Subscription</c>. The provider resolves the tenant id (from the metadata we
+/// stamped at checkout), the plan (from the price), and the normalized status.
+/// </summary>
+/// <param name="EventId">The provider's unique event id — the inbox idempotency key (ADR-007).</param>
+/// <param name="TenantId">The tenant this event reconciles, from the signed metadata.</param>
+/// <param name="PlanKey">The plan the subscription grants (a <c>PlanKeys</c> value).</param>
+/// <param name="Status">Normalized status — a <c>SubscriptionStatus</c> value (active/trialing/past_due/canceled).</param>
+public sealed record BillingWebhookEvent(
+    string EventId,
+    Guid TenantId,
+    string PlanKey,
+    string Status,
+    string? StripeCustomerId,
+    string? StripeSubscriptionId,
+    DateTimeOffset? CurrentPeriodEnd);
+
+/// <summary>Thrown when a webhook payload fails signature verification (not authentic).</summary>
+public sealed class BillingWebhookSignatureException(string message) : Exception(message);

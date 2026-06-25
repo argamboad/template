@@ -92,6 +92,8 @@ builder.Services.AddScoped<IEntitlementService, EntitlementService>();
 // Billing checkout orchestration (BILLING-2), behind the platform BillingController. The
 // IBillingProvider (Stripe or fake) is registered in AddInfrastructure.
 builder.Services.AddScoped<IBillingService, BillingService>();
+// Billing webhook handler (BILLING-3): verify → inbox-dedup → EnterTenant → upsert Subscription.
+builder.Services.AddScoped<BillingWebhookHandler>();
 
 // 🗑️ DELETE-ME: sample feature slice (Features/Notes) — the reference for how a vertical
 // slice wires up: a handler + a tenant-data contributor, with endpoints mapped below.
