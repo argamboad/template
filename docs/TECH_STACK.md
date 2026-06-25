@@ -137,4 +137,8 @@ Production reads the same keys from real environment variables, never a committe
 - **`Stripe.net` 52.x** — billing/subscriptions (ADR-006 / `docs/stories/billing.md`). Registered only
   when `Billing:Stripe:SecretKey` is set; otherwise an in-memory `FakeBillingProvider` keeps the app
   bootable and tests offline. Stripe is the source of truth for money; our `Subscription` is a projection.
+- **OpenTelemetry 1.16** (`OpenTelemetry.Extensions.Hosting` + AspNetCore/Http instrumentation + OTLP/
+  Console exporters) — traces + metrics (OBS-2 / ADR-008). Npgsql DB spans via its built-in `"Npgsql"`
+  `ActivitySource` (not the beta EF Core instrumentation). Exporter config-gated: OTLP when
+  `OpenTelemetry:Otlp:Endpoint` is set, else nothing (or console via `OpenTelemetry:ConsoleExporter`).
 - _TODO_
