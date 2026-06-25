@@ -2,10 +2,10 @@
 
 > One file per epic. Two complementary concerns shipped together: **operational observability**
 > (structured logging, OpenTelemetry traces/metrics, health endpoints) and a tenant-scoped,
-> append-only **audit log**. **Status: IN PROGRESS** — **OBS-1 + OBS-2 shipped** (structured logging
-> with tenant/user enrichment; OpenTelemetry traces/metrics with tenant-tagged spans); OBS-3 (health),
-> OBS-4 (audit log) pending. Design decision and constraints in **ADR-008**. Stories use Gherkin
-> acceptance criteria.
+> append-only **audit log**. **Status: IN PROGRESS** — **OBS-1, 2 & 3 shipped** (structured logging
+> with tenant/user enrichment; OpenTelemetry traces/metrics with tenant-tagged spans; health/readiness
+> endpoints). **OBS-4 (tenant audit log) is the last slice.** Design decision and constraints in
+> **ADR-008**. Stories use Gherkin acceptance criteria.
 >
 > **Audit ≠ logs.** Audit is durable, queryable, exportable **tenant data** (compliance). Logs/traces
 > are operational telemetry (sampled, ephemeral). They do not substitute for each other.
@@ -108,6 +108,12 @@ exporter); merged, app working.
 
 ### OBS-3 — Health & readiness endpoints
 
+**Status: ✅ Implemented** (`feat/obs-3-health`). `/health` (liveness — runs no checks) + `/health/ready`
+(readiness — the `"ready"`-tagged `DatabaseHealthCheck` via `Database.CanConnectAsync`), mapped in
+`Program.cs`. **Unauthenticated, status-only** (default writer emits just `Healthy`/`Unhealthy` — no
+connection details). Zero new dependencies (health-check core is in-box). Tests
+`tests/Api.Tests/Observability/DatabaseHealthCheckTests.cs` (reachable→Healthy, unreachable→Unhealthy).
+
 **As an** operator / orchestrator
 **I want** liveness and readiness probes
 **So that** deployments and load balancers know when the app is up and able to serve
@@ -199,8 +205,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    instrumentation + Npgsql DB spans (`AddSource("Npgsql")`, not the beta EF instrumentation); tenant/user
    span tags; config-gated exporter (OTLP when endpoint set, else none unless the console flag is on —
    judgment call: keeps the dev console clean vs. ADR's "console default"). Span tags unit-tested directly.
-3. **Health checks (OBS-3).** `AddHealthChecks().AddNpgSql(...)`; map `/health` + `/health/ready`;
-   redaction-safe responses.
+3. ✅ **Health checks (OBS-3).** — DONE. `AddHealthChecks().AddCheck<DatabaseHealthCheck>(... tags ["ready"])`
+   (custom `CanConnectAsync` check, zero new deps — no Xabaril package); `/health` (liveness) +
+   `/health/ready` (readiness); status-only responses.
 4. **Audit log (OBS-4).** `Core/Entities/AuditEvent.cs : ITenantScoped` + EF config + migration;
    `AuditInterceptor` (sibling of `TenantStampingInterceptor`, wired in `AppDbContext.OnConfiguring`
    so tests enforce it too); `IAuditLog.Record(...)`; append-only guard; an
