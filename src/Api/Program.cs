@@ -78,7 +78,11 @@ builder.Services.AddSingleton<INativeAuthCodeService, NativeAuthCodeService>();
 // Current-tenant accessor — reads the JWT tenant_id claim; drives the global tenant
 // query filter in AppDbContext and is the slice-facing tenancy entry point.
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
+// One scoped HttpCurrentTenant backs both interfaces, so entering a tenant via ITenantContext is seen
+// by ICurrentTenant (and thus the AppDbContext filter/stamping) within the same scope.
+builder.Services.AddScoped<HttpCurrentTenant>();
+builder.Services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<HttpCurrentTenant>());
+builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpCurrentTenant>());
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 

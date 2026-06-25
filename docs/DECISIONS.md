@@ -160,6 +160,20 @@ for reads (replacing ad-hoc `Query().IgnoreQueryFilters()` in feature code; used
 A build-time ban on `IgnoreQueryFilters` inside `src/Api/Features/**` is planned (audit B9-1) to make
 the escape hatch unreachable from slice code.
 
+*Amendment (2026-06-25) — `EnterTenant`: scope system/integration writes instead of bypassing scoping.*
+The cross-tenant escape hatch (`QueryAllTenants()`) is right for rare **teardown** (tenant dissolve),
+but a frequent, access-*granting* write that runs without a JWT — notably the **Stripe billing
+webhook** (BILLING-3) — should not punch a permanent hole in tenant isolation. New primitive
+**`ITenantContext.EnterTenant(tenantId)`** (implemented by `HttpCurrentTenant`, registered so one
+scoped instance backs both `ICurrentTenant` and `ITenantContext`): after the caller has
+**authenticated** the tenant id by other means (a verified webhook signature; an admin authz check),
+it makes that tenant *current* for the scope, so the write-stamping interceptor and the global read
+filter scope to it — the operation gets the **same structural isolation an authenticated request
+gets**, no `IgnoreQueryFilters`. It *scopes*, it does not *authorize*; entering `Guid.Empty` is
+rejected. Preferred over the escape hatch for any signature-/system-authenticated tenant-scoped write;
+the escape hatch stays for genuine cross-tenant teardown/enumeration. Reused later by ADMIN
+impersonation (`docs/PLATFORM_BACKLOG.md`).
+
 **ADR-004 — Clean platform baseline + vertical-slice features (hybrid). (2026-06-19)**
 The reusable **platform** stays clean-layered / horizontal — Core, Infrastructure, and the
 auth/tenancy controllers (the durable chassis: JWT auth, membership tenancy, the global query
