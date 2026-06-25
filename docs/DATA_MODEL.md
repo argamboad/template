@@ -91,10 +91,13 @@ _TODO_
 - SMS/phone field on User — needed when phone-based OTP is implemented.
 - App/domain tables — implement `ITenantScoped` so the global tenant filter covers them, and wire
   them into `ITenantRepository.HasDataAsync`/`WipeDataAsync` (the dissolve hook) once they exist.
-- **`Subscription`** *(ADR-006 / `docs/stories/billing.md`)* — `ITenantScoped`; plan key, status,
-  Stripe customer/subscription ids, `current_period_end`. A **projection** of Stripe state (Stripe is
-  the source of truth for money); absent ⇒ Free tier (fail-closed). Plan catalog is code/config, not
-  a table. Participates in dissolve (cancel + wipe).
+- **`Subscription`** *(ADR-006 / `docs/stories/billing.md`)* — ✅ **BUILT (BILLING-1)**:
+  `src/Core/Entities/Subscription.cs`, migration `AddSubscription`. `ITenantScoped`, **unique per
+  tenant**; `plan_key`, `status`, `stripe_customer_id`/`stripe_subscription_id` (nullable until
+  BILLING-2), `current_period_end`. A **projection** of Stripe state (Stripe is the source of truth for
+  money); absent ⇒ Free tier (fail-closed), as is any non-active/lapsed status. Plan catalog is
+  code (`src/Core/Billing/PlanCatalog.cs`), not a table. Will participate in dissolve (cancel + wipe)
+  once BILLING-2 adds the provider.
 - **`OutboxMessage`** *(ADR-007 / `docs/stories/async-jobs.md`)* — ✅ **BUILT (JOBS-1)**:
   `src/Core/Entities/OutboxMessage.cs`, migration `AddOutbox`. **NOT** `ITenantScoped` (platform infra;
   carries an optional `TenantId` for context). `type`, `payload` (text/JSON), `status`,

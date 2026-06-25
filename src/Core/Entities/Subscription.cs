@@ -1,0 +1,37 @@
+namespace Template.Core.Entities;
+
+/// <summary>
+/// A tenant's billing subscription — a local **projection** of the payment provider's state (Stripe is
+/// the source of truth for money; ADR-006). A tenant has at most one (unique on <c>TenantId</c>).
+/// **Absence ⇒ Free**, and any non-active status fails closed to Free — entitlements are never granted
+/// on stale/uncertain state. The Stripe ids are null until BILLING-2 attaches a paid plan.
+/// </summary>
+public class Subscription : ITenantScoped
+{
+    public Guid Id { get; set; } = Guid.CreateVersion7();
+    public Guid TenantId { get; set; }
+
+    /// <summary>The plan this subscription grants while active — a <c>PlanKeys</c> value.</summary>
+    public required string PlanKey { get; set; }
+
+    /// <summary>One of <see cref="SubscriptionStatus"/>. Only active/trialing grant the plan.</summary>
+    public required string Status { get; set; }
+
+    public string? StripeCustomerId { get; set; }
+    public string? StripeSubscriptionId { get; set; }
+
+    /// <summary>End of the paid period; past = lapsed (fails closed to Free even if Status is active).</summary>
+    public DateTimeOffset? CurrentPeriodEnd { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+/// <summary>Status constants for <see cref="Subscription.Status"/> (mirrors the Stripe lifecycle).</summary>
+public static class SubscriptionStatus
+{
+    public const string Active = "active";
+    public const string Trialing = "trialing";
+    public const string PastDue = "past_due";
+    public const string Canceled = "canceled";
+}
