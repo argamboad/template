@@ -91,4 +91,18 @@ _TODO_
 - SMS/phone field on User — needed when phone-based OTP is implemented.
 - App/domain tables — implement `ITenantScoped` so the global tenant filter covers them, and wire
   them into `ITenantRepository.HasDataAsync`/`WipeDataAsync` (the dissolve hook) once they exist.
+- **`Subscription`** *(ADR-006 / `docs/stories/billing.md`)* — `ITenantScoped`; plan key, status,
+  Stripe customer/subscription ids, `current_period_end`. A **projection** of Stripe state (Stripe is
+  the source of truth for money); absent ⇒ Free tier (fail-closed). Plan catalog is code/config, not
+  a table. Participates in dissolve (cancel + wipe).
+- **`OutboxMessage`** / inbox *(ADR-007 / `docs/stories/async-jobs.md`)* — **NOT** `ITenantScoped`
+  (platform infra; carries an optional `TenantId` for context). type, payload (jsonb), status,
+  `attempt_count`, `next_attempt_at`, `direction` (outbound/inbound), idempotency id (inbound dedupe).
+  Written in the **same transaction** as the business change (atomic effects).
+- **`AuditEvent`** *(ADR-008 / `docs/stories/observability.md`)* — `ITenantScoped`, **append-only**;
+  `actor_user_id`, `action`, `entity_type`, `entity_id`, `metadata` (jsonb), `created_at`. Written via
+  an EF interceptor (sibling of `TenantStampingInterceptor`) + explicit `IAuditLog.Record`. No
+  secrets/PII in `metadata`. Dissolve vs retention: export-then-wipe if legal-hold is required.
+- Further future entities (RBAC roles, `ApiKey`, `Notification`, webhook subscriptions) are scoped in
+  `docs/PLATFORM_BACKLOG.md`.
 - _TODO_

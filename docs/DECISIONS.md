@@ -208,3 +208,98 @@ Decision: keep the design open to Apple; implement **web-first** as the slice in
 *Rationale:* the architecture doesn't fight a third provider — the cost is Apple's protocol and
 account setup, not our code. Recording the constraints now prevents re-scoping later and stops "it's
 just one line" from being assumed for Apple.
+
+**ADR-006 — Billing & subscriptions: provider-abstracted (`IBillingProvider`), Stripe reference impl, plan-tier entitlements + quotas. Implementation DEFERRED, web-first. (2026-06-25)**
+Monetization enters through a Core abstraction **`IBillingProvider`** (same shape as `IEmailSender`):
+a **Stripe** reference implementation in Infrastructure plus an in-memory **`FakeBillingProvider`**
+for tests. A tenant has at most one **`Subscription`** (`ITenantScoped`) holding plan tier, status,
+and Stripe customer/subscription ids; access is gated by an **`IEntitlementService`** (feature flags
+keyed to plan) and an **`IQuotaService`** (countable limits — seats, metered usage). The **plan
+catalog is code/config, not tenant data.** Stripe is the **system of record for money**; our DB holds
+a **projection** kept current by **webhooks processed idempotently through the inbox** (ADR-007) —
+we never treat our own DB as the truth for billing state.
+Constraints recorded:
+1. **Webhooks are at-least-once and out-of-order** — the handler verifies the Stripe signature,
+   dedupes by event id, and is reentrant. This is the reliable-consumer problem ADR-007's **inbox**
+   solves, so **BILLING depends on JOBS** (the outbox/inbox slice) landing first.
+2. **Entitlement checks are server-side and fail-closed** — no/expired/`past_due` subscription ⇒
+   Free tier; never trust the client.
+3. **No card data, minimal PCI scope** — money mutations happen on **Stripe Checkout + Customer
+   Portal** (redirects); we build no card forms and store no PANs (SAQ-A).
+4. **Access is granted on the webhook, not the Checkout redirect** — returning from Checkout does
+   not flip the tenant to paid; the `subscription.created/updated` event does.
+5. **Quotas ≠ rate limits** — the existing `RateLimiting.cs` is per-IP request throttling (abuse);
+   plan quotas are per-tenant **persisted** counters (seats = membership count; usage = a counter).
+   Different mechanism — don't conflate.
+6. `Subscription` participates in tenant **dissolve** via an `ITenantDataContributor` that cancels
+   the Stripe subscription and wipes the projection.
+7. **Sandbox/fake test stack (the answer to "can we test billing without real money": yes):**
+   `FakeBillingProvider` for unit; **stripe-mock** (Stripe's official offline mock server) for
+   `Api.Tests` request/response; **Stripe test mode + Stripe CLI** (`stripe listen`/`stripe trigger`)
+   for webhook E2E; **Stripe Test Clocks** to simulate trial-end/renewal/dunning deterministically.
+   This is the Mailpit-for-billing analogue (ADR-C13: trap it locally, zero real charges).
+*Rationale:* billing is what makes this a SaaS template rather than a multi-tenant CRUD app;
+abstracting the provider keeps Core clean and the test suite offline; projecting Stripe state (rather
+than owning money truth) avoids reconciliation bugs; deferring matches the web-first/business-need
+posture (ADR-C9) — there is no app or plan catalog yet (`PROJECT_BRIEF.md` is still TODO).
+Stories + slice plan: `docs/stories/billing.md` (epic `BILLING`). Future siblings parked in
+`docs/PLATFORM_BACKLOG.md`.
+
+**ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**
+Side effects that must not be lost (email, billing webhooks, future integrations) move off the
+request thread through a **transactional outbox**: an **`OutboxMessage`** is written in the **same EF
+`SaveChanges`** as the business change (via `IUnitOfWork`), so the effect is atomic with the data —
+no "saved the row but lost the email," no "charged but didn't provision." A **`BackgroundService`**
+(`OutboxDispatcher`) polls unsent rows (claiming with Postgres `FOR UPDATE SKIP LOCKED`), dispatches
+via typed handlers, and retries with backoff into a **dead-letter** state. The **inbox** is its
+mirror — same table family with a `direction` discriminator, keyed by an external idempotency id
+(e.g. Stripe event id) — giving exactly-once **inbound** processing. **Scheduled/recurring** work
+(trial-expiry sweeps, dunning nudges, expired-token cleanup, quota resets) runs via a lightweight
+timer hosted service.
+Constraints recorded:
+1. **In-process on Postgres, no broker** — keeps the template's run cost "Postgres only" (ADR-C13).
+   A distributed scheduler (Hangfire/Quartz) or message broker is a documented **swap-in** when
+   multi-node arrives, not a dependency now; the `SKIP LOCKED` claim design keeps a single-table
+   approach correct even multi-instance.
+2. **`OutboxMessage` is NOT `ITenantScoped`** — it's platform infra and may carry system (non-tenant)
+   effects; it stores an optional `TenantId` for handler context but is outside the global filter.
+   On dissolve, pending tenant-related outbox rows are drained/cancelled by the relevant contributor.
+3. **At-least-once delivery ⇒ all handlers must be idempotent** — the same contract billing webhooks
+   need (ADR-006).
+4. **First consumer is the existing email path** — passwordless and invitation sends currently call
+   `IEmailSender` **inline in the request**; the first slice migrates them to enqueue-to-outbox (the
+   SMTP send moves into a handler), proving the path on existing, already-tested behavior.
+*Rationale:* the template already sends email inline during request handling, so a transient SMTP
+failure becomes a request error or a silently lost message. A generic outbox makes every side effect
+reliable once, and gives billing webhooks a correct idempotent home. In-process keeps infrastructure
+minimal until scale actually forces a broker.
+Stories + slice plan: `docs/stories/async-jobs.md` (epic `JOBS`).
+
+**ADR-008 — Observability (structured logging + OpenTelemetry + health checks) and a tenant-scoped audit log. Implementation DEFERRED. (2026-06-25)**
+Two complementary concerns shipped as one slice group.
+**(a) Operational observability** — structured (JSON) logging with per-request scopes enriched with
+`tenant_id`/`user_id` (from the JWT claim via `HttpCurrentTenant`); **OpenTelemetry** traces +
+metrics (ASP.NET Core + EF Core + HttpClient instrumentation) with the request span tagged by
+tenant/user; and `/health` (liveness) + `/health/ready` (readiness — DB reachable) endpoints. The
+OTLP exporter is **config-gated** (console in dev, OTLP when an endpoint is configured — same
+config-presence pattern as the OAuth providers), so the template runs with **no external telemetry
+dependency** by default.
+**(b) Audit log** — an append-only, tenant-scoped **`AuditEvent`** (`actor_user_id`, `action`,
+`entity_type`, `entity_id`, `metadata` jsonb, `created_at`) for security/compliance-relevant actions
+(member invited/removed, role changed, subscription changed, tenant dissolved). Written via an EF
+`SaveChanges` interceptor (sibling of `TenantStampingInterceptor`) for declarative cases plus an
+explicit `IAuditLog.Record(...)` for semantic events; **append-only** (no update/delete from app
+code); `ITenantScoped` so it's auto-filtered per tenant and participates in dissolve.
+Constraints recorded:
+1. **Audit ≠ logs** — audit is durable, queryable, exportable **tenant data** (compliance); logs and
+   traces are operational telemetry (sampled, ephemeral). Neither substitutes for the other.
+2. **No secrets/PII in spans or audit metadata** — identifiers only; never tokens or card data.
+3. **Health endpoints are unauthenticated and status-only** — must not leak internals.
+4. **Dissolve vs retention tension** — wiping a tenant deletes its audit trail; if legal-hold/
+   retention is required, the dissolve contributor must **export-then-wipe** (flagged for the
+   GDPR/Account-Lifecycle backlog item).
+*Rationale:* nothing in the template currently emits structured telemetry, a health endpoint, or an
+audit trail — every downstream app would re-invent all three. Adding them once at the platform layer
+means every feature inherits them, and audit slots naturally onto the existing interceptor +
+tenant-scoping machinery (ADR-003 amendment).
+Stories + slice plan: `docs/stories/observability.md` (epic `OBS`).
