@@ -99,8 +99,13 @@ _TODO_
   `src/Core/Entities/OutboxMessage.cs`, migration `AddOutbox`. **NOT** `ITenantScoped` (platform infra;
   carries an optional `TenantId` for context). `type`, `payload` (text/JSON), `status`,
   `attempt_count`, `next_attempt_at`, `processed_at`, `last_error`. Written in the **same transaction**
-  as the business change (atomic effects). The **inbox** (idempotent inbound dedupe via a `direction`
-  discriminator + idempotency id) is JOBS-2 — pending.
+  as the business change (atomic effects).
+- **`InboxMessage`** *(ADR-007 / `docs/stories/async-jobs.md`)* — ✅ **BUILT (JOBS-2)**:
+  `src/Core/Entities/InboxMessage.cs`, migration `AddInbox`. **NOT** `ITenantScoped`. Dedup ledger for
+  idempotent inbound (webhook) deliveries: `id`, `source`, `idempotency_key`, `received_at`; **unique on
+  `(source, idempotency_key)`**. `IInbox.TryClaimAsync` claims via `INSERT … ON CONFLICT DO NOTHING`
+  inside the caller's transaction (claim + work commit together). Built as a separate ledger rather than
+  an outbox `direction` column — see the ADR-007 amendment.
 - **`AuditEvent`** *(ADR-008 / `docs/stories/observability.md`)* — `ITenantScoped`, **append-only**;
   `actor_user_id`, `action`, `entity_type`, `entity_id`, `metadata` (jsonb), `created_at`. Written via
   an EF interceptor (sibling of `TenantStampingInterceptor`) + explicit `IAuditLog.Record`. No

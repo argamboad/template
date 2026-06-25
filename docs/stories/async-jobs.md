@@ -3,10 +3,10 @@
 > One file per epic. Makes side effects reliable: a **transactional outbox** (effects committed
 > atomically with the data change), a background **dispatcher**, an **inbox** for idempotent inbound
 > deliveries (e.g. Stripe webhooks), and a host for **scheduled/recurring** work. **Status: IN
-> PROGRESS** — **JOBS-1 shipped** (outbox + dispatcher + email migration); JOBS-2 (inbox) and
-> JOBS-3 (scheduler) pending. Design decision and constraints in **ADR-007**. Stories use Gherkin
-> acceptance criteria. This epic is a prerequisite for reliable billing webhooks
-> (`docs/stories/billing.md`).
+> PROGRESS** — **JOBS-1 + JOBS-2 shipped** (outbox + dispatcher + email migration; inbox dedup gate);
+> JOBS-3 (scheduler) pending. Design decision and constraints in **ADR-007** (see its 2026-06-25
+> amendment on the inbox design). Stories use Gherkin acceptance criteria. This epic is a
+> prerequisite for reliable billing webhooks (`docs/stories/billing.md`).
 
 **Epic key:** `JOBS`
 
@@ -80,6 +80,12 @@ by the existing auth/invitation tests still passing; merged, app working; ADR-00
 ---
 
 ### JOBS-2 — Inbox: idempotent inbound delivery (webhook dedupe)
+
+**Status: ✅ Implemented** (`feat/jobs-2-inbox`). Entity `src/Core/Entities/InboxMessage.cs`;
+abstraction `src/Core/Abstractions/IInbox.cs`; impl `src/Infrastructure/Inbox/EfInbox.cs`
+(`INSERT … ON CONFLICT DO NOTHING` on a unique `(Source, IdempotencyKey)` index — race-free, no
+`SKIP LOCKED`); migration `AddInbox`; tests `tests/Api.Tests/Inbox/`. See the ADR-007 amendment for
+why it's a separate ledger rather than a `direction` column. BILLING-3 consumes it.
 
 **As a** the platform
 **I want** at-least-once inbound events processed exactly once
@@ -163,8 +169,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
      `EmailOutboxHandler` (the SMTP send moves into the handler).
    - **Tests first:** rollback-leaves-no-message; dispatch; retry→dead-letter; existing auth/invite
      email tests still green.
-2. **Inbox (JOBS-2).** Same table family + `direction`; `IInbox.TryClaim(idempotencyId)`; concurrency
-     test with `SKIP LOCKED`. Consumed by BILLING-3.
+2. ✅ **Inbox (JOBS-2).** — DONE. Separate `InboxMessage` ledger; `IInbox.TryClaimAsync(source, key)`
+     via `INSERT … ON CONFLICT DO NOTHING` on a unique index (race-free); concurrency test included.
+     Consumed by BILLING-3. (Built as a dedup ledger, not a `direction` column — ADR-007 amendment.)
 3. **Scheduled host (JOBS-3).** `ScheduledJobsHost : BackgroundService` + `IScheduledJob`; reference
      token-cleanup job; failure isolation.
 

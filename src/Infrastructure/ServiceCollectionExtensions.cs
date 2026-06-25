@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Template.Core.Abstractions;
 using Template.Core.Repositories;
 using Template.Infrastructure.Email;
+using Template.Infrastructure.Inbox;
 using Template.Infrastructure.Outbox;
 using Template.Infrastructure.Persistence;
 using Template.Infrastructure.Repositories;
@@ -57,6 +58,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutboxHandler>(sp =>
             new EmailOutboxHandler(sp.GetRequiredKeyedService<IEmailSender>("smtp")));
         services.AddHostedService<OutboxDispatcher>();
+
+        // Inbox dedup gate — idempotent inbound (webhook) deliveries (ADR-007). Used inline by the
+        // receiving endpoint inside its unit of work; no background service.
+        services.AddScoped<IInbox, EfInbox>();
 
         // Clock — repositories/services depend on TimeProvider for testable time. The host
         // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.
