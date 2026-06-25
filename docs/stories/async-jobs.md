@@ -2,11 +2,11 @@
 
 > One file per epic. Makes side effects reliable: a **transactional outbox** (effects committed
 > atomically with the data change), a background **dispatcher**, an **inbox** for idempotent inbound
-> deliveries (e.g. Stripe webhooks), and a host for **scheduled/recurring** work. **Status: IN
-> PROGRESS** — **JOBS-1 + JOBS-2 shipped** (outbox + dispatcher + email migration; inbox dedup gate);
-> JOBS-3 (scheduler) pending. Design decision and constraints in **ADR-007** (see its 2026-06-25
-> amendment on the inbox design). Stories use Gherkin acceptance criteria. This epic is a
-> prerequisite for reliable billing webhooks (`docs/stories/billing.md`).
+> deliveries (e.g. Stripe webhooks), and a host for **scheduled/recurring** work. **Status: ✅ COMPLETE**
+> — JOBS-1 (outbox + dispatcher + email migration), JOBS-2 (inbox dedup gate), and JOBS-3 (scheduled-
+> jobs host + token-cleanup job) all shipped. Design decision and constraints in **ADR-007** (see its
+> 2026-06-25 amendment). Stories use Gherkin acceptance criteria. This epic was the prerequisite for
+> reliable billing webhooks (`docs/stories/billing.md`) — **BILLING is now unblocked.**
 
 **Epic key:** `JOBS`
 
@@ -125,6 +125,13 @@ Postgres Testcontainer (`SKIP LOCKED` proven); merged, app working.
 
 ### JOBS-3 — Scheduled / recurring jobs host
 
+**Status: ✅ Implemented** (`feat/jobs-3-scheduler`). Abstraction `src/Core/Abstractions/IScheduledJob.cs`;
+host `src/Infrastructure/Scheduling/ScheduledJobsHost.cs` (timer `BackgroundService`; per-job
+intervals; failure isolation; fresh DI scope per run); reference job
+`src/Infrastructure/Scheduling/ExpiredTokenCleanupJob.cs`; tests `tests/Api.Tests/Scheduling/`. Add a
+job by registering an `IScheduledJob` — no host edits. Future jobs (trial-expiry sweeps, quota resets)
+copy the cleanup job's shape.
+
 **As a** the platform
 **I want** a place to run periodic background work
 **So that** sweeps and nudges (trial expiry, dunning, token cleanup, quota resets) happen on time
@@ -172,8 +179,8 @@ Ordered, each a mergeable vertical slice. TDD throughout.
 2. ✅ **Inbox (JOBS-2).** — DONE. Separate `InboxMessage` ledger; `IInbox.TryClaimAsync(source, key)`
      via `INSERT … ON CONFLICT DO NOTHING` on a unique index (race-free); concurrency test included.
      Consumed by BILLING-3. (Built as a dedup ledger, not a `direction` column — ADR-007 amendment.)
-3. **Scheduled host (JOBS-3).** `ScheduledJobsHost : BackgroundService` + `IScheduledJob`; reference
-     token-cleanup job; failure isolation.
+3. ✅ **Scheduled host (JOBS-3).** — DONE. `ScheduledJobsHost : BackgroundService` + `IScheduledJob`
+     (per-job intervals, failure isolation, fresh scope per run); reference `ExpiredTokenCleanupJob`.
 
 **Dissolve interaction (note):** pending outbox rows for a dissolving tenant should be drained or
 cancelled — the BILLING dissolve contributor handles billing-related ones; generic system effects

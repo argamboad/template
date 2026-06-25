@@ -11,6 +11,7 @@ using Template.Core.Repositories;
 using Template.Infrastructure.Email;
 using Template.Infrastructure.Inbox;
 using Template.Infrastructure.Outbox;
+using Template.Infrastructure.Scheduling;
 using Template.Infrastructure.Persistence;
 using Template.Infrastructure.Repositories;
 
@@ -62,6 +63,13 @@ public static class ServiceCollectionExtensions
         // Inbox dedup gate — idempotent inbound (webhook) deliveries (ADR-007). Used inline by the
         // receiving endpoint inside its unit of work; no background service.
         services.AddScoped<IInbox, EfInbox>();
+
+        // Scheduled/recurring jobs (ADR-007). The host ticks and runs each IScheduledJob on its own
+        // interval; add a job by registering IScheduledJob (no host edits). Jobs are scoped so they
+        // get a fresh DbContext per run.
+        services.AddSingleton(new ScheduledJobsOptions());
+        services.AddScoped<IScheduledJob, ExpiredTokenCleanupJob>();
+        services.AddHostedService<ScheduledJobsHost>();
 
         // Clock — repositories/services depend on TimeProvider for testable time. The host
         // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.

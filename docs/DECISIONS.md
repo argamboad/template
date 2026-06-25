@@ -286,8 +286,15 @@ half-null; (b) dedup is a **unique-key concern**, so `IInbox.TryClaimAsync` uses
 claims of one key serialise on the index; exactly one wins), which is cleaner here than the outbox's
 `SKIP LOCKED` queue-claim (that pattern is for *picking work off a queue*, not deduping). The claim runs
 on the shared `AppDbContext`, so it enlists in the caller's transaction: claim + guarded work commit
-together (or roll back together, freeing the key for the inevitable redelivery). JOBS-3 (scheduler)
-remains. BILLING-3 consumes `IInbox` for webhook idempotency.
+together (or roll back together, freeing the key for the inevitable redelivery). BILLING-3 consumes
+`IInbox` for webhook idempotency.
+
+*Amendment (2026-06-25) — JOBS-3 implemented; epic COMPLETE.* The scheduled-jobs host
+(`ScheduledJobsHost : BackgroundService`) runs registered `IScheduledJob`s on per-job intervals with
+failure isolation (one job's throw never stops the others or the host) and a fresh DI scope per run;
+the reference `ExpiredTokenCleanupJob` deletes expired login/refresh tokens hourly. In-process,
+single-instance per the baseline; Hangfire/Quartz remains the documented multi-node swap-in. The JOBS
+epic (outbox, inbox, scheduler) is now done — **BILLING is unblocked.**
 
 **ADR-008 — Observability (structured logging + OpenTelemetry + health checks) and a tenant-scoped audit log. Implementation DEFERRED. (2026-06-25)**
 Two complementary concerns shipped as one slice group.
