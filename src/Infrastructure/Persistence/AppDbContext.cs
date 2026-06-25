@@ -25,6 +25,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<LoginToken> LoginTokens => Set<LoginToken>();
 
+    // Transactional outbox — reliable, atomic side effects (ADR-007). Platform infra, not
+    // ITenantScoped, so it is outside the global tenant query filter.
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     // 🗑️ DELETE-ME: sample feature set (remove with the Features/Notes slice).
     public DbSet<Note> Notes => Set<Note>();
 
@@ -127,6 +131,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             t.Ignore(x => x.IsConsumed);
             t.Ignore(x => x.IsExpired);
             t.Ignore(x => x.IsValid);
+        });
+
+        builder.Entity<OutboxMessage>(o =>
+        {
+            o.HasKey(x => x.Id);
+            o.Property(x => x.Type).HasMaxLength(128).IsRequired();
+            o.Property(x => x.Status).HasMaxLength(16).IsRequired();
+            o.Property(x => x.Payload).IsRequired();
+            o.Property(x => x.LastError).HasMaxLength(1000);
+            // Drives the dispatcher claim query: pending + due, oldest first.
+            o.HasIndex(x => new { x.Status, x.NextAttemptAt });
         });
 
         // 🗑️ DELETE-ME: sample feature (remove with the Features/Notes slice). Implements

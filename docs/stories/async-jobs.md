@@ -2,9 +2,11 @@
 
 > One file per epic. Makes side effects reliable: a **transactional outbox** (effects committed
 > atomically with the data change), a background **dispatcher**, an **inbox** for idempotent inbound
-> deliveries (e.g. Stripe webhooks), and a host for **scheduled/recurring** work. **Status:
-> DEFERRED** — design decision and constraints in **ADR-007**. Stories use Gherkin acceptance
-> criteria. This epic is a prerequisite for reliable billing webhooks (`docs/stories/billing.md`).
+> deliveries (e.g. Stripe webhooks), and a host for **scheduled/recurring** work. **Status: IN
+> PROGRESS** — **JOBS-1 shipped** (outbox + dispatcher + email migration); JOBS-2 (inbox) and
+> JOBS-3 (scheduler) pending. Design decision and constraints in **ADR-007**. Stories use Gherkin
+> acceptance criteria. This epic is a prerequisite for reliable billing webhooks
+> (`docs/stories/billing.md`).
 
 **Epic key:** `JOBS`
 
@@ -22,6 +24,13 @@ is not atomic. The outbox fixes this generically so every future side effect inh
 ---
 
 ### JOBS-1 — Transactional outbox + dispatcher (email is the first consumer)
+
+**Status: ✅ Implemented** (`feat/jobs-1-outbox-dispatcher`). Entity `src/Core/Entities/OutboxMessage.cs`;
+abstractions `src/Core/Abstractions/IOutbox.cs` + `IOutboxHandler.cs`; infra `src/Infrastructure/Outbox/`
+(`EfOutbox`, `OutboxProcessor`, `OutboxDispatcher`) + `src/Infrastructure/Email/`
+(`OutboxEmailSender` decorator, `EmailOutboxHandler`); migration `AddOutbox`; tests
+`tests/Api.Tests/Outbox/`. All three email call sites (passwordless ×2, invitations) were migrated
+with zero changes — they still depend on `IEmailSender`, which is now the outbox decorator.
 
 **As a** the platform
 **I want** side effects enqueued in the same transaction as the data change and dispatched in the
@@ -144,7 +153,7 @@ boundaries unit/integration-tested; merged, app working.
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. **Outbox + dispatcher + email migration (JOBS-1).**
+1. ✅ **Outbox + dispatcher + email migration (JOBS-1).** — DONE.
    - `Core/Entities/OutboxMessage.cs` (id, type, payload jsonb, optional `TenantId`, status,
      attempt_count, next_attempt_at, created_at) + EF config + migration. **Not** `ITenantScoped`.
    - `IOutbox.Enqueue(message)` writing through the **same** `IUnitOfWork` as the caller's change.
