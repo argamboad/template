@@ -132,4 +132,9 @@ Production reads the same keys from real environment variables, never a committe
 ## App-specific notes
 <!-- Fill per project: anything this app needs beyond the constant stack — extra libraries,
      storage (blob/file), background jobs, real-time (SignalR), search, etc. -->
+- **Background jobs** — in-process outbox/inbox + scheduled-jobs host on Postgres (no broker); see
+  ADR-007 / `docs/stories/async-jobs.md`. Hangfire/Quartz/MassTransit are the documented swap-ins at scale.
+- **`Stripe.net` 52.x** — billing/subscriptions (ADR-006 / `docs/stories/billing.md`). Registered only
+  when `Billing:Stripe:SecretKey` is set; otherwise an in-memory `FakeBillingProvider` keeps the app
+  bootable and tests offline. Stripe is the source of truth for money; our `Subscription` is a projection.
 - _TODO_

@@ -2,10 +2,11 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1
-> shipped** (plan catalog + entitlement gate, no payment yet); BILLING-2…6 pending. Design decision
-> and constraints in **ADR-006**. Stories use Gherkin acceptance criteria. The inbox prerequisite
-> (`docs/stories/async-jobs.md` / ADR-007) is **done**, so webhook work (BILLING-3) is unblocked.
+> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1 + 2
+> shipped** (entitlement gate; Stripe provider + owner-only Checkout); BILLING-3…6 pending. Design
+> decision and constraints in **ADR-006**. Stories use Gherkin acceptance criteria. The inbox
+> prerequisite (`docs/stories/async-jobs.md` / ADR-007) is **done**, so webhook work (BILLING-3) is
+> unblocked — it's the next slice.
 
 **Epic key:** `BILLING`
 
@@ -80,6 +81,18 @@ merged, app working; ADR-006 referenced.
 ---
 
 ### BILLING-2 — Subscribe via Stripe Checkout
+
+**Status: ✅ Implemented** (`feat/billing-2-checkout`). Abstraction `src/Core/Abstractions/IBillingProvider.cs`
+(+ `BillingCheckoutRequest`/`BillingCheckoutSession`); `src/Infrastructure/Billing/` —
+`StripeBillingProvider` (Stripe.net 52, subscription-mode Checkout, tenant id in
+`ClientReferenceId`+metadata), `FakeBillingProvider` (offline; also the dev fallback when no Stripe key
+is set), `StripeSettings`; feature slice `src/Api/Features/Billing/` (`/api/billing/checkout`,
+owner-only via `BillingHandler`). Config `Billing__Stripe__SecretKey` + `Billing__Stripe__Prices__pro`
+in `.env.example`. Tests `tests/Api.Tests/Billing/`. **Test-coverage note:** acceptance criteria are
+covered offline by `FakeBillingProvider`; the live SDK round-trip is left to the E2E layer (Stripe
+test mode / stripe-mock) per the DoD — the planned stripe-mock Testcontainer integration test was
+deferred (Testcontainers 4.12 API friction; not worth blocking the slice for bonus coverage), with a
+deterministic price-resolution guard test kept in its place.
 
 **As a** tenant owner
 **I want** to upgrade my tenant to a paid plan
@@ -266,13 +279,16 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
      granted) + filter 402-vs-allow via TestServer.
    - **Deferred to slice 2:** `IBillingProvider` + `FakeBillingProvider` — first needed for the Checkout
      call, so they land with BILLING-2 (no payment path exists in BILLING-1 to test them against).
-2. **Stripe reference impl + Checkout (BILLING-2).**
-   - `Infrastructure/Billing/StripeBillingProvider.cs` (`Stripe.net`); register in
-     `ServiceCollectionExtensions` guarded by `Billing:Stripe:SecretKey` presence (same
-     config-presence pattern as the OAuth providers).
-   - `Features/Billing/` slice: `MapTenantFeatureGroup("/api/billing")`, owner-only checkout handler.
-   - `.env.example`: `Billing__Stripe__SecretKey`, `Billing__Stripe__WebhookSecret`, price ids.
-   - **Tests first:** owner-only; tenant-id in session metadata; `stripe-mock` integration.
+2. ✅ **Stripe reference impl + Checkout (BILLING-2).** — DONE.
+   - `IBillingProvider` (Core) + `StripeBillingProvider` (`Stripe.net` 52) + `FakeBillingProvider`
+     (offline + dev fallback). Registered in `ServiceCollectionExtensions` guarded by
+     `Billing:Stripe:SecretKey` presence (same pattern as the OAuth providers); no key ⇒ fake.
+   - `Features/Billing/` slice: `MapTenantFeatureGroup("/api/billing")` + owner-only `BillingHandler`.
+   - `.env.example`: `Billing__Stripe__SecretKey`, `Billing__Stripe__Prices__pro`.
+     (`Billing__Stripe__WebhookSecret` lands with BILLING-3.)
+   - **Tests:** owner-only / member-403 / no-membership / invalid-plan / no-access-until-webhook +
+     tenant-id-in-request, all via `FakeBillingProvider`; price-resolution guard for the Stripe impl.
+     The `stripe-mock` integration test is deferred to E2E (see the BILLING-2 status note above).
 3. **Webhook + projection (BILLING-3).** Unauthenticated signed endpoint → inbox (JOBS-2) →
    idempotent apply. **Tests first:** signature reject, dedupe, each transition (drive with
    `stripe trigger`).
