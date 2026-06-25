@@ -58,6 +58,10 @@ builder.Services.AddSwaggerGen(o =>
 // External cookie + OAuth provider schemes.
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// OpenTelemetry traces + metrics (OBS-2). Exporter is config-gated (OTLP when configured); see
+// TelemetryExtensions. Spans are tagged with tenant_id/user_id.
+builder.Services.AddAppTelemetry(builder.Configuration);
+
 // Typed settings (read configuration once at startup).
 builder.Services.AddSingleton<IJwtSettings>(new JwtSettings(builder.Configuration));
 builder.Services.AddSingleton<IRefreshTokenSettings>(new RefreshTokenSettings(builder.Configuration));

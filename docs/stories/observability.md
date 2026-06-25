@@ -2,9 +2,10 @@
 
 > One file per epic. Two complementary concerns shipped together: **operational observability**
 > (structured logging, OpenTelemetry traces/metrics, health endpoints) and a tenant-scoped,
-> append-only **audit log**. **Status: IN PROGRESS** — **OBS-1 shipped** (structured logging +
-> tenant/user enrichment); OBS-2 (OpenTelemetry), OBS-3 (health), OBS-4 (audit log) pending. Design
-> decision and constraints in **ADR-008**. Stories use Gherkin acceptance criteria.
+> append-only **audit log**. **Status: IN PROGRESS** — **OBS-1 + OBS-2 shipped** (structured logging
+> with tenant/user enrichment; OpenTelemetry traces/metrics with tenant-tagged spans); OBS-3 (health),
+> OBS-4 (audit log) pending. Design decision and constraints in **ADR-008**. Stories use Gherkin
+> acceptance criteria.
 >
 > **Audit ≠ logs.** Audit is durable, queryable, exportable **tenant data** (compliance). Logs/traces
 > are operational telemetry (sampled, ephemeral). They do not substitute for each other.
@@ -65,6 +66,15 @@ a secret-redaction test; merged, app working; ADR-008 referenced.
 ---
 
 ### OBS-2 — OpenTelemetry traces & metrics
+
+**Status: ✅ Implemented** (`feat/obs-2-opentelemetry`). `TelemetryExtensions.AddAppTelemetry`
+(`src/Api/Observability/`) wires OTel tracing + metrics with ASP.NET Core + HttpClient instrumentation
+and Npgsql DB spans via `AddSource("Npgsql")` (the stable built-in source — **not** the beta EF Core
+instrumentation). Request spans tagged with `tenant_id`/`user_id` via the AspNetCore enrich callback.
+**Exporter is config-gated:** OTLP when `OpenTelemetry:Otlp:Endpoint` is set; otherwise **nothing is
+exported** (clean dev console; spans still produced) unless `OpenTelemetry:ConsoleExporter=true`. Tests
+`tests/Api.Tests/Observability/TelemetryEnrichmentTests.cs` (span tags authed/anon). Packages:
+`OpenTelemetry.Extensions.Hosting` + AspNetCore/Http instrumentation + OTLP/Console exporters.
 
 **As an** operator
 **I want** distributed traces and runtime metrics exported via OTLP
@@ -185,9 +195,10 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    log scope with `tenant_id`/`user_id`; built-in console formatter (single-line dev / JSON prod, with
    scopes) — **chose built-in `ILogger` over Serilog** to avoid a dependency; Serilog/OTel-logs is a
    documented swap-in. Secret-exclusion test included.
-2. **OpenTelemetry (OBS-2).** `AddOpenTelemetry().WithTracing(...).WithMetrics(...)`; instrument
-   ASP.NET Core + EF + HttpClient; span enrichment for tenant/user; config-gated OTLP exporter
-   (console default). Validate span attributes with an in-memory exporter.
+2. ✅ **OpenTelemetry (OBS-2).** — DONE. `AddAppTelemetry`: tracing + metrics, ASP.NET Core + HttpClient
+   instrumentation + Npgsql DB spans (`AddSource("Npgsql")`, not the beta EF instrumentation); tenant/user
+   span tags; config-gated exporter (OTLP when endpoint set, else none unless the console flag is on —
+   judgment call: keeps the dev console clean vs. ADR's "console default"). Span tags unit-tested directly.
 3. **Health checks (OBS-3).** `AddHealthChecks().AddNpgSql(...)`; map `/health` + `/health/ready`;
    redaction-safe responses.
 4. **Audit log (OBS-4).** `Core/Entities/AuditEvent.cs : ITenantScoped` + EF config + migration;
