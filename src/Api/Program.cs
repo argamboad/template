@@ -82,6 +82,10 @@ builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 
+// Billing entitlements (ADR-006). Server-side plan gate behind .RequireEntitlement(...); reads the
+// tenant's Subscription projection and fails closed to Free. No payment provider yet (BILLING-2).
+builder.Services.AddScoped<IEntitlementService, EntitlementService>();
+
 // 🗑️ DELETE-ME: sample feature slice (Features/Notes) — the reference for how a vertical
 // slice wires up: a handler + a tenant-data contributor, with endpoints mapped below.
 builder.Services.AddScoped<NotesHandler>();

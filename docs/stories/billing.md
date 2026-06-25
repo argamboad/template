@@ -2,10 +2,10 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: DEFERRED** — design decision
-> and constraints in **ADR-006**; pick this up web-first when there's a paid product to sell.
-> Stories use Gherkin acceptance criteria. Billing depends on the outbox/inbox from
-> `docs/stories/async-jobs.md` (ADR-007) for reliable webhook processing.
+> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1
+> shipped** (plan catalog + entitlement gate, no payment yet); BILLING-2…6 pending. Design decision
+> and constraints in **ADR-006**. Stories use Gherkin acceptance criteria. The inbox prerequisite
+> (`docs/stories/async-jobs.md` / ADR-007) is **done**, so webhook work (BILLING-3) is unblocked.
 
 **Epic key:** `BILLING`
 
@@ -31,6 +31,15 @@ This is the Mailpit-for-billing analogue (ADR-C13): traps everything locally, ze
 ---
 
 ### BILLING-1 — Plan catalog + entitlement gate
+
+**Status: ✅ Implemented** (`feat/billing-1-entitlement-gate`). Entity `src/Core/Entities/Subscription.cs`
+(`ITenantScoped`, unique per tenant; Stripe ids nullable until BILLING-2); catalog
+`src/Core/Billing/PlanCatalog.cs` (`PlanKeys`, `Entitlements`, fail-closed `Get`); gate
+`src/Core/Abstractions/IEntitlementService.cs` + `src/Api/Services/EntitlementService.cs`
+(fails closed to Free) + `src/Api/Features/EntitlementEndpointExtensions.cs` (`.RequireEntitlement(key)`
+→ 402); migration `AddSubscription`; tests `tests/Api.Tests/Billing/`. **Scope note:** `IBillingProvider`
++ `FakeBillingProvider` were deferred to **BILLING-2**, where the first provider call (Checkout) actually
+needs them — BILLING-1 has no payment path, so adding them now would be untested dead code.
 
 **As a** product owner
 **I want** features gated by the tenant's plan tier
@@ -246,17 +255,17 @@ timeline)._
 Ordered, each a mergeable vertical slice. TDD throughout (write the failing test first). **JOBS-1/2
 must land first** (ADR-007) — billing webhooks depend on the inbox.
 
-1. **Seam + plan catalog + entitlement gate (BILLING-1).**
-   - `Core/Abstractions/IBillingProvider.cs` (CreateCheckoutSession, CreatePortalSession,
-     ParseWebhookEvent) — mirrors `IEmailSender`'s Core-abstraction shape.
-   - `Core/Entities/Subscription.cs : ITenantScoped` (plan key, status, stripe customer/subscription
-     ids, current_period_end) + EF config + migration. Default-absent ⇒ Free.
-   - Plan catalog as code/config (`PlanCatalog` static or `Billing:Plans` config): plan key →
-     entitlements + seat/usage limits + Stripe price id.
-   - `IEntitlementService` + `RequireEntitlement(key)` endpoint filter (sibling of
-     `FeatureEndpointExtensions`). 402 on deny.
-   - `FakeBillingProvider` (Infrastructure or test double) for unit tests.
-   - **Tests first:** entitlement fail-closed default; filter Free→402 / Pro→200.
+1. ✅ **Plan catalog + entitlement gate (BILLING-1).** — DONE.
+   - `Core/Entities/Subscription.cs : ITenantScoped` (plan key, status, stripe ids [nullable],
+     current_period_end) + EF config + `AddSubscription` migration. Default-absent ⇒ Free.
+   - Plan catalog in code (`Core/Billing/PlanCatalog.cs`): plan key → entitlements (seat/usage limits
+     come in BILLING-5).
+   - `IEntitlementService` + `EntitlementService` (fail-closed) + `.RequireEntitlement(key)` endpoint
+     filter (sibling of `FeatureEndpointExtensions`), 402 on deny.
+   - **Tests:** fail-closed resolution (no-sub / past_due / canceled / lapsed → Free; active/trialing →
+     granted) + filter 402-vs-allow via TestServer.
+   - **Deferred to slice 2:** `IBillingProvider` + `FakeBillingProvider` — first needed for the Checkout
+     call, so they land with BILLING-2 (no payment path exists in BILLING-1 to test them against).
 2. **Stripe reference impl + Checkout (BILLING-2).**
    - `Infrastructure/Billing/StripeBillingProvider.cs` (`Stripe.net`); register in
      `ServiceCollectionExtensions` guarded by `Billing:Stripe:SecretKey` presence (same

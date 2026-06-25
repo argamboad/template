@@ -33,6 +33,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     // not ITenantScoped.
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
+    // Billing subscription projection (ADR-006). ITenantScoped, so the global query filter scopes
+    // it to the current tenant automatically.
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
+
     // 🗑️ DELETE-ME: sample feature set (remove with the Features/Notes slice).
     public DbSet<Note> Notes => Set<Note>();
 
@@ -156,6 +160,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             // Dedup arbiter: one row per (source, key). The unique index is the ON CONFLICT target
             // that makes EfInbox.TryClaimAsync race-free.
             i.HasIndex(x => new { x.Source, x.IdempotencyKey }).IsUnique();
+        });
+
+        builder.Entity<Subscription>(s =>
+        {
+            s.HasKey(x => x.Id);
+            s.Property(x => x.PlanKey).HasMaxLength(64).IsRequired();
+            s.Property(x => x.Status).HasMaxLength(32).IsRequired();
+            s.Property(x => x.StripeCustomerId).HasMaxLength(256);
+            s.Property(x => x.StripeSubscriptionId).HasMaxLength(256);
+            // At most one subscription per tenant.
+            s.HasIndex(x => x.TenantId).IsUnique();
         });
 
         // 🗑️ DELETE-ME: sample feature (remove with the Features/Notes slice). Implements

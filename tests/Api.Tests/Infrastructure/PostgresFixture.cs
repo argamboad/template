@@ -59,9 +59,9 @@ public sealed class PostgresFixture : IAsyncLifetime
         await using var db = CreateContext();
         await db.Database.ExecuteSqlRawAsync(
             """
-            TRUNCATE TABLE "InboxMessages", "OutboxMessages", "Notes", "TenantInvitations",
-                          "TenantMemberships", "UserLogins", "RefreshTokens", "LoginTokens",
-                          "Users", "Tenants"
+            TRUNCATE TABLE "Subscriptions", "InboxMessages", "OutboxMessages", "Notes",
+                          "TenantInvitations", "TenantMemberships", "UserLogins", "RefreshTokens",
+                          "LoginTokens", "Users", "Tenants"
             RESTART IDENTITY CASCADE;
             """);
     }
