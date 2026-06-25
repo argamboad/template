@@ -26,9 +26,13 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
     public AppDbContext CreateDbContext(string[] args)
     {
+        // Prefer an explicit env override (e.g. CI/prod); otherwise use the local dev DB. The
+        // fallback mirrors src/Api/appsettings.Development.json (the dev connection isn't kept in
+        // .env), so `dotnet ef database update` targets the same Postgres the API uses. Keep the
+        // two in sync if the dev DB coordinates change.
         var connectionString =
             Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-            ?? "Host=localhost;Database=template;Username=postgres;Password=postgres";
+            ?? "Host=localhost;Port=5433;Database=dev_db;Username=dev;Password=devpassword";
 
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(connectionString)

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Template.Api.Configuration;
 using Template.Api.Features.Notes;
@@ -131,6 +132,19 @@ if (allowedOrigins.Length > 0)
 }
 
 var app = builder.Build();
+
+// Apply EF migrations on startup so a freshly-created database (e.g. after a
+// `docker compose down -v && up`) gets its schema with no manual `dotnet ef database update`.
+// QA_TEST_PLAN documents "re-apply migrations by starting the API" — this is what does it.
+// Migrate() is idempotent (a no-op when already current); the relational guard keeps
+// non-relational test providers unaffected. AppDbContext needs ICurrentTenant, which resolves
+// to a null tenant outside a request — fine, migrating doesn't use the tenant filter.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (db.Database.IsRelational())
+        db.Database.Migrate();
+}
 
 if (app.Environment.IsDevelopment())
 {
