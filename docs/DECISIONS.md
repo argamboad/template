@@ -275,6 +275,20 @@ reliable once, and gives billing webhooks a correct idempotent home. In-process 
 minimal until scale actually forces a broker.
 Stories + slice plan: `docs/stories/async-jobs.md` (epic `JOBS`).
 
+*Amendment (2026-06-25) — JOBS-1 + JOBS-2 implemented; inbox is a separate dedup ledger, not a
+`direction` column.* JOBS-1 shipped the outbox + `OutboxDispatcher` + the email migration as described.
+JOBS-2 shipped the **inbox**, but as a **purpose-built `InboxMessage` ledger** (`Id`, `Source`,
+`IdempotencyKey`, `ReceivedAt`; unique on `(Source, IdempotencyKey)`) rather than the originally-sketched
+"same table + `direction` discriminator." Reasons: (a) inbox rows need none of the outbox's
+queue columns (`Type`/`Payload`/`Status`/`AttemptCount`/`NextAttemptAt`), so a shared table would be
+half-null; (b) dedup is a **unique-key concern**, so `IInbox.TryClaimAsync` uses
+`INSERT … ON CONFLICT DO NOTHING` against the unique index — **race-free by construction** (concurrent
+claims of one key serialise on the index; exactly one wins), which is cleaner here than the outbox's
+`SKIP LOCKED` queue-claim (that pattern is for *picking work off a queue*, not deduping). The claim runs
+on the shared `AppDbContext`, so it enlists in the caller's transaction: claim + guarded work commit
+together (or roll back together, freeing the key for the inevitable redelivery). JOBS-3 (scheduler)
+remains. BILLING-3 consumes `IInbox` for webhook idempotency.
+
 **ADR-008 — Observability (structured logging + OpenTelemetry + health checks) and a tenant-scoped audit log. Implementation DEFERRED. (2026-06-25)**
 Two complementary concerns shipped as one slice group.
 **(a) Operational observability** — structured (JSON) logging with per-request scopes enriched with

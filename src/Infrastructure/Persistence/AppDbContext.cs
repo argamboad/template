@@ -29,6 +29,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     // ITenantScoped, so it is outside the global tenant query filter.
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    // Inbox dedup ledger — idempotent inbound (webhook) deliveries (ADR-007). Platform infra,
+    // not ITenantScoped.
+    public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
+
     // 🗑️ DELETE-ME: sample feature set (remove with the Features/Notes slice).
     public DbSet<Note> Notes => Set<Note>();
 
@@ -142,6 +146,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             o.Property(x => x.LastError).HasMaxLength(1000);
             // Drives the dispatcher claim query: pending + due, oldest first.
             o.HasIndex(x => new { x.Status, x.NextAttemptAt });
+        });
+
+        builder.Entity<InboxMessage>(i =>
+        {
+            i.HasKey(x => x.Id);
+            i.Property(x => x.Source).HasMaxLength(64).IsRequired();
+            i.Property(x => x.IdempotencyKey).HasMaxLength(256).IsRequired();
+            // Dedup arbiter: one row per (source, key). The unique index is the ON CONFLICT target
+            // that makes EfInbox.TryClaimAsync race-free.
+            i.HasIndex(x => new { x.Source, x.IdempotencyKey }).IsUnique();
         });
 
         // 🗑️ DELETE-ME: sample feature (remove with the Features/Notes slice). Implements
