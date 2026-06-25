@@ -16,6 +16,13 @@ public interface IBillingProvider
     Task<BillingCheckoutSession> CreateCheckoutSessionAsync(BillingCheckoutRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Creates a hosted billing-management portal session for an existing customer (manage/upgrade/
+    /// cancel) and returns its URL. Resulting changes flow back through the webhook, so there is no
+    /// separate state logic here.
+    /// </summary>
+    Task<BillingPortalSession> CreatePortalSessionAsync(BillingPortalRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Verifies an inbound webhook's authenticity (signature) and maps it to a provider-agnostic
     /// <see cref="BillingWebhookEvent"/>, or <c>null</c> for an authentic-but-irrelevant event (the
     /// caller acknowledges it). Throws <see cref="BillingWebhookSignatureException"/> when the payload
@@ -32,6 +39,13 @@ public sealed record BillingCheckoutRequest(Guid TenantId, string PlanKey, strin
 
 /// <summary>The hosted checkout URL the client redirects to.</summary>
 public sealed record BillingCheckoutSession(string Url);
+
+/// <param name="StripeCustomerId">The provider customer to open the management portal for (from the <c>Subscription</c> projection).</param>
+/// <param name="ReturnUrl">Where the provider returns the user when they leave the portal.</param>
+public sealed record BillingPortalRequest(string StripeCustomerId, string ReturnUrl);
+
+/// <summary>The hosted billing-portal URL the client redirects to.</summary>
+public sealed record BillingPortalSession(string Url);
 
 /// <summary>
 /// A provider-agnostic projection of a subscription-lifecycle webhook — what the platform needs to

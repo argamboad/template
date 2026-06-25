@@ -34,4 +34,22 @@ public class BillingController(
             _ => BadRequest(ErrorFactory.CreateError("invalid_plan", "Unknown or non-purchasable plan")),
         };
     }
+
+    /// <summary>Opens the hosted billing-management portal for the tenant's subscription (owner only).</summary>
+    [HttpPost("portal")]
+    public async Task<IActionResult> Portal(CancellationToken cancellationToken)
+    {
+        var membership = await GetMembershipAsync(cancellationToken);
+        if (membership is null)
+            return InvalidToken();
+        if (!IsOwner(membership))
+            return Forbid403("Only the household owner can manage billing");
+
+        var result = await billing.CreatePortalAsync(cancellationToken);
+        return result.Outcome switch
+        {
+            PortalOutcome.Created => Ok(new PortalResponse { Url = result.Url! }),
+            _ => BadRequest(ErrorFactory.CreateError("no_subscription", "No subscription to manage")),
+        };
+    }
 }

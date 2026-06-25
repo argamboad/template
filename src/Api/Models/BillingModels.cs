@@ -13,3 +13,9 @@ public record CheckoutResponse
 {
     [JsonPropertyName("url")] public required string Url { get; init; }
 }
+
+/// <summary>The hosted billing-portal URL the client should redirect to.</summary>
+public record PortalResponse
+{
+    [JsonPropertyName("url")] public required string Url { get; init; }
+}
