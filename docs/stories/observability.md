@@ -2,8 +2,9 @@
 
 > One file per epic. Two complementary concerns shipped together: **operational observability**
 > (structured logging, OpenTelemetry traces/metrics, health endpoints) and a tenant-scoped,
-> append-only **audit log**. **Status: DEFERRED** — design decision and constraints in **ADR-008**.
-> Stories use Gherkin acceptance criteria.
+> append-only **audit log**. **Status: IN PROGRESS** — **OBS-1 shipped** (structured logging +
+> tenant/user enrichment); OBS-2 (OpenTelemetry), OBS-3 (health), OBS-4 (audit log) pending. Design
+> decision and constraints in **ADR-008**. Stories use Gherkin acceptance criteria.
 >
 > **Audit ≠ logs.** Audit is durable, queryable, exportable **tenant data** (compliance). Logs/traces
 > are operational telemetry (sampled, ephemeral). They do not substitute for each other.
@@ -21,6 +22,13 @@
 ---
 
 ### OBS-1 — Structured logging with tenant/user enrichment
+
+**Status: ✅ Implemented** (`feat/obs-1-logging`). `RequestLoggingScopeMiddleware`
+(`src/Api/Observability/`) opens a per-request `ILogger` scope with `tenant_id` (from `ICurrentTenant`)
++ `user_id` (NameIdentifier claim) — identifiers only, never tokens — wired after auth in `Program.cs`.
+Logging config: single-line console + scopes in dev, **JSON console + scopes in prod** (built-in, no
+new dependency; Serilog/OTel-logs is a documented swap-in). Tests `tests/Api.Tests/Observability/`
+(authed→scope, anon→none, secret-exclusion).
 
 **As an** operator
 **I want** JSON structured logs enriched with tenant and user context
@@ -173,9 +181,10 @@ merged, app working.
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. **Structured logging (OBS-1).** Request-scope enrichment middleware reading
-   `HttpCurrentTenant`/claims; JSON console formatter (built-in `ILogger` or Serilog —
-   decide at build, record in the PR). Secret-redaction test.
+1. ✅ **Structured logging (OBS-1).** — DONE. `RequestLoggingScopeMiddleware` enriches each request's
+   log scope with `tenant_id`/`user_id`; built-in console formatter (single-line dev / JSON prod, with
+   scopes) — **chose built-in `ILogger` over Serilog** to avoid a dependency; Serilog/OTel-logs is a
+   documented swap-in. Secret-exclusion test included.
 2. **OpenTelemetry (OBS-2).** `AddOpenTelemetry().WithTracing(...).WithMetrics(...)`; instrument
    ASP.NET Core + EF + HttpClient; span enrichment for tenant/user; config-gated OTLP exporter
    (console default). Validate span attributes with an in-memory exporter.
