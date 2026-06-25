@@ -106,7 +106,7 @@ deferred items without an explicit decision.
 | `docs/PLATFORM_BACKLOG.md` | Future foundation slices not yet ADR'd (GDPR, RBAC, files, MFA, webhooks, public API, admin, cache) |
 | `docs/stories/` | User stories per epic — generated at build time |
 | `docs/stories/billing.md` | **DEFERRED** epic `BILLING` — subscriptions + entitlements + quotas (ADR-006) |
-| `docs/stories/async-jobs.md` | **DEFERRED** epic `JOBS` — transactional outbox/inbox + scheduled jobs (ADR-007) |
+| `docs/stories/async-jobs.md` | epic `JOBS` — outbox+dispatcher (JOBS-1 ✅ shipped), inbox + scheduled jobs pending (ADR-007) |
 | `docs/stories/observability.md` | **DEFERRED** epic `OBS` — logging/OTel/health + tenant audit log (ADR-008) |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `src/Infrastructure/Persistence/Migrations/` | Concrete schema — EF Core migrations generated from DATA_MODEL.md |

@@ -95,10 +95,12 @@ _TODO_
   Stripe customer/subscription ids, `current_period_end`. A **projection** of Stripe state (Stripe is
   the source of truth for money); absent ⇒ Free tier (fail-closed). Plan catalog is code/config, not
   a table. Participates in dissolve (cancel + wipe).
-- **`OutboxMessage`** / inbox *(ADR-007 / `docs/stories/async-jobs.md`)* — **NOT** `ITenantScoped`
-  (platform infra; carries an optional `TenantId` for context). type, payload (jsonb), status,
-  `attempt_count`, `next_attempt_at`, `direction` (outbound/inbound), idempotency id (inbound dedupe).
-  Written in the **same transaction** as the business change (atomic effects).
+- **`OutboxMessage`** *(ADR-007 / `docs/stories/async-jobs.md`)* — ✅ **BUILT (JOBS-1)**:
+  `src/Core/Entities/OutboxMessage.cs`, migration `AddOutbox`. **NOT** `ITenantScoped` (platform infra;
+  carries an optional `TenantId` for context). `type`, `payload` (text/JSON), `status`,
+  `attempt_count`, `next_attempt_at`, `processed_at`, `last_error`. Written in the **same transaction**
+  as the business change (atomic effects). The **inbox** (idempotent inbound dedupe via a `direction`
+  discriminator + idempotency id) is JOBS-2 — pending.
 - **`AuditEvent`** *(ADR-008 / `docs/stories/observability.md`)* — `ITenantScoped`, **append-only**;
   `actor_user_id`, `action`, `entity_type`, `entity_id`, `metadata` (jsonb), `created_at`. Written via
   an EF interceptor (sibling of `TenantStampingInterceptor`) + explicit `IAuditLog.Record`. No

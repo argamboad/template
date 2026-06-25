@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Template.Core.Abstractions;
 using Template.Core.Repositories;
 using Template.Infrastructure.Email;
+using Template.Infrastructure.Outbox;
 using Template.Infrastructure.Persistence;
 using Template.Infrastructure.Repositories;
 
@@ -40,7 +41,22 @@ public static class ServiceCollectionExtensions
 
         // Email — dev: points to Mailpit via appsettings.Development.json
         services.Configure<SmtpSettings>(configuration.GetSection("Email:Smtp"));
-        services.AddTransient<IEmailSender, SmtpEmailSender>();
+        // The real SMTP sender, registered KEYED so the outbox handler can resolve it without
+        // getting the outbox decorator (the default IEmailSender) back.
+        services.AddKeyedTransient<IEmailSender, SmtpEmailSender>("smtp");
+        // App-facing IEmailSender enqueues onto the outbox instead of sending inline (ADR-007);
+        // the dispatcher performs the real send out-of-band, with retry. Existing call sites
+        // (passwordless, invitations) are unchanged — they still depend on IEmailSender.
+        services.AddScoped<IEmailSender, OutboxEmailSender>();
+
+        // Transactional outbox + background dispatcher (ADR-007). OutboxMessage is staged in the
+        // same transaction as the business change; the dispatcher drains it via typed handlers.
+        services.AddSingleton(new OutboxOptions());
+        services.AddScoped<IOutbox, EfOutbox>();
+        services.AddScoped<OutboxProcessor>();
+        services.AddScoped<IOutboxHandler>(sp =>
+            new EmailOutboxHandler(sp.GetRequiredKeyedService<IEmailSender>("smtp")));
+        services.AddHostedService<OutboxDispatcher>();
 
         // Clock — repositories/services depend on TimeProvider for testable time. The host
         // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.
