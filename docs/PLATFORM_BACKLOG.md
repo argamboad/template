@@ -106,8 +106,10 @@ the UI (BILLING-1/5). Rate-limit per key (extend [`RateLimiting`](../src/Api/Con
 **Why:** support and debugging at scale.
 **Sketch / hooks:** a platform-staff role **outside** the tenant model; cross-tenant reads go through
 the audited `QueryAllTenants()` escape hatch (ADR-003) — never loosen the global filter. Impersonation
-mints a scoped, **short-lived, audited** token and must be **loudly audit-logged** (ADR-008) — this is
-the highest-blast-radius feature in the platform; treat it accordingly.
+enters the target tenant via **`ITenantContext.EnterTenant`** (ADR-003 amendment 2026-06-25) so the
+session is properly scoped rather than bypassing the filter; mint a scoped, **short-lived, audited**
+token and **loudly audit-log** it (ADR-008) — this is the highest-blast-radius feature in the platform;
+treat it accordingly.
 **Deps:** audit log (ADR-008) — required; RBAC.
 
 ## 9. Distributed cache (Redis) — `CACHE`
