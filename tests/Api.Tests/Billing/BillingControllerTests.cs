@@ -64,12 +64,64 @@ public class BillingControllerTests(PostgresFixture fixture) : PostgresTestBase(
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
 
+    // --- BILLING-4: portal (owner only; needs a subscription) ---
+
+    [Fact]
+    public async Task Owner_Portal_WithSubscription_ReturnsOkWithUrl()
+    {
+        var tenantId = Guid.CreateVersion7();
+        var ownerId = await SeedMembershipAsync(tenantId, TenantRoles.Owner);
+        await SeedSubscriptionAsync(tenantId, "cus_123");
+
+        await using var db = Fixture.CreateContext(tenantId); // scoped so the service reads this tenant's sub
+        var fake = new FakeBillingProvider();
+        var controller = NewController(db, fake, ownerId);
+
+        var result = await controller.Portal(default);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.IsType<PortalResponse>(ok.Value);
+        Assert.Equal("cus_123", Assert.Single(fake.PortalRequests).StripeCustomerId);
+    }
+
+    [Fact]
+    public async Task Owner_Portal_WithoutSubscription_Returns400()
+    {
+        var tenantId = Guid.CreateVersion7();
+        var ownerId = await SeedMembershipAsync(tenantId, TenantRoles.Owner);
+
+        await using var db = Fixture.CreateContext(tenantId);
+        var controller = NewController(db, new FakeBillingProvider(), ownerId);
+
+        var result = await controller.Portal(default);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Member_Portal_Returns403()
+    {
+        var tenantId = Guid.CreateVersion7();
+        await SeedMembershipAsync(tenantId, TenantRoles.Owner);
+        var memberId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
+
+        await using var db = Fixture.CreateContext(tenantId);
+        var fake = new FakeBillingProvider();
+        var controller = NewController(db, fake, memberId);
+
+        var result = await controller.Portal(default);
+
+        var obj = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+        Assert.Empty(fake.PortalRequests);
+    }
+
     private static BillingController NewController(AppDbContext db, FakeBillingProvider billing, Guid currentUserId)
     {
         var controller = new BillingController(
             new TenantRepository(db),
             new ErrorResponseFactory(),
-            new BillingService(billing, new TestAppSettings()));
+            new BillingService(billing, new TestAppSettings(), new EfRepository<Subscription>(db)));
 
         var user = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, currentUserId.ToString())], authenticationType: "test"));
@@ -88,5 +140,19 @@ public class BillingControllerTests(PostgresFixture fixture) : PostgresTestBase(
         db.Set<TenantMembership>().Add(new TenantMembership { TenantId = tenantId, UserId = userId, Role = role });
         await db.SaveChangesAsync();
         return userId;
+    }
+
+    private async Task SeedSubscriptionAsync(Guid tenantId, string stripeCustomerId)
+    {
+        await using var db = Fixture.CreateContext(tenantId); // interceptor stamps TenantId
+        db.Set<Subscription>().Add(new Subscription
+        {
+            PlanKey = PlanKeys.Pro,
+            Status = SubscriptionStatus.Active,
+            StripeCustomerId = stripeCustomerId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
     }
 }

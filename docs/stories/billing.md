@@ -2,11 +2,11 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1, 2 & 3
-> shipped** (entitlement gate; Stripe provider + owner-only Checkout; webhook → subscription
-> projection). The core loop is closed: completing checkout now grants access via the webhook.
-> BILLING-4 (Customer Portal), 5 (quotas), 6 (trial/dunning) pending. Design decision and constraints
-> in **ADR-006**. Stories use Gherkin acceptance criteria.
+> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1–4
+> shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal). The core
+> loop is closed and self-serve manage/cancel works (changes flow back through the webhook). BILLING-5
+> (seat/usage quotas) and 6 (trial/dunning) pending. Design decision and constraints in **ADR-006**.
+> Stories use Gherkin acceptance criteria.
 
 **Epic key:** `BILLING`
 
@@ -191,6 +191,15 @@ correct tenant) verified; merged, app working.
 
 ### BILLING-4 — Manage subscription via Customer Portal
 
+**Status: ✅ Implemented** (`feat/billing-4-portal`). `IBillingProvider.CreatePortalSessionAsync` (+
+`BillingPortalRequest`/`BillingPortalSession`); `StripeBillingProvider` via
+`Stripe.BillingPortal.SessionService`; `FakeBillingProvider` for offline tests. `BillingService.CreatePortalAsync`
+reads the current tenant's `Subscription.StripeCustomerId` (stored by the webhook) → no subscription ⇒
+clean 400. `POST /api/billing/portal` on the platform `BillingController` (owner-only via the base gate).
+Tests in `tests/Api.Tests/Billing/` (service: with/without subscription; controller: owner→200,
+owner-no-sub→400, member→403). All changes made in the portal flow back through the BILLING-3 webhook —
+no new state logic.
+
 **As a** tenant owner
 **I want** to change or cancel my plan
 **So that** I control my own billing without contacting support
@@ -309,7 +318,8 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
    tenant-scoped path (no escape hatch). Tests: signature reject, idempotent dedup, activate, fail-closed
    cancel, tenant isolation (offline via `FakeBillingProvider`); live verification via `stripe trigger`
    at E2E.
-4. **Customer Portal (BILLING-4).** Portal redirect; changes reconcile via the webhook from step 3.
+4. ✅ **Customer Portal (BILLING-4).** — DONE. `POST /api/billing/portal` (owner-only) → portal redirect
+   from the tenant's stored Stripe customer id; changes reconcile via the BILLING-3 webhook.
 5. **Quotas (BILLING-5).** `IQuotaService` + seat check wired into the invitation path; a
    `BillingDataContributor : ITenantDataContributor` that cancels the Stripe subscription and wipes
    the projection on tenant dissolve.

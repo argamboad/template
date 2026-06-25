@@ -44,6 +44,20 @@ public sealed class StripeBillingProvider(IOptions<StripeSettings> options) : IB
         return new BillingCheckoutSession(session.Url);
     }
 
+    public async Task<BillingPortalSession> CreatePortalSessionAsync(BillingPortalRequest request, CancellationToken cancellationToken = default)
+    {
+        var client = new StripeClient(_settings.SecretKey, apiBase: _settings.ApiBase);
+        var sessions = new Stripe.BillingPortal.SessionService(client);
+
+        var session = await sessions.CreateAsync(new Stripe.BillingPortal.SessionCreateOptions
+        {
+            Customer = request.StripeCustomerId,
+            ReturnUrl = request.ReturnUrl,
+        }, cancellationToken: cancellationToken);
+
+        return new BillingPortalSession(session.Url);
+    }
+
     public BillingWebhookEvent? ParseWebhookEvent(string payload, string? signature)
     {
         Event stripeEvent;

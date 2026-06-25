@@ -23,10 +23,19 @@ public sealed class FakeBillingProvider : IBillingProvider
     /// <summary>Every checkout request received, for assertions.</summary>
     public ConcurrentQueue<BillingCheckoutRequest> Requests { get; } = new();
 
+    /// <summary>Every portal request received, for assertions.</summary>
+    public ConcurrentQueue<BillingPortalRequest> PortalRequests { get; } = new();
+
     public Task<BillingCheckoutSession> CreateCheckoutSessionAsync(BillingCheckoutRequest request, CancellationToken cancellationToken = default)
     {
         Requests.Enqueue(request);
         return Task.FromResult(new BillingCheckoutSession($"https://billing.test/checkout/{request.TenantId}/{request.PlanKey}"));
+    }
+
+    public Task<BillingPortalSession> CreatePortalSessionAsync(BillingPortalRequest request, CancellationToken cancellationToken = default)
+    {
+        PortalRequests.Enqueue(request);
+        return Task.FromResult(new BillingPortalSession($"https://billing.test/portal/{request.StripeCustomerId}"));
     }
 
     public BillingWebhookEvent? ParseWebhookEvent(string payload, string? signature)
