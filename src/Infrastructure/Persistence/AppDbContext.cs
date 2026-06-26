@@ -37,6 +37,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     // it to the current tenant automatically.
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
+    // Append-only tenant audit trail (ADR-008). ITenantScoped (auto-filtered per tenant); writes are
+    // append-only via AuditAppendOnlyInterceptor.
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
     // 🗑️ DELETE-ME: sample feature set (remove with the Features/Notes slice).
     public DbSet<Note> Notes => Set<Note>();
 
@@ -47,7 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         base.OnConfiguring(optionsBuilder);
-        optionsBuilder.AddInterceptors(TenantStampingInterceptor.Instance);
+        optionsBuilder.AddInterceptors(TenantStampingInterceptor.Instance, AuditAppendOnlyInterceptor.Instance);
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -171,6 +175,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             s.Property(x => x.StripeSubscriptionId).HasMaxLength(256);
             // At most one subscription per tenant.
             s.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<AuditEvent>(a =>
+        {
+            a.HasKey(x => x.Id);
+            a.Property(x => x.Action).HasMaxLength(128).IsRequired();
+            a.Property(x => x.EntityType).HasMaxLength(128);
+            a.Property(x => x.EntityId).HasMaxLength(256);
+            a.Property(x => x.Metadata).HasColumnType("jsonb");
+            // Read pattern: a tenant's trail, newest first.
+            a.HasIndex(x => new { x.TenantId, x.CreatedAt });
         });
 
         // 🗑️ DELETE-ME: sample feature (remove with the Features/Notes slice). Implements

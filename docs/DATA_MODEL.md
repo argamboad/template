@@ -109,10 +109,13 @@ _TODO_
   `(source, idempotency_key)`**. `IInbox.TryClaimAsync` claims via `INSERT … ON CONFLICT DO NOTHING`
   inside the caller's transaction (claim + work commit together). Built as a separate ledger rather than
   an outbox `direction` column — see the ADR-007 amendment.
-- **`AuditEvent`** *(ADR-008 / `docs/stories/observability.md`)* — `ITenantScoped`, **append-only**;
+- **`AuditEvent`** *(ADR-008 / `docs/stories/observability.md`)* — ✅ **BUILT (OBS-4)**:
+  `src/Core/Entities/AuditEvent.cs`, migration `AddAuditEvent`. `ITenantScoped`, **append-only**;
   `actor_user_id`, `action`, `entity_type`, `entity_id`, `metadata` (jsonb), `created_at`. Written via
-  an EF interceptor (sibling of `TenantStampingInterceptor`) + explicit `IAuditLog.Record`. No
-  secrets/PII in `metadata`. Dissolve vs retention: export-then-wipe if legal-hold is required.
+  explicit `IAuditLog.RecordAsync` (stages on the caller's unit of work); append-only enforced by
+  `AuditAppendOnlyInterceptor` (throws on tracked update/delete). `AuditDataContributor` purges on
+  dissolve (set-based delete bypasses the guard). No secrets/PII in `metadata`. Dissolve vs retention:
+  export-then-wipe if legal-hold is required (GDPR backlog).
 - Further future entities (RBAC roles, `ApiKey`, `Notification`, webhook subscriptions) are scoped in
   `docs/PLATFORM_BACKLOG.md`.
 - _TODO_

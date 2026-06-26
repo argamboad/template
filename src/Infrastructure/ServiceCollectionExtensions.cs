@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Template.Core.Abstractions;
 using Template.Core.Repositories;
+using Template.Infrastructure.Audit;
 using Template.Infrastructure.Billing;
 using Template.Infrastructure.Email;
 using Template.Infrastructure.Inbox;
@@ -64,6 +65,10 @@ public static class ServiceCollectionExtensions
         // Inbox dedup gate — idempotent inbound (webhook) deliveries (ADR-007). Used inline by the
         // receiving endpoint inside its unit of work; no background service.
         services.AddScoped<IInbox, EfInbox>();
+
+        // Append-only tenant audit log (ADR-008) + its dissolve hook.
+        services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<ITenantDataContributor, AuditDataContributor>();
 
         // Scheduled/recurring jobs (ADR-007). The host ticks and runs each IScheduledJob on its own
         // interval; add a job by registering IScheduledJob (no host edits). Jobs are scoped so they
