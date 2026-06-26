@@ -103,7 +103,8 @@ deferred items without an explicit decision.
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
 | `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web/desktop/Android (smoke + regression) |
-| `docs/PLATFORM_BACKLOG.md` | Future foundation slices not yet ADR'd (GDPR, RBAC, files, MFA, webhooks, public API, admin, cache) |
+| `docs/ROADMAP.md` | Sequenced plan — pillars done (JOBS/BILLING/OBS) + the next waves (RBAC, files, GDPR, MFA, …) |
+| `docs/PLATFORM_BACKLOG.md` | Per-item design sketches for the future foundation slices (the detail behind ROADMAP) |
 | `docs/stories/` | User stories per epic — generated at build time |
 | `docs/stories/billing.md` | epic `BILLING` — entitlements + Checkout + webhook + Portal (BILLING-1–4 ✅); quotas/dunning pending (ADR-006) |
 | `docs/stories/async-jobs.md` | epic `JOBS` ✅ COMPLETE — outbox+dispatcher, inbox, scheduler (ADR-007) |
