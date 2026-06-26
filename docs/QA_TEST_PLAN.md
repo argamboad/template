@@ -33,8 +33,10 @@ docker compose up -d                                   # Postgres + Mailpit
 dotnet run --project src/Api --launch-profile https    # binds https:7160 (web/desktop) AND http:5238 (android)
 ```
 
-- API health check: `curl -k -X POST https://localhost:7160/api/auth/refresh` returns **401**
-  (a reachable API with no session) — *not* a connection error.
+- API health/liveness check: `curl -k https://localhost:7160/health` → **200** (`Healthy`);
+  `curl -k https://localhost:7160/health/ready` → **200** when the database is reachable (503 if not).
+  *(The older `curl -k -X POST https://localhost:7160/api/auth/refresh` → **401** reachability check
+  still works.)*
 - **Mailpit UI: <http://localhost:8025>** — this is the dev mail trap. Every magic link, OTP code,
   and invitation email lands here. Keep it open in a tab throughout testing.
   > ⚠️ **Email only reaches Mailpit if SMTP points at it.** If your repo-root `.env` has the
@@ -48,6 +50,12 @@ dotnet run --project src/Api --launch-profile https    # binds https:7160 (web/d
   >     --Email:Smtp:Host=localhost --Email:Smtp:Port=1025 --Email:Smtp:Username= --Email:Smtp:Password=
   >   ```
   > Verify by triggering one OTP (QA-SMK-01) and confirming it appears in Mailpit before running the suite.
+  > ⚠️ **Email delivery is now asynchronous.** Requesting a code/link/invite **enqueues** the email and
+  > a background dispatcher (the outbox) sends it — so it appears in Mailpit **a few seconds later, not
+  > instantly**. Wait briefly before assuming failure. The send request now **always returns success**
+  > (reliability moved to the background): if an email never arrives while SMTP points at Mailpit, the
+  > message is retrying or dead-lettered in the `OutboxMessages` table — it is **no longer** surfaced as
+  > a request error.
 - Web app: `dotnet run --project src/Web --launch-profile https` → **<https://localhost:7008>**.
   > ⚠️ Always use the **https** profile for both web and API. Chrome treats `http://localhost` and
   > `https://localhost` as different sites, so the refresh cookie is dropped over http and sign-in
@@ -96,6 +104,12 @@ transactional emails, and cross-cutting security (tenant isolation, auth guards,
 **Out of scope (per `docs/PROJECT_BRIEF.md` OUT list & current state):** SMS OTP, OAuth providers
 beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — see
 `docs/LOCALIZATION.md`), and any app-specific domain features not yet built on this template.
+
+**Platform services with no client UI (API-/operational-level, not manually testable through the app
+yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
+health endpoints, and the background outbox/inbox/scheduled-jobs. These are **covered by automated
+tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual cases for the
+rest will be added when client UI exists.
 
 ---
 
@@ -170,6 +184,22 @@ Then I am still signed in without re-authenticating
 
 ### QA-SMK-05 — Desktop: OTP sign-in 🔴 (Desktop) — see QA-DSK-01
 ### QA-SMK-06 — Android: OTP sign-in 🔴 (Android) — see QA-AND-01
+
+### QA-SMK-07 — API health & readiness 🔴 (Platform)
+**Gherkin**
+```gherkin
+Given the API is running
+When I GET /health and /health/ready
+Then /health returns 200 "Healthy"
+And /health/ready returns 200 when the database is reachable, 503 when it is not
+```
+**Walkthrough**
+1. `curl -k https://localhost:7160/health` → **200**, body `Healthy` (liveness — process up).
+2. `curl -k https://localhost:7160/health/ready` → **200** (readiness — Postgres reachable).
+3. *(Optional)* stop the DB (`docker compose stop db`) and re-run step 2 → **503**; then
+   `docker compose start db` and confirm it returns to **200**.
+4. **Expected:** liveness is 200 whenever the process runs; readiness tracks DB reachability.
+   Responses are **status-only** (no connection details leaked).
 
 ---
 
@@ -624,6 +654,10 @@ Then the email arrives in Spanish
 
 ## 11. Emails (Mailpit) — branding & content 🟠
 
+> **Delivery is asynchronous** (the outbox dispatcher) — emails land in Mailpit a few seconds after the
+> triggering action, and the send request succeeds regardless (see §1.1). Wait briefly before opening
+> Mailpit; a missing email is a delayed/retrying/dead-lettered outbox message, not a request failure.
+
 ### QA-MAIL-01 — OTP email is branded & correct 🟠
 **Gherkin**
 ```gherkin
@@ -845,6 +879,10 @@ the API directly:
 | Localization | I18N-01..04 | `PUT /api/auth/locale` (+ resx) |
 | Emails / branding | MAIL-01..04, I18N-04 | (SMTP via Mailpit) |
 | Tenant isolation / auth guards | SEC-01..05 | (all `[Authorize]` endpoints; write-stamping + reuse detection are automated) |
+| Platform health / readiness | SMK-07 | `GET /health`, `GET /health/ready` |
+| Transactional email delivery | (all email cases) | async via the outbox dispatcher (`OutboxMessages`) |
+| Billing (API-only, no UI) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
+| Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -885,3 +923,13 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   (Microsoft trusted only on the `consumers` tenant; work/school + unknown providers fail closed —
   audit MITI-3); and QA-SEC-05 adds the **legacy refresh-cookie self-heal** as automated coverage
   (`CookieServiceTests`).
+- **Updated 2026-06-26** for the platform-foundation work (JOBS/BILLING/OBS, ADR-006/007/008):
+  - **Transactional email is now delivered asynchronously** via the outbox dispatcher — a few-second
+    delay, and the send request always succeeds (reliability moved to the background). Affects every
+    email-based case; see the §1.1 and §11 notes. The E2E `AuthFlowTests` (which reads OTP codes from
+    Mailpit) now traverses this async path — confirm it waits/polls for the email rather than assuming
+    instant delivery.
+  - Added **API health/readiness** endpoints + smoke case **QA-SMK-07** (`/health`, `/health/ready`).
+  - The **billing API** (checkout/portal/webhook), the **append-only audit log**, and **OpenTelemetry**
+    telemetry are API-/operational-level with **no client UI** — covered by `tests/Api.Tests`, E2E
+    pending; manual cases will follow when UI exists (see §2 + §15).
