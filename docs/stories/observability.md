@@ -2,9 +2,9 @@
 
 > One file per epic. Two complementary concerns shipped together: **operational observability**
 > (structured logging, OpenTelemetry traces/metrics, health endpoints) and a tenant-scoped,
-> append-only **audit log**. **Status: IN PROGRESS** — **OBS-1, 2 & 3 shipped** (structured logging
-> with tenant/user enrichment; OpenTelemetry traces/metrics with tenant-tagged spans; health/readiness
-> endpoints). **OBS-4 (tenant audit log) is the last slice.** Design decision and constraints in
+> append-only **audit log**. **Status: ✅ COMPLETE** — OBS-1 (structured logging + tenant/user
+> enrichment), OBS-2 (OpenTelemetry traces/metrics with tenant-tagged spans), OBS-3 (health/readiness
+> endpoints), and OBS-4 (append-only tenant audit log) all shipped. Design decision and constraints in
 > **ADR-008**. Stories use Gherkin acceptance criteria.
 >
 > **Audit ≠ logs.** Audit is durable, queryable, exportable **tenant data** (compliance). Logs/traces
@@ -148,6 +148,17 @@ working.
 
 ### OBS-4 — Tenant-scoped audit log
 
+**Status: ✅ Implemented** (`feat/obs-4-audit-log`). `AuditEvent : ITenantScoped`
+(`src/Core/Entities/`, jsonb `metadata`, migration `AddAuditEvent`); `IAuditLog.RecordAsync` +
+`src/Infrastructure/Audit/AuditLog.cs` (stages the event on the caller's unit of work — atomic with the
+audited change, like the outbox); **append-only** enforced by `AuditAppendOnlyInterceptor` (sibling of
+`TenantStampingInterceptor`, wired in `AppDbContext.OnConfiguring` — throws on tracked update/delete);
+`AuditDataContributor` purges on dissolve via set-based delete (bypasses the append-only guard).
+Auto-filtered per tenant. Tests `tests/Api.Tests/AuditLogTests.cs`. **Scope note:** the *declarative*
+SaveChanges-interceptor auto-audit (ADR-008) was **not** built — the explicit `IAuditLog.Record` covers
+semantic events (the real need); auto-auditing every entity change is noisy/speculative and is left as a
+future extension.
+
 **As a** tenant owner / compliance reviewer
 **I want** a durable trail of security-relevant actions in my tenant
 **So that** I can answer "who did what, when" for membership and billing changes
@@ -208,10 +219,11 @@ Ordered, each a mergeable vertical slice. TDD throughout.
 3. ✅ **Health checks (OBS-3).** — DONE. `AddHealthChecks().AddCheck<DatabaseHealthCheck>(... tags ["ready"])`
    (custom `CanConnectAsync` check, zero new deps — no Xabaril package); `/health` (liveness) +
    `/health/ready` (readiness); status-only responses.
-4. **Audit log (OBS-4).** `Core/Entities/AuditEvent.cs : ITenantScoped` + EF config + migration;
-   `AuditInterceptor` (sibling of `TenantStampingInterceptor`, wired in `AppDbContext.OnConfiguring`
-   so tests enforce it too); `IAuditLog.Record(...)`; append-only guard; an
-   `AuditDataContributor : ITenantDataContributor` for dissolve.
+4. ✅ **Audit log (OBS-4).** — DONE. `AuditEvent : ITenantScoped` + EF config (jsonb) + migration;
+   `IAuditLog.RecordAsync` (stages on the caller's UoW); `AuditAppendOnlyInterceptor` (sibling of
+   `TenantStampingInterceptor`, wired in `OnConfiguring` so tests enforce it too) throws on
+   update/delete; `AuditDataContributor` for dissolve. Declarative auto-audit interceptor deferred
+   (explicit `Record` covers semantic events).
 
 **Known sharp edges (from ADR-008):** keep audit (durable tenant data) and logs (telemetry)
 separate; health endpoints must not leak internals; never put secrets/PII in spans or audit
