@@ -5,6 +5,9 @@
 > re-discovering the shape. When one is taken on, write its ADR in `DECISIONS.md`, its stories in
 > `docs/stories/<epic>.md` (Gherkin), and remove/strike it here.
 >
+> **For the priority *ordering* of these items (waves + sizes + which deps are already satisfied), see
+> `docs/ROADMAP.md`.** This file holds the per-item design detail behind that sequence.
+>
 > The **three prioritized moves already have ADRs + story files** and are *not* in this list:
 > - Billing & subscriptions + entitlements + quotas → **ADR-006**, `docs/stories/billing.md`
 > - Outbox / inbox / scheduled jobs → **ADR-007**, `docs/stories/async-jobs.md`
