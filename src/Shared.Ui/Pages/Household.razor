@@ -32,7 +32,7 @@
         <div class="card shadow-sm mb-3">
             <div class="card-body">
                 @* ── Name ── *@
-                @if (IsOwner)
+                @if (CanRename)
                 {
                     <label class="form-label fw-medium">@Localizer["Household_NameLabel"]</label>
                     <div class="d-flex gap-2 flex-wrap">
@@ -64,19 +64,41 @@
                                     <div class="small text-muted">@m.Email</div>
                                 }
                             </div>
-                            <div class="d-flex align-items-center gap-3">
+                            <div class="d-flex align-items-center gap-2">
                                 @if (m.Role == "owner")
                                 {
                                     <span class="badge bg-primary-subtle text-primary-emphasis">@Localizer["Household_RoleOwner"]</span>
+                                }
+                                else if (m.Role == "admin")
+                                {
+                                    <span class="badge bg-info-subtle text-info-emphasis">@Localizer["Household_RoleAdmin"]</span>
                                 }
                                 else
                                 {
                                     <span class="badge bg-secondary-subtle text-secondary-emphasis">@Localizer["Household_RoleMember"]</span>
                                 }
-                                @if (IsOwner && m.UserId != _myUserId)
+                                @* Actions target everyone but the owner, and never self. Roles are owner-only
+                                   (ManageRoles); remove is owner+admin (ManageMembers). *@
+                                @if (m.UserId != _myUserId && m.Role != "owner")
                                 {
-                                    <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => RemoveMember(m)">@Localizer["Household_Remove"]</button>
+                                    @if (CanManageRoles)
+                                    {
+                                        @if (m.Role == "admin")
+                                        {
+                                            <button class="btn btn-outline-secondary btn-sm" disabled="@_busy"
+                                                    @onclick="() => Demote(m)">@Localizer["Household_MakeMember"]</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-outline-secondary btn-sm" disabled="@_busy"
+                                                    @onclick="() => Promote(m)">@Localizer["Household_MakeAdmin"]</button>
+                                        }
+                                    }
+                                    @if (CanManageMembers)
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
+                                                @onclick="() => RemoveMember(m)">@Localizer["Household_Remove"]</button>
+                                    }
                                 }
                             </div>
                         </li>
@@ -85,8 +107,8 @@
             </div>
         </div>
 
-        @* ── Invitations (owner only) ── *@
-        @if (IsOwner)
+        @* ── Invitations (owner + admin — ManageMembers) ── *@
+        @if (CanManageMembers)
         {
             <div class="card shadow-sm mb-3">
                 <div class="card-body">
@@ -188,7 +210,13 @@
     private string? _revealedToken;
     private string? _revealedEmail;
 
+    // Client-side mirror of the RolePermissions matrix (ADR-009). The API is the real gate; this just
+    // shows/hides controls so the UI matches what the caller can actually do.
     private bool IsOwner => _household?.MyRole == "owner";
+    private bool IsAdmin => _household?.MyRole == "admin";
+    private bool CanRename => IsOwner || IsAdmin;        // RenameTenant
+    private bool CanManageMembers => IsOwner || IsAdmin; // ManageMembers (invite / remove)
+    private bool CanManageRoles => IsOwner;              // ManageRoles (promote / demote) — owner only
     private List<Member> OtherMembers =>
         _household?.Members.Where(m => m.UserId != _myUserId).ToList() ?? new();
 
@@ -210,7 +238,7 @@
         {
             _household = await Http.GetFromJsonAsync<TenantView>("/api/household");
             _name = _household?.Name ?? "";
-            if (IsOwner)
+            if (CanManageMembers)
                 _pending = await Http.GetFromJsonAsync<List<Invitation>>("/api/household/invitations") ?? new();
             else
                 _pending = new();
@@ -322,6 +350,25 @@
                 await Reload();
             }
             else { SetStatus(Localizer["Household_ErrRemoveMember"], false); }
+        }
+        finally { _busy = false; }
+    }
+
+    private Task Promote(Member m) => ChangeRole(m, "admin");
+    private Task Demote(Member m) => ChangeRole(m, "member");
+
+    private async Task ChangeRole(Member m, string role)
+    {
+        _busy = true;
+        try
+        {
+            var resp = await Http.PutAsJsonAsync($"/api/household/members/{m.UserId}/role", new { role });
+            if (resp.IsSuccessStatusCode)
+            {
+                SetStatus(Localizer["Household_StatusRoleChanged"], true);
+                await Reload();
+            }
+            else { SetStatus(Localizer["Household_ErrRoleChange"], false); }
         }
         finally { _busy = false; }
     }

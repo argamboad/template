@@ -27,7 +27,7 @@ sequenced below by value, not by dependency.
 
 | Item | Epic | Size | Why first | Deps |
 |------|------|------|-----------|------|
-| **RBAC** (admin role + permission seam) — ✅ *API done* · roster UI = RBAC-3 follow-up (ADR-009, `stories/rbac.md`) | `RBAC` | M | B2B table stakes; unblocks Admin + Public API | ready |
+| **RBAC** (admin role + permission seam + roster UI) — ✅ *COMPLETE* (RBAC-1/2/3; ADR-009, `stories/rbac.md`) | `RBAC` | M | B2B table stakes; unblocks Admin + Public API | ready |
 | **File storage** (`IFileStorage`: local / S3 / Azure Blob) | `FILES` | S–M | Avatars, attachments, and the GDPR export artifact all need it | ready |
 
 ## Wave 2 — Compliance & security (enterprise table stakes)
