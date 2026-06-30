@@ -22,7 +22,7 @@
 |---|------|----------|----------------------|-----------|
 | 1 | Account & data lifecycle (GDPR) | `GDPR` | Legal exposure the moment you have EU users; reuses tenant scoping | Audit (ADR-008) for export completeness |
 | 2 | ~~RBAC beyond owner/member~~ → **being built** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
-| 3 | File / blob storage | `FILES` | Avatars/attachments/exports all block on it | none |
+| 3 | ~~File / blob storage~~ → **being built** (ADR-010, `stories/files.md`) | `FILES` | Avatars/attachments/exports all block on it | none |
 | 4 | MFA / TOTP 2FA | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
 | 5 | In-app notifications | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
 | 6 | Outbound webhooks (customer-facing) | `HOOKS` | Integration story for *your* customers | Outbox (ADR-007) required |
@@ -57,15 +57,18 @@ two-role `TenantMembership.Role`.
 (sibling of `RequireEntitlement`, → 403). "Exactly one owner" preserved; role read live from
 membership (no JWT claim). Pairs with `ADMIN` and `PUBAPI`.
 
-## 3. File / blob storage — `FILES`
+## 3. File / blob storage — `FILES` → **TAKEN ON (ADR-010)**
+> **Now an active epic** — design decided in **ADR-010**, stories + slice plan in
+> `docs/stories/files.md`. The sketch below is retained for context; the ADR supersedes it.
+
 **What:** an `IFileStorage` Core abstraction (put/get/delete/signed-url) with a local-disk dev impl
-and an S3/Azure-Blob prod impl.
+and an S3-compatible prod impl.
 **Why:** avatars, attachments, and the GDPR export artifact all need somewhere to live.
-**Sketch / hooks:** mirror the `IEmailSender` → `SmtpEmailSender` shape (Core abstraction +
-Infrastructure impl, registered in `ServiceCollectionExtensions` by config presence). Tenant-scope
-object keys (`{tenantId}/...`) and enforce it server-side; never trust client paths. Stream, don't
-buffer. Prefer signed URLs over proxying bytes through the API.
-**Deps:** none.
+**Resolved (ADR-010):** `IFileStorage` (streaming) mirrors the `IEmailSender` shape; **tenant-scoped
+keys** (`{tenantId}/…`) validated server-side (traversal/cross-tenant rejected); **config-gated** impls
+(local-disk default, S3-compatible when configured — Stripe-vs-Fake switch); **signed time-limited
+download URLs** (native presigned for cloud; `ITimeLimitedDataProtector` token + `GET /api/files/{token}`
+for local). Slices FILES-1 (abstraction+local) → FILES-2 (signed download) → FILES-3 (S3).
 
 ## 4. MFA / TOTP 2FA — `MFA`
 **What:** authenticator-app TOTP as a second factor (and recovery codes).
