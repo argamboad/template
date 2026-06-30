@@ -11,9 +11,13 @@ namespace Template.Infrastructure.Files;
 /// the tenant directory, so a crafted key can't read or write outside the tenant namespace. Streams
 /// to/from disk — never buffers a whole file. With no current tenant it fails closed.
 /// </summary>
-public sealed class LocalDiskFileStorage(IOptions<LocalFileStorageSettings> options, ICurrentTenant currentTenant) : IFileStorage
+public sealed class LocalDiskFileStorage(
+    IOptions<LocalFileStorageSettings> options,
+    ICurrentTenant currentTenant,
+    IFileDownloadTokenizer tokenizer) : IFileStorage
 {
     private readonly string _root = ResolveRoot(options.Value.RootPath);
+    private readonly string _downloadBaseUrl = options.Value.DownloadBaseUrl;
 
     public async Task PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default)
     {
@@ -50,6 +54,20 @@ public sealed class LocalDiskFileStorage(IOptions<LocalFileStorageSettings> opti
         if (File.Exists(blob)) File.Delete(blob);
         if (File.Exists(meta)) File.Delete(meta);
         return Task.CompletedTask;
+    }
+
+    public Task<Uri> GetDownloadUrlAsync(string key, TimeSpan lifetime, CancellationToken cancellationToken = default)
+    {
+        var tenantId = currentTenant.TenantId
+            ?? throw new InvalidOperationException("No current tenant — file storage requires a tenant context.");
+        ValidateKey(key); // don't mint a URL for a key we'd refuse to serve
+
+        var token = tokenizer.Mint(tenantId, key, lifetime);
+        var relative = $"api/files/{token}";
+        var uri = string.IsNullOrWhiteSpace(_downloadBaseUrl)
+            ? new Uri(relative, UriKind.Relative)
+            : new Uri(new Uri(_downloadBaseUrl, UriKind.Absolute), relative);
+        return Task.FromResult(uri);
     }
 
     private static string ResolveRoot(string configured) =>
