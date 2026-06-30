@@ -10,9 +10,10 @@ namespace Template.Api.Controllers;
 /// Tenant ("household") management. Authorization goes through the permission seam (ADR-009):
 /// reading needs <see cref="Permission.ViewTenant"/> (every member); rename needs
 /// <see cref="Permission.RenameTenant"/> and remove-member needs <see cref="Permission.ManageMembers"/>
-/// (owner/admin); transfer needs <see cref="Permission.TransferOwnership"/> (owner only). Leave is open
-/// to any member. The caller's role is read from the membership, never from the request. Invitations
-/// live in <see cref="HouseholdInvitationsController"/>.
+/// (owner/admin); transfer needs <see cref="Permission.TransferOwnership"/> and changing a member's
+/// role (admin↔member) needs <see cref="Permission.ManageRoles"/> (both owner only). Leave is open to
+/// any member. The caller's role is read from the membership, never from the request. Invitations live
+/// in <see cref="HouseholdInvitationsController"/>.
 /// </summary>
 [ApiController]
 [Route("api/household")]
@@ -87,9 +88,41 @@ public class HouseholdController(
                 "You cannot remove yourself — transfer ownership or leave instead"));
 
         var result = await service.RemoveMemberAsync(membership.TenantId, userId, cancellationToken);
-        return result == RemoveMemberResult.Removed
-            ? NoContent()
-            : NotFound(ErrorFactory.CreateError("member_not_found", "That user is not a member of this household"));
+        return result switch
+        {
+            RemoveMemberResult.Removed => NoContent(),
+            RemoveMemberResult.CannotRemoveOwner => BadRequest(ErrorFactory.CreateError(
+                "cannot_remove_owner", "The household owner can't be removed — transfer ownership first")),
+            _ => NotFound(ErrorFactory.CreateError("member_not_found", "That user is not a member of this household")),
+        };
+    }
+
+    /// <summary>Changes a member's role between admin and member (owner only — ManageRoles).</summary>
+    [HttpPut("members/{userId:guid}/role")]
+    public async Task<IActionResult> ChangeMemberRole(Guid userId, [FromBody] ChangeMemberRoleRequest request, CancellationToken cancellationToken)
+    {
+        var membership = await GetMembershipAsync(cancellationToken);
+        if (membership == null)
+            return InvalidToken();
+        if (RequirePermission(membership, Permission.ManageRoles, "Only the household owner can change member roles") is { } forbidden)
+            return forbidden;
+
+        var result = await service.ChangeMemberRoleAsync(
+            membership.TenantId, membership.UserId, userId, request.Role ?? "", cancellationToken);
+        return result switch
+        {
+            ChangeRoleResult.Changed or ChangeRoleResult.Unchanged => NoContent(),
+            ChangeRoleResult.TargetNotMember => NotFound(ErrorFactory.CreateError(
+                "member_not_found", "That user is not a member of this household")),
+            ChangeRoleResult.CannotChangeOwner => BadRequest(ErrorFactory.CreateError(
+                "cannot_change_owner", "The owner's role can't be changed here — use transfer ownership")),
+            ChangeRoleResult.CannotChangeSelf => BadRequest(ErrorFactory.CreateError(
+                "invalid_request", "You cannot change your own role")),
+            ChangeRoleResult.InvalidRole => BadRequest(ErrorFactory.CreateError(
+                "invalid_role", "Role must be 'admin' or 'member'")),
+            _ => StatusCode(StatusCodes.Status500InternalServerError,
+                ErrorFactory.CreateError("internal_error", "Unexpected role-change result")),
+        };
     }
 
     /// <summary>Transfers ownership to an existing member (owner only).</summary>

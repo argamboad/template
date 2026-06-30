@@ -19,6 +19,12 @@ public record LeaveTenantRequest
     [JsonPropertyName("confirm_dissolve")] public bool ConfirmDissolve { get; init; }
 }
 
+public record ChangeMemberRoleRequest
+{
+    /// <summary>The target role — <c>admin</c> or <c>member</c> only (owner is conferred via transfer).</summary>
+    [JsonPropertyName("role")] public string? Role { get; init; }
+}
+
 public record TenantMemberResponse
 {
     [JsonPropertyName("user_id")] public required Guid UserId { get; init; }

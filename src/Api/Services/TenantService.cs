@@ -4,8 +4,25 @@ using Template.Core.Repositories;
 
 namespace Template.Api.Services;
 
-public enum RemoveMemberResult { Removed, NotAMember }
+public enum RemoveMemberResult { Removed, NotAMember, CannotRemoveOwner }
 public enum TransferResult { Transferred, TargetNotMember, ConcurrentModification }
+
+/// <summary>Outcome of a member role change (RBAC-2, ADR-009).</summary>
+public enum ChangeRoleResult
+{
+    /// <summary>The role was changed (and audited).</summary>
+    Changed,
+    /// <summary>The target already had that role — no-op, not audited.</summary>
+    Unchanged,
+    /// <summary>The target user is not a member of this tenant.</summary>
+    TargetNotMember,
+    /// <summary>The requested role is not assignable here (only <c>admin</c>/<c>member</c>).</summary>
+    InvalidRole,
+    /// <summary>The owner's role can't be changed here — ownership moves via transfer.</summary>
+    CannotChangeOwner,
+    /// <summary>A caller can't change their own role.</summary>
+    CannotChangeSelf,
+}
 
 /// <summary>Outcome of a leave attempt.</summary>
 public enum LeaveOutcome
@@ -33,9 +50,18 @@ public interface ITenantService
     /// <summary>
     /// Removes a member from the tenant and lands them in a fresh tenant-of-one
     /// (owner) so they are never tenant-less. Their contributed data stays with
-    /// the tenant.
+    /// the tenant. The owner is never removable here (single-owner invariant) —
+    /// they leave via transfer/dissolve.
     /// </summary>
     Task<RemoveMemberResult> RemoveMemberAsync(Guid tenantId, Guid targetUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Changes a member's role between <c>admin</c> and <c>member</c> (RBAC-2, ADR-009). The owner role
+    /// is never set or cleared here (ownership moves via <see cref="TransferOwnershipAsync"/>), the owner
+    /// is never targeted, and a caller can't change their own role. A real change is recorded in the audit
+    /// log atomically with the update; setting the role the member already has is an idempotent no-op.
+    /// </summary>
+    Task<ChangeRoleResult> ChangeMemberRoleAsync(Guid tenantId, Guid actorUserId, Guid targetUserId, string newRole, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Transfers ownership to an existing member — the target becomes owner, the
@@ -58,7 +84,8 @@ public class TenantService(
     IUnitOfWork unitOfWork,
     IEnumerable<ITenantDataContributor> dataContributors,
     TimeProvider clock,
-    ILogger<TenantService> logger) : ITenantService
+    ILogger<TenantService> logger,
+    IAuditLog audit) : ITenantService
 {
     // The tenant a re-homed user lands in (UI label is "Household").
     private const string ReHomeTenantName = "My Household";
@@ -79,6 +106,11 @@ public class TenantService(
         if (membership == null || membership.TenantId != tenantId)
             return RemoveMemberResult.NotAMember;
 
+        // The owner is never removable here — that would orphan the tenant (single-owner invariant).
+        // Now that admins hold ManageMembers (RBAC-2), guard this server-side, not just in the UI.
+        if (string.Equals(membership.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase))
+            return RemoveMemberResult.CannotRemoveOwner;
+
         // Drop the membership and re-home the user atomically.
         await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
 
@@ -89,6 +121,57 @@ public class TenantService(
         logger.LogInformation("Member {UserId} removed from tenant {TenantId}; re-homed",
             targetUserId, tenantId);
         return RemoveMemberResult.Removed;
+    }
+
+    public async Task<ChangeRoleResult> ChangeMemberRoleAsync(Guid tenantId, Guid actorUserId, Guid targetUserId, string newRole, CancellationToken cancellationToken = default)
+    {
+        // Only admin/member are assignable here; owner is conferred via transfer (ADR-009).
+        if (!TryNormalizeAssignableRole(newRole, out var normalized))
+            return ChangeRoleResult.InvalidRole;
+        if (targetUserId == actorUserId)
+            return ChangeRoleResult.CannotChangeSelf;
+
+        var membership = await tenants.GetMembershipAsync(targetUserId, cancellationToken);
+        if (membership == null || membership.TenantId != tenantId)
+            return ChangeRoleResult.TargetNotMember;
+
+        // The owner's role is never changed here — ownership moves via transfer only.
+        if (string.Equals(membership.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase))
+            return ChangeRoleResult.CannotChangeOwner;
+
+        if (string.Equals(membership.Role, normalized, StringComparison.OrdinalIgnoreCase))
+            return ChangeRoleResult.Unchanged; // idempotent no-op — nothing to change or audit
+
+        var oldRole = membership.Role;
+        // Stage the audit event first, then persist both in one SaveChanges so the role change and its
+        // audit record commit atomically (the audit stages on the shared unit of work — ADR-008).
+        await audit.RecordAsync(
+            "member.role_changed", actorUserId, nameof(TenantMembership), membership.Id.ToString(),
+            new { user_id = targetUserId, from = oldRole, to = normalized }, cancellationToken);
+        membership.Role = normalized;
+        await tenants.UpdateMemberAsync(membership, cancellationToken);
+
+        logger.LogInformation("Tenant {TenantId} member {UserId} role {From} -> {To} by {Actor}",
+            tenantId, targetUserId, oldRole, normalized, actorUserId);
+        return ChangeRoleResult.Changed;
+    }
+
+    // The roles assignable via this endpoint, normalized to their canonical constant. Owner is
+    // intentionally excluded — it is conferred only through TransferOwnershipAsync.
+    private static bool TryNormalizeAssignableRole(string role, out string normalized)
+    {
+        if (string.Equals(role, TenantRoles.Admin, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = TenantRoles.Admin;
+            return true;
+        }
+        if (string.Equals(role, TenantRoles.Member, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = TenantRoles.Member;
+            return true;
+        }
+        normalized = string.Empty;
+        return false;
     }
 
     public async Task<TransferResult> TransferOwnershipAsync(Guid tenantId, Guid currentOwnerUserId, Guid targetUserId, CancellationToken cancellationToken = default)

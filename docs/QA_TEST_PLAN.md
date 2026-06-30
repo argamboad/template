@@ -107,9 +107,11 @@ beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — s
 
 **Platform services with no client UI (API-/operational-level, not manually testable through the app
 yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
-health endpoints, and the background outbox/inbox/scheduled-jobs. These are **covered by automated
-tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual cases for the
-rest will be added when client UI exists.
+health endpoints, the background outbox/inbox/scheduled-jobs, and **RBAC role management** — the
+`admin` tier + the owner-only role-change endpoint (`PUT /api/household/members/{id}/role`), API-only
+until its roster UI ships (RBAC-3). These are **covered by automated tests** (`tests/Api.Tests`); E2E
+is pending. Health has a smoke check (QA-SMK-07); manual cases for the rest will be added when client
+UI exists.
 
 ---
 
@@ -883,6 +885,7 @@ the API directly:
 | Transactional email delivery | (all email cases) | async via the outbox dispatcher (`OutboxMessages`) |
 | Billing (API-only, no UI) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
+| RBAC roles (admin tier, API-only) | covered by `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`); web roster UI + manual cases pending (RBAC-3) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -933,3 +936,12 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   - The **billing API** (checkout/portal/webhook), the **append-only audit log**, and **OpenTelemetry**
     telemetry are API-/operational-level with **no client UI** — covered by `tests/Api.Tests`, E2E
     pending; manual cases will follow when UI exists (see §2 + §15).
+- **Updated 2026-06-30** for RBAC (ADR-009): the tenant role model gains an **`admin`** tier behind a
+  permission seam (owner > admin > member). RBAC-1 added the seam (no behavior change); RBAC-2 added
+  the **owner-only role-change endpoint** (`PUT /api/household/members/{id}/role`, admin↔member; owner
+  is conferred only via transfer) and hardened member-removal so the **owner can't be removed**. This
+  is **API-only** for now — `admin` isn't assignable through the app until the roster UI ships
+  (RBAC-3), so the §7 web cases (still owner-vs-member) are unchanged and the coverage is automated
+  (`tests/Api.Tests`: `RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`).
+  Manual web cases (promote/demote; admin can invite/rename but not manage billing/roles; admin can't
+  remove the owner) land with RBAC-3.

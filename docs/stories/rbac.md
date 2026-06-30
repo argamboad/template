@@ -3,8 +3,9 @@
 > One file per epic. Adds a third tenant role (`admin`) **and** a permission seam so authorization
 > call sites ask *"can the caller do X?"* (a `Permission` capability) instead of *"is the caller the
 > owner?"*. Design decision, the permission matrix, and constraints in **ADR-009**. Stories use
-> Gherkin acceptance criteria. **Status: 🔲 in progress** — RBAC-1 (seam + matrix) ✅, RBAC-2
-> (role-change endpoint) 🔲.
+> Gherkin acceptance criteria. **Status: ✅ COMPLETE** — RBAC-1 (seam + matrix) ✅, RBAC-2
+> (role-change endpoint) ✅. The `admin` tier is API-only until its roster UI ships (tracked as a
+> follow-up, RBAC-3).
 
 **Epic key:** `RBAC`
 
@@ -93,7 +94,16 @@ working; ADR-009 referenced.
 
 ### RBAC-2 — Change a member's role (promote/demote)
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/rbac-2-role-change`). Owner-only `PUT /api/household/members/{userId}/role`
+on [`HouseholdController`](../../src/Api/Controllers/HouseholdController.cs) gated by
+`Permission.ManageRoles`; `TenantService.ChangeMemberRoleAsync` enforces the ADR-009 invariants (owner
+never set/cleared here — `InvalidRole`/`CannotChangeOwner`; no self-change; idempotent no-op) and
+records `member.role_changed` via `IAuditLog` **atomically** with the update (staged on the shared unit
+of work — first real audit producer). Member-removal hardened: `RemoveMemberResult.CannotRemoveOwner`
+so an admin (who now holds `ManageMembers`) can't orphan the tenant. Tests
+`tests/Api.Tests/Rbac/MemberRoleManagementTests.cs` (promote/demote + audit, every invariant, 403 for
+non-owner, 404, idempotency, owner-removal guard). **API-only** — the roster promote/demote UI is the
+RBAC-3 follow-up.
 
 **As a** tenant owner
 **I want** to promote a member to admin and demote an admin back to member
@@ -153,9 +163,15 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    and a `.RequirePermission(perm)` minimal-API endpoint filter (sibling of `RequireEntitlement`, →
    403) backed by `IPermissionService`. Refactored the `IsOwner` call sites onto it and removed
    `IsOwner` (one enforcement path). No behavior change (owner passes everything).
-2. 🔲 **Role-change endpoint (RBAC-2).** Owner-only `PUT /api/household/members/{userId}/role`
-   (or similar) moving a target between `admin`/`member`; ADR-009 invariants enforced; audited via
-   `IAuditLog`. Makes the RBAC-1 seam live.
+2. ✅ **Role-change endpoint (RBAC-2).** — DONE. Owner-only `PUT /api/household/members/{userId}/role`
+   moving a target between `admin`/`member`; ADR-009 invariants enforced (owner never via this path, no
+   self-change, idempotent no-op); audited via `IAuditLog` atomically; member-removal hardened against
+   removing the owner. API-only (roster UI deferred to RBAC-3). Makes the RBAC-1 seam live.
+
+3. 🔲 **Roster role-management UI (RBAC-3, follow-up).** Promote/demote control on the existing
+   Household roster (owner-only), wired to `PUT …/members/{id}/role`, with EN/ES strings; then the
+   web-level QA cases (promote/demote; admin can invite/rename but not billing/roles; admin can't
+   remove the owner). Out of the original two-slice plan — added because RBAC-2 shipped API-first.
 
 **Known sharp edges (from ADR-009):** keep the **exactly-one-owner** invariant — the role endpoint
 never touches `owner`; **no self-escalation / no lockout** (can't change own role, admin can't act on
