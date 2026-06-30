@@ -4,8 +4,7 @@
 > call sites ask *"can the caller do X?"* (a `Permission` capability) instead of *"is the caller the
 > owner?"*. Design decision, the permission matrix, and constraints in **ADR-009**. Stories use
 > Gherkin acceptance criteria. **Status: ✅ COMPLETE** — RBAC-1 (seam + matrix) ✅, RBAC-2
-> (role-change endpoint) ✅. The `admin` tier is API-only until its roster UI ships (tracked as a
-> follow-up, RBAC-3).
+> (owner-only role-change endpoint) ✅, RBAC-3 (admin-aware Household roster UI) ✅.
 
 **Epic key:** `RBAC`
 
@@ -168,10 +167,12 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    self-change, idempotent no-op); audited via `IAuditLog` atomically; member-removal hardened against
    removing the owner. API-only (roster UI deferred to RBAC-3). Makes the RBAC-1 seam live.
 
-3. 🔲 **Roster role-management UI (RBAC-3, follow-up).** Promote/demote control on the existing
-   Household roster (owner-only), wired to `PUT …/members/{id}/role`, with EN/ES strings; then the
-   web-level QA cases (promote/demote; admin can invite/rename but not billing/roles; admin can't
-   remove the owner). Out of the original two-slice plan — added because RBAC-2 shipped API-first.
+3. ✅ **Roster role-management UI (RBAC-3).** — DONE. Owner-only **Make admin / Make member** controls
+   on the Household roster (`Shared.Ui/Pages/Household.razor`), wired to `PUT …/members/{id}/role`, with
+   EN/ES strings + an **Admin** badge. Made the page **admin-aware** (client mirror of the matrix:
+   admin can rename + invite/remove members, but sees no role/transfer/dissolve controls; the owner row
+   never shows actions). Web QA cases **QA-HH-09..12** + both PDFs regenerated. Added after RBAC-2
+   shipped API-first.
 
 **Known sharp edges (from ADR-009):** keep the **exactly-one-owner** invariant — the role endpoint
 never touches `owner`; **no self-escalation / no lockout** (can't change own role, admin can't act on

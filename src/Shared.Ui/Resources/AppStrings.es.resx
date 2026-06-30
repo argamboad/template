@@ -122,7 +122,12 @@
   <data name="Household_Rename" xml:space="preserve"><value>Renombrar</value></data>
   <data name="Household_Members" xml:space="preserve"><value>Miembros</value></data>
   <data name="Household_RoleOwner" xml:space="preserve"><value>Propietario</value></data>
+  <data name="Household_RoleAdmin" xml:space="preserve"><value>Administrador</value></data>
   <data name="Household_RoleMember" xml:space="preserve"><value>Miembro</value></data>
+  <data name="Household_MakeAdmin" xml:space="preserve"><value>Hacer administrador</value></data>
+  <data name="Household_MakeMember" xml:space="preserve"><value>Hacer miembro</value></data>
+  <data name="Household_StatusRoleChanged" xml:space="preserve"><value>Rol actualizado.</value></data>
+  <data name="Household_ErrRoleChange" xml:space="preserve"><value>No se pudo actualizar el rol. Inténtalo de nuevo.</value></data>
   <data name="Household_Remove" xml:space="preserve"><value>Eliminar</value></data>
   <data name="Household_Invitations" xml:space="preserve"><value>Invitaciones</value></data>
   <data name="Household_Invite" xml:space="preserve"><value>Invitar</value></data>

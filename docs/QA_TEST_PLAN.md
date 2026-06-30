@@ -107,11 +107,10 @@ beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — s
 
 **Platform services with no client UI (API-/operational-level, not manually testable through the app
 yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
-health endpoints, the background outbox/inbox/scheduled-jobs, and **RBAC role management** — the
-`admin` tier + the owner-only role-change endpoint (`PUT /api/household/members/{id}/role`), API-only
-until its roster UI ships (RBAC-3). These are **covered by automated tests** (`tests/Api.Tests`); E2E
-is pending. Health has a smoke check (QA-SMK-07); manual cases for the rest will be added when client
-UI exists.
+health endpoints, and the background outbox/inbox/scheduled-jobs. These are **covered by automated tests**
+(`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual cases for the rest
+will be added when client UI exists. **RBAC role management now has a web UI** (RBAC-3) — covered by
+the household cases QA-HH-09..12.
 
 ---
 
@@ -371,8 +370,9 @@ data intact.
 
 ## 7. Web — Household management 🟠
 
-> Owner-only controls: rename, invite, remove member, transfer ownership, dissolve. Members see a
-> read-only name and a **Leave** button.
+> Roles: **owner** > **admin** > **member** (ADR-009). **Owner + admin** can rename and invite/remove
+> members; **owner-only**: change member roles (promote/demote), transfer ownership, dissolve. Members
+> see a read-only name and a **Leave** button. The owner's row never shows action buttons.
 
 ### QA-HH-01 — Owner renames the household 🟠 (Web)
 **Gherkin**
@@ -449,6 +449,51 @@ Then I leave the household and am re-homed to a fresh solo household I own
 1. As a member, **Household** → **Leave** → confirm.
 2. **Expected:** app reloads; you now own a brand-new empty household. The household you left still
    exists for its remaining members (verify as the owner: the leaver is gone from the member list).
+
+### QA-HH-09 — Owner promotes a member to admin 🟠 (Web)
+**Precondition:** signed in as the owner with at least one **member** present (use the QA-INV flow).
+**Gherkin**
+```gherkin
+Given I am the owner and another member exists
+When I click "Make admin" next to that member
+Then their badge changes to Admin
+```
+**Walkthrough**
+1. On **Household**, find a member's row → click **Make admin**.
+2. **Expected:** success banner ("Role updated."); the member's badge flips from **Member** to
+   **Admin**, and the button becomes **Make member**. (Verify as that user — see QA-HH-11.)
+
+### QA-HH-10 — Owner demotes an admin to member 🟠 (Web)
+**Gherkin**
+```gherkin
+Given I am the owner and an admin exists
+When I click "Make member" next to that admin
+Then their badge changes back to Member
+```
+**Walkthrough**
+1. On **Household**, on an **Admin** row → click **Make member**.
+2. **Expected:** success banner; the badge returns to **Member** and the button becomes **Make admin**.
+
+### QA-HH-11 — Admin sees management controls but not role/ownership controls 🟠 (Web)
+**Precondition:** signed in **as the admin** promoted in QA-HH-09.
+**Gherkin**
+```gherkin
+Given I am an admin (not the owner)
+When I open Household
+Then I can rename the household and invite/remove members
+But I see no promote/demote (role) controls and no transfer/dissolve — only Leave
+```
+**Walkthrough**
+1. As the admin, open **Household**.
+2. **Expected:** the **rename** field and the **Invitations** card are available; member rows show a
+   **Remove** button **but no Make admin/Make member** buttons (role changes are owner-only). The
+   bottom card shows **Leave** (no Transfer ownership / Leave & delete). The owner's row shows **no**
+   action buttons.
+
+### QA-HH-12 — Member sees no management controls 🟢 (Web)
+**Walkthrough:** signed in as a plain **member**, open **Household**. **Expected:** read-only name, no
+Invitations card, no per-row action buttons (no Remove/role controls), only a **Leave** button —
+unchanged from QA-HH-02 (a member is never shown management controls regardless of the admin tier).
 
 ---
 
@@ -885,7 +930,7 @@ the API directly:
 | Transactional email delivery | (all email cases) | async via the outbox dispatcher (`OutboxMessages`) |
 | Billing (API-only, no UI) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
-| RBAC roles (admin tier, API-only) | covered by `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`); web roster UI + manual cases pending (RBAC-3) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
+| RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -940,8 +985,7 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   permission seam (owner > admin > member). RBAC-1 added the seam (no behavior change); RBAC-2 added
   the **owner-only role-change endpoint** (`PUT /api/household/members/{id}/role`, admin↔member; owner
   is conferred only via transfer) and hardened member-removal so the **owner can't be removed**. This
-  is **API-only** for now — `admin` isn't assignable through the app until the roster UI ships
-  (RBAC-3), so the §7 web cases (still owner-vs-member) are unchanged and the coverage is automated
-  (`tests/Api.Tests`: `RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`).
-  Manual web cases (promote/demote; admin can invite/rename but not manage billing/roles; admin can't
-  remove the owner) land with RBAC-3.
+  was API-only at first; **RBAC-3 added the web UI** — the Household roster now has owner-only
+  **Make admin / Make member** controls, and the page is admin-aware (admin can rename + invite/remove
+  members, but sees no role/transfer/dissolve controls). New web cases **QA-HH-09..12**; §7 intro
+  updated for the three-tier model. API coverage stays automated (`tests/Api.Tests`).
