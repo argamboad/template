@@ -413,3 +413,53 @@ already established, makes the common case (add a permission, gate an endpoint) 
 the owner-only blast-radius items explicit. Pairs with the `ADMIN` (back-office/impersonation) and
 `PUBAPI` backlog items, which build on this seam.
 Stories + slice plan: `docs/stories/rbac.md` (epic `RBAC`).
+
+---
+
+**ADR-010 — File/blob storage: `IFileStorage` abstraction, local-disk dev default, config-gated S3-compatible prod impl; tenant-scoped keys; signed time-limited download URLs. (2026-06-30)**
+The template has no way to store binary content. Avatars, attachments, and the GDPR data-export
+artifact (backlog) all block on it, and every downstream app would otherwise re-invent file handling
+(and likely leak files across tenants). This adds one storage seam, mirroring the `IEmailSender` →
+`SmtpEmailSender` shape (Core abstraction + Infrastructure impl, registered by config presence).
+
+**Decision:**
+1. **`IFileStorage` (Core) is the only way to store/retrieve blobs** — `PutAsync`/`GetAsync`/
+   `DeleteAsync`/`ExistsAsync` + `GetDownloadUrlAsync`. It **streams, never buffers** whole files
+   (bound memory; large uploads/downloads). Features depend on this abstraction, never on a cloud SDK
+   or `System.IO` directly — the same rule as "never reference MailKit outside `Infrastructure/Email/`".
+2. **Keys are tenant-scoped and enforced server-side.** Every object key is namespaced `{tenantId}/…`
+   from `ICurrentTenant`; the storage layer **rejects** keys that escape the tenant prefix or contain
+   traversal (`..`, absolute/rooted paths, alternate separators). This is the blob equivalent of the
+   `ITenantScoped` global query filter (ADR-003): isolation is structural, not by-convention, and the
+   client path is never trusted. No `ICurrentTenant` (system context) ⇒ fail closed.
+3. **Two implementations, config-gated like the billing provider (ADR-006).** `LocalDiskFileStorage`
+   (root dir from config) is the **dev/test default** so the app boots and the suite runs with **zero
+   cloud setup**; an **S3-compatible** impl (`S3FileStorage`, AWS SDK — works with AWS S3, MinIO,
+   Cloudflare R2, DO Spaces) is selected when `Storage:S3:*` is configured, else local. Same
+   config-presence switch as Stripe-vs-Fake.
+4. **Signed, time-limited download URLs — never proxy bytes through the API for the common case.**
+   Cloud returns a **native presigned GET URL**. Local disk can't presign, so a **platform endpoint**
+   `GET /api/files/{token}` verifies a short-lived token minted with `ITimeLimitedDataProtector` (the
+   Data Protection stack is already wired, keys persisted to the DB) and streams the file
+   tenant-checked. `GetDownloadUrlAsync` returns the right URL per impl — a **uniform contract** so
+   feature code never branches on the backend.
+5. **Uploads flow through `IFileStorage.PutAsync` from feature services.** The template ships the
+   abstraction + both impls + the download surface; it does **not** prescribe what gets stored or wire
+   an upload endpoint to a specific entity (that's a vertical/app concern — horizontal-only template).
+
+**Constraints recorded:**
+1. **Tenant isolation is structural** — keys carry the tenant; the layer refuses cross-tenant or
+   traversal keys. A feature passes a logical key; the layer prepends/validates the tenant prefix.
+2. **Stream, don't buffer** — `PutAsync`/`GetAsync` take/return streams; never read a whole file into
+   memory.
+3. **Signed URLs are short-lived and scoped to one key** — never a directory/prefix/wildcard; the
+   token encodes key + expiry, signed, opaque.
+4. **No content sniffing / AV scanning / image processing** here — out of scope; a downstream concern.
+   The declared content-type is stored and served back.
+5. **Deletion is best-effort idempotent** — deleting a missing key is not an error (parity with cloud
+   semantics).
+*Rationale:* one storage seam at the platform layer means avatars, attachments, exports, etc. all get
+tenant-safe, backend-agnostic file handling for free, and swapping local→S3 is a config change, not a
+code change — exactly the property the email and billing seams already give. The signed-URL contract
+keeps large transfers off the API process while staying uniform across dev and prod.
+Stories + slice plan: `docs/stories/files.md` (epic `FILES`).

@@ -28,7 +28,7 @@ sequenced below by value, not by dependency.
 | Item | Epic | Size | Why first | Deps |
 |------|------|------|-----------|------|
 | **RBAC** (admin role + permission seam + roster UI) — ✅ *COMPLETE* (RBAC-1/2/3; ADR-009, `stories/rbac.md`) | `RBAC` | M | B2B table stakes; unblocks Admin + Public API | ready |
-| **File storage** (`IFileStorage`: local / S3 / Azure Blob) | `FILES` | S–M | Avatars, attachments, and the GDPR export artifact all need it | ready |
+| **File storage** (`IFileStorage`: local / S3-compatible) — 🔲 *in progress* (ADR-010, `stories/files.md`) | `FILES` | S–M | Avatars, attachments, and the GDPR export artifact all need it | ready |
 
 ## Wave 2 — Compliance & security (enterprise table stakes)
 
@@ -71,7 +71,7 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**RBAC is underway** (ADR-009 + `stories/rbac.md`; RBAC-1 seam → RBAC-2 role-change). After it lands,
-**GDPR** (legal weight, deps ready) or **File storage** (W1 keystone) are the natural follow-ons;
-**MFA** slots in anywhere as a self-contained win. Re-sequence freely — the dependency graph is mostly
-clear now.
+**RBAC is done** (ADR-009; RBAC-1/2/3 merged). **File storage is underway** (ADR-010 + `stories/files.md`;
+FILES-1 abstraction+local → FILES-2 signed download → FILES-3 S3) — finishing Wave 1. After it lands,
+**GDPR** (legal weight; the export artifact needs File storage, now satisfied) is the natural next;
+**MFA** slots in anywhere as a self-contained win. Re-sequence freely.
