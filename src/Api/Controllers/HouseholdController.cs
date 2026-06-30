@@ -1,16 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using Template.Api.Models;
 using Template.Api.Services;
+using Template.Core.Authorization;
 using Template.Core.Repositories;
 
 namespace Template.Api.Controllers;
 
 /// <summary>
-/// Tenant ("household") management. Owns the role-enforcement matrix: any member
-/// may READ the tenant; only the OWNER may rename it, remove a member, or transfer
-/// ownership. Leave is open to any member. The caller's role is read from the
-/// membership, never from the request. Invitations live in
-/// <see cref="HouseholdInvitationsController"/>.
+/// Tenant ("household") management. Authorization goes through the permission seam (ADR-009):
+/// reading needs <see cref="Permission.ViewTenant"/> (every member); rename needs
+/// <see cref="Permission.RenameTenant"/> and remove-member needs <see cref="Permission.ManageMembers"/>
+/// (owner/admin); transfer needs <see cref="Permission.TransferOwnership"/> (owner only). Leave is open
+/// to any member. The caller's role is read from the membership, never from the request. Invitations
+/// live in <see cref="HouseholdInvitationsController"/>.
 /// </summary>
 [ApiController]
 [Route("api/household")]
@@ -48,8 +50,8 @@ public class HouseholdController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can rename the household");
+        if (RequirePermission(membership, Permission.RenameTenant, "Only the household owner can rename the household") is { } forbidden)
+            return forbidden;
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest(ErrorFactory.CreateError("invalid_request", "Name is required"));
@@ -76,8 +78,8 @@ public class HouseholdController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can remove members");
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can remove members") is { } forbidden)
+            return forbidden;
 
         // The owner leaves/transfers via the leave/transfer endpoints, not this one.
         if (userId == membership.UserId)
@@ -97,8 +99,8 @@ public class HouseholdController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can transfer ownership");
+        if (RequirePermission(membership, Permission.TransferOwnership, "Only the household owner can transfer ownership") is { } forbidden)
+            return forbidden;
 
         if (request.UserId is not { } targetUserId)
             return BadRequest(ErrorFactory.CreateError("invalid_request", "user_id is required"));

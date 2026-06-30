@@ -42,7 +42,8 @@ One OAuth identity linked to a `User` (a user may link several providers).
 ### TenantMembership *(the user→tenant link — source of truth for tenancy)*
 - `id` (UUIDv7), `tenant_id` (FK → Tenant), `user_id` (FK → User)
 - **unique on `user_id`** — a user is in exactly one tenant at a time
-- `role` — `owner` | `member` (exactly one owner per tenant), `joined_at`
+- `role` — `owner` | `admin` | `member` (exactly one owner per tenant; `admin` is a delegated-management
+  tier — ADR-009), `joined_at`. Capabilities per role are defined in `RolePermissions`, not ad-hoc checks.
 
 ### RefreshToken
 A rotating, hashed refresh token backing a session — only the **hash** is stored, so a DB leak

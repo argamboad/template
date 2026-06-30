@@ -3,8 +3,8 @@
 > One file per epic. Adds a third tenant role (`admin`) **and** a permission seam so authorization
 > call sites ask *"can the caller do X?"* (a `Permission` capability) instead of *"is the caller the
 > owner?"*. Design decision, the permission matrix, and constraints in **ADR-009**. Stories use
-> Gherkin acceptance criteria. **Status: 🔲 in progress** — RBAC-1 (seam + matrix), RBAC-2 (role-change
-> endpoint).
+> Gherkin acceptance criteria. **Status: 🔲 in progress** — RBAC-1 (seam + matrix) ✅, RBAC-2
+> (role-change endpoint) 🔲.
 
 **Epic key:** `RBAC`
 
@@ -33,7 +33,17 @@ next request with no token refresh.
 
 ### RBAC-1 — Permission seam + `admin` role + enforcement helpers
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/rbac-1-permission-seam`). `TenantRoles.Admin` added; `Permission`
+enum + `RolePermissions` matrix in **Core** (`src/Core/Authorization/`); enforcement via
+`RequirePermission(membership, perm)` on
+[`TenantApiControllerBase`](../../src/Api/Controllers/TenantApiControllerBase.cs) (→ 403 envelope) and
+a `.RequirePermission(perm)` minimal-API filter
+([`PermissionEndpointExtensions`](../../src/Api/Features/PermissionEndpointExtensions.cs), → 403)
+backed by `IPermissionService`/`PermissionService` (fail-closed). The `IsOwner` checks in
+`HouseholdController`, `HouseholdInvitationsController`, and `BillingController` were refactored onto
+the seam (behavior unchanged — only owners exist until RBAC-2); `IsOwner` removed (one enforcement
+path). Tests: `tests/Core.Tests/RolePermissionsTests.cs` (matrix), `tests/Api.Tests/Rbac/`
+(filter allow/deny + `PermissionService` resolution/fail-closed).
 
 **As a** platform/app developer
 **I want** authorization expressed as capability checks backed by one role→permission matrix
@@ -138,10 +148,11 @@ the roster reflects the new role; merged, app working; ADR-009 referenced.
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. 🔲 **Permission seam (RBAC-1).** `TenantRoles.Admin`; `Permission` enum + `RolePermissions` matrix
-   (Core); `RequirePermission(membership, perm)` on `TenantApiControllerBase` (→ 403 envelope) and a
-   `.RequirePermission(perm)` minimal-API endpoint filter (sibling of `RequireEntitlement`, → 403).
-   Refactor the `IsOwner` call sites onto it. No behavior change (owner passes everything).
+1. ✅ **Permission seam (RBAC-1).** — DONE. `TenantRoles.Admin`; `Permission` enum + `RolePermissions`
+   matrix (Core); `RequirePermission(membership, perm)` on `TenantApiControllerBase` (→ 403 envelope)
+   and a `.RequirePermission(perm)` minimal-API endpoint filter (sibling of `RequireEntitlement`, →
+   403) backed by `IPermissionService`. Refactored the `IsOwner` call sites onto it and removed
+   `IsOwner` (one enforcement path). No behavior change (owner passes everything).
 2. 🔲 **Role-change endpoint (RBAC-2).** Owner-only `PUT /api/household/members/{userId}/role`
    (or similar) moving a target between `admin`/`member`; ADR-009 invariants enforced; audited via
    `IAuditLog`. Makes the RBAC-1 seam live.
