@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using Template.Api.Tests.Infrastructure;
 using Template.Core.Abstractions;
@@ -16,9 +17,10 @@ public sealed class LocalDiskFileStorageTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "tmpl-files-" + Guid.NewGuid().ToString("N"));
 
-    private LocalDiskFileStorage NewStorage(Guid? tenantId) =>
-        new(Options.Create(new LocalFileStorageSettings { RootPath = _root }),
-            new TestCurrentTenant { TenantId = tenantId });
+    private LocalDiskFileStorage NewStorage(Guid? tenantId, string downloadBaseUrl = "") =>
+        new(Options.Create(new LocalFileStorageSettings { RootPath = _root, DownloadBaseUrl = downloadBaseUrl }),
+            new TestCurrentTenant { TenantId = tenantId },
+            new FileDownloadTokenizer(new EphemeralDataProtectionProvider()));
 
     [Fact]
     public async Task PutThenGet_RoundTripsBytesAndContentType()
@@ -116,6 +118,29 @@ public sealed class LocalDiskFileStorageTests : IDisposable
             () => storage.PutAsync("k", Bytes("x"), "text/plain"));
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => storage.GetAsync("k"));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.GetDownloadUrlAsync("k", TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
+    public async Task GetDownloadUrl_BuildsApiFilesUrl_Relative_AndAbsolute()
+    {
+        var relative = await NewStorage(Guid.NewGuid()).GetDownloadUrlAsync("a/b.png", TimeSpan.FromMinutes(5));
+        Assert.False(relative.IsAbsoluteUri);
+        Assert.StartsWith("api/files/", relative.ToString());
+
+        var absolute = await NewStorage(Guid.NewGuid(), "https://api.example.com")
+            .GetDownloadUrlAsync("a/b.png", TimeSpan.FromMinutes(5));
+        Assert.True(absolute.IsAbsoluteUri);
+        Assert.Equal("https", absolute.Scheme);
+        Assert.StartsWith("/api/files/", absolute.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task GetDownloadUrl_RejectsInvalidKey()
+    {
+        await Assert.ThrowsAsync<InvalidStorageKeyException>(
+            () => NewStorage(Guid.NewGuid()).GetDownloadUrlAsync("../escape", TimeSpan.FromMinutes(5)));
     }
 
     [Fact]

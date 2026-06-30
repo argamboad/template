@@ -90,6 +90,7 @@ public static class ServiceCollectionExtensions
         // S3-compatible backend is selected when configured (FILES-3) — same config-presence switch as
         // the billing provider. Keys are tenant-scoped and validated server-side by the impl.
         services.Configure<LocalFileStorageSettings>(configuration.GetSection("Storage:Local"));
+        services.AddSingleton<IFileDownloadTokenizer, FileDownloadTokenizer>();
         services.AddScoped<IFileStorage, LocalDiskFileStorage>();
 
         // Clock — repositories/services depend on TimeProvider for testable time. The host

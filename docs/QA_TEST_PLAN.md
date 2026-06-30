@@ -107,10 +107,12 @@ beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — s
 
 **Platform services with no client UI (API-/operational-level, not manually testable through the app
 yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
-health endpoints, and the background outbox/inbox/scheduled-jobs. These are **covered by automated tests**
-(`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual cases for the rest
-will be added when client UI exists. **RBAC role management now has a web UI** (RBAC-3) — covered by
-the household cases QA-HH-09..12.
+health endpoints, the background outbox/inbox/scheduled-jobs, and **file storage** — the `IFileStorage`
+seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
+authorization; local-disk only — cloud backends hand out native presigned URLs). These are **covered by
+automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
+cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
+(RBAC-3) — covered by the household cases QA-HH-09..12.
 
 ---
 
@@ -931,6 +933,7 @@ the API directly:
 | Billing (API-only, no UI) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
+| File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`) | `IFileStorage` (tenant-scoped keys, local disk / S3); signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure) |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -989,3 +992,8 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   **Make admin / Make member** controls, and the page is admin-aware (admin can rename + invite/remove
   members, but sees no role/transfer/dissolve controls). New web cases **QA-HH-09..12**; §7 intro
   updated for the three-tier model. API coverage stays automated (`tests/Api.Tests`).
+- **Updated 2026-06-30** for file storage (ADR-010): an `IFileStorage` seam (tenant-scoped keys,
+  local-disk dev default / S3-compatible prod) with a signed, time-limited download endpoint
+  `GET /api/files/{token}`. **API-only** (no UI consumer yet) — covered by `tests/Api.Tests`
+  (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`); see §2 + §15.
+  Manual cases will follow when a feature (avatars/attachments) wires it to UI.

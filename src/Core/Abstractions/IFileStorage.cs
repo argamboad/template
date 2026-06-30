@@ -25,6 +25,28 @@ public interface IFileStorage
 
     /// <summary>Deletes the object. Deleting a missing key is a no-op, not an error (cloud parity).</summary>
     Task DeleteAsync(string key, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A signed, time-limited URL that downloads exactly this object (ADR-010). For cloud backends this
+    /// is a native presigned GET URL; for local disk it points at the platform <c>GET /api/files/{token}</c>
+    /// endpoint with an <c>ITimeLimitedDataProtector</c>-signed token. The URL is scoped to one key and
+    /// expires after <paramref name="lifetime"/> — never a directory or wildcard.
+    /// </summary>
+    Task<Uri> GetDownloadUrlAsync(string key, TimeSpan lifetime, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Mints and reads the opaque, signed, time-limited tokens that back local-disk download URLs
+/// (ADR-010). The token binds a tenant + key + expiry; reading fails closed for an expired, tampered,
+/// or malformed token. One implementation owns the token format so the minting side (storage) and the
+/// reading side (the <c>/api/files/{token}</c> endpoint) can't drift.
+/// </summary>
+public interface IFileDownloadTokenizer
+{
+    string Mint(Guid tenantId, string key, TimeSpan lifetime);
+
+    /// <summary>True (with <paramref name="tenantId"/>/<paramref name="key"/> set) for a valid, unexpired token.</summary>
+    bool TryRead(string token, out Guid tenantId, out string key);
 }
 
 /// <summary>

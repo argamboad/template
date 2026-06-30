@@ -78,7 +78,15 @@ missing-key, and fail-closed covered; config-gated registration; merged, app wor
 
 ### FILES-2 — Signed, time-limited download URL + platform download endpoint
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/files-2-signed-download`). `IFileStorage.GetDownloadUrlAsync(key,
+lifetime)`; `IFileDownloadTokenizer`/`FileDownloadTokenizer` (`src/Infrastructure/Files/`) mints/reads
+an `ITimeLimitedDataProtector`-signed token binding `{tenantId}/{key}` (DB-persisted keys → survives
+restarts); `LocalDiskFileStorage.GetDownloadUrlAsync` returns `…/api/files/{token}` (absolute when
+`Storage:Local:DownloadBaseUrl` is set, else relative). Anonymous `FilesController`
+(`GET /api/files/{token}`) reads the token, **enters that tenant** (ADR-003), and streams the one
+object — **404** on expired/tampered/malformed token, wrong tenant, or missing file (never leaks).
+Tests `tests/Api.Tests/Files/` (`FileDownloadTokenizerTests` expiry/tamper/foreign-signer;
+`FilesControllerTests` stream/expired/garbage/missing/cross-tenant; storage URL build).
 
 **As a** feature developer
 **I want** a short-lived signed URL to hand a client for download
@@ -171,8 +179,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
 1. ✅ **Abstraction + local disk (FILES-1).** — DONE. `IFileStorage` (Core); `LocalDiskFileStorage`
    (Infrastructure) under a configured root (defaults to `storage/` under the app base dir);
    tenant-key namespacing + traversal/cross-tenant rejection; config-gated DI (local default). No URLs yet.
-2. 🔲 **Signed download (FILES-2).** `GetDownloadUrlAsync` + `ITimeLimitedDataProtector` token +
-   `GET /api/files/{token}` streaming endpoint (tenant-checked). Uniform "signed URL, don't proxy".
+2. ✅ **Signed download (FILES-2).** — DONE. `GetDownloadUrlAsync` + `FileDownloadTokenizer`
+   (`ITimeLimitedDataProtector`) + anonymous `GET /api/files/{token}` streaming endpoint that enters the
+   token's tenant and 404s on any failure. Uniform "signed URL, don't proxy".
 3. 🔲 **S3 prod impl (FILES-3).** `S3FileStorage` (AWSSDK.S3), config-gated, native presigned URLs;
    `.env.example` documented. The production swap-in, parallel to Stripe.
 
