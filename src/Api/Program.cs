@@ -105,6 +105,10 @@ builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpCurre
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 
+// RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
+// resolves the caller's membership and consults the RolePermissions matrix; fails closed.
+builder.Services.AddScoped<IPermissionService, PermissionService>();
+
 // Billing entitlements (ADR-006). Server-side plan gate behind .RequireEntitlement(...); reads the
 // tenant's Subscription projection and fails closed to Free.
 builder.Services.AddScoped<IEntitlementService, EntitlementService>();

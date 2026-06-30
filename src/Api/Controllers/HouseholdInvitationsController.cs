@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Template.Api.Models;
 using Template.Api.Services;
+using Template.Core.Authorization;
 using Template.Core.Repositories;
 
 namespace Template.Api.Controllers;
@@ -25,8 +26,8 @@ public class HouseholdInvitationsController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can invite members");
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can invite members") is { } forbidden)
+            return forbidden;
 
         var result = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "", cancellationToken);
         return result.Status switch
@@ -47,8 +48,8 @@ public class HouseholdInvitationsController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can view invitations");
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can view invitations") is { } forbidden)
+            return forbidden;
 
         var pending = await service.GetPendingAsync(membership.TenantId, cancellationToken);
         return Ok((IReadOnlyList<InvitationResponse>)pending.Select(InvitationResponse.From).ToList());
@@ -61,8 +62,8 @@ public class HouseholdInvitationsController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can regenerate invitation tokens");
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can regenerate invitation tokens") is { } forbidden)
+            return forbidden;
 
         var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId, cancellationToken);
         return result.Status switch
@@ -83,8 +84,8 @@ public class HouseholdInvitationsController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can revoke invitations");
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can revoke invitations") is { } forbidden)
+            return forbidden;
 
         var found = await service.RevokeAsync(membership.TenantId, id, cancellationToken);
         return found

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Template.Api.Models;
 using Template.Api.Services;
+using Template.Core.Authorization;
 using Template.Core.Repositories;
 
 namespace Template.Api.Controllers;
@@ -24,8 +25,8 @@ public class BillingController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership is null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can manage billing");
+        if (RequirePermission(membership, Permission.ManageBilling, "Only the household owner can manage billing") is { } forbidden)
+            return forbidden;
 
         var result = await billing.CreateCheckoutAsync(membership.TenantId, request.PlanKey, cancellationToken);
         return result.Outcome switch
@@ -42,8 +43,8 @@ public class BillingController(
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership is null)
             return InvalidToken();
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can manage billing");
+        if (RequirePermission(membership, Permission.ManageBilling, "Only the household owner can manage billing") is { } forbidden)
+            return forbidden;
 
         var result = await billing.CreatePortalAsync(cancellationToken);
         return result.Outcome switch

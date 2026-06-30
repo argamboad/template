@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Template.Api.Configuration;
 using Template.Api.Services;
+using Template.Core.Authorization;
 using Template.Core.Entities;
 using Template.Core.Repositories;
 
@@ -35,8 +36,18 @@ public abstract class TenantApiControllerBase(
             ? Tenants.GetMembershipAsync(uid, cancellationToken)
             : Task.FromResult<TenantMembership?>(null);
 
-    protected static bool IsOwner(TenantMembership membership) =>
-        string.Equals(membership.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase);
+    /// <summary>True if the caller's role grants <paramref name="permission"/> (ADR-009 matrix).</summary>
+    protected static bool HasPermission(TenantMembership membership, Permission permission) =>
+        RolePermissions.Grants(membership.Role, permission);
+
+    /// <summary>
+    /// Authorization gate for controllers (ADR-009): returns <c>null</c> when the caller's role grants
+    /// <paramref name="permission"/>, otherwise a ready-to-return <b>403</b> with the standard envelope.
+    /// The controller counterpart to the minimal-API <c>.RequirePermission(...)</c> filter — one
+    /// enforcement path backed by the same <see cref="RolePermissions"/> matrix.
+    /// </summary>
+    protected IActionResult? RequirePermission(TenantMembership membership, Permission permission, string forbiddenMessage) =>
+        HasPermission(membership, permission) ? null : Forbid403(forbiddenMessage);
 
     /// <summary>401 with the standard envelope — the caller's token is missing/invalid.</summary>
     protected IActionResult InvalidToken() =>

@@ -13,15 +13,20 @@ public class TenantMembership
     public Guid TenantId { get; set; }
     public Guid UserId { get; set; }
 
-    /// <summary><see cref="TenantRoles.Owner"/> | <see cref="TenantRoles.Member"/>.</summary>
+    /// <summary><see cref="TenantRoles.Owner"/> | <see cref="TenantRoles.Admin"/> | <see cref="TenantRoles.Member"/>.</summary>
     public string Role { get; set; } = TenantRoles.Member;
 
     public DateTimeOffset JoinedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
-/// <summary>Role constants for <see cref="TenantMembership.Role"/>.</summary>
+/// <summary>
+/// Role constants for <see cref="TenantMembership.Role"/>, ordered <c>owner</c> &gt; <c>admin</c> &gt;
+/// <c>member</c> (ADR-009). A tenant has exactly one <c>owner</c>; <c>admin</c> is a delegated-management
+/// tier. What each role can do is defined once in <c>RolePermissions</c> — not by ad-hoc role checks.
+/// </summary>
 public static class TenantRoles
 {
     public const string Owner = "owner";
+    public const string Admin = "admin";
     public const string Member = "member";
 }
