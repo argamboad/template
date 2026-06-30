@@ -352,3 +352,64 @@ audit trail — every downstream app would re-invent all three. Adding them once
 means every feature inherits them, and audit slots naturally onto the existing interceptor +
 tenant-scoping machinery (ADR-003 amendment).
 Stories + slice plan: `docs/stories/observability.md` (epic `OBS`).
+
+---
+
+**ADR-009 — RBAC: a third `admin` role + a permission seam (capability checks, not role checks). (2026-06-30)**
+The template shipped with exactly two tenant roles — `owner` and `member` — enforced by `IsOwner(...)`
+boolean checks copied across every tenant controller (`HouseholdController`,
+`HouseholdInvitationsController`, `BillingController`). B2B tenants delegate administration almost
+immediately, and a copied `role == "owner"` test is both too coarse (no middle tier) and too brittle
+(scattered, easy to drift). This ADR adds an `admin` tier **and**, more importantly, a **permission
+seam** so call sites ask *"can the caller do X?"* instead of *"is the caller the owner?"*.
+
+**Decision:**
+1. **Roles are ordered: `owner` > `admin` > `member`.** `admin` is a new `TenantRoles` constant; the
+   "exactly one owner" invariant (ADR-003) is unchanged — owner is conferred only via
+   `TransferOwnershipAsync`, never via a role-change endpoint.
+2. **A `Permission` enum + a static role→permission matrix** (`RolePermissions`) in **Core** is the
+   single source of truth for "what can this role do". Permissions are coarse capabilities
+   (`ViewTenant`, `RenameTenant`, `ManageMembers`, `ManageRoles`, `ManageBilling`,
+   `TransferOwnership`, `DissolveTenant`), **not** per-entity ACLs. The matrix:
+
+   | Permission | owner | admin | member |
+   |---|:--:|:--:|:--:|
+   | `ViewTenant` | ✅ | ✅ | ✅ |
+   | `RenameTenant` | ✅ | ✅ | ❌ |
+   | `ManageMembers` | ✅ | ✅ | ❌ |
+   | `ManageRoles` | ✅ | ❌ | ❌ |
+   | `ManageBilling` | ✅ | ❌ | ❌ |
+   | `TransferOwnership` / `DissolveTenant` | ✅ | ❌ | ❌ |
+
+   **Owner-only by deliberate choice:** billing is **financial** and role/ownership changes are the
+   **privilege-escalation surface** — keeping both owner-only stops an admin from minting more admins
+   or touching money. Apps that want a different posture edit one matrix, not N call sites.
+3. **Two enforcement mechanisms mirror the two API styles (ADR-004):** controllers get a
+   `RequirePermission(membership, Permission.X)` helper on `TenantApiControllerBase` (returns the
+   standard 403 envelope); feature minimal-API groups get a `.RequirePermission(Permission.X)`
+   endpoint filter that mirrors `.RequireEntitlement(...)` (ADR-006) but yields **403 Forbidden**
+   (authorization), not 402 (payment). The existing `IsOwner` checks are refactored onto
+   `RequirePermission` so there is one enforcement path.
+4. **Role is read live from membership, never from the JWT.** A role change takes effect on the
+   caller's next request with **no token refresh** — the access token carries `tenant_id`, not the
+   role (status quo, made explicit here). This is why the seam is a runtime DB-backed check, not a
+   claims policy.
+5. **Role changes are audited** (ADR-008) — promote/demote records an `AuditEvent` with the actor,
+   target, and old→new role.
+
+**Constraints recorded:**
+1. **Exactly one owner, always** — the role-change endpoint moves users only between `admin` and
+   `member`; it can never set or clear `owner` (that path stays `TransferOwnershipAsync`), and it can
+   never target the owner.
+2. **No self-escalation / no lockout** — a caller cannot change their own role; an admin cannot act
+   on the owner.
+3. **Permissions are coarse capabilities, not resource ACLs** — fine-grained per-record sharing is a
+   different (deferred) concern; don't grow this into an ACL system without a new ADR.
+4. **The matrix is the only place roles map to capabilities** — no new scattered `role == "admin"`
+   checks; add a `Permission` and a matrix row instead.
+*Rationale:* every downstream B2B app needs an admin tier and will otherwise re-invent role checks ad
+hoc. Centralizing the capability mapping once, behind a seam the existing entitlement-filter pattern
+already established, makes the common case (add a permission, gate an endpoint) a one-liner and keeps
+the owner-only blast-radius items explicit. Pairs with the `ADMIN` (back-office/impersonation) and
+`PUBAPI` backlog items, which build on this seam.
+Stories + slice plan: `docs/stories/rbac.md` (epic `RBAC`).

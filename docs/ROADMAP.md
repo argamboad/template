@@ -27,7 +27,7 @@ sequenced below by value, not by dependency.
 
 | Item | Epic | Size | Why first | Deps |
 |------|------|------|-----------|------|
-| **RBAC** (admin role + permission seam) | `RBAC` | M | B2B table stakes; unblocks Admin + Public API | ready |
+| **RBAC** (admin role + permission seam) — 🔲 *in progress* (ADR-009, `stories/rbac.md`) | `RBAC` | M | B2B table stakes; unblocks Admin + Public API | ready |
 | **File storage** (`IFileStorage`: local / S3 / Azure Blob) | `FILES` | S–M | Avatars, attachments, and the GDPR export artifact all need it | ready |
 
 ## Wave 2 — Compliance & security (enterprise table stakes)
@@ -71,7 +71,7 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**RBAC** — B2B essential, the keystone that unblocks Admin + Public API, and self-contained (extends
-`TenantRoles` + a permission predicate on the existing `AuthPolicies`). Then **GDPR** (legal weight, deps
-ready). **MFA** slots in anywhere as a self-contained win. Re-sequence freely — the dependency graph is
-mostly clear now.
+**RBAC is underway** (ADR-009 + `stories/rbac.md`; RBAC-1 seam → RBAC-2 role-change). After it lands,
+**GDPR** (legal weight, deps ready) or **File storage** (W1 keystone) are the natural follow-ons;
+**MFA** slots in anywhere as a self-contained win. Re-sequence freely — the dependency graph is mostly
+clear now.

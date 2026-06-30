@@ -21,7 +21,7 @@
 | # | Item | Epic key | Why it's ranked here | Hard deps |
 |---|------|----------|----------------------|-----------|
 | 1 | Account & data lifecycle (GDPR) | `GDPR` | Legal exposure the moment you have EU users; reuses tenant scoping | Audit (ADR-008) for export completeness |
-| 2 | RBAC beyond owner/member | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
+| 2 | ~~RBAC beyond owner/member~~ → **being built** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
 | 3 | File / blob storage | `FILES` | Avatars/attachments/exports all block on it | none |
 | 4 | MFA / TOTP 2FA | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
 | 5 | In-app notifications | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
@@ -44,15 +44,18 @@ sole owner without dissolving/transferring). **Tension with audit (ADR-008):** e
 legal-hold — export-then-wipe; decide retention windows here.
 **Deps:** audit log (ADR-008) so export is complete; the dissolve flow as the wipe backbone.
 
-## 2. RBAC beyond owner/member — `RBAC`
+## 2. RBAC beyond owner/member — `RBAC` → **TAKEN ON (ADR-009)**
+> **Now an active epic** — design decided in **ADR-009**, stories + slice plan in
+> `docs/stories/rbac.md`. The sketch below is retained for context; the ADR supersedes it.
+
 **What:** at least owner / **admin** / member, plus a permission-check seam finer than the current
 two-role `TenantMembership.Role`.
 **Why:** B2B tenants delegate administration; two roles run out fast.
-**Sketch / hooks:** extend [`TenantRoles`](../src/Core/Entities/TenantMembership.cs); add a
-permission predicate/policy layer building on
-[`AuthPolicies`](../src/Api/Configuration/AuthPolicies.cs) and the `RequireEntitlement`-style filter
-pattern. Keep "exactly one owner" invariant. Consider a `Permission` enum vs string capabilities.
-**Deps:** none. Pairs well with `ADMIN`.
+**Resolved (ADR-009):** ordered roles `owner > admin > member`; a `Permission` enum + a static
+`RolePermissions` matrix in **Core** as the single source of truth; enforcement via a
+`RequirePermission(...)` controller helper **and** a `.RequirePermission(...)` minimal-API filter
+(sibling of `RequireEntitlement`, → 403). "Exactly one owner" preserved; role read live from
+membership (no JWT claim). Pairs with `ADMIN` and `PUBAPI`.
 
 ## 3. File / blob storage — `FILES`
 **What:** an `IFileStorage` Core abstraction (put/get/delete/signed-url) with a local-disk dev impl
