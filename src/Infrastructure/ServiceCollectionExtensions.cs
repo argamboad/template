@@ -11,6 +11,7 @@ using Template.Core.Repositories;
 using Template.Infrastructure.Audit;
 using Template.Infrastructure.Billing;
 using Template.Infrastructure.Email;
+using Template.Infrastructure.Files;
 using Template.Infrastructure.Inbox;
 using Template.Infrastructure.Outbox;
 using Template.Infrastructure.Scheduling;
@@ -84,6 +85,12 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IBillingProvider, StripeBillingProvider>();
         else
             services.AddScoped<IBillingProvider, FakeBillingProvider>();
+
+        // File/blob storage (ADR-010). Local disk is the dev/test default (zero setup); an
+        // S3-compatible backend is selected when configured (FILES-3) — same config-presence switch as
+        // the billing provider. Keys are tenant-scoped and validated server-side by the impl.
+        services.Configure<LocalFileStorageSettings>(configuration.GetSection("Storage:Local"));
+        services.AddScoped<IFileStorage, LocalDiskFileStorage>();
 
         // Clock — repositories/services depend on TimeProvider for testable time. The host
         // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.

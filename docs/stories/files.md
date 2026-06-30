@@ -21,7 +21,14 @@ in `ServiceCollectionExtensions` by **config presence** (S3 when `Storage:S3:*` 
 
 ### FILES-1 — `IFileStorage` abstraction + local-disk impl + tenant-scoped keys
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/files-1-local-storage`). `IFileStorage` (`src/Core/Abstractions/`,
+streaming Put/Get/Delete/Exists + `FileObject`/`InvalidStorageKeyException`); `LocalDiskFileStorage`
+(`src/Infrastructure/Files/`) stores blobs under `{root}/blobs/{tenantId}/{key}` with content type in a
+parallel `{root}/meta/...` tree, defaults the root to `storage/` under the app base dir (zero config),
+validates keys (no empty/`\\`/rooted/`.`/`..`) and asserts the resolved path stays inside the tenant
+dir (defense-in-depth), fails closed without a tenant. Config-gated DI (local default; S3 branch lands
+in FILES-3). Tests `tests/Api.Tests/Files/LocalDiskFileStorageTests.cs` (round-trip, isolation,
+missing-key no-op, traversal/rooted/cross-tenant rejection, fail-closed).
 
 **As a** platform/app developer
 **I want** one streaming storage abstraction that namespaces every object by tenant
@@ -161,9 +168,9 @@ referenced.
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. 🔲 **Abstraction + local disk (FILES-1).** `IFileStorage` (Core); `LocalDiskFileStorage`
-   (Infrastructure) under a configured root; tenant-key namespacing + traversal/cross-tenant rejection;
-   config-gated DI (local default). No URLs yet.
+1. ✅ **Abstraction + local disk (FILES-1).** — DONE. `IFileStorage` (Core); `LocalDiskFileStorage`
+   (Infrastructure) under a configured root (defaults to `storage/` under the app base dir);
+   tenant-key namespacing + traversal/cross-tenant rejection; config-gated DI (local default). No URLs yet.
 2. 🔲 **Signed download (FILES-2).** `GetDownloadUrlAsync` + `ITimeLimitedDataProtector` token +
    `GET /api/files/{token}` streaming endpoint (tenant-checked). Uniform "signed URL, don't proxy".
 3. 🔲 **S3 prod impl (FILES-3).** `S3FileStorage` (AWSSDK.S3), config-gated, native presigned URLs;
