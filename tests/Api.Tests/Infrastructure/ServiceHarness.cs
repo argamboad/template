@@ -28,6 +28,8 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
     public IUnitOfWork UnitOfWork { get; } = new EfUnitOfWork(db);
     public ITokenGenerator TokenGen { get; } = new TokenGenerator();
     public ITokenHasher Hasher { get; } = new TokenHasher();
+    public IAuditLog Audit { get; } = new Template.Infrastructure.Audit.AuditLog(
+        new EfRepository<AuditEvent>(db), clock ?? TimeProvider.System);
 
     public UserService UserService() => new(Users, Tenants, UnitOfWork, Clock, NullLogger<UserService>.Instance);
 
@@ -38,7 +40,7 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
         new(LoginTokens, UserService(), TokenGen, Hasher, settings ?? new TestPasswordlessSettings(), Clock);
 
     public TenantService TenantService() =>
-        new(Tenants, UnitOfWork, [], Clock, NullLogger<TenantService>.Instance);
+        new(Tenants, UnitOfWork, [], Clock, NullLogger<TenantService>.Instance, Audit);
 
     public JwtTokenService JwtTokenService() =>
         new(new TestJwtSettings(), Clock, NullLogger<JwtTokenService>.Instance);
