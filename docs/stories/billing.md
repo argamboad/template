@@ -2,17 +2,19 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: ✅ COMPLETE** — **BILLING-1–6
+> flags keyed to plan) and **quotas** (countable limits). **Status: ✅ COMPLETE** — **BILLING-1–7
 > shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal; seat +
-> metered-usage quotas; trial/dunning lifecycle). The core loop is closed and self-serve manage/cancel
+> metered-usage quotas; trial/dunning lifecycle; **dissolve cleanup** — cancel the provider sub + wipe
+> the projection when a tenant is dissolved). The core loop is closed and self-serve manage/cancel
 > works (changes flow back through the webhook). **BILLING-5** (`feat/billing-5-quotas`): `IQuotaService`
 > — seats (members + pending invites vs the plan's `SeatLimit`) enforced on the invite path
 > (→ 402 `seat_limit_reached`) + metered usage (`TryConsumeAsync`, monthly `UsageCounter`); limits in
 > `PlanCatalog` (null = unlimited). **BILLING-6** (`feat/billing-6-dunning`): dunning notifications to the
 > owner on past_due/canceled transitions + a `SubscriptionLapseSweepJob` one-time nudge for lapsed
-> periods (via NOTIFY). *Remaining follow-ups (optional):* advance trial-ending nudge, a billing-dissolve
-> `ITenantDataContributor`. Design decision and constraints in **ADR-006**. Stories use Gherkin
-> acceptance criteria.
+> periods (via NOTIFY). **BILLING-7** (`feat/billing-7-dissolve-cleanup`): `BillingDataContributor` — wipe
+> the projection + cancel the provider subscription (outbox) when a tenant is dissolved. *Remaining
+> follow-up (optional):* advance trial-ending nudge. Design decision and constraints in **ADR-006**.
+> Stories use Gherkin acceptance criteria.
 
 **Epic key:** `BILLING`
 
@@ -332,7 +334,7 @@ Scenario: A lapsed period is swept and nudged once
 
 **Out of scope:** advance "trial ends in N days" nudges (needs a Stripe `trial_will_end` event kind or a
 dedup field per period — a small follow-up); reimplementing Stripe's own retry schedule / card-failure
-emails (**Stripe Smart Retries** owns that); a `BillingDataContributor` for dissolve cleanup (separate).
+emails (**Stripe Smart Retries** owns that). *(Dissolve cleanup is BILLING-7 — done.)*
 **Definition of done:** tests first; dunning on past_due/canceled transitions (once, no spam); lapse sweep
 nudges once + records it; Stripe status never fabricated; merged, app working; ADR-006 referenced.
 
@@ -375,14 +377,15 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
    from the tenant's stored Stripe customer id; changes reconcile via the BILLING-3 webhook.
 5. ✅ **Quotas (BILLING-5).** — DONE. `IQuotaService` (seats = members + pending invites vs
    `Plan.SeatLimit`, enforced on the invite path → 402; metered usage via `TryConsumeAsync` +
-   monthly `UsageCounter`); limits are `PlanCatalog` data (null = unlimited). *Follow-up (not quotas):*
-   a `BillingDataContributor : ITenantDataContributor` to cancel the Stripe subscription + wipe the
-   projection on tenant dissolve — still open.
+   monthly `UsageCounter`); limits are `PlanCatalog` data (null = unlimited).
 6. ✅ **Trial/dunning (BILLING-6).** — DONE. `IBillingNotifier` dunning on webhook transitions into
    past_due/canceled (once, no spam) + `SubscriptionLapseSweepJob` (JOBS-3) one-time "expired" nudge for
    periods that lapse without a webhook (records `LapseNotifiedAt`, never fabricates status). Notifications
-   ride NOTIFY (in-app + outbox email). *Follow-ups:* advance trial-ending nudge; billing-dissolve
-   contributor.
+   ride NOTIFY (in-app + outbox email). *Follow-up:* advance trial-ending nudge.
+7. ✅ **Dissolve cleanup (BILLING-7).** — DONE. `BillingDataContributor` wipes the `Subscription`
+   projection on tenant dissolve and **cancels the provider subscription** (via a `"billing.cancel"`
+   outbox message → `IBillingProvider.CancelSubscriptionAsync`), so a deleted tenant stops being billed.
+   `HasDataAsync` = false (billing isn't abandonable content); export gains a `billing` section.
 
 **Known sharp edges (from ADR-006):** webhooks are at-least-once and out-of-order (idempotency is
 mandatory — needs JOBS-2); never grant access on the Checkout redirect, only on the webhook; the DB

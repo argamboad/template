@@ -166,6 +166,10 @@ builder.Services.AddScoped<BillingWebhookHandler>();
 builder.Services.AddScoped<NotesHandler>();
 builder.Services.AddScoped<ITenantDataContributor, NotesDataContributor>();
 
+// Billing participates in tenant dissolve (BILLING-7): wipe the Subscription projection + cancel the
+// provider subscription (via the outbox) so a dissolved tenant stops being billed.
+builder.Services.AddScoped<ITenantDataContributor, BillingDataContributor>();
+
 // Caches + session (LinkTokenService uses IMemoryCache; session backed by distributed cache).
 builder.Services.AddMemoryCache();
 builder.Services.AddDistributedMemoryCache();
