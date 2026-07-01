@@ -933,7 +933,7 @@ the API directly:
 | Billing (API-only, no UI) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
-| File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`) | `IFileStorage` (tenant-scoped keys, local disk / S3); signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure) |
+| File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -996,4 +996,7 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   local-disk dev default / S3-compatible prod) with a signed, time-limited download endpoint
   `GET /api/files/{token}`. **API-only** (no UI consumer yet) — covered by `tests/Api.Tests`
   (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`); see §2 + §15.
-  Manual cases will follow when a feature (avatars/attachments) wires it to UI.
+  Manual cases will follow when a feature (avatars/attachments) wires it to UI. FILES-3 added the
+  **S3-compatible** backend (AWS/MinIO/R2/B2, config-gated by `Storage:S3:Bucket`), tested against a
+  real **MinIO** container (`S3FileStorageMinioTests`); prod config is documented in `.env.example`.
+  **This completes Wave 1** (RBAC + File storage).

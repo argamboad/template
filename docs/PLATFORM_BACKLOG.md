@@ -22,7 +22,7 @@
 |---|------|----------|----------------------|-----------|
 | 1 | Account & data lifecycle (GDPR) | `GDPR` | Legal exposure the moment you have EU users; reuses tenant scoping | Audit (ADR-008) for export completeness |
 | 2 | ~~RBAC beyond owner/member~~ → **being built** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
-| 3 | ~~File / blob storage~~ → **being built** (ADR-010, `stories/files.md`) | `FILES` | Avatars/attachments/exports all block on it | none |
+| 3 | ~~File / blob storage~~ → **✅ DONE** (ADR-010, `stories/files.md`) | `FILES` | Avatars/attachments/exports all block on it | none |
 | 4 | MFA / TOTP 2FA | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
 | 5 | In-app notifications | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
 | 6 | Outbound webhooks (customer-facing) | `HOOKS` | Integration story for *your* customers | Outbox (ADR-007) required |
@@ -57,9 +57,10 @@ two-role `TenantMembership.Role`.
 (sibling of `RequireEntitlement`, → 403). "Exactly one owner" preserved; role read live from
 membership (no JWT claim). Pairs with `ADMIN` and `PUBAPI`.
 
-## 3. File / blob storage — `FILES` → **TAKEN ON (ADR-010)**
-> **Now an active epic** — design decided in **ADR-010**, stories + slice plan in
-> `docs/stories/files.md`. The sketch below is retained for context; the ADR supersedes it.
+## 3. File / blob storage — `FILES` → **✅ DONE (ADR-010)**
+> **Shipped** — `IFileStorage` (local disk + S3-compatible), tenant-scoped keys, signed download URLs.
+> Design in **ADR-010**, slices in `docs/stories/files.md` (FILES-1/2/3, all merged). Sketch retained
+> for historical context.
 
 **What:** an `IFileStorage` Core abstraction (put/get/delete/signed-url) with a local-disk dev impl
 and an S3-compatible prod impl.

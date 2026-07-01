@@ -3,7 +3,8 @@
 > One file per epic. Adds a single storage seam — `IFileStorage` (Core) with a local-disk dev default
 > and a config-gated S3-compatible production impl — so downstream features (avatars, attachments, the
 > GDPR export artifact) get tenant-safe, backend-agnostic file handling. Design decision + constraints
-> in **ADR-010**. Stories use Gherkin acceptance criteria. **Status: 🔲 in progress.**
+> in **ADR-010**. Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — FILES-1
+> (abstraction + local), FILES-2 (signed download), FILES-3 (S3-compatible prod impl) all merged.
 
 **Epic key:** `FILES`
 
@@ -126,7 +127,15 @@ covered; the endpoint streams (no full-buffer); merged, app working; ADR-010 ref
 
 ### FILES-3 — S3-compatible production implementation
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/files-3-s3-storage`). `S3FileStorage` (`src/Infrastructure/Files/`,
+`AWSSDK.S3`) — Put/Get/Exists/Delete + native presigned `GetDownloadUrlAsync`; keys tenant-namespaced +
+validated via the shared `StorageKeys` (extracted, now used by both backends). Config-gated in
+`ServiceCollectionExtensions`: `Storage:S3:Bucket` set ⇒ S3 (client built by `S3FileStorage.CreateClient`
+from Endpoint/Region/keys/`ForcePathStyle`), else local disk. Presigned URLs honor a plain-HTTP endpoint
+(`GetPreSignedUrlRequest.Protocol`) for MinIO/self-host. `.env.example` documents the settings + the
+AWS-vs-MinIO/R2/B2 matrix. Tested against a **real MinIO Testcontainer** (`S3FileStorageMinioTests`:
+round-trip, tenant isolation, working presigned download, delete-missing no-op, invalid-key reject) +
+config-gating (`FileStorageRegistrationTests`).
 
 **As an** operator
 **I want** the same storage seam backed by an S3-compatible bucket in production
@@ -182,8 +191,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
 2. ✅ **Signed download (FILES-2).** — DONE. `GetDownloadUrlAsync` + `FileDownloadTokenizer`
    (`ITimeLimitedDataProtector`) + anonymous `GET /api/files/{token}` streaming endpoint that enters the
    token's tenant and 404s on any failure. Uniform "signed URL, don't proxy".
-3. 🔲 **S3 prod impl (FILES-3).** `S3FileStorage` (AWSSDK.S3), config-gated, native presigned URLs;
-   `.env.example` documented. The production swap-in, parallel to Stripe.
+3. ✅ **S3 prod impl (FILES-3).** — DONE. `S3FileStorage` (AWSSDK.S3), config-gated, native presigned
+   URLs (HTTP-endpoint aware); shared `StorageKeys` validation; `.env.example` documented; tested against
+   a real MinIO Testcontainer. The production swap-in, parallel to Stripe.
 
 **Known sharp edges (from ADR-010):** never trust the client path — **validate keys server-side**
 (traversal, rooted, cross-tenant); **stream, don't buffer**; signed URLs are **short-lived + single-key**;
