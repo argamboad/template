@@ -50,6 +50,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     // Outbound webhook subscriptions (HOOKS, ADR-016). ITenantScoped; signing secret encrypted at rest.
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
 
+    // Webhook delivery attempts (HOOKS-2). NOT ITenantScoped (written from the tenant-less dispatcher);
+    // TenantId is a plain filter column for the read side.
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
     // Append-only tenant audit trail (ADR-008). ITenantScoped (auto-filtered per tenant); writes are
     // append-only via AuditAppendOnlyInterceptor.
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -249,6 +253,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             w.Property(x => x.EventTypes).HasMaxLength(1024).IsRequired();
             w.Property(x => x.EncryptedSecret).IsRequired();
             w.HasIndex(x => x.TenantId);
+        });
+
+        builder.Entity<WebhookDelivery>(d =>
+        {
+            d.HasKey(x => x.Id);
+            d.Property(x => x.EventType).HasMaxLength(128).IsRequired();
+            d.Property(x => x.EventId).HasMaxLength(64).IsRequired();
+            d.Property(x => x.Error).HasMaxLength(1000);
+            // Read pattern: a subscription's attempts newest-first, tenant-filtered.
+            d.HasIndex(x => new { x.TenantId, x.SubscriptionId, x.CreatedAt });
         });
 
         builder.Entity<AuditEvent>(a =>

@@ -19,7 +19,8 @@ public sealed record WebhookOutboxPayload(Guid SubscriptionId, string EventType,
 public sealed class WebhookOutboxHandler(
     AppDbContext db,
     IWebhookSender sender,
-    IWebhookSecretProtector protector) : IOutboxHandler
+    IWebhookSecretProtector protector,
+    TimeProvider clock) : IOutboxHandler
 {
     public const string MessageType = "webhook";
     public string Type => MessageType;
@@ -36,8 +37,37 @@ public sealed class WebhookOutboxHandler(
             return; // removed/disabled since enqueue — nothing to deliver, don't retry
 
         var secret = protector.Unprotect(subscription.EncryptedSecret);
-        var status = await sender.SendAsync(subscription.Url, secret, payload.EventType, payload.EventId, payload.Body, cancellationToken);
-        if (status is < 200 or >= 300)
-            throw new InvalidOperationException($"Webhook delivery to {subscription.Url} returned HTTP {status}.");
+
+        int? status = null;
+        string? transportError = null;
+        try
+        {
+            status = await sender.SendAsync(subscription.Url, secret, payload.EventType, payload.EventId, payload.Body, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            transportError = ex.Message; // network/timeout — no HTTP status
+        }
+
+        var success = status is >= 200 and < 300;
+
+        // Record the attempt (HOOKS-2). Added to the shared context; the OutboxProcessor's SaveChanges
+        // commits it together with the message's sent/retry outcome (whether we return or throw below).
+        db.Set<WebhookDelivery>().Add(new WebhookDelivery
+        {
+            TenantId = message.TenantId ?? subscription.TenantId,
+            SubscriptionId = subscription.Id,
+            EventType = payload.EventType,
+            EventId = payload.EventId,
+            Body = payload.Body,
+            Success = success,
+            StatusCode = status,
+            Error = success ? null : transportError ?? $"HTTP {status}",
+            CreatedAt = clock.GetUtcNow(),
+        });
+
+        if (!success)
+            throw new InvalidOperationException(
+                transportError ?? $"Webhook delivery to {subscription.Url} returned HTTP {status}."); // → outbox retry
     }
 }

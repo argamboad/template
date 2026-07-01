@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Template.Api.Services;
 using Template.Api.Tests.Infrastructure;
 using Template.Core.Entities;
+using Template.Infrastructure.Outbox;
 using Template.Infrastructure.Repositories;
 using Template.Infrastructure.Webhooks;
 
@@ -92,5 +93,7 @@ public class WebhookSubscriptionServiceTests(PostgresFixture fixture) : Postgres
     private static WebhookSecretProtector NewProtector() => new(new EphemeralDataProtectionProvider());
 
     private static WebhookSubscriptionService Build(Template.Infrastructure.Persistence.AppDbContext db, WebhookSecretProtector? protector = null) =>
-        new(new EfRepository<WebhookSubscription>(db), new TokenGenerator(), protector ?? NewProtector(), TimeProvider.System);
+        new(new EfRepository<WebhookSubscription>(db), new EfRepository<WebhookDelivery>(db),
+            new EfOutbox(db, TimeProvider.System), new TestCurrentTenant(),
+            new TokenGenerator(), protector ?? NewProtector(), TimeProvider.System);
 }
