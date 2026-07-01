@@ -129,6 +129,10 @@ builder.Services.AddScoped<ITenantExportService, TenantExportService>();
 builder.Services.AddScoped<IAccountErasureService, AccountErasureService>();
 // MFA — authenticator-app TOTP (MFA-1, ADR-012). Secret encrypted at rest; hashed recovery codes.
 builder.Services.AddScoped<IMfaService, MfaService>();
+// Per-user data teardown for account erasure (GDPR-2): each concern that stores user-keyed PII
+// registers an IUserDataContributor so AccountErasureService wipes it without a hard-coded list.
+builder.Services.AddScoped<IUserDataContributor, MfaUserDataContributor>();
+builder.Services.AddScoped<IUserDataContributor, NotificationUserDataContributor>();
 // MFA login step-up (MFA-2). Signed short-lived challenge + verify → completes the session.
 builder.Services.AddSingleton<IMfaChallengeService, MfaChallengeService>();
 builder.Services.AddScoped<IMfaLoginService, MfaLoginService>();

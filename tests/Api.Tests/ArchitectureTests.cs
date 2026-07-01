@@ -57,6 +57,37 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void EveryUserKeyedEntity_IsWiredIntoAccountErasure()
+    {
+        // Every entity with a user-owned key ("UserId") must be erased on account deletion (GDPR-2) —
+        // by AccountErasureService's identity-core deletes, an IUserDataContributor, or tenant-membership
+        // teardown. This canary fails when a NEW user-keyed entity appears, so its author must wire the
+        // erasure and list it here (v2 audit SOLID-1 / R12). Actor references (CreatedByUserId /
+        // InvitedByUserId) are deliberately excluded — they are tenant data, not the user's own PII.
+        var handled = new HashSet<string>
+        {
+            nameof(UserLogin), nameof(RefreshToken),          // identity-core (AccountErasureService)
+            nameof(TenantMembership),                          // tenant-membership teardown
+            nameof(UserMfa), nameof(MfaRecoveryCode),          // MfaUserDataContributor
+            nameof(Notification), nameof(NotificationPreference), // NotificationUserDataContributor
+        };
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql("Host=localhost;Database=arch-check") // model-only; never connects
+            .Options;
+        using var ctx = new AppDbContext(options, new TestCurrentTenant());
+
+        var uncovered = ctx.Model.GetEntityTypes()
+            .Where(e => e.ClrType.GetProperty("UserId") is not null)
+            .Select(e => e.ClrType.Name)
+            .Where(name => !handled.Contains(name))
+            .ToList();
+
+        Assert.True(uncovered.Count == 0,
+            $"User-keyed entities not wired into account erasure — add an IUserDataContributor (or identity-core delete) and list it: {string.Join(", ", uncovered)}");
+    }
+
+    [Fact]
     public void WebApp_HasNoInlineBlazorComponents()
     {
         // The web app may only carry bootstrap markup; all UI components live in Shared.Ui (RCL).

@@ -109,15 +109,16 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
                 new Template.Api.Features.Notes.NotesDataContributor(new EfRepository<Note>(db)),
                 new AuditDataContributor(new EfRepository<AuditEvent>(db)),
             },
+            new IUserDataContributor[]
+            {
+                new MfaUserDataContributor(new EfRepository<UserMfa>(db), new EfRepository<MfaRecoveryCode>(db)),
+                new NotificationUserDataContributor(new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db)),
+            },
             new AuditLog(new EfRepository<AuditEvent>(db), TimeProvider.System),
             new EfRepository<User>(db),
             new EfRepository<UserLogin>(db),
             new EfRepository<RefreshToken>(db),
-            new EfRepository<LoginToken>(db),
-            new EfRepository<UserMfa>(db),
-            new EfRepository<MfaRecoveryCode>(db),
-            new EfRepository<Notification>(db),
-            new EfRepository<NotificationPreference>(db));
+            new EfRepository<LoginToken>(db));
 
     // --- seeding ---
 
