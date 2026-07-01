@@ -21,7 +21,15 @@ impersonation is **short-lived + non-refreshable + audited**; admin is **read-on
 
 ### ADMIN-1 — Platform-staff gate + cross-tenant inspection
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/admin-1-staff-inspection`). `PlatformAdminSettings` (`Admin:StaffEmails`,
+`.env`-documented) + `IPlatformStaffService.IsStaffAsync` (resolves email, checks the allowlist
+case-insensitively, fails closed) + `AdminApiControllerBase.RequireStaffAsync` (401/403 gate).
+`AdminController` (`GET /api/admin/tenants` list via `ITenantRepository.ListAllAsync` — non-scoped
+tables, no hatch; `GET /api/admin/tenants/{id}` detail **enters the target tenant** via
+`ITenantContext.EnterTenant` so scoped reads go through the normal filter, and records
+`admin.tenant.viewed` **in that tenant**). Read-only; the global filter is never loosened. Tests
+`tests/Api.Tests/Admin/` (`PlatformStaffServiceTests` allowlist; `AdminControllerTests` non-staff→403,
+list-with-counts, detail+in-tenant-audit, unknown→404).
 
 **As a** platform staff member
 **I want** to list and inspect any tenant
@@ -117,9 +125,10 @@ ADR-014 referenced.
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. 🔲 **Staff gate + inspection (ADMIN-1).** `PlatformAdminSettings` + `IPlatformStaffService` +
-   `AdminOnly` gate; `AdminController` list/detail via the audited `QueryAllTenants()` hatch; audited;
-   read-only.
+1. ✅ **Staff gate + inspection (ADMIN-1).** — DONE. `PlatformAdminSettings` (config allowlist) +
+   `IPlatformStaffService` + `AdminApiControllerBase.RequireStaffAsync` (403); `AdminController`
+   list (non-scoped tables) + detail (via `EnterTenant`, audited in-tenant). Read-only; global filter
+   never loosened. (Chose `EnterTenant` over `QueryAllTenants` — keeps the filter engaged, scoped.)
 2. 🔲 **Impersonation (ADMIN-2).** `POST /api/admin/impersonate/{userId}` → short-lived,
    non-refreshable, `impersonated_by`-tagged access token; audited in the target's tenant.
 

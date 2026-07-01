@@ -120,6 +120,12 @@ builder.Services.AddScoped<IMfaLoginService, MfaLoginService>();
 // unit of work; the center API reads/marks the caller's own notifications.
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
+// Platform-staff admin surface (ADMIN, ADR-014). Staff is an out-of-band config allowlist; the admin
+// endpoints gate on it per-request. Cross-tenant reads use EnterTenant / non-scoped tables — the global
+// filter is never loosened.
+builder.Services.Configure<PlatformAdminSettings>(builder.Configuration.GetSection("Admin"));
+builder.Services.AddScoped<IPlatformStaffService, PlatformStaffService>();
+
 // RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
 // resolves the caller's membership and consults the RolePermissions matrix; fails closed.
 builder.Services.AddScoped<IPermissionService, PermissionService>();

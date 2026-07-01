@@ -89,6 +89,12 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
                select new TenantMemberDetail(m.UserId, u.DisplayName, u.Email, m.Role, m.JoinedAt))
             .ToListAsync(cancellationToken);
 
+    public async Task<List<TenantSummary>> ListAllAsync(CancellationToken cancellationToken = default) =>
+        await db.Tenants
+            .OrderBy(t => t.Name)
+            .Select(t => new TenantSummary(t.Id, t.Name, t.CreatedAt, db.TenantMemberships.Count(m => m.TenantId == t.Id)))
+            .ToListAsync(cancellationToken);
+
     public async Task UpdateTenantAsync(Tenant tenant, CancellationToken cancellationToken = default)
     {
         db.Tenants.Update(tenant);
