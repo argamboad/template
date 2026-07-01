@@ -942,7 +942,7 @@ the API directly:
 | GDPR data export (API-only) | covered by `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Wired into OTP-verify + native-exchange; OAuth/magic-link **redirect** step-up is a UI follow-up. |
-| In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`) | `GET /api/notifications` (+ `?before=&limit=`), `GET /api/notifications/unread-count`, `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all` — **per-user** (scoped to the caller, never cross-user); features produce via `NotifyAsync`. Bell-menu UI + email fan-out = follow-ups (NOTIFY-2). |
+| In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). Bell-menu UI = follow-up. |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1031,5 +1031,8 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
 - **Updated 2026-07-01** for in-app notifications (ADR-013, Wave 3): a **per-user** notification center —
   `GET /api/notifications` (paginated), `/unread-count`, `POST /{id}/read`, `/read-all` — scoped to the
   caller (never cross-user); features produce via `NotifyAsync` (staged in-app row). Notifications are
-  user PII (wiped by account erasure). **API-only** (bell-menu UI + email fan-out + preferences are
-  NOTIFY-2 / a UI follow-up) — covered by `Api.Tests` (`NotificationServiceTests`).
+  user PII (wiped by account erasure). **API-only** — covered by `Api.Tests` (`NotificationServiceTests`).
+  **NOTIFY-2:** per-user **delivery preferences** (`GET|PUT /api/notifications/preferences`, default both
+  on) + `NotifyAsync` **fan-out** — in-app row + email via the outbox-backed `IEmailSender`, gated by
+  prefs. Covered by `NotificationFanOutTests`. Bell-menu UI is an API-first follow-up. **NOTIFY epic +
+  Wave 3's first item complete.**

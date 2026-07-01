@@ -1,9 +1,14 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Template.Core.Abstractions;
 using Template.Core.Entities;
 using Template.Core.Repositories;
 
 namespace Template.Api.Services;
+
+/// <summary>A user's notification delivery preferences (NOTIFY-2). Absence ⇒ both on.</summary>
+public sealed record NotificationPreferences(bool InApp, bool Email);
 
 /// <summary>
 /// Per-user in-app notifications (NOTIFY-1, ADR-013). <see cref="NotifyAsync"/> is the seam a feature
@@ -14,8 +19,17 @@ namespace Template.Api.Services;
 /// </summary>
 public interface INotificationService
 {
-    /// <summary>Stages an in-app notification for a user (commits with the caller's unit of work).</summary>
+    /// <summary>
+    /// Notifies a user across the channels their preferences allow (NOTIFY-2): the in-app row is
+    /// staged on the caller's unit of work; the email copy goes through the outbox-backed
+    /// <c>IEmailSender</c> (reliable, retried). Channels are never hard-coded here.
+    /// </summary>
     Task NotifyAsync(Guid userId, string kind, string title, string body, object? metadata = null, CancellationToken cancellationToken = default);
+
+    /// <summary>The user's delivery preferences (defaults to both channels on).</summary>
+    Task<NotificationPreferences> GetPreferencesAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    Task SetPreferencesAsync(Guid userId, bool inApp, bool email, CancellationToken cancellationToken = default);
 
     /// <summary>The user's notifications, newest first; optionally before a cursor timestamp; capped at 100.</summary>
     Task<IReadOnlyList<Notification>> ListAsync(Guid userId, DateTimeOffset? before, int limit, CancellationToken cancellationToken = default);
@@ -28,19 +42,61 @@ public interface INotificationService
     Task MarkAllReadAsync(Guid userId, CancellationToken cancellationToken = default);
 }
 
-public sealed class NotificationService(IRepository<Notification> notifications, TimeProvider clock) : INotificationService
+public sealed class NotificationService(
+    IRepository<Notification> notifications,
+    IRepository<NotificationPreference> preferences,
+    IUserRepository users,
+    IEmailSender emailSender,
+    TimeProvider clock) : INotificationService
 {
-    public async Task NotifyAsync(Guid userId, string kind, string title, string body, object? metadata = null, CancellationToken cancellationToken = default) =>
-        await notifications.AddAsync(new Notification
+    public async Task NotifyAsync(Guid userId, string kind, string title, string body, object? metadata = null, CancellationToken cancellationToken = default)
+    {
+        var prefs = await GetPreferencesAsync(userId, cancellationToken);
+
+        if (prefs.InApp)
+            // Staged on the caller's unit of work — persists with the triggering change (ADR-013).
+            await notifications.AddAsync(new Notification
+            {
+                UserId = userId,
+                Kind = kind,
+                Title = title,
+                Body = body,
+                Metadata = metadata is null ? null : JsonSerializer.Serialize(metadata),
+                CreatedAt = clock.GetUtcNow(),
+            }, cancellationToken);
+
+        if (prefs.Email)
         {
-            UserId = userId,
-            Kind = kind,
-            Title = title,
-            Body = body,
-            Metadata = metadata is null ? null : JsonSerializer.Serialize(metadata),
-            CreatedAt = clock.GetUtcNow(),
-        }, cancellationToken);
-        // Intentionally no SaveChanges — persists with the caller's unit of work (ADR-013).
+            var user = await users.GetByIdAsync(userId, cancellationToken);
+            if (user is not null)
+                // The app-facing IEmailSender is the outbox-backed decorator (ADR-007) — reliable + retried.
+                await emailSender.SendAsync(user.Email, title, $"<p>{WebUtility.HtmlEncode(body)}</p>", cancellationToken: cancellationToken);
+        }
+    }
+
+    public async Task<NotificationPreferences> GetPreferencesAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var row = await preferences.Query().FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+        return row is null
+            ? new NotificationPreferences(InApp: true, Email: true) // default on
+            : new NotificationPreferences(row.InAppEnabled, row.EmailEnabled);
+    }
+
+    public async Task SetPreferencesAsync(Guid userId, bool inApp, bool email, CancellationToken cancellationToken = default)
+    {
+        var row = await preferences.Query().FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+        if (row is null)
+        {
+            await preferences.AddAsync(new NotificationPreference { UserId = userId, InAppEnabled = inApp, EmailEnabled = email }, cancellationToken);
+        }
+        else
+        {
+            row.InAppEnabled = inApp;
+            row.EmailEnabled = email;
+            preferences.Update(row);
+        }
+        await preferences.SaveChangesAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<Notification>> ListAsync(Guid userId, DateTimeOffset? before, int limit, CancellationToken cancellationToken = default)
     {

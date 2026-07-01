@@ -77,6 +77,11 @@ user only ever sees their own. User PII (wiped by account erasure).
 - `metadata` (jsonb, nullable — identifiers only, no secrets), `read_at` (nullable), `created_at`
 - indexed on `(user_id, created_at)` for the newest-first feed + unread counts
 
+### NotificationPreference *(in-app notifications — ADR-013)*
+Per-user delivery preferences (the ADR-C2 per-user carve-out, like `User.Locale`). One row per user;
+absence ⇒ both channels on. User PII (wiped by account erasure).
+- `id` (UUIDv7), `user_id` (unique), `in_app_enabled`, `email_enabled` (both default true)
+
 ### TenantInvitation *(constant — auth foundation)* — implements `ITenantScoped`
 An email invitation to join a tenant. The raw token is revealed once at creation; only its hash is
 stored.

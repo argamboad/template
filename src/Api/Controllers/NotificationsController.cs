@@ -61,4 +61,26 @@ public class NotificationsController(INotificationService notifications, IErrorR
         await notifications.MarkAllReadAsync(userId, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>The caller's delivery preferences (defaults to both channels on).</summary>
+    [HttpGet("preferences")]
+    public async Task<IActionResult> GetPreferences(CancellationToken cancellationToken)
+    {
+        if (CurrentUserId is not { } userId)
+            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+
+        var prefs = await notifications.GetPreferencesAsync(userId, cancellationToken);
+        return Ok(new NotificationPreferencesResponse { InApp = prefs.InApp, Email = prefs.Email });
+    }
+
+    /// <summary>Updates the caller's delivery preferences.</summary>
+    [HttpPut("preferences")]
+    public async Task<IActionResult> UpdatePreferences([FromBody] UpdatePreferencesRequest req, CancellationToken cancellationToken)
+    {
+        if (CurrentUserId is not { } userId)
+            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+
+        await notifications.SetPreferencesAsync(userId, req.InApp, req.Email, cancellationToken);
+        return Ok(new NotificationPreferencesResponse { InApp = req.InApp, Email = req.Email });
+    }
 }

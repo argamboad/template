@@ -27,6 +27,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     public DbSet<UserMfa> UserMfa => Set<UserMfa>();
     public DbSet<MfaRecoveryCode> MfaRecoveryCodes => Set<MfaRecoveryCode>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
 
     // Transactional outbox — reliable, atomic side effects (ADR-007). Platform infra, not
     // ITenantScoped, so it is outside the global tenant query filter.
@@ -171,6 +172,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             n.Property(x => x.Metadata).HasColumnType("jsonb");
             // Per-user feed: list newest-first + unread counts.
             n.HasIndex(x => new { x.UserId, x.CreatedAt });
+        });
+
+        builder.Entity<NotificationPreference>(p =>
+        {
+            p.HasKey(x => x.Id);
+            p.HasIndex(x => x.UserId).IsUnique(); // one preferences row per user
         });
 
         builder.Entity<OutboxMessage>(o =>
