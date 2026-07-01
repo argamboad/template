@@ -37,6 +37,7 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
         Assert.Equal(0, await CountAsync<UserMfa>(m => m.UserId == memberId));
         Assert.Equal(0, await CountAsync<MfaRecoveryCode>(c => c.UserId == memberId));
         Assert.Equal(0, await CountAsync<Notification>(n => n.UserId == memberId));
+        Assert.Equal(0, await CountAsync<NotificationPreference>(p => p.UserId == memberId));
         Assert.Equal(0, await CountAsync<TenantMembership>(m => m.UserId == memberId));
         // ...but the tenant and its owner remain.
         Assert.True(await ExistsAsync<User>(u => u.Id == ownerId));
@@ -115,7 +116,8 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
             new EfRepository<LoginToken>(db),
             new EfRepository<UserMfa>(db),
             new EfRepository<MfaRecoveryCode>(db),
-            new EfRepository<Notification>(db));
+            new EfRepository<Notification>(db),
+            new EfRepository<NotificationPreference>(db));
 
     // --- seeding ---
 
@@ -152,6 +154,7 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
         db.Set<UserMfa>().Add(new UserMfa { UserId = userId, EncryptedSecret = "enc", Enabled = true, EnrolledAt = DateTimeOffset.UtcNow });
         db.Set<MfaRecoveryCode>().Add(new MfaRecoveryCode { UserId = userId, CodeHash = "rc-hash" });
         db.Set<Notification>().Add(new Notification { UserId = userId, Kind = "test", Title = "t", CreatedAt = DateTimeOffset.UtcNow });
+        db.Set<NotificationPreference>().Add(new NotificationPreference { UserId = userId });
         await db.SaveChangesAsync();
     }
 

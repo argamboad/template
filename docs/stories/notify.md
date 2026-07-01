@@ -3,7 +3,8 @@
 > One file per epic. A **per-user** notification center (read/unread) + **per-user delivery preferences**
 > (in-app / email), fanned out through the existing **outbox** (ADR-007) so one call reaches a user on
 > the channels they chose. Design decision + constraints in **ADR-013**. Stories use Gherkin acceptance
-> criteria. **Status: 🔲 in progress.**
+> criteria. **Status: ✅ COMPLETE** — NOTIFY-1 (in-app center) + NOTIFY-2 (preferences + email fan-out).
+> A bell-menu UI is an API-first follow-up.
 
 **Epic key:** `NOTIFY`
 
@@ -72,7 +73,14 @@ one/all read, per-user isolation, erasure wipes notifications; merged, app worki
 
 ### NOTIFY-2 — Delivery preferences + email fan-out
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/notify-2-preferences`). `NotificationPreference` (per-user unique,
+in-app/email, **default on**; migration `AddNotificationPreferences`). `NotifyAsync` is now the
+**fan-out**: reads prefs → stages the in-app row when in-app is on, and sends the email via the
+**outbox-backed `IEmailSender`** (ADR-007) when email is on — resolving the user's email, channels never
+hard-coded. `GetPreferencesAsync` (defaults on) + `SetPreferencesAsync` (upsert); endpoints
+`GET|PUT /api/notifications/preferences`. Account erasure (GDPR-2) wipes preferences. Tests
+`tests/Api.Tests/Notify/NotificationFanOutTests.cs` (default→both channels, email-off→in-app-only,
+in-app-off→email-only, defaults-on, upsert) via a capturing email sender.
 
 **As a** user
 **I want** to choose whether I'm notified in-app and/or by email
@@ -120,8 +128,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
 1. ✅ **In-app center (NOTIFY-1).** — DONE. `Notification` (per-user) + migration `AddNotifications`;
    `NotificationService.NotifyAsync` (staged in-app insert) + user-scoped center API
    (list/unread-count/mark-read/mark-all); account erasure wipes notifications.
-2. 🔲 **Preferences + fan-out (NOTIFY-2).** `NotificationPreference` (per-user, default-on) + get/update API;
-   `NotifyAsync` fans out to in-app + email (outbox-backed `IEmailSender`) per prefs.
+2. ✅ **Preferences + fan-out (NOTIFY-2).** — DONE. `NotificationPreference` (per-user, default-on;
+   migration `AddNotificationPreferences`) + `GET|PUT /api/notifications/preferences`; `NotifyAsync`
+   fans out to in-app + email (outbox-backed `IEmailSender`) per prefs; erasure wipes prefs.
 
 **Known sharp edges (from ADR-013):** everything is **per-user** (scoped to the caller, never
 cross-user); **in-app = transactional DB row, email = outbox** (don't mix them up); **preferences gate

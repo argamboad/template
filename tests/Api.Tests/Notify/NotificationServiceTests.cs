@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Template.Api.Services;
 using Template.Api.Tests.Infrastructure;
+using Template.Core.Abstractions;
 using Template.Core.Entities;
 using Template.Infrastructure.Persistence;
 using Template.Infrastructure.Repositories;
@@ -15,12 +16,16 @@ namespace Template.Api.Tests.Notify;
 [Collection(PostgresCollection.Name)]
 public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
+    private static NotificationService NewService(AppDbContext db, IEmailSender? email = null) =>
+        new(new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db),
+            new UserRepository(db), email ?? new NoopEmailSender(), TimeProvider.System);
+
     [Fact]
     public async Task Notify_ThenList_ShowsUnread_NewestFirst()
     {
         var userId = Guid.CreateVersion7();
         await using var db = Fixture.CreateContext();
-        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        var service = NewService(db);
 
         await service.NotifyAsync(userId, "member.invited", "First", "b1");
         await service.NotifyAsync(userId, "member.joined", "Second", "b2");
@@ -39,7 +44,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
     {
         var userId = Guid.CreateVersion7();
         await using var db = Fixture.CreateContext();
-        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        var service = NewService(db);
         for (var i = 0; i < 5; i++)
             await service.NotifyAsync(userId, "k", $"n{i}", "");
         await db.SaveChangesAsync();
@@ -56,7 +61,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
     {
         var userId = Guid.CreateVersion7();
         await using var db = Fixture.CreateContext();
-        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        var service = NewService(db);
         await service.NotifyAsync(userId, "k", "n", "");
         await db.SaveChangesAsync();
         var id = (await service.ListAsync(userId, null, 10))[0].Id;
@@ -70,7 +75,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
     {
         var userId = Guid.CreateVersion7();
         await using var db = Fixture.CreateContext();
-        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        var service = NewService(db);
         for (var i = 0; i < 3; i++) await service.NotifyAsync(userId, "k", $"n{i}", "");
         await db.SaveChangesAsync();
 
@@ -85,7 +90,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
         var mine = Guid.CreateVersion7();
         var theirs = Guid.CreateVersion7();
         await using var db = Fixture.CreateContext();
-        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        var service = NewService(db);
         await service.NotifyAsync(theirs, "k", "theirs", "");
         await db.SaveChangesAsync();
         var theirId = (await service.ListAsync(theirs, null, 10))[0].Id;
@@ -100,7 +105,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
         var a = Guid.CreateVersion7();
         var b = Guid.CreateVersion7();
         await using var db = Fixture.CreateContext();
-        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        var service = NewService(db);
         await service.NotifyAsync(a, "k", "for-a", "");
         await service.NotifyAsync(b, "k", "for-b", "");
         await db.SaveChangesAsync();
@@ -114,7 +119,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
     {
         var userId = Guid.CreateVersion7();
         await using var db = Fixture.CreateContext();
-        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        var service = NewService(db);
         await service.NotifyAsync(userId, "k", "n", "", new { invitation_id = "abc" });
         await db.SaveChangesAsync();
 

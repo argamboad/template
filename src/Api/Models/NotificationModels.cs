@@ -30,3 +30,15 @@ public record UnreadCountResponse
 {
     [JsonPropertyName("count")] public required int Count { get; init; }
 }
+
+public record NotificationPreferencesResponse
+{
+    [JsonPropertyName("in_app")] public required bool InApp { get; init; }
+    [JsonPropertyName("email")] public required bool Email { get; init; }
+}
+
+public record UpdatePreferencesRequest
+{
+    [JsonPropertyName("in_app")] public bool InApp { get; init; } = true;
+    [JsonPropertyName("email")] public bool Email { get; init; } = true;
+}
