@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using OtpNet;
 using Template.Api.Services;
 using Template.Api.Tests.Infrastructure;
@@ -80,6 +81,24 @@ public class MfaLoginServiceTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task VerifyChallenge_ReplayedChallengeAndCode_IsRejectedOnSecondUse()
+    {
+        // v2 audit LOGIC-S1: one captured {challenge, code} must mint at most one session — the challenge
+        // is single-use and the TOTP timestep is anti-replayed.
+        await using var db = Fixture.CreateContext();
+        var (login, mfa, user) = await BuildWithUserAsync(db);
+        var secret = await EnableMfaAsync(mfa, user.Id);
+        var (_, challenge) = await login.CompleteOrChallengeAsync(user, "otp", "127.0.0.1", native: false);
+        var code = CurrentCode(secret);
+
+        var first = await login.VerifyChallengeAsync(challenge!, code, "127.0.0.1");
+        var replay = await login.VerifyChallengeAsync(challenge!, code, "127.0.0.1");
+
+        Assert.NotNull(first);   // first redemption issues a session
+        Assert.Null(replay);     // identical replay refused
+    }
+
+    [Fact]
     public async Task VerifyChallenge_PreservesNativeFlag()
     {
         await using var db = Fixture.CreateContext();
@@ -100,7 +119,7 @@ public class MfaLoginServiceTests(PostgresFixture fixture) : PostgresTestBase(fi
         var mfa = new MfaService(
             new EfRepository<UserMfa>(db), new EfRepository<MfaRecoveryCode>(db), new UserRepository(db),
             new EphemeralDataProtectionProvider(), new TokenGenerator(), new TokenHasher(), TimeProvider.System);
-        var challenges = new MfaChallengeService(new EphemeralDataProtectionProvider());
+        var challenges = new MfaChallengeService(new EphemeralDataProtectionProvider(), new MemoryCache(new MemoryCacheOptions()));
         var harness = new ServiceHarness(db);
         var login = new MfaLoginService(mfa, challenges, harness.SessionService(), harness.UserService());
 

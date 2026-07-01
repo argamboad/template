@@ -84,6 +84,21 @@ public class MfaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture
     }
 
     [Fact]
+    public async Task Verify_SameTotpTwice_SecondRejected_AntiReplay()
+    {
+        // v2 audit LOGIC-S1: a TOTP is valid for a ~90s window, but a given code must verify only once.
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        var userId = await SeedUserAsync(db);
+        var secret = (await service.BeginEnrollmentAsync(userId))!.Secret;
+        await service.ConfirmEnrollmentAsync(userId, CurrentCode(secret));
+
+        var code = CurrentCode(secret);
+        Assert.True(await service.VerifyAsync(userId, code));   // first login accepts
+        Assert.False(await service.VerifyAsync(userId, code));  // same code/timestep replayed → rejected
+    }
+
+    [Fact]
     public async Task RecoveryCode_IsSingleUse()
     {
         await using var db = Fixture.CreateContext();

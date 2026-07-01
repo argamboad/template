@@ -40,10 +40,12 @@ public sealed class MfaLoginService(
     public async Task<MfaVerifyOutcome?> VerifyChallengeAsync(
         string challenge, string code, string ip, CancellationToken cancellationToken = default)
     {
-        if (!challenges.TryRead(challenge, out var userId, out var provider, out var native))
+        if (!challenges.TryRead(challenge, out var userId, out var provider, out var native, out var challengeId))
             return null;
         if (!await mfa.VerifyAsync(userId, code, cancellationToken))
-            return null;
+            return null; // wrong code: challenge NOT consumed, so the user can retry
+        if (!challenges.Consume(challengeId))
+            return null; // challenge already redeemed (replay) or expired — single-use
 
         var user = await userService.GetUserByIdAsync(userId, cancellationToken);
         if (user is null)
