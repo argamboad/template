@@ -111,14 +111,15 @@ health endpoints, the background outbox/inbox/scheduled-jobs, **file storage** �
 seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
 authorization; local-disk only — cloud backends hand out native presigned URLs), and **GDPR data
 export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle),
-**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), the
-**in-app notification center** (`/api/notifications/*`; per-user
-list/unread-count/mark-read), and the **platform-staff admin surface** (`/api/admin/*`; config-gated
+**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), and the
+**platform-staff admin surface** (`/api/admin/*`; config-gated
 cross-tenant inspection). These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12. **MFA now has a web UI** (UI-2) — enrollment/
-disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..03.
+disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..03. The **in-app
+notification center now has a web UI** (UI-3) — the header bell (list, unread count, mark-read) and
+Settings delivery-preference switches — covered by QA-NOTIF-01..03.
 
 ---
 
@@ -739,6 +740,50 @@ And I can disable two-factor from Settings with a valid code
    (or another recovery code) → **Disable**.
 3. **Expected:** the badge flips to **Off**; a subsequent sign-in no longer asks for a second step.
 
+### QA-NOTIF-01 — Notification bell + list 🟠 (Web)
+**Note:** the template has no built-in producer; to see items, a feature must call
+`INotificationService.NotifyAsync` (seed one in dev, or exercise a downstream feature that notifies).
+**Gherkin**
+```gherkin
+Given I am signed in
+When I open the notification bell in the header
+Then I see my notifications newest-first, with unread ones marked
+And the bell shows an unread count when I have unread notifications
+```
+**Walkthrough**
+1. In the header, click the **bell**. **Expected:** a dropdown opens; with none, it reads
+   "You're all caught up."
+2. With unread notifications present: a red **count badge** shows on the bell; unread rows carry a dot +
+   bold title; each shows a relative time ("just now", "5m", "3h", "2d").
+3. Click the backdrop (outside the panel) → it closes.
+
+### QA-NOTIF-02 — Mark read / mark all read 🟠 (Web)
+**Precondition:** at least one unread notification (see QA-NOTIF-01 note).
+**Gherkin**
+```gherkin
+Given I have unread notifications
+When I click one (and, separately, "Mark all read")
+Then that one clears its unread mark and the count drops
+And "Mark all read" zeroes the count
+```
+**Walkthrough**
+1. Open the bell → click an **unread** row. **Expected:** its dot/bold clears; the count decrements.
+2. Click **Mark all read**. **Expected:** the count badge disappears; all rows show as read.
+3. Reload the page → the counts/read state persist (server-side).
+
+### QA-NOTIF-03 — Delivery preferences 🟠 (Web)
+**Gherkin**
+```gherkin
+Given I am signed in on /settings
+When I toggle the In-app or Email notification switches
+Then the choice is saved and survives a reload
+```
+**Walkthrough**
+1. **Settings** → **Notifications** card shows two switches (**In-app**, **Email**), both on by default.
+2. Toggle one off. **Expected:** it saves immediately (optimistic; reverts with an error if it fails).
+3. Reload → the switch keeps its new state. (Email-off suppresses the email channel on future notifies;
+   in-app-off suppresses the in-app row.)
+
 ---
 
 ## 10. Web — Localization (i18n) 🟠
@@ -1019,7 +1064,7 @@ the API directly:
 | GDPR data export | **HH-13** (owner Household → Data → download) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP | **MFA-01..03** (Settings enroll/QR/confirm/recovery + disable; Login step-up) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Web UI wired on the **OTP** sign-in path; OAuth/magic-link **redirect** step-up remains a UI follow-up. |
-| In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). Bell-menu UI = follow-up. |
+| In-app notifications | **NOTIF-01..03** (header bell: list/unread-count/mark-read; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
 | Admin back-office (API-only) | covered by `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/tenants` (+ `/{id}`) inspection + `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
@@ -1136,3 +1181,10 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   `mfa_required` response with a **step-up code prompt** → `POST /api/auth/mfa/verify` (TOTP or recovery
   code) → `/auth-callback`. **QA-MFA-01..03**; EN/ES localized. Native OTP + OAuth/magic-link step-up
   remain follow-ups (web-first).
+- **Updated 2026-07-01** — **UI-3 (Notifications):** a **header bell** (`NotificationBell` component) —
+  unread-count badge (polled ~60s), a dropdown list (newest-first, unread dot + relative time),
+  click-to-mark-read and **Mark all read** via `GET /api/notifications[/unread-count]`,
+  `POST /{id}/read`, `/read-all`. A **Notifications** card in Settings (`NotificationPrefsCard`) with
+  **In-app**/**Email** switches (optimistic save, reverts on error) via `GET|PUT
+  /api/notifications/preferences`. **QA-NOTIF-01..03**; EN/ES localized. (No built-in producer — items
+  appear once a feature calls `NotifyAsync`.)

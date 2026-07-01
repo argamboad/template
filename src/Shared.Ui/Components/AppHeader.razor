@@ -34,6 +34,7 @@
                     <span class="tenant-badge" data-testid="tenant-badge">@Auth.TenantName</span>
                     <span class="user-name text-white-50 small">@Auth.DisplayName</span>
                 </div>
+                <NotificationBell />
                 <NavLink class="btn btn-outline-light btn-sm" href="/household">@Localizer["Nav_Household"]</NavLink>
                 <NavLink class="btn btn-outline-light btn-sm" href="/settings">@Localizer["Nav_Settings"]</NavLink>
                 <button class="btn btn-outline-light btn-sm" data-testid="sign-out" @onclick="SignOutAsync">@Localizer["Nav_SignOut"]</button>

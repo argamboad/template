@@ -4,7 +4,9 @@
 > (in-app / email), fanned out through the existing **outbox** (ADR-007) so one call reaches a user on
 > the channels they chose. Design decision + constraints in **ADR-013**. Stories use Gherkin acceptance
 > criteria. **Status: ✅ COMPLETE** — NOTIFY-1 (in-app center) + NOTIFY-2 (preferences + email fan-out).
-> A bell-menu UI is an API-first follow-up.
+> **UI shipped** (`feat/ui-3-notifications`): a header **bell** (`NotificationBell` — unread badge,
+> dropdown list, mark-read / mark-all-read) and a **Notifications** preferences card in Settings
+> (`NotificationPrefsCard` — in-app/email switches). EN/ES; QA-NOTIF-01..03.
 
 **Epic key:** `NOTIFY`
 
