@@ -16,6 +16,7 @@ public class RolePermissionsTests
     [InlineData(Permission.ManageMembers)]
     [InlineData(Permission.ManageRoles)]
     [InlineData(Permission.ManageBilling)]
+    [InlineData(Permission.ExportData)]
     [InlineData(Permission.TransferOwnership)]
     [InlineData(Permission.DissolveTenant)]
     public void Owner_HasEveryPermission(Permission permission) =>
@@ -27,6 +28,7 @@ public class RolePermissionsTests
     [InlineData(Permission.ManageMembers, true)]
     [InlineData(Permission.ManageRoles, false)]
     [InlineData(Permission.ManageBilling, false)]
+    [InlineData(Permission.ExportData, false)]
     [InlineData(Permission.TransferOwnership, false)]
     [InlineData(Permission.DissolveTenant, false)]
     public void Admin_HasManagementButNotOwnerOnlyPermissions(Permission permission, bool granted) =>
@@ -38,6 +40,7 @@ public class RolePermissionsTests
     [InlineData(Permission.ManageMembers, false)]
     [InlineData(Permission.ManageRoles, false)]
     [InlineData(Permission.ManageBilling, false)]
+    [InlineData(Permission.ExportData, false)]
     [InlineData(Permission.TransferOwnership, false)]
     [InlineData(Permission.DissolveTenant, false)]
     public void Member_HasOnlyViewTenant(Permission permission, bool granted) =>

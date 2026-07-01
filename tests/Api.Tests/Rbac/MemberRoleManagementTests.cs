@@ -211,7 +211,7 @@ public class MemberRoleManagementTests(PostgresFixture fixture) : PostgresTestBa
         var service = new TenantService(tenants, new EfUnitOfWork(db), [], TimeProvider.System,
             NullLogger<TenantService>.Instance, audit);
 
-        var controller = new HouseholdController(service, tenants, new ErrorResponseFactory());
+        var controller = new HouseholdController(service, tenants, new ErrorResponseFactory(), new StubExportService());
         var user = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, currentUserId.ToString())], authenticationType: "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };

@@ -105,6 +105,10 @@ builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpCurre
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 
+// Tenant data export (GDPR-1, ADR-011). Assembles core + each contributor's section into a JSON
+// bundle stored via IFileStorage, returned as a signed URL. Owner-gated at the endpoint.
+builder.Services.AddScoped<ITenantExportService, TenantExportService>();
+
 // RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
 // resolves the caller's membership and consults the RolePermissions matrix; fails closed.
 builder.Services.AddScoped<IPermissionService, PermissionService>();

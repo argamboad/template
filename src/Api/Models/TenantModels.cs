@@ -25,6 +25,12 @@ public record ChangeMemberRoleRequest
     [JsonPropertyName("role")] public string? Role { get; init; }
 }
 
+public record TenantExportResponse
+{
+    /// <summary>Signed, time-limited URL to download the export bundle.</summary>
+    [JsonPropertyName("download_url")] public required string DownloadUrl { get; init; }
+}
+
 public record TenantMemberResponse
 {
     [JsonPropertyName("user_id")] public required Guid UserId { get; init; }

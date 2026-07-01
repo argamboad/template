@@ -21,4 +21,14 @@ public sealed class AuditDataContributor(IRepository<AuditEvent> events) : ITena
         await events.QueryAllTenants()
             .Where(e => e.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
+
+    public string ExportKey => "audit";
+
+    // The audit trail is already secret-free (identifiers + metadata only), so it exports as-is.
+    public async Task<object?> ExportAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        await events.QueryAllTenants()
+            .Where(e => e.TenantId == tenantId)
+            .OrderBy(e => e.CreatedAt)
+            .Select(e => new { e.Action, e.ActorUserId, e.EntityType, e.EntityId, e.Metadata, e.CreatedAt })
+            .ToListAsync(cancellationToken);
 }

@@ -91,3 +91,15 @@ internal sealed class NoopEmailSender : IEmailSender
     public Task SendAsync(string to, string subject, string htmlBody,
         IReadOnlyList<EmailInlineImage>? inlineImages = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
+
+/// <summary>Test double for the export service — used by controller tests that don't exercise export.</summary>
+internal sealed class StubExportService : Template.Api.Services.ITenantExportService
+{
+    public bool Called { get; private set; }
+
+    public Task<Uri> ExportAsync(Guid tenantId, Guid actorUserId, CancellationToken cancellationToken = default)
+    {
+        Called = true;
+        return Task.FromResult(new Uri("https://example.test/api/files/stub-token"));
+    }
+}
