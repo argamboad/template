@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Template.Core.Abstractions;
 using Template.Core.Repositories;
@@ -34,7 +35,8 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         // Persistence
         services.AddDbContext<AppDbContext>(options =>
@@ -90,13 +92,22 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScheduledJob, ExpiredTokenCleanupJob>();
         services.AddHostedService<ScheduledJobsHost>();
 
-        // Billing provider (ADR-006). Stripe when a secret key is configured; otherwise the in-memory
-        // fake, so the app boots and dev/E2E run with zero Stripe setup and zero real charges.
+        // Billing provider (ADR-006, amended by the v2 audit / GAP-1). Stripe when a secret key is
+        // configured; otherwise the in-memory fake — but ONLY in Development. The fake trusts a literal
+        // webhook signature (FakeBillingProvider), and the webhook endpoint is anonymous, so registering
+        // it outside Development would accept forged, unauthenticated cross-tenant billing writes. Fail
+        // fast at startup instead, so a misconfigured production deploy cannot boot with the fake.
         services.Configure<StripeSettings>(configuration.GetSection("Billing:Stripe"));
         if (!string.IsNullOrEmpty(configuration["Billing:Stripe:SecretKey"]))
             services.AddScoped<IBillingProvider, StripeBillingProvider>();
-        else
+        else if (environment.IsDevelopment())
             services.AddScoped<IBillingProvider, FakeBillingProvider>();
+        else
+            throw new InvalidOperationException(
+                "No Billing:Stripe:SecretKey is configured and the environment is not Development. The " +
+                "in-memory FakeBillingProvider trusts a literal webhook signature and must never run " +
+                "outside Development (it would accept forged, unauthenticated cross-tenant billing " +
+                "writes). Configure a real Stripe secret key for this environment.");
 
         // File/blob storage (ADR-010). An S3-compatible backend (AWS/MinIO/R2/B2) is selected when a
         // bucket is configured; otherwise local disk — the dev/test default with zero setup. Same
