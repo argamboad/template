@@ -503,6 +503,19 @@ But I see no promote/demote (role) controls and no transfer/dissolve — only Le
 Invitations card, no per-row action buttons (no Remove/role controls), only a **Leave** button —
 unchanged from QA-HH-02 (a member is never shown management controls regardless of the admin tier).
 
+### QA-HH-13 — Owner exports household data 🟠 (Web)
+**Gherkin**
+```gherkin
+Given I am the household owner on /household
+When I click "Download household data"
+Then I get a link to a JSON export of the household's data
+```
+**Walkthrough**
+1. As owner, open **Household** → the **Data** card → **Download household data**.
+2. **Expected:** a success row with a **Download** link; following it downloads a JSON bundle containing
+   the tenant, members and invitations (and each feature's data). Members/admins don't see the Data card
+   (owner-only). No secrets (invitation token hashes) appear in the file.
+
 ---
 
 ## 8. Web — Invitations & joining 🟠
@@ -662,6 +675,23 @@ available by design, so provider removal can't lock you out.)
 
 ### QA-SET-06 — Settings requires auth 🟢 (Web)
 **Walkthrough:** signed out, navigate to `/settings`. **Expected:** redirect to `/login`.
+
+### QA-SET-07 — Delete my account 🟠 (Web)
+**Precondition:** use a **throwaway** account (this is destructive). Easiest: a member of another
+owner's household (so no dissolve).
+**Gherkin**
+```gherkin
+Given I am signed in on /settings
+When I use the Danger zone "Delete my account" and confirm
+Then my account and personal data are deleted and I'm signed out
+```
+**Walkthrough**
+1. **Settings** → **Danger zone** → **Delete my account** → confirm the dialog.
+2. **Expected (member):** account deleted; you're signed out and land on `/login`. Signing in again
+   creates a brand-new account.
+3. **Owner with other members:** an error tells you to **transfer ownership first** (nothing deleted).
+4. **Sole owner:** a second confirm warns it also **dissolves the household**; on confirm, the account +
+   household are deleted.
 
 ---
 
@@ -940,8 +970,8 @@ the API directly:
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
-| GDPR data export (API-only) | covered by `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
-| GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
+| GDPR data export | **HH-13** (owner Household → Data → download) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
+| GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Wired into OTP-verify + native-exchange; OAuth/magic-link **redirect** step-up is a UI follow-up. |
 | In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). Bell-menu UI = follow-up. |
 | Admin back-office (API-only) | covered by `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/tenants` (+ `/{id}`) inspection + `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
@@ -1048,3 +1078,7 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   identity + an `impersonated_by` claim; **loudly audited in the target's tenant**. Unknown target → 404.
   Covered by `AdminControllerTests`. **This completes the ADMIN epic — and the planned platform**
   (nine epics, ADRs 006–014).
+- **Updated 2026-07-01** — UI pass (putting a face on the API-first surfaces). **UI-1 (GDPR):** the owner
+  **Data → Download household data** button on Household (**QA-HH-13**) and **Settings → Danger zone →
+  Delete my account** (**QA-SET-07**) — wired to `POST /api/household/export` and `DELETE /api/auth/me`
+  (single-owner-safe, with the dissolve second-confirm). EN/ES localized.

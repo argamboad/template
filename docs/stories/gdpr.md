@@ -4,7 +4,9 @@
 > forgotten"), assembled from machinery the platform already has: the `ITenantDataContributor` seam,
 > the transactional **dissolve** flow, the **audit log** (ADR-008), and **file storage** (ADR-010).
 > Design decision + constraints in **ADR-011**. Stories use Gherkin acceptance criteria.
-> **Status: ✅ COMPLETE** — GDPR-1 (tenant export) + GDPR-2 (account erasure) both merged.
+> **Status: ✅ COMPLETE** — GDPR-1 (tenant export) + GDPR-2 (account erasure) both merged. **UI shipped**
+> (`feat/ui-1-gdpr`): owner **Download household data** on Household + **Delete my account** in Settings
+> (EN/ES; QA-HH-13, QA-SET-07).
 
 **Epic key:** `GDPR`
 
