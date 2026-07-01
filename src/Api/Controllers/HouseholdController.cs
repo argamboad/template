@@ -20,7 +20,8 @@ namespace Template.Api.Controllers;
 public class HouseholdController(
     ITenantService service,
     ITenantRepository tenants,
-    IErrorResponseFactory errorFactory) : TenantApiControllerBase(tenants, errorFactory)
+    IErrorResponseFactory errorFactory,
+    ITenantExportService exportService) : TenantApiControllerBase(tenants, errorFactory)
 {
     /// <summary>Tenant + caller role + member roster (any member).</summary>
     [HttpGet]
@@ -95,6 +96,20 @@ public class HouseholdController(
                 "cannot_remove_owner", "The household owner can't be removed — transfer ownership first")),
             _ => NotFound(ErrorFactory.CreateError("member_not_found", "That user is not a member of this household")),
         };
+    }
+
+    /// <summary>Exports the tenant's data as a downloadable bundle (owner only — ExportData).</summary>
+    [HttpPost("export")]
+    public async Task<IActionResult> Export(CancellationToken cancellationToken)
+    {
+        var membership = await GetMembershipAsync(cancellationToken);
+        if (membership == null)
+            return InvalidToken();
+        if (RequirePermission(membership, Permission.ExportData, "Only the household owner can export the household's data") is { } forbidden)
+            return forbidden;
+
+        var url = await exportService.ExportAsync(membership.TenantId, membership.UserId, cancellationToken);
+        return Ok(new TenantExportResponse { DownloadUrl = url.ToString() });
     }
 
     /// <summary>Changes a member's role between admin and member (owner only — ManageRoles).</summary>

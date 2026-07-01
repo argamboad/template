@@ -21,4 +21,13 @@ public class NotesDataContributor(IRepository<Note> notes) : ITenantDataContribu
         await notes.QueryAllTenants()
             .Where(n => n.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
+
+    public string ExportKey => "notes";
+
+    public async Task<object?> ExportAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        await notes.QueryAllTenants()
+            .Where(n => n.TenantId == tenantId)
+            .OrderBy(n => n.CreatedAt)
+            .Select(n => new { n.Id, n.Title, n.Content, n.CreatedAt, n.UpdatedAt })
+            .ToListAsync(cancellationToken);
 }

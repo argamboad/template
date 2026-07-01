@@ -21,7 +21,14 @@ transfer/dissolve invariants (ADR-003).
 
 ### GDPR-1 — Tenant data export ("download my data")
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/gdpr-1-tenant-export`). `ITenantDataContributor` gained
+`ExportKey` + `ExportAsync` (Notes + Audit contributors implement it — secret-free); `TenantExportService`
+(`src/Api/Services/`) assembles core (tenant/members/invitations, **token hashes omitted**) + each
+contributor's section → JSON → `IFileStorage.PutAsync` → signed URL via `GetDownloadUrlAsync`; records
+`tenant.exported`. Owner-only endpoint `POST /api/household/export` (new `Permission.ExportData`, → 403
+for non-owner). **API-only** (no UI button yet). Tests `tests/Api.Tests/Gdpr/TenantExportTests.cs`
+(bundle assembly + secret-exclusion + tenant-scoping via a capturing `IFileStorage`, owner 200 /
+non-owner 403, audit) + matrix (`RolePermissionsTests`).
 
 **As a** tenant owner
 **I want** to download an export of my tenant's data
@@ -129,9 +136,10 @@ merged, app working; ADR-011 referenced.
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. 🔲 **Tenant export (GDPR-1).** `ExportAsync`/`ExportKey` on `ITenantDataContributor`;
+1. ✅ **Tenant export (GDPR-1).** — DONE. `ExportAsync`/`ExportKey` on `ITenantDataContributor`;
    `TenantExportService` assembles core + contributor sections → `IFileStorage` → signed URL;
-   owner-gated endpoint (`Permission.ExportData`); audited; secret-free.
+   owner-gated endpoint `POST /api/household/export` (`Permission.ExportData`); audited; secret-free.
+   API-only (no UI button yet).
 2. 🔲 **Account erasure (GDPR-2).** Self-service delete-my-account: wipe identity rows in one
    transaction, honoring transfer-or-dissolve for owners and remove-without-re-home for members;
    audited; audit trail (actor ids) survives.

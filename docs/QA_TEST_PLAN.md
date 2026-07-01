@@ -107,9 +107,11 @@ beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — s
 
 **Platform services with no client UI (API-/operational-level, not manually testable through the app
 yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
-health endpoints, the background outbox/inbox/scheduled-jobs, and **file storage** — the `IFileStorage`
+health endpoints, the background outbox/inbox/scheduled-jobs, **file storage** — the `IFileStorage`
 seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
-authorization; local-disk only — cloud backends hand out native presigned URLs). These are **covered by
+authorization; local-disk only — cloud backends hand out native presigned URLs), and **GDPR data
+export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle).
+These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12.
@@ -934,6 +936,7 @@ the API directly:
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
+| GDPR data export (API-only) | covered by `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1000,3 +1003,7 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   **S3-compatible** backend (AWS/MinIO/R2/B2, config-gated by `Storage:S3:Bucket`), tested against a
   real **MinIO** container (`S3FileStorageMinioTests`); prod config is documented in `.env.example`.
   **This completes Wave 1** (RBAC + File storage).
+- **Updated 2026-07-01** for GDPR data export (ADR-011, Wave 2): owner-only `POST /api/household/export`
+  assembles the tenant's data (core + each feature's contributor section) into a JSON bundle stored via
+  file storage and returns a **signed download URL**; **secret-free** (no token hashes), tenant-scoped,
+  audited. **API-only** (no UI button yet) — covered by `Api.Tests` (`TenantExportTests`); see §2 + §15.

@@ -24,6 +24,9 @@ public enum Permission
     /// <summary>Start checkout and open the billing portal (owner-only — financial).</summary>
     ManageBilling,
 
+    /// <summary>Export the tenant's data — "download my data" (owner-only; GDPR, ADR-011).</summary>
+    ExportData,
+
     /// <summary>Transfer ownership to another member (owner-only).</summary>
     TransferOwnership,
 
