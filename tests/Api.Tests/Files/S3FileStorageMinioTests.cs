@@ -49,7 +49,8 @@ public sealed class S3FileStorageMinioTests(MinioFixture fixture) : IClassFixtur
     private S3FileStorage NewStorage(Guid tenant) =>
         new(S3FileStorage.CreateClient(fixture.Settings),
             new TestCurrentTenant { TenantId = tenant },
-            Options.Create(fixture.Settings));
+            Options.Create(fixture.Settings),
+            TimeProvider.System);
 
     [Fact]
     public async Task RoundTrip_PutExistsGetDelete()

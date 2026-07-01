@@ -18,7 +18,8 @@ public sealed record ApiKeyAuthResult(Guid KeyId, Guid TenantId, string Name, IR
 /// </summary>
 public interface IApiKeyService
 {
-    Task<ApiKeyCreated> CreateAsync(Guid createdByUserId, string name, IEnumerable<string>? scopes, DateTimeOffset? expiresAt, CancellationToken cancellationToken = default);
+    /// <summary>Mints a key; null if scopes were provided but none are recognized (reject, don't grant all).</summary>
+    Task<ApiKeyCreated?> CreateAsync(Guid createdByUserId, string name, IEnumerable<string>? scopes, DateTimeOffset? expiresAt, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ApiKey>> ListAsync(CancellationToken cancellationToken = default);
     Task<bool> RevokeAsync(Guid id, CancellationToken cancellationToken = default);
 
@@ -34,10 +35,13 @@ public sealed class ApiKeyService(
 {
     private const string RawPrefix = "pk_";
 
-    public async Task<ApiKeyCreated> CreateAsync(Guid createdByUserId, string name, IEnumerable<string>? scopes, DateTimeOffset? expiresAt, CancellationToken cancellationToken = default)
+    public async Task<ApiKeyCreated?> CreateAsync(Guid createdByUserId, string name, IEnumerable<string>? scopes, DateTimeOffset? expiresAt, CancellationToken cancellationToken = default)
     {
-        var raw = RawPrefix + tokenGenerator.GenerateToken();
         var granted = NormalizeScopes(scopes);
+        if (granted is null)
+            return null; // scopes were provided but none are known — reject rather than grant all
+
+        var raw = RawPrefix + tokenGenerator.GenerateToken();
         var key = new ApiKey
         {
             Name = string.IsNullOrWhiteSpace(name) ? "API key" : name.Trim(),
@@ -91,14 +95,18 @@ public sealed class ApiKeyService(
         return new ApiKeyAuthResult(key.Id, key.TenantId, key.Name, ApiScopes.Parse(key.Scopes));
     }
 
-    // Keep only scopes the app knows about; empty request defaults to all known scopes.
-    private static IReadOnlyList<string> NormalizeScopes(IEnumerable<string>? scopes)
+    // A null request defaults to all known scopes; a request that names scopes but none are known is
+    // REJECTED (null), never silently granted full access — v2 audit SOLID-3.
+    private static IReadOnlyList<string>? NormalizeScopes(IEnumerable<string>? scopes)
     {
-        var requested = (scopes ?? ApiScopes.All)
+        if (scopes is null)
+            return ApiScopes.All;
+
+        var requested = scopes
             .Select(s => s.Trim().ToLowerInvariant())
             .Where(ApiScopes.All.Contains)
             .Distinct()
             .ToList();
-        return requested.Count == 0 ? ApiScopes.All : requested;
+        return requested.Count == 0 ? null : requested; // provided but all-invalid → reject
     }
 }

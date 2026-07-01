@@ -59,6 +59,18 @@ public class WebhookSubscriptionServiceTests(PostgresFixture fixture) : Postgres
     }
 
     [Fact]
+    public async Task Create_AllInvalidEventTypes_IsRejected_NotSubscribedToAll()
+    {
+        // v2 audit SOLID-3: naming only unknown event types must be REJECTED, not silently subscribed to all.
+        var tenant = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext(tenant);
+
+        var created = await Build(db).CreateAsync(Creator, "https://example.test/hook", ["bogus_event"], default);
+
+        Assert.Null(created);
+    }
+
+    [Fact]
     public async Task List_IsTenantScoped()
     {
         var mine = Guid.CreateVersion7();
@@ -95,5 +107,5 @@ public class WebhookSubscriptionServiceTests(PostgresFixture fixture) : Postgres
     private static WebhookSubscriptionService Build(Template.Infrastructure.Persistence.AppDbContext db, WebhookSecretProtector? protector = null) =>
         new(new EfRepository<WebhookSubscription>(db), new EfRepository<WebhookDelivery>(db),
             new EfOutbox(db, TimeProvider.System), new TestCurrentTenant(),
-            new TokenGenerator(), protector ?? NewProtector(), TimeProvider.System);
+            new TokenGenerator(), protector ?? NewProtector(), new AllowAllUrlGuard(), TimeProvider.System);
 }

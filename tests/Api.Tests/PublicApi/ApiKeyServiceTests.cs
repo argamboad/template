@@ -24,7 +24,7 @@ public class ApiKeyServiceTests(PostgresFixture fixture) : PostgresTestBase(fixt
         await using var db = Fixture.CreateContext(tenant);
         var svc = Build(db);
 
-        var created = await svc.CreateAsync(Creator, "CI", null, null, default);
+        var created = (await svc.CreateAsync(Creator, "CI", null, null, default))!;
 
         Assert.StartsWith("pk_", created.RawKey);
         Assert.NotEqual(created.RawKey, created.Key.KeyHash);       // raw never stored
@@ -40,9 +40,21 @@ public class ApiKeyServiceTests(PostgresFixture fixture) : PostgresTestBase(fixt
         await using var db = Fixture.CreateContext(tenant);
         var svc = Build(db);
 
-        var created = await svc.CreateAsync(Creator, "read-only", ["read", "bogus"], null, default);
+        var created = (await svc.CreateAsync(Creator, "read-only", ["read", "bogus"], null, default))!;
 
         Assert.Equal(new HashSet<string> { ApiScopes.Read }, ApiScopes.Parse(created.Key.Scopes));
+    }
+
+    [Fact]
+    public async Task Create_AllInvalidScopes_IsRejected_NotGrantedAll()
+    {
+        // v2 audit SOLID-3: a request that names scopes but none are known must be REJECTED, not silently
+        // minted with full access.
+        await using var db = Fixture.CreateContext(Guid.CreateVersion7());
+
+        var created = await Build(db).CreateAsync(Creator, "typo", ["raed", "wrte"], null, default);
+
+        Assert.Null(created);
     }
 
     [Fact]
@@ -51,7 +63,7 @@ public class ApiKeyServiceTests(PostgresFixture fixture) : PostgresTestBase(fixt
         var tenant = Guid.CreateVersion7();
         string raw;
         await using (var db = Fixture.CreateContext(tenant))
-            raw = (await Build(db).CreateAsync(Creator, "k", ["read"], null, default)).RawKey;
+            raw = (await Build(db).CreateAsync(Creator, "k", ["read"], null, default))!.RawKey;
 
         await using var authDb = Fixture.CreateContext(); // no ambient tenant — the key selects it
         var result = await Build(authDb).AuthenticateAsync(raw, default);
@@ -78,7 +90,7 @@ public class ApiKeyServiceTests(PostgresFixture fixture) : PostgresTestBase(fixt
         await using (var db = Fixture.CreateContext(tenant))
         {
             var svc = Build(db);
-            var created = await svc.CreateAsync(Creator, "k", null, null, default);
+            var created = (await svc.CreateAsync(Creator, "k", null, null, default))!;
             (keyId, raw) = (created.Key.Id, created.RawKey);
             Assert.True(await svc.RevokeAsync(keyId, default));
         }
@@ -94,7 +106,7 @@ public class ApiKeyServiceTests(PostgresFixture fixture) : PostgresTestBase(fixt
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
         string raw;
         await using (var db = Fixture.CreateContext(tenant))
-            raw = (await Build(db, clock).CreateAsync(Creator, "k", null, clock.GetUtcNow().AddHours(1), default)).RawKey;
+            raw = (await Build(db, clock).CreateAsync(Creator, "k", null, clock.GetUtcNow().AddHours(1), default))!.RawKey;
 
         clock.Advance(TimeSpan.FromHours(2)); // past expiry
         await using var authDb = Fixture.CreateContext();
@@ -108,7 +120,7 @@ public class ApiKeyServiceTests(PostgresFixture fixture) : PostgresTestBase(fixt
         var clock = new FakeTimeProvider(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
         string raw;
         await using (var db = Fixture.CreateContext(tenant))
-            raw = (await Build(db, clock).CreateAsync(Creator, "k", null, null, default)).RawKey;
+            raw = (await Build(db, clock).CreateAsync(Creator, "k", null, null, default))!.RawKey;
 
         await using (var authDb = Fixture.CreateContext())
             await Build(authDb, clock).AuthenticateAsync(raw, default);

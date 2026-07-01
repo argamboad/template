@@ -14,6 +14,7 @@ using Template.Infrastructure.Audit;
 using Template.Infrastructure.Billing;
 using Template.Infrastructure.Email;
 using Template.Infrastructure.Files;
+using Template.Infrastructure.Http;
 using Template.Infrastructure.Inbox;
 using Template.Infrastructure.Outbox;
 using Template.Infrastructure.Scheduling;
@@ -71,6 +72,7 @@ public static class ServiceCollectionExtensions
         // delivery (retry/backoff via the outbox). Always registered — dormant until webhooks are enabled
         // and a subscription exists; the management routes are the config-gated part (Program.cs).
         services.AddScoped<IWebhookSecretProtector, WebhookSecretProtector>();
+        services.AddSingleton<IOutboundUrlGuard, OutboundUrlGuard>(); // SSRF guard for tenant-supplied webhook URLs (GAP-2)
         services.AddHttpClient<IWebhookSender, WebhookSender>(c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IOutboxHandler, WebhookOutboxHandler>();
 
