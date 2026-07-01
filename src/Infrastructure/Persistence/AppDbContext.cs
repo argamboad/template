@@ -44,6 +44,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     // Per-tenant metered-usage counters (BILLING-5). ITenantScoped (auto-filtered per tenant).
     public DbSet<UsageCounter> UsageCounters => Set<UsageCounter>();
 
+    // Tenant API keys for programmatic access (PUBAPI, ADR-015). ITenantScoped; only the hash is stored.
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
     // Append-only tenant audit trail (ADR-008). ITenantScoped (auto-filtered per tenant); writes are
     // append-only via AuditAppendOnlyInterceptor.
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -222,6 +225,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             u.Property(x => x.Period).HasMaxLength(7).IsRequired(); // yyyy-MM
             // One counter row per (tenant, key, period) — the upsert target for TryConsume.
             u.HasIndex(x => new { x.TenantId, x.Key, x.Period }).IsUnique();
+        });
+
+        builder.Entity<ApiKey>(k =>
+        {
+            k.HasKey(x => x.Id);
+            k.Property(x => x.Name).HasMaxLength(128).IsRequired();
+            k.Property(x => x.KeyHash).HasMaxLength(128).IsRequired();
+            k.Property(x => x.Prefix).HasMaxLength(32).IsRequired();
+            k.Property(x => x.Scopes).HasMaxLength(256).IsRequired();
+            // Auth looks a presented key up by hash (across tenants, pre-scope) — unique + indexed.
+            k.HasIndex(x => x.KeyHash).IsUnique();
+            k.HasIndex(x => x.TenantId);
         });
 
         builder.Entity<AuditEvent>(a =>

@@ -1165,6 +1165,7 @@ the API directly:
 | Billing — checkout/portal/webhook (API-only) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Billing — quotas (BILLING-5) | **HH-14** (seat limit blocks invite → 402 upgrade message) + `Api.Tests` (`QuotaServiceTests`) | seats (members + pending invites vs `Plan.SeatLimit`) enforced on `POST /api/household/invitations` → 402 `seat_limit_reached`; metered usage via `IQuotaService.TryConsumeAsync` (monthly `UsageCounter`). Limits in `PlanCatalog` (null = unlimited). |
 | Billing — trial/dunning (BILLING-6) | covered by `Api.Tests` (`BillingWebhookHandlerTests`, `SubscriptionLapseSweepJobTests`); manual via Stripe test triggers | webhook transition into `past_due`/`canceled` → owner **notification** (in-app bell + outbox email, NOTIFY) once; `SubscriptionLapseSweepJob` (6h) nudges the owner once when a paid period lapses without a webhook (`LapseNotifiedAt`). Verify with `stripe trigger invoice.payment_failed` (test mode) → owner sees a billing notification in the bell. |
+| Public API + API keys (PUBAPI, **config-gated off**) | covered by `Api.Tests` (`ApiKeyServiceTests`); boot-verified on/off | `PublicApi:Enabled` toggles it. Owner-only `/api/apikeys` (create → raw `pk_…` once, list, revoke; `Permission.ManageApiKeys`); API-key auth scheme mints a `tenant_id`-scoped principal; demo `/api/public/whoami` (read scope) + `/api/public/echo` (write scope) via `.RequireApiScope`. **Off (default) ⇒ routes 404** (scheme not added, not mapped). Manual: set `PublicApi__Enabled=true`, mint a key in-app, `curl -H "X-Api-Key: pk_…" /api/public/whoami`. |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
@@ -1334,3 +1335,11 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   Stripe stays source of truth, no fabricated status. Covered by `BillingWebhookHandlerTests` +
   `SubscriptionLapseSweepJobTests`; manual via `stripe trigger`. **The BILLING epic is now complete**
   (1–6); only optional follow-ups remain (advance trial nudge; billing-dissolve contributor).
+- **Updated 2026-07-01** — **PUBAPI-1 (public API + API keys, config-gated OFF):** a programmatic surface
+  for machines (the user reversed the earlier "no public API" stance). `ApiKey` (hash-only, `pk_…`
+  revealed once; migration `AddApiKey`); a second **API-key auth scheme** mints a `tenant_id`-scoped
+  principal (so tenant isolation applies for free); owner-only `/api/apikeys` management
+  (`Permission.ManageApiKeys`); demo `/api/public/whoami` (read) + `/echo` (write) gated by
+  `.RequireApiScope`. **`PublicApi:Enabled` (default false) — strong gating: off ⇒ the scheme isn't added
+  and the routes 404.** Covered by `ApiKeyServiceTests` (9); boot-verified on (401 without a key) and off
+  (404). HOOKS (outbound webhooks) is the companion outbound half — next.

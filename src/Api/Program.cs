@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Template.Api.Authentication;
 using Template.Api.Configuration;
+using Template.Api.Features;
 using Template.Api.Features.Notes;
 using Template.Api.Observability;
 using Template.Api.Services;
@@ -167,12 +169,22 @@ builder.Services.AddSession(options =>
 // JWT Bearer — authenticates /api/* endpoints with the app-issued access token.
 // Validation mirrors JwtTokenService (issuer = audience = Jwt:Issuer).
 var jwtSettings = new JwtSettings(builder.Configuration);
-builder.Services.AddAuthentication()
+var authBuilder = builder.Services.AddAuthentication()
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
         // Single validation definition shared with JwtTokenService — see JwtValidation.
         options.TokenValidationParameters = jwtSettings.CreateParameters();
     });
+
+// PUBAPI (ADR-015): the public API + API keys. Default OFF — a deployment opts in via PublicApi:Enabled.
+// Strong gating: the API-key scheme is only added, and the routes only mapped (below), when enabled.
+var publicApiSettings = new PublicApiSettings();
+builder.Configuration.GetSection(PublicApiSettings.SectionName).Bind(publicApiSettings);
+builder.Services.AddSingleton(publicApiSettings);
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+if (publicApiSettings.Enabled)
+    authBuilder.AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationHandler.SchemeName, _ => { });
 
 // Single tenant-API authorization policy, shared by the platform controllers and feature groups.
 builder.Services.AddTenantApiAuthorization();
@@ -245,5 +257,12 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 // 🗑️ DELETE-ME: sample feature slice endpoints (remove with Features/Notes).
 app.MapNotes();
 // Billing is a platform controller (BillingController) — auto-mapped by MapControllers above.
+
+// PUBAPI (ADR-015): map key management + the public routes only when enabled — off ⇒ they don't exist.
+if (publicApiSettings.Enabled)
+{
+    app.MapApiKeyManagement();
+    app.MapPublicApi();
+}
 
 app.Run();
