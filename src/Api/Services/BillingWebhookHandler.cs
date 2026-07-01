@@ -20,6 +20,7 @@ public sealed class BillingWebhookHandler(
     IRepository<Subscription> subscriptions,
     ITenantContext tenantContext,
     IUnitOfWork unitOfWork,
+    IBillingNotifier billingNotifier,
     TimeProvider clock)
 {
     public async Task<WebhookResult> HandleAsync(string payload, string? signature, CancellationToken cancellationToken = default)
@@ -50,17 +51,23 @@ public sealed class BillingWebhookHandler(
         // by the normal interceptor/filter, not the cross-tenant escape hatch (ADR-003).
         using (tenantContext.EnterTenant(evt.TenantId))
         {
-            await UpsertSubscriptionAsync(evt, cancellationToken);
-            await transaction.CommitAsync(cancellationToken); // claim + projection commit atomically
+            var previousStatus = await UpsertSubscriptionAsync(evt, cancellationToken);
+            // Dunning (BILLING-6): notify the owner when the status *transitions into* a bad state — a
+            // failed payment or a cancellation. Same-status redeliveries don't re-notify (no oracle,
+            // no spam); the inbox already dedups by event id.
+            await MaybeNotifyDunningAsync(evt, previousStatus, cancellationToken);
+            await transaction.CommitAsync(cancellationToken); // claim + projection + notification commit atomically
         }
 
         return WebhookResult.Applied;
     }
 
-    private async Task UpsertSubscriptionAsync(BillingWebhookEvent evt, CancellationToken cancellationToken)
+    /// <summary>Upserts the projection and returns the status it had before this event (null if new).</summary>
+    private async Task<string?> UpsertSubscriptionAsync(BillingWebhookEvent evt, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
         var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken); // entered-tenant scoped
+        var previousStatus = subscription?.Status;
 
         if (subscription is null)
         {
@@ -87,5 +94,28 @@ public sealed class BillingWebhookHandler(
         }
 
         await subscriptions.SaveChangesAsync(cancellationToken);
+        return previousStatus;
+    }
+
+    private async Task MaybeNotifyDunningAsync(BillingWebhookEvent evt, string? previousStatus, CancellationToken cancellationToken)
+    {
+        if (evt.Status == previousStatus)
+            return; // no transition — nothing new to tell the owner
+
+        var copy = evt.Status switch
+        {
+            SubscriptionStatus.PastDue => BillingNotifications.PastDue,
+            SubscriptionStatus.Canceled => BillingNotifications.Canceled,
+            _ => default,
+        };
+        if (copy == default)
+            return; // active/trialing transitions aren't dunning events
+
+        var kind = evt.Status == SubscriptionStatus.PastDue
+            ? BillingNotifications.PastDueKind
+            : BillingNotifications.CanceledKind;
+
+        await billingNotifier.NotifyOwnerAsync(evt.TenantId, kind, copy.Title, copy.Body, cancellationToken);
+        await subscriptions.SaveChangesAsync(cancellationToken); // flush the staged notification within the tx
     }
 }

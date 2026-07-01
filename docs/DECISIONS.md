@@ -283,7 +283,20 @@ past the cap) vs `Plan.SeatLimit`; checked in `TenantInvitationService.CreateAsy
 no sweep job** (simpler than the point-5 "usage counter + JOBS-3 reset" sketch). Limits live in
 `PlanCatalog` as **data**: a `null`/absent limit means unlimited, so the mechanism ships **inert** until a
 plan sets a number; the template ships example numbers (Free 3/3, Pro 10/100) to demonstrate. Confirms
-point 5 (quotas ≠ rate limits): these are per-tenant persisted counters, not the per-IP throttle. **Still
+point 5 (quotas ≠ rate limits): these are per-tenant persisted counters, not the per-IP throttle.
+
+*Addendum (BILLING-6, 2026-07-01) — trial/dunning lifecycle (owner-facing reaction, mechanism-first).*
+The projection already reflects Stripe's lifecycle (BILLING-3), and entitlements already fail closed on a
+lapsed period — so BILLING-6 adds the **reaction**, not new state. **`IBillingNotifier`** notifies the
+tenant **owner** through the notification center (NOTIFY: in-app row + outbox email per prefs). The
+**webhook handler** compares the pre-event status and, on a **transition into `past_due` or `canceled`**,
+notifies once (same-status redeliveries don't re-notify; the inbox dedups by event id). A
+**`SubscriptionLapseSweepJob`** (`IScheduledJob`, ADR-007) scans all tenants (`QueryAllTenants`) for
+active/trialing subscriptions whose `CurrentPeriodEnd` has passed, sends a one-time "expired" nudge, and
+records `Subscription.LapseNotifiedAt` so it fires once per lapse — **without fabricating a status**
+(Stripe stays the money-truth; a later webhook corrects the projection). Deliberately **not** built:
+Stripe's own retry schedule / card-failure emails (**Smart Retries** owns that), and the advance
+"trial-ends-in-N-days" nudge (a small follow-up — needs a Stripe `trial_will_end` event kind). **Still
 open from point 6:** a `BillingDataContributor` (cancel Stripe sub + wipe projection on dissolve).
 
 **ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**

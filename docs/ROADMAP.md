@@ -50,8 +50,9 @@ sequenced below by value, not by dependency.
 
 - **BILLING-5** (seat/usage quotas) — ✅ **DONE** (`IQuotaService`; seats on the invite path → 402,
   metered usage via monthly `UsageCounter`; limits in `PlanCatalog`, null = unlimited). · **BILLING-6**
-  (trial/dunning) — M. Deps met (outbox for dunning email, scheduler for trial sweeps). Do when you offer
-  trials / charge recurring money. (Also open: a billing-dissolve `ITenantDataContributor`.)
+  (trial/dunning) — ✅ **DONE** (`IBillingNotifier` dunning on past_due/canceled transitions +
+  `SubscriptionLapseSweepJob` one-time lapse nudge, via NOTIFY). **BILLING epic complete (1–6).** Optional
+  follow-ups: advance trial-ending nudge; a billing-dissolve `ITenantDataContributor`.
 
 ## Test & hardening debt (small, parallel cleanup)
 
