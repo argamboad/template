@@ -6,7 +6,7 @@ failing test before the production code on every slice (see `CLAUDE.md`, golden 
 
 ## Definition of "Solid" — the frozen quality bar
 
-This is the finish line from the 2026-06-21 deep audit (`docs/AUDIT_REPORT.md` §6). It is the spec
+This is the finish line from the 2026-06-21 deep audit (`docs/audits/v1-2026-06/AUDIT_REPORT.md` §6). It is the spec
 that ends the audit treadmill: when all five hold, "solid" is **provable by the test suite + CI**,
 not asserted by a reviewer. **Do not run another discovery audit — keep these green instead.**
 
