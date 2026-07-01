@@ -70,6 +70,13 @@ Single-use recovery codes, stored **only as hashes** (SHA-256); the raw codes ar
 enrollment. User-scoped (wiped by account erasure).
 - `id` (UUIDv7), `user_id`, `code_hash`, `used_at` (nullable — consumed when set)
 
+### Notification *(in-app notifications — ADR-013)*
+A per-user notification. **Keyed by `user_id` — NOT tenant-scoped** (the ADR-C2 per-user carve-out); a
+user only ever sees their own. User PII (wiped by account erasure).
+- `id` (UUIDv7), `user_id`, `kind` (stable verb), `title`, `body`
+- `metadata` (jsonb, nullable — identifiers only, no secrets), `read_at` (nullable), `created_at`
+- indexed on `(user_id, created_at)` for the newest-first feed + unread counts
+
 ### TenantInvitation *(constant — auth foundation)* — implements `ITenantScoped`
 An email invitation to join a tenant. The raw token is revealed once at creation; only its hash is
 stored.

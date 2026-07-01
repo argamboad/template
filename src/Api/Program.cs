@@ -116,6 +116,9 @@ builder.Services.AddScoped<IMfaService, MfaService>();
 // MFA login step-up (MFA-2). Signed short-lived challenge + verify → completes the session.
 builder.Services.AddSingleton<IMfaChallengeService, MfaChallengeService>();
 builder.Services.AddScoped<IMfaLoginService, MfaLoginService>();
+// Per-user in-app notifications (NOTIFY-1, ADR-013). NotifyAsync stages an in-app row on the caller's
+// unit of work; the center API reads/marks the caller's own notifications.
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
 // resolves the caller's membership and consults the RolePermissions matrix; fails closed.

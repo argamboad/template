@@ -113,7 +113,8 @@ authorization; local-disk only — cloud backends hand out native presigned URLs
 export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle),
 **account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), and
 **MFA enrollment/management** (`/api/auth/mfa/*`; authenticator TOTP — secret encrypted, hashed
-single-use recovery codes). These are **covered by
+single-use recovery codes), and the **in-app notification center** (`/api/notifications/*`; per-user
+list/unread-count/mark-read). These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12.
@@ -941,6 +942,7 @@ the API directly:
 | GDPR data export (API-only) | covered by `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Wired into OTP-verify + native-exchange; OAuth/magic-link **redirect** step-up is a UI follow-up. |
+| In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`) | `GET /api/notifications` (+ `?before=&limit=`), `GET /api/notifications/unread-count`, `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all` — **per-user** (scoped to the caller, never cross-user); features produce via `NotifyAsync`. Bell-menu UI + email fan-out = follow-ups (NOTIFY-2). |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1026,3 +1028,8 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   (needs the MFA UI) and are a flagged **follow-up** — no template-web user can enable MFA via those paths
   today (no enrollment UI). Covered by `MfaChallengeServiceTests` + `MfaLoginServiceTests`.
   **This completes Wave 2** (GDPR + MFA).
+- **Updated 2026-07-01** for in-app notifications (ADR-013, Wave 3): a **per-user** notification center —
+  `GET /api/notifications` (paginated), `/unread-count`, `POST /{id}/read`, `/read-all` — scoped to the
+  caller (never cross-user); features produce via `NotifyAsync` (staged in-app row). Notifications are
+  user PII (wiped by account erasure). **API-only** (bell-menu UI + email fan-out + preferences are
+  NOTIFY-2 / a UI follow-up) — covered by `Api.Tests` (`NotificationServiceTests`).
