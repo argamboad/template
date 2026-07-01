@@ -559,3 +559,46 @@ gap, not a re-do. Add authenticator-app **TOTP** (RFC 6238) as an optional secon
 Reusing Data Protection (secret encryption + challenge signing) and `ITokenHasher` (recovery codes)
 means no new crypto primitives — only Otp.NET for the standard TOTP math.
 Stories + slice plan: `docs/stories/mfa.md` (epic `MFA`).
+
+---
+
+**ADR-013 — In-app notifications: a per-user notification center + delivery preferences, fanned out through the outbox. (2026-07-01)**
+Transactional email exists (`IEmailSender`), but there's no in-app notification center and no per-user
+control over how a user is reached. This adds both, reusing the reliable-delivery path the platform
+already has (the outbox, ADR-007) rather than a second delivery mechanism.
+
+**Decision:**
+1. **`Notification` is per-user, not tenant-scoped.** It's a personal artifact ("your bell menu"), so it
+   is keyed by `user_id` and is the sanctioned per-user carve-out (**ADR-C2** — only preferences/personal
+   state are per-user; everything else is tenant-scoped). A user reads only their own notifications,
+   filtered by the authenticated user id — **not** the tenant filter. Fields: `id`, `user_id`, `kind`
+   (stable verb), `title`, `body`, `metadata` (jsonb), `read_at` (nullable), `created_at`.
+2. **One fan-out entry point.** `INotificationService.NotifyAsync(userId, kind, title, body, metadata)`
+   is the single call a feature makes to notify a user. It creates the **in-app** row **transactionally**
+   (a DB write in the same unit of work as the triggering change — no extra reliability machinery needed)
+   and, per the user's preferences, dispatches the **email** copy through `IEmailSender` — which is
+   already the **outbox-backed** sender (ADR-007), so the out-of-process channel is reliable + retried.
+   One domain event → one call → both channels, each delivered by the right mechanism.
+3. **Per-user delivery preferences** (`NotificationPreference`, keyed by `user_id`): channel toggles
+   (in-app / email), defaulting to on. This is the ADR-C2 per-user preference, alongside `User.Locale`.
+   The fan-out consults it; a feature never hard-codes channels.
+4. **A user-scoped notification-center API** — list (paginated), unread count, mark-one/all read, and
+   get/update preferences. All scoped to the caller (`NameIdentifier` claim), like `/api/auth/me` — never
+   tenant-filtered, never another user's notifications.
+5. **No new delivery infrastructure.** In-app = a DB row; email = the existing outbox path. The template
+   ships the center + the fan-out seam; a feature calls `NotifyAsync`, it does not wire channels itself.
+
+**Constraints recorded:**
+1. **Per-user, never cross-user** — every read/write is scoped to the authenticated user; a notification
+   is only ever visible to its owner.
+2. **In-app is transactional, email is outbox-reliable** — don't push the in-app insert through the
+   outbox (it's a same-DB write); don't send email inline (use the outbox-backed `IEmailSender`).
+3. **Preferences gate delivery** — the fan-out reads prefs; no channel is hard-coded at a call site.
+4. **Notifications are user PII** — wiped by account erasure (GDPR-2, ADR-011), like the other
+   user-scoped identity rows.
+5. **No secrets/PII beyond identifiers in `metadata`** — same rule as audit metadata.
+*Rationale:* the next ask after transactional email is almost always an in-app center + "how do you want
+to be reached." Keying it per-user (ADR-C2) and fanning out through the existing outbox keeps it a thin,
+reliable addition — a feature gets multi-channel, preference-aware notification from a single call, with
+no new delivery machinery to operate.
+Stories + slice plan: `docs/stories/notify.md` (epic `NOTIFY`).
