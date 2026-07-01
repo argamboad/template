@@ -58,6 +58,18 @@ typo'd or probed email leaves no account behind.
 - `created_at`, `expires_at`, `consumed_at` (nullable), `attempt_count` (OTP lockout)
 - **Derived (computed, never stored):** `is_expired`, `is_consumed`, `is_valid`
 
+### UserMfa *(MFA — authenticator TOTP; ADR-012)*
+A user's TOTP second-factor state (one per user). User-scoped identity data (wiped by account erasure).
+- `id` (UUIDv7), `user_id` (unique) — one MFA row per user
+- `encrypted_secret` — the TOTP secret **encrypted at rest** (Data Protection); never plaintext, never
+  returned after enrollment
+- `enabled` (true only after a valid code confirms possession), `enrolled_at`
+
+### MfaRecoveryCode *(MFA — ADR-012)*
+Single-use recovery codes, stored **only as hashes** (SHA-256); the raw codes are shown once at
+enrollment. User-scoped (wiped by account erasure).
+- `id` (UUIDv7), `user_id`, `code_hash`, `used_at` (nullable — consumed when set)
+
 ### TenantInvitation *(constant — auth foundation)* — implements `ITenantScoped`
 An email invitation to join a tenant. The raw token is revealed once at creation; only its hash is
 stored.

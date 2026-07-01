@@ -39,7 +39,9 @@ public sealed class AccountErasureService(
     IRepository<User> users,
     IRepository<UserLogin> logins,
     IRepository<RefreshToken> refreshTokens,
-    IRepository<LoginToken> loginTokens) : IAccountErasureService
+    IRepository<LoginToken> loginTokens,
+    IRepository<UserMfa> userMfa,
+    IRepository<MfaRecoveryCode> mfaRecoveryCodes) : IAccountErasureService
 {
     public async Task<EraseAccountResult> EraseAsync(Guid userId, bool confirmDissolve, CancellationToken cancellationToken = default)
     {
@@ -86,6 +88,8 @@ public sealed class AccountErasureService(
         await refreshTokens.Query().Where(r => r.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await logins.Query().Where(l => l.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await loginTokens.Query().Where(l => l.Email == user.Email).ExecuteDeleteAsync(cancellationToken);
+        await mfaRecoveryCodes.Query().Where(c => c.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+        await userMfa.Query().Where(m => m.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await users.Query().Where(u => u.Id == userId).ExecuteDeleteAsync(cancellationToken);
 
         await scope.CommitAsync(cancellationToken);
