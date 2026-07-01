@@ -48,8 +48,10 @@ sequenced below by value, not by dependency.
 
 ## Finish-the-epic (optional — when a real paid plan exists)
 
-- **BILLING-5** (seat/usage quotas) — M · **BILLING-6** (trial/dunning) — M. Deps now met (outbox for
-  dunning email, scheduler for trial sweeps). Not blocking anything; do when a plan has limits.
+- **BILLING-5** (seat/usage quotas) — ✅ **DONE** (`IQuotaService`; seats on the invite path → 402,
+  metered usage via monthly `UsageCounter`; limits in `PlanCatalog`, null = unlimited). · **BILLING-6**
+  (trial/dunning) — M. Deps met (outbox for dunning email, scheduler for trial sweeps). Do when you offer
+  trials / charge recurring money. (Also open: a billing-dissolve `ITenantDataContributor`.)
 
 ## Test & hardening debt (small, parallel cleanup)
 

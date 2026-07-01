@@ -41,6 +41,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     // it to the current tenant automatically.
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
+    // Per-tenant metered-usage counters (BILLING-5). ITenantScoped (auto-filtered per tenant).
+    public DbSet<UsageCounter> UsageCounters => Set<UsageCounter>();
+
     // Append-only tenant audit trail (ADR-008). ITenantScoped (auto-filtered per tenant); writes are
     // append-only via AuditAppendOnlyInterceptor.
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -210,6 +213,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             s.Property(x => x.StripeSubscriptionId).HasMaxLength(256);
             // At most one subscription per tenant.
             s.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<UsageCounter>(u =>
+        {
+            u.HasKey(x => x.Id);
+            u.Property(x => x.Key).HasMaxLength(64).IsRequired();
+            u.Property(x => x.Period).HasMaxLength(7).IsRequired(); // yyyy-MM
+            // One counter row per (tenant, key, period) — the upsert target for TryConsume.
+            u.HasIndex(x => new { x.TenantId, x.Key, x.Period }).IsUnique();
         });
 
         builder.Entity<AuditEvent>(a =>

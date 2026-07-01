@@ -217,6 +217,7 @@
   <data name="Household_StatusRenamed" xml:space="preserve"><value>Hogar renombrado.</value></data>
   <data name="Household_ErrRename" xml:space="preserve"><value>No se pudo renombrar el hogar.</value></data>
   <data name="Household_ErrEmailAlreadyMember" xml:space="preserve"><value>Ese correo ya es miembro.</value></data>
+  <data name="Household_ErrSeatLimit" xml:space="preserve"><value>Has alcanzado el límite de asientos de tu plan. Mejora tu plan para invitar a más miembros.</value></data>
   <data name="Household_ErrSendInvite" xml:space="preserve"><value>No se pudo enviar la invitación.</value></data>
   <data name="Household_ErrRegenerate" xml:space="preserve"><value>No se pudo regenerar el token.</value></data>
   <data name="Household_StatusRevoked" xml:space="preserve"><value>Invitación revocada.</value></data>

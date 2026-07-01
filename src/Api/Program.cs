@@ -133,6 +133,8 @@ builder.Services.AddScoped<IPermissionService, PermissionService>();
 // Billing entitlements (ADR-006). Server-side plan gate behind .RequireEntitlement(...); reads the
 // tenant's Subscription projection and fails closed to Free.
 builder.Services.AddScoped<IEntitlementService, EntitlementService>();
+// Billing quotas (BILLING-5): seat + metered-usage limits from the plan; used by the invite flow.
+builder.Services.AddScoped<IQuotaService, QuotaService>();
 // Billing checkout orchestration (BILLING-2), behind the platform BillingController. The
 // IBillingProvider (Stripe or fake) is registered in AddInfrastructure.
 builder.Services.AddScoped<IBillingService, BillingService>();

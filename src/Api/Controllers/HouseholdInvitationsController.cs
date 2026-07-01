@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Template.Api.Models;
 using Template.Api.Services;
@@ -37,6 +38,10 @@ public class HouseholdInvitationsController(
                 CreateInvitationResponse.From(result.Invitation, result.RawToken!)),
             InviteCreateStatus.AlreadyMember => Conflict(
                 ErrorFactory.CreateError("already_member", "That email is already a member of this household")),
+            // Seat quota hit (BILLING-5): 402 with an upgrade pointer, mirroring the entitlement gate.
+            InviteCreateStatus.SeatLimitReached => StatusCode(StatusCodes.Status402PaymentRequired,
+                ErrorFactory.CreateError("seat_limit_reached",
+                    "Your plan's seat limit is reached — upgrade to invite more members.")),
             _ => BadRequest(ErrorFactory.CreateError("invalid_request", "A valid email is required")),
         };
     }
