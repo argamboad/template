@@ -88,6 +88,32 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
             Assert.IsType<NotFoundObjectResult>(await controller.TenantDetail(Guid.CreateVersion7(), default));
     }
 
+    // --- staff status probe (UI-4): 200 for any authenticated caller, never 403 ---
+
+    [Fact]
+    public async Task Staff_Me_ReturnsIsStaffTrue()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.Me(default));
+            Assert.True(Assert.IsType<AdminStatusResponse>(ok.Value).IsStaff);
+        }
+    }
+
+    [Fact]
+    public async Task NonStaff_Me_ReturnsIsStaffFalse_Not403()
+    {
+        var callerId = await SeedUserAsync("normal@corp.com");
+        var (controller, db) = BuildController(callerId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.Me(default));
+            Assert.False(Assert.IsType<AdminStatusResponse>(ok.Value).IsStaff);
+        }
+    }
+
     // --- ADMIN-2: impersonation ---
 
     [Fact]

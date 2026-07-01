@@ -109,6 +109,26 @@
   <data name="NotifPrefs_Email" xml:space="preserve"><value>Notificaciones por correo</value></data>
   <data name="NotifPrefs_ErrLoad" xml:space="preserve"><value>No se pudieron cargar tus preferencias de notificación.</value></data>
   <data name="NotifPrefs_ErrSave" xml:space="preserve"><value>No se pudieron guardar tus preferencias. Inténtalo de nuevo.</value></data>
+  <data name="Nav_Admin" xml:space="preserve"><value>Administración</value></data>
+  <data name="Impersonation_Banner" xml:space="preserve"><value>Estás viendo la app como {0}.</value></data>
+  <data name="Impersonation_Stop" xml:space="preserve"><value>Dejar de suplantar</value></data>
+  <data name="Admin_Title" xml:space="preserve"><value>Consola de administración</value></data>
+  <data name="Admin_Subtitle" xml:space="preserve"><value>Back office del personal de plataforma: inspecciona inquilinos e inicia sesión como un usuario.</value></data>
+  <data name="Admin_Forbidden" xml:space="preserve"><value>No tienes acceso a la consola de administración.</value></data>
+  <data name="Admin_BackHome" xml:space="preserve"><value>Volver al inicio</value></data>
+  <data name="Admin_TenantsTitle" xml:space="preserve"><value>Inquilinos</value></data>
+  <data name="Admin_NoTenants" xml:space="preserve"><value>No hay inquilinos.</value></data>
+  <data name="Admin_SelectTenant" xml:space="preserve"><value>Selecciona un inquilino para ver sus detalles.</value></data>
+  <data name="Admin_Created" xml:space="preserve"><value>Creado</value></data>
+  <data name="Admin_AuditEvents" xml:space="preserve"><value>Eventos de auditoría</value></data>
+  <data name="Admin_Members" xml:space="preserve"><value>Miembros</value></data>
+  <data name="Admin_ColMember" xml:space="preserve"><value>Miembro</value></data>
+  <data name="Admin_ColRole" xml:space="preserve"><value>Rol</value></data>
+  <data name="Admin_Impersonate" xml:space="preserve"><value>Iniciar sesión como</value></data>
+  <data name="Admin_ConfirmImpersonate" xml:space="preserve"><value>¿Iniciar sesión como {0}? Las acciones que realices se registrarán a su nombre.</value></data>
+  <data name="Admin_ErrLoad" xml:space="preserve"><value>No se pudieron cargar los inquilinos.</value></data>
+  <data name="Admin_ErrDetail" xml:space="preserve"><value>No se pudieron cargar los detalles del inquilino.</value></data>
+  <data name="Admin_ErrImpersonate" xml:space="preserve"><value>No se pudo iniciar la suplantación.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>

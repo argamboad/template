@@ -24,6 +24,12 @@ public record AdminTenantDetailResponse
     [JsonPropertyName("audit_event_count")] public required int AuditEventCount { get; init; }
 }
 
+/// <summary>Whether the authenticated caller is platform staff — drives the client's admin nav/gate.</summary>
+public record AdminStatusResponse
+{
+    [JsonPropertyName("is_staff")] public required bool IsStaff { get; init; }
+}
+
 public record ImpersonationResponse
 {
     /// <summary>Short-lived access token for the impersonated user. No refresh token is issued.</summary>

@@ -35,6 +35,10 @@
                     <span class="user-name text-white-50 small">@Auth.DisplayName</span>
                 </div>
                 <NotificationBell />
+                @if (_isStaff && !Auth.IsImpersonating)
+                {
+                    <NavLink class="btn btn-outline-warning btn-sm" href="/admin" data-testid="nav-admin">@Localizer["Nav_Admin"]</NavLink>
+                }
                 <NavLink class="btn btn-outline-light btn-sm" href="/household">@Localizer["Nav_Household"]</NavLink>
                 <NavLink class="btn btn-outline-light btn-sm" href="/settings">@Localizer["Nav_Settings"]</NavLink>
                 <button class="btn btn-outline-light btn-sm" data-testid="sign-out" @onclick="SignOutAsync">@Localizer["Nav_SignOut"]</button>
@@ -46,9 +50,13 @@
 
 @code {
     private bool _menuOpen;
+    private bool _isStaff;
 
     // Close the menu after any navigation so it doesn't stay open over the new page on mobile.
     protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    // Show the Admin link only for platform staff (cheap, cached probe). Hidden while impersonating.
+    protected override async Task OnInitializedAsync() => _isStaff = await Auth.IsStaffAsync();
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
