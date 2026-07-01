@@ -70,7 +70,7 @@ public class WebhookDeliveryTests(PostgresFixture fixture) : PostgresTestBase(fi
         var message = OutboxMessage(new WebhookOutboxPayload(subId, "ping", "e1", body));
 
         await using var db = Fixture.CreateContext();
-        await new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(stub)), protector).HandleAsync(message, default);
+        await new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(stub)), protector, TimeProvider.System).HandleAsync(message, default);
 
         Assert.NotNull(stub.LastRequest);
         Assert.Equal(body, stub.LastBody);
@@ -90,7 +90,7 @@ public class WebhookDeliveryTests(PostgresFixture fixture) : PostgresTestBase(fi
         var message = OutboxMessage(new WebhookOutboxPayload(subId, "ping", "e1", "{}"));
 
         await using var db = Fixture.CreateContext();
-        var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(stub)), protector);
+        var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(stub)), protector, TimeProvider.System);
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(message, default));
     }
 
@@ -102,7 +102,7 @@ public class WebhookDeliveryTests(PostgresFixture fixture) : PostgresTestBase(fi
 
         await using var db = Fixture.CreateContext();
         await new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(stub)),
-            new WebhookSecretProtector(new EphemeralDataProtectionProvider())).HandleAsync(message, default);
+            new WebhookSecretProtector(new EphemeralDataProtectionProvider()), TimeProvider.System).HandleAsync(message, default);
 
         Assert.Null(stub.LastRequest); // never POSTed
     }

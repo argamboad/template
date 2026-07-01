@@ -108,8 +108,9 @@ notification through one reliable path.
 > **Shipped** (config-gated, default off) — `WebhookSubscription` (encrypted signing secret),
 > `IWebhookPublisher.PublishAsync` fan-out → one `"webhook"` **outbox** message per sub → HMAC-signed POST
 > with retry/dead-letter via the outbox; owner-only `/api/webhooks` (`Permission.ManageWebhooks`) + send-test.
-> Design in **ADR-016**, slices in `docs/stories/hooks.md`. **HOOKS-2 (optional):** tenant-facing delivery
-> log + replay + management UI. Sketch below retained for context.
+> Design in **ADR-016**, slices in `docs/stories/hooks.md`. **HOOKS-2 ✅ DONE:** tenant-facing delivery log
+> (`WebhookDelivery`, per-attempt) + view/replay endpoints. **HOOKS-3 (optional):** a Blazor management UI.
+> Sketch below retained for context.
 
 **What:** let *your* tenants subscribe to events from their data (endpoint registration, signed
 deliveries, retries, a delivery log).
