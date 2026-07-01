@@ -7,7 +7,7 @@ using Template.Infrastructure.Email;
 
 namespace Template.Api.Services;
 
-public enum InviteCreateStatus { Created, InvalidEmail, AlreadyMember }
+public enum InviteCreateStatus { Created, InvalidEmail, AlreadyMember, SeatLimitReached }
 
 public record InviteCreateResult(InviteCreateStatus Status, TenantInvitation? Invitation = null, string? RawToken = null);
 
@@ -56,6 +56,7 @@ public class TenantInvitationService(
     IApplicationSettings appSettings,
     IInvitationSettings invitationSettings,
     IEnumerable<ITenantDataContributor> dataContributors,
+    IQuotaService quota,
     TimeProvider clock,
     ILogger<TenantInvitationService> logger) : ITenantInvitationService
 {
@@ -91,6 +92,14 @@ public class TenantInvitationService(
         }
         else
         {
+            // A brand-new invite claims a seat (members + pending) — enforce the plan's seat quota
+            // (BILLING-5). Refreshing an existing pending invite (above) reuses its seat, so it's exempt.
+            if (!await quota.CanAddSeatsAsync(1, cancellationToken))
+            {
+                logger.LogInformation("Invite to tenant {TenantId} blocked: seat limit reached", tenantId);
+                return new InviteCreateResult(InviteCreateStatus.SeatLimitReached);
+            }
+
             invitation = await invitations.CreateAsync(new TenantInvitation
             {
                 Id = Guid.CreateVersion7(),

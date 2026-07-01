@@ -273,6 +273,19 @@ already platform and are unchanged; `.RequireEntitlement(...)` stays as `Feature
 controller action too. (The only vertical slice in the template remains the `Notes` 🗑️ DELETE-ME
 sample.)
 
+*Addendum (BILLING-5, 2026-07-01) — quotas implemented (mechanism-first, policy as data).* Decision
+point on quotas is now built: **`IQuotaService`** (`src/Api/Services/QuotaService.cs`) resolves the plan
+exactly like `EntitlementService` (fail-closed to Free) and enforces two limit kinds. **Seats** =
+tenant members + **pending invites** (a pending invite reserves a seat, so N invites can't over-provision
+past the cap) vs `Plan.SeatLimit`; checked in `TenantInvitationService.CreateAsync` for new invites →
+**402 `seat_limit_reached`**. **Metered usage** = `TryConsumeAsync(key)` against a **monthly**
+`UsageCounter` (`{tenant, key, yyyy-MM}`) — the calendar-month period key makes it **self-resetting with
+no sweep job** (simpler than the point-5 "usage counter + JOBS-3 reset" sketch). Limits live in
+`PlanCatalog` as **data**: a `null`/absent limit means unlimited, so the mechanism ships **inert** until a
+plan sets a number; the template ships example numbers (Free 3/3, Pro 10/100) to demonstrate. Confirms
+point 5 (quotas ≠ rate limits): these are per-tenant persisted counters, not the per-IP throttle. **Still
+open from point 6:** a `BillingDataContributor` (cancel Stripe sub + wipe projection on dissolve).
+
 **ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**
 Side effects that must not be lost (email, billing webhooks, future integrations) move off the
 request thread through a **transactional outbox**: an **`OutboxMessage`** is written in the **same EF

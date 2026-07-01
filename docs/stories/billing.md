@@ -2,10 +2,13 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1–4
-> shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal). The core
-> loop is closed and self-serve manage/cancel works (changes flow back through the webhook). BILLING-5
-> (seat/usage quotas) and 6 (trial/dunning) pending. Design decision and constraints in **ADR-006**.
+> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1–5
+> shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal; **seat +
+> metered-usage quotas**). The core loop is closed and self-serve manage/cancel works (changes flow back
+> through the webhook). **BILLING-5** (`feat/billing-5-quotas`): `IQuotaService` — seats (members +
+> pending invites vs the plan's `SeatLimit`) enforced on the invite path (→ 402 `seat_limit_reached`) +
+> metered usage (`TryConsumeAsync`, monthly `UsageCounter`); limits live in `PlanCatalog` (null =
+> unlimited). Only **BILLING-6** (trial/dunning) pending. Design decision and constraints in **ADR-006**.
 > Stories use Gherkin acceptance criteria.
 
 **Epic key:** `BILLING`
@@ -228,7 +231,18 @@ Scenario: Cancellation propagates via webhook
 
 ---
 
-### BILLING-5 — Seat & usage quotas
+### BILLING-5 — Seat & usage quotas — ✅ Implemented (`feat/billing-5-quotas`)
+
+> **Shipped.** `IQuotaService` (`src/Api/Services/QuotaService.cs`) resolves the tenant's plan like
+> `EntitlementService` (fail-closed to Free). **Seats** = members + pending invites vs `Plan.SeatLimit`;
+> checked in `TenantInvitationService.CreateAsync` for new invites → `InviteCreateStatus.SeatLimitReached`
+> → **402 `seat_limit_reached`** (Household invite UI shows an upgrade message). **Metered usage** =
+> `TryConsumeAsync(key)` against a monthly `UsageCounter` (per `{tenant, key, yyyy-MM}` — self-resetting,
+> no sweep job); returns false without incrementing at the cap. Limits are `PlanCatalog` example data
+> (Free seats=3/export=3, Pro seats=10/export=100); **null/absent = unlimited** so it's inert until set.
+> Tests: `tests/Api.Tests/Billing/QuotaServiceTests.cs` (seat boundaries incl. pending-invite counting +
+> upgrade; usage within/at-limit/unlimited/month-reset; invite-flow 402). `TryConsumeAsync` is the seam —
+> call it at any metered action (e.g. an export) to enforce a per-month cap.
 
 **As a** the platform
 **I want** plan-tier quotas enforced (e.g. seats, metered usage)
@@ -320,9 +334,11 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
    at E2E.
 4. ✅ **Customer Portal (BILLING-4).** — DONE. `POST /api/billing/portal` (owner-only) → portal redirect
    from the tenant's stored Stripe customer id; changes reconcile via the BILLING-3 webhook.
-5. **Quotas (BILLING-5).** `IQuotaService` + seat check wired into the invitation path; a
-   `BillingDataContributor : ITenantDataContributor` that cancels the Stripe subscription and wipes
-   the projection on tenant dissolve.
+5. ✅ **Quotas (BILLING-5).** — DONE. `IQuotaService` (seats = members + pending invites vs
+   `Plan.SeatLimit`, enforced on the invite path → 402; metered usage via `TryConsumeAsync` +
+   monthly `UsageCounter`); limits are `PlanCatalog` data (null = unlimited). *Follow-up (not quotas):*
+   a `BillingDataContributor : ITenantDataContributor` to cancel the Stripe subscription + wipe the
+   projection on tenant dissolve — still open.
 6. **Trial/dunning (BILLING-6).** Undeferred later; Test Clocks + JOBS-1 (emails) + JOBS-3 (sweeps).
 
 **Known sharp edges (from ADR-006):** webhooks are at-least-once and out-of-order (idempotency is

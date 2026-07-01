@@ -321,6 +321,11 @@
             {
                 SetStatus(Localizer["Household_ErrEmailAlreadyMember"], false);
             }
+            else if (resp.StatusCode == System.Net.HttpStatusCode.PaymentRequired)
+            {
+                // Seat quota reached (BILLING-5) — prompt to upgrade rather than a generic error.
+                SetStatus(Localizer["Household_ErrSeatLimit"], false);
+            }
             else { SetStatus(Localizer["Household_ErrSendInvite"], false); }
         }
         finally { _busy = false; }

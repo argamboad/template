@@ -518,6 +518,25 @@ Then I get a link to a JSON export of the household's data
    the tenant, members and invitations (and each feature's data). Members/admins don't see the Data card
    (owner-only). No secrets (invitation token hashes) appear in the file.
 
+### QA-HH-14 — Seat quota blocks inviting past the plan limit 🟠 (Web)
+**Precondition:** the template ships example seat caps (Free = 3 seats, counting members + pending invites;
+`PlanCatalog`). A Free household at its cap (e.g. 3 members, or 2 members + 1 pending invite).
+**Gherkin**
+```gherkin
+Given my Free plan's seats are all used (members + pending invites)
+When I invite another member
+Then I'm told my seat limit is reached and to upgrade (nothing is invited)
+And raising the limit (Pro plan / editing PlanCatalog) lets the invite through
+```
+**Walkthrough**
+1. As owner of a Free household at the seat cap, **Household** → invite a new email.
+2. **Expected:** an error — "Your plan's seat limit is reached. Upgrade your plan to invite more members."
+   (HTTP **402**); no invitation is created and no email is sent.
+3. Free up a seat (revoke a pending invite / remove a member) **or** move to a higher-seat plan — the next
+   invite succeeds. (Seats count members **plus** pending invites, so invites can't over-provision.)
+4. **Note:** limits are `PlanCatalog` data; `null`/absent = unlimited. Metered-usage caps
+   (`IQuotaService.TryConsumeAsync`, monthly) are wired the same way where an app calls them.
+
 ---
 
 ## 8. Web — Invitations & joining 🟠
@@ -1143,7 +1162,8 @@ the API directly:
 | Tenant isolation / auth guards | SEC-01..05 | (all `[Authorize]` endpoints; write-stamping + reuse detection are automated) |
 | Platform health / readiness | SMK-07 | `GET /health`, `GET /health/ready` |
 | Transactional email delivery | (all email cases) | async via the outbox dispatcher (`OutboxMessages`) |
-| Billing (API-only, no UI) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
+| Billing — checkout/portal/webhook (API-only) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
+| Billing — quotas (BILLING-5) | **HH-14** (seat limit blocks invite → 402 upgrade message) + `Api.Tests` (`QuotaServiceTests`) | seats (members + pending invites vs `Plan.SeatLimit`) enforced on `POST /api/household/invitations` → 402 `seat_limit_reached`; metered usage via `IQuotaService.TryConsumeAsync` (monthly `UsageCounter`). Limits in `PlanCatalog` (null = unlimited). |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
@@ -1298,3 +1318,10 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   transport); `Login.razor`'s native branches reuse the same code prompt. Client-only — no API change;
   build-verified (native is E2E/manual per `MOBILE_TESTING.md`); **QA-MFA-05**. **MFA is now enforced on
   every sign-in path, web and native — the epic is fully closed, no open gaps.**
+- **Updated 2026-07-01** — **BILLING-5 (quotas):** `IQuotaService` adds plan **seat** limits (members +
+  pending invites vs `Plan.SeatLimit`, enforced on the invite path → **402 `seat_limit_reached`**, with an
+  upgrade message in the Household invite UI) and **metered usage** (`TryConsumeAsync` against a monthly,
+  self-resetting `UsageCounter`). Limits are `PlanCatalog` data — `null`/absent = unlimited, so it's inert
+  until set (template ships example caps: Free 3/3, Pro 10/100). New entity + migration `AddUsageCounter`.
+  Covered by `QuotaServiceTests` (10 cases); **QA-HH-14**; EN/ES. Only **BILLING-6** (trial/dunning) and a
+  billing-dissolve contributor remain from the BILLING epic.

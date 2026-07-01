@@ -15,16 +15,22 @@ namespace Template.Api.Tests.Infrastructure;
 /// test doubles for settings, email, and the clock. Construct one per logical actor:
 /// the context's current tenant drives the global query filter.
 /// </summary>
-public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
+public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null, ICurrentTenant? currentTenant = null)
 {
     public AppDbContext Db { get; } = db;
     public TimeProvider Clock { get; } = clock ?? TimeProvider.System;
+
+    /// <summary>The ambient tenant QuotaService counts seats against. Defaults to "no tenant" (null),
+    /// which makes the seat check trivially pass — pass an explicit one to exercise seat quotas.</summary>
+    public ICurrentTenant CurrentTenant { get; } = currentTenant ?? new TestCurrentTenant();
 
     public IUserRepository Users { get; } = new UserRepository(db);
     public ILoginTokenRepository LoginTokens { get; } = new LoginTokenRepository(db, clock ?? TimeProvider.System);
     public IRefreshTokenRepository RefreshTokens { get; } = new RefreshTokenRepository(db, clock ?? TimeProvider.System);
     public ITenantRepository Tenants { get; } = new TenantRepository(db);
     public ITenantInvitationRepository Invitations { get; } = new TenantInvitationRepository(db);
+    public IRepository<Subscription> Subscriptions { get; } = new EfRepository<Subscription>(db);
+    public IRepository<UsageCounter> UsageCounters { get; } = new EfRepository<UsageCounter>(db);
     public IUnitOfWork UnitOfWork { get; } = new EfUnitOfWork(db);
     public ITokenGenerator TokenGen { get; } = new TokenGenerator();
     public ITokenHasher Hasher { get; } = new TokenHasher();
@@ -48,10 +54,13 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null)
     public SessionService SessionService() =>
         new(RefreshTokenService(), JwtTokenService(), Tenants, new TestJwtSettings());
 
+    public QuotaService QuotaService() =>
+        new(Subscriptions, Tenants, Invitations, UsageCounters, CurrentTenant, Clock);
+
     public TenantInvitationService InvitationService(IInvitationSettings? invitation = null) =>
         new(Invitations, Tenants, TokenGen, Hasher, UnitOfWork, new NoopEmailSender(),
             UserService(), new TestAppSettings(), invitation ?? new TestInvitationSettings(),
-            [], Clock, NullLogger<TenantInvitationService>.Instance);
+            [], QuotaService(), Clock, NullLogger<TenantInvitationService>.Instance);
 }
 
 internal sealed class TestRefreshSettings(int expiryDays = 30) : IRefreshTokenSettings
