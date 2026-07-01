@@ -4,7 +4,7 @@
 > forgotten"), assembled from machinery the platform already has: the `ITenantDataContributor` seam,
 > the transactional **dissolve** flow, the **audit log** (ADR-008), and **file storage** (ADR-010).
 > Design decision + constraints in **ADR-011**. Stories use Gherkin acceptance criteria.
-> **Status: 🔲 in progress.**
+> **Status: ✅ COMPLETE** — GDPR-1 (tenant export) + GDPR-2 (account erasure) both merged.
 
 **Epic key:** `GDPR`
 
@@ -83,7 +83,15 @@ app working; ADR-011 referenced.
 
 ### GDPR-2 — Account erasure ("delete my account")
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/gdpr-2-account-erasure`). `AccountErasureService`
+(`src/Api/Services/`) wipes the caller's identity (`User`/`UserLogin`/`RefreshToken`/`LoginToken` — the
+last email-keyed) in one transaction, honoring the single-owner invariant (ADR-003): owner with other
+members → `MustTransferFirst`; solo owner → dissolve (contributors wipe + core teardown), gated by a
+`DissolveConfirmationRequired` confirm; member/admin → membership removed **without re-home** and
+`account.erased` audited in the surviving tenant. Endpoint `DELETE /api/auth/me`
+(`?confirm_dissolve=true`) on `AuthController` → 204 / 400 / 409 / 401. Tests
+`tests/Api.Tests/Gdpr/AccountErasureTests.cs` (member keeps-tenant + audit, solo-owner confirm/dissolve,
+owner-with-members blocked, no-confirm erases nothing, unknown user).
 
 **As a** user
 **I want** to delete my account and personal data
@@ -140,9 +148,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    `TenantExportService` assembles core + contributor sections → `IFileStorage` → signed URL;
    owner-gated endpoint `POST /api/household/export` (`Permission.ExportData`); audited; secret-free.
    API-only (no UI button yet).
-2. 🔲 **Account erasure (GDPR-2).** Self-service delete-my-account: wipe identity rows in one
-   transaction, honoring transfer-or-dissolve for owners and remove-without-re-home for members;
-   audited; audit trail (actor ids) survives.
+2. ✅ **Account erasure (GDPR-2).** — DONE. `AccountErasureService` + `DELETE /api/auth/me`: wipes
+   identity rows in one transaction, honoring transfer-or-dissolve for owners and remove-without-re-home
+   for members; audited; audit trail (actor ids) survives.
 
 **Known sharp edges (from ADR-011):** export is **owner-only** + returned as a **signed URL** (not
 inline); **no secrets** in the bundle; erasure **never strands a tenant ownerless** (transfer or

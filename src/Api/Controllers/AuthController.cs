@@ -37,6 +37,7 @@ public class AuthController(
     IErrorResponseFactory errorFactory,
     IApplicationSettings appSettings,
     IPasswordlessSettings passwordlessSettings,
+    IAccountErasureService accountErasure,
     ILogger<AuthController> logger) : ControllerBase
 {
     private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
@@ -245,6 +246,32 @@ public class AuthController(
             UserName = user.DisplayName ?? user.Email,
             TenantName = tenantName ?? string.Empty
         });
+    }
+
+    /// <summary>
+    /// Deletes the signed-in user's account and personal data (GDPR-2, ADR-011). Removes identity/PII
+    /// in one audited transaction; honors the single-owner invariant — an owner with other members must
+    /// transfer first, and a solo owner must confirm dissolution (which wipes the tenant's data).
+    /// </summary>
+    [HttpDelete("me")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> DeleteAccount([FromQuery(Name = "confirm_dissolve")] bool confirmDissolve, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+
+        var result = await accountErasure.EraseAsync(userId, confirmDissolve, cancellationToken);
+        return result switch
+        {
+            EraseAccountResult.Erased => NoContent(),
+            EraseAccountResult.MustTransferFirst => BadRequest(errorFactory.CreateError(
+                "must_transfer_first", "Transfer ownership before deleting your account — other members remain")),
+            EraseAccountResult.DissolveConfirmationRequired => Conflict(errorFactory.CreateError(
+                "confirmation_required",
+                "Deleting your account dissolves your household and permanently deletes its data. "
+                + "Re-send with confirm_dissolve=true to proceed.")),
+            _ => Unauthorized(errorFactory.CreateError("user_not_found", "User not found")),
+        };
     }
 
     /// <summary>

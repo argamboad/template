@@ -110,7 +110,8 @@ yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelem
 health endpoints, the background outbox/inbox/scheduled-jobs, **file storage** — the `IFileStorage`
 seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
 authorization; local-disk only — cloud backends hand out native presigned URLs), and **GDPR data
-export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle).
+export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle) +
+**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe).
 These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
@@ -937,6 +938,7 @@ the API directly:
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
 | GDPR data export (API-only) | covered by `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
+| GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1007,3 +1009,8 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   assembles the tenant's data (core + each feature's contributor section) into a JSON bundle stored via
   file storage and returns a **signed download URL**; **secret-free** (no token hashes), tenant-scoped,
   audited. **API-only** (no UI button yet) — covered by `Api.Tests` (`TenantExportTests`); see §2 + §15.
+- **Updated 2026-07-01** for GDPR account erasure (ADR-011): `DELETE /api/auth/me` ("delete my account")
+  wipes the caller's identity/PII (`User`/`UserLogin`/`RefreshToken`/`LoginToken`) in one transaction,
+  single-owner-safe (owner-with-members → transfer first; solo owner → confirm to dissolve; member
+  removed, not re-homed), audited (the audit trail survives — actor ids, never PII). **API-only** —
+  covered by `Api.Tests` (`AccountErasureTests`). **GDPR epic complete (export + erasure).**
