@@ -3,12 +3,15 @@
 > One file per epic. Optional **authenticator-app TOTP** second factor, enforced as a **step-up** after
 > the existing primary auth (ADR-002). Reuses Data Protection (encrypt the secret + sign the challenge)
 > and `ITokenHasher` (recovery codes); only Otp.NET is new. Design decision + constraints in **ADR-012**.
-> Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE (planned scope)** — MFA-1 (enrollment) +
-> MFA-2 (login step-up on the JSON paths). Step-up on the OAuth/magic-link **redirect** paths is a flagged
-> UI follow-up (see MFA-2). **UI shipped** (`feat/ui-2-mfa`): a Two-factor card in Settings
+> Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — MFA-1 (enrollment) + MFA-2 (login
+> step-up on the JSON paths) + **MFA-3** (step-up on the OAuth/magic-link **redirect** paths — the
+> security fix). **UI shipped** (`feat/ui-2-mfa`): a Two-factor card in Settings
 > (enroll → client-side QR of the `otpauth://` URI + manual key → confirm → one-time recovery codes →
-> disable) and the OTP sign-in **step-up** prompt on Login (EN/ES; QA-MFA-01..03). Native OTP and the
-> redirect step-up remain follow-ups (web-first).
+> disable) and the OTP sign-in **step-up** prompt on Login (EN/ES; QA-MFA-01..03). **MFA-3**
+> (`feat/mfa-3-redirect-stepup`): OAuth callback + magic-link now route through
+> `CompleteOrChallengeAsync` and redirect to `/login?mfa=<challenge>`, reusing the same prompt
+> (QA-MFA-04). **All web sign-in paths now enforce MFA.** Native (MAUI) OTP/OAuth step-up is the only
+> remaining follow-up (web-first).
 
 **Epic key:** `MFA`
 

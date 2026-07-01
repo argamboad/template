@@ -558,6 +558,19 @@ gap, not a re-do. Add authenticator-app **TOTP** (RFC 6238) as an optional secon
 `IssueAsync` convergence keeps every login path covered without touching each one's transport quirks.
 Reusing Data Protection (secret encryption + challenge signing) and `ITokenHasher` (recovery codes)
 means no new crypto primitives — only Otp.NET for the standard TOTP math.
+
+**Addendum (MFA-3, 2026-07-01) — redirect paths brought in line with decision point 4.** MFA-2 wired the
+step-up only into the **JSON** paths (OTP verify, native exchange); the **web OAuth callback** and
+**magic-link verify** still issued a session directly, so an MFA-enabled user could sign in via those and
+skip the second factor — an implementation gap against point 4, which always intended *every* primary-auth
+path to enforce step-up. MFA-3 routes both redirect handlers through `CompleteOrChallengeAsync`: when a
+challenge is returned they redirect to `/login?mfa=<challenge>` instead of `/auth-callback`. The challenge
+travelling as a query param is acceptable — it's the same signed, single-use, 5-min Data-Protection token
+already returned in JSON elsewhere, carries no secret, and is useless without a live TOTP/recovery code
+(same class as an OAuth authorization code in a URL). The client reuses the existing step-up prompt →
+`POST /api/auth/mfa/verify`. **Still open:** native (MAUI) OTP/OAuth step-up (the server already
+challenges; the native client doesn't yet complete it) — deferred web-first.
+
 Stories + slice plan: `docs/stories/mfa.md` (epic `MFA`).
 
 ---
