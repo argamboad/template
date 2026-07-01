@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
 using Template.Infrastructure.Repositories;
 
 namespace Template.Api.Tests;
@@ -22,13 +21,13 @@ public class RepositoryScopingTests(PostgresFixture fixture) : PostgresTestBase(
 
         await using (var seed = Fixture.CreateContext())
         {
-            seed.Notes.Add(new Note { Id = Guid.CreateVersion7(), TenantId = tenantA, Title = "A" });
-            seed.Notes.Add(new Note { Id = Guid.CreateVersion7(), TenantId = tenantB, Title = "B" });
+            seed.Set<TestWidget>().Add(new TestWidget { Id = Guid.CreateVersion7(), TenantId = tenantA, Name = "A" });
+            seed.Set<TestWidget>().Add(new TestWidget { Id = Guid.CreateVersion7(), TenantId = tenantB, Name = "B" });
             await seed.SaveChangesAsync();
         }
 
         await using var asA = Fixture.CreateContext(tenantA);
-        var repo = new EfRepository<Note>(asA);
+        var repo = new EfRepository<TestWidget>(asA);
 
         // Scoped surface: only the current tenant's row.
         var scoped = await repo.Query().ToListAsync();

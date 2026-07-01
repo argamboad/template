@@ -6,15 +6,31 @@ using Template.Core.Entities;
 
 namespace Template.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant currentTenant)
-    : DbContext(options), IDataProtectionKeyContext
+public class AppDbContext : DbContext, IDataProtectionKeyContext
 {
+    private readonly ICurrentTenant _currentTenant;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant currentTenant)
+        : this((DbContextOptions)options, currentTenant) { }
+
+    /// <summary>
+    /// Non-generic-options constructor so a test harness can subclass this context (e.g. to add a
+    /// test-only <c>ITenantScoped</c> fixture entity) with its own <c>DbContextOptions&lt;TDerived&gt;</c>,
+    /// without the platform tests depending on the DELETE-ME sample slice (v2 audit TR-1). Not used by
+    /// the app itself.
+    /// </summary>
+    protected AppDbContext(DbContextOptions options, ICurrentTenant currentTenant)
+        : base(options)
+    {
+        _currentTenant = currentTenant;
+    }
+
     /// <summary>
     /// Tenant the global query filter scopes to. <see cref="Guid.Empty"/> when there is
     /// no current tenant — it matches no real (UUIDv7) row, so unauthenticated/tenant-less
     /// callers see no tenant-scoped data (fail closed).
     /// </summary>
-    public Guid CurrentTenantId => currentTenant.TenantId ?? Guid.Empty;
+    public Guid CurrentTenantId => _currentTenant.TenantId ?? Guid.Empty;
 
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<Tenant> Tenants => Set<Tenant>();

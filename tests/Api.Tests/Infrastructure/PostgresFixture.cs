@@ -42,29 +42,38 @@ public sealed class PostgresFixture : IAsyncLifetime
     /// (null = no current tenant, so tenant-scoped rows are filtered out). The caller
     /// disposes it.
     /// </summary>
-    public AppDbContext CreateContext(Guid? tenantId = null)
+    public AppDbContext CreateContext(Guid? tenantId = null) => CreateTestContext(tenantId);
+
+    /// <summary>
+    /// A fresh <see cref="TestAppDbContext"/> (real model + the <see cref="TestWidget"/> fixture entity)
+    /// bound to the container. Returned typed as the concrete test context so tests can reach
+    /// <c>TestWidgets</c>; existing tests use it as an <see cref="AppDbContext"/> transparently.
+    /// </summary>
+    public TestAppDbContext CreateTestContext(Guid? tenantId = null)
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
+        var options = new DbContextOptionsBuilder<TestAppDbContext>()
             .UseNpgsql(ConnectionString)
             .Options;
-        return new AppDbContext(options, new TestCurrentTenant { TenantId = tenantId });
+        return new TestAppDbContext(options, new TestCurrentTenant { TenantId = tenantId });
     }
 
     /// <summary>
-    /// Truncates every table so each test starts from a clean slate. Call at the top
-    /// of a test (or in the test class constructor) when tests share the container.
+    /// Truncates every table so each test starts from a clean slate. The table list is DERIVED from the
+    /// EF model (v2 audit TR-3), so a new entity is reset automatically — no hand-maintained list to
+    /// forget. Call at the top of a test (or in the class constructor) when tests share the container.
     /// </summary>
     public async Task ResetAsync()
     {
-        await using var db = CreateContext();
-        await db.Database.ExecuteSqlRawAsync(
-            """
-            TRUNCATE TABLE "AuditEvents", "Subscriptions", "UsageCounters", "ApiKeys", "WebhookSubscriptions", "WebhookDeliveries", "InboxMessages", "OutboxMessages", "Notes",
-                          "Notifications", "NotificationPreferences", "TenantInvitations", "TenantMemberships",
-                          "MfaRecoveryCodes", "UserMfa", "UserLogins", "RefreshTokens", "LoginTokens",
-                          "Users", "Tenants"
-            RESTART IDENTITY CASCADE;
-            """);
+        await using var db = CreateTestContext();
+        var tables = db.Model.GetEntityTypes()
+            .Select(e => e.GetTableName())
+            .Where(name => name is not null)
+            .Distinct()
+            .Select(name => $"\"{name}\"");
+        // Table names come from the EF model (not user input), so this is not an injection surface;
+        // build the statement as a plain string (no interpolated argument) to satisfy the EF1002 analyzer.
+        var sql = "TRUNCATE TABLE " + string.Join(", ", tables) + " RESTART IDENTITY CASCADE;";
+        await db.Database.ExecuteSqlRawAsync(sql);
     }
 }
 

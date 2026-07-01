@@ -27,7 +27,7 @@ public class OutboxProcessorTests(PostgresFixture fixture) : PostgresTestBase(fi
         await using (var db = Fixture.CreateContext(tenant))
         await using (var tx = await db.Database.BeginTransactionAsync())
         {
-            db.Notes.Add(new Note { Title = "business change", TenantId = tenant });
+            db.Set<TestWidget>().Add(new TestWidget { Name = "business change", TenantId = tenant });
             await new EfOutbox(db, TimeProvider.System).EnqueueAsync("email", "{}");
             await db.SaveChangesAsync();
             // tx disposed without CommitAsync -> rollback
@@ -35,7 +35,7 @@ public class OutboxProcessorTests(PostgresFixture fixture) : PostgresTestBase(fi
 
         await using var read = Fixture.CreateContext();
         Assert.Empty(await read.Set<OutboxMessage>().ToListAsync());
-        Assert.Empty(await read.Notes.IgnoreQueryFilters().ToListAsync());
+        Assert.Empty(await read.Set<TestWidget>().IgnoreQueryFilters().ToListAsync());
     }
 
     [Fact]

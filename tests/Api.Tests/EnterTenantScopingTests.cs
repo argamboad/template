@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Template.Api.Services;
 using Template.Api.Tests.Infrastructure;
 using Template.Core.Abstractions;
-using Template.Core.Entities;
 using Template.Infrastructure.Persistence;
 
 namespace Template.Api.Tests;
@@ -27,17 +26,17 @@ public class EnterTenantScopingTests(PostgresFixture fixture) : PostgresTestBase
         await using (var db = NewContext(current))
         using (current.EnterTenant(tenant))
         {
-            db.Notes.Add(new Note { Title = "from a webhook-like context" }); // TenantId left unset
+            db.Set<TestWidget>().Add(new TestWidget { Name = "from a webhook-like context" }); // TenantId left unset
             await db.SaveChangesAsync(); // interceptor stamps the ENTERED tenant
         }
 
         // Visible under the entered tenant via the normal global filter (no IgnoreQueryFilters).
         await using (var read = Fixture.CreateContext(tenant))
-            Assert.Equal(tenant, (await read.Notes.SingleAsync()).TenantId);
+            Assert.Equal(tenant, (await read.Set<TestWidget>().SingleAsync()).TenantId);
 
         // Invisible to any other tenant.
         await using (var other = Fixture.CreateContext(Guid.CreateVersion7()))
-            Assert.Empty(await other.Notes.ToListAsync());
+            Assert.Empty(await other.Set<TestWidget>().ToListAsync());
     }
 
     [Fact]
@@ -47,15 +46,15 @@ public class EnterTenantScopingTests(PostgresFixture fixture) : PostgresTestBase
 
         await using (var db = NewContext(current))
         {
-            db.Notes.Add(new Note { Title = "unstamped" });
+            db.Set<TestWidget>().Add(new TestWidget { Name = "unstamped" });
             await db.SaveChangesAsync();
         }
 
         await using var read = Fixture.CreateContext();
-        var note = await read.Notes.IgnoreQueryFilters().SingleAsync();
+        var note = await read.Set<TestWidget>().IgnoreQueryFilters().SingleAsync();
         Assert.Equal(Guid.Empty, note.TenantId); // system context → not stamped
     }
 
-    private AppDbContext NewContext(ICurrentTenant currentTenant) =>
-        new(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(Fixture.ConnectionString).Options, currentTenant);
+    private TestAppDbContext NewContext(ICurrentTenant currentTenant) =>
+        new(new DbContextOptionsBuilder<TestAppDbContext>().UseNpgsql(Fixture.ConnectionString).Options, currentTenant);
 }
