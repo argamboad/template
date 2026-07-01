@@ -568,8 +568,14 @@ challenge is returned they redirect to `/login?mfa=<challenge>` instead of `/aut
 travelling as a query param is acceptable — it's the same signed, single-use, 5-min Data-Protection token
 already returned in JSON elsewhere, carries no secret, and is useless without a live TOTP/recovery code
 (same class as an OAuth authorization code in a URL). The client reuses the existing step-up prompt →
-`POST /api/auth/mfa/verify`. **Still open:** native (MAUI) OTP/OAuth step-up (the server already
-challenges; the native client doesn't yet complete it) — deferred web-first.
+`POST /api/auth/mfa/verify`.
+
+**Addendum (MFA-4, 2026-07-01) — native step-up completes the coverage.** The server always challenged the
+native OTP/OAuth-exchange paths (point 4), but the MAUI client only understood a tokens response and
+treated a challenge as a failure. MFA-4 teaches the client to recognize `{mfa_required, challenge}`
+(`AuthService` now returns a `SignInResult`; `VerifyMfaAsync` completes the step-up with tokens in the
+body) and reuse the same in-app prompt. Client-only, no API change. **MFA is now enforced on every
+sign-in path — web (OTP/OAuth/magic-link) and native (OTP/OAuth) — with no remaining gaps.**
 
 Stories + slice plan: `docs/stories/mfa.md` (epic `MFA`).
 
