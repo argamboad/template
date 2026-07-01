@@ -517,3 +517,45 @@ on the contributor seam + dissolve + file storage keeps the common case a one-li
 audited place. Depends on: audit (ADR-008, ✅), file storage (ADR-010, ✅), the dissolve flow, and the
 permission seam (ADR-009).
 Stories + slice plan: `docs/stories/gdpr.md` (epic `GDPR`).
+
+---
+
+**ADR-012 — MFA: authenticator-app TOTP as a step-up after primary auth; secret encrypted at rest; hashed single-use recovery codes. (2026-07-01)**
+The template's custom auth stack (ADR-002) has no second factor. ADR-C15 once claimed TOTP via
+`AddDefaultTokenProviders()`, but that was superseded by ADR-002 and never built — so this is a genuine
+gap, not a re-do. Add authenticator-app **TOTP** (RFC 6238) as an optional second factor, enforced as a
+**step-up** after the existing primary auth, reusing the crypto the platform already has.
+
+**Decision:**
+1. **TOTP via Otp.NET** (latest stable, no previews — ADR-C10). Per-user secret; enrollment returns an
+   `otpauth://…` provisioning URI the client renders as a QR. Verification allows a small time-step
+   window (±1) for clock skew; comparisons are constant-time.
+2. **The secret is encrypted at rest** with the existing **Data Protection** stack (an `IDataProtector`;
+   keys already persisted to the DB). It is **never returned after enrollment and never logged**.
+3. **Two user-scoped entities** (identity, not tenant): **`UserMfa`** (`UserId`, `EncryptedSecret`,
+   `Enabled`, `EnrolledAt`) — one per user; **`MfaRecoveryCode`** (`UserId`, `CodeHash`, `UsedAt`) —
+   single-use, **hashed with the existing `ITokenHasher`** (SHA-256), same pattern as
+   `LoginToken`/`RefreshToken`. Both are **wiped by account erasure** (GDPR-2, ADR-011).
+4. **Step-up at the auth convergence point.** Every primary-auth path (OAuth callback, magic-link/OTP
+   verify, native exchange) resolves a `User` then calls `SessionService.IssueAsync`. When the user has
+   MFA enabled, primary auth does **not** issue a full session; it returns an **MFA challenge** — a
+   short-lived **signed** token (Data Protection time-limited, like the file-download token) naming the
+   user + purpose. `POST /api/auth/mfa/verify` accepts the challenge + a TOTP **or recovery** code and,
+   on success, calls `IssueAsync` to complete login. One enforcement path, no per-endpoint duplication.
+5. **Recovery codes** are issued once at enrollment (shown once), stored **hashed + single-use**, and
+   accepted at the challenge as an alternative to a TOTP code; regenerating invalidates the old set.
+
+**Constraints recorded:**
+1. **Secret stays encrypted at rest**, is returned only as the enrollment provisioning URI, and never
+   appears in logs or later reads.
+2. **Recovery codes are hashed + single-use**, shown exactly once; verification is constant-time.
+3. **Step-up is enforced server-side** — the signed MFA challenge is required to complete login; a
+   client cannot skip straight to a full session.
+4. **MFA is user-scoped PII** — wiped by account erasure (GDPR-2); it is not tenant data.
+5. **Enabling requires proving possession** — MFA turns on only after a valid code confirms enrollment
+   (never enabled from an unverified secret); disabling likewise requires a valid code.
+*Rationale:* MFA is a security baseline any serious SaaS needs, and doing it as a step-up at the single
+`IssueAsync` convergence keeps every login path covered without touching each one's transport quirks.
+Reusing Data Protection (secret encryption + challenge signing) and `ITokenHasher` (recovery codes)
+means no new crypto primitives — only Otp.NET for the standard TOTP math.
+Stories + slice plan: `docs/stories/mfa.md` (epic `MFA`).
