@@ -30,6 +30,19 @@ public class AdminController(
     // Impersonation tokens are deliberately short-lived and non-refreshable (ADR-014).
     private static readonly TimeSpan ImpersonationLifetime = TimeSpan.FromMinutes(15);
 
+    /// <summary>
+    /// Whether the authenticated caller is platform staff. Unlike the other actions this never 403s —
+    /// any signed-in user gets <c>{ is_staff }</c> so the client can decide whether to show the admin UI.
+    /// </summary>
+    [HttpGet("me")]
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    {
+        if (CurrentUserId is null)
+            return Unauthorized(ErrorFactory.CreateError("invalid_token", "Invalid user identity"));
+
+        return Ok(new AdminStatusResponse { IsStaff = await IsCurrentUserStaffAsync(cancellationToken) });
+    }
+
     /// <summary>Every tenant with its member count (staff only).</summary>
     [HttpGet("tenants")]
     public async Task<IActionResult> ListTenants(CancellationToken cancellationToken)

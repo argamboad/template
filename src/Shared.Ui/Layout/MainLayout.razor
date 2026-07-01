@@ -4,6 +4,7 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject IStringLocalizer<AppStrings> Localizer
 
 @if (!_initialized)
 {
@@ -20,6 +21,14 @@ else if (!Auth.IsAuthenticated)
 }
 else
 {
+    @if (Auth.IsImpersonating)
+    {
+        <div class="impersonation-banner alert alert-warning d-flex align-items-center justify-content-center gap-3 mb-0 rounded-0 py-2"
+             role="alert" data-testid="impersonation-banner">
+            <span class="small mb-0">@Localizer["Impersonation_Banner", Auth.DisplayName ?? ""]</span>
+            <button class="btn btn-sm btn-outline-dark" @onclick="StopImpersonation">@Localizer["Impersonation_Stop"]</button>
+        </div>
+    }
     <AppHeader />
     <main class="main-content">
         <div class="content-container">
@@ -63,5 +72,12 @@ else
         var isAnonymous = AnonymousPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
         if (!Auth.IsAuthenticated && !isAnonymous)
             Nav.NavigateTo("/login", replace: true);
+    }
+
+    // Leave the impersonated session and reload as the staff user (restored from the refresh cookie).
+    private async Task StopImpersonation()
+    {
+        await Auth.StopImpersonationAsync();
+        Nav.NavigateTo("/", forceLoad: true);
     }
 }

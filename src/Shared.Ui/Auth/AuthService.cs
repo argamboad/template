@@ -212,6 +212,57 @@ public class AuthService(
         }
     }
 
+    // ── Platform-staff admin surface (ADR-014) ──────────────────────────────
+
+    // Cache the staff probe for the session so nav rendering doesn't re-hit the API.
+    // Reset whenever the identity changes (impersonate/stop/logout).
+    private bool? _isStaff;
+
+    /// <summary>
+    /// Whether the signed-in user is platform staff — drives the admin nav link + page gate.
+    /// Cheap probe of <c>GET /api/admin/me</c> (200 with <c>is_staff</c> for any authenticated user);
+    /// cached per identity. False when signed out, on any error, or while impersonating.
+    /// </summary>
+    public async Task<bool> IsStaffAsync()
+    {
+        if (_isStaff is { } cached) return cached;
+        if (!IsAuthenticated || IsImpersonating) return (_isStaff = false).Value;
+        try
+        {
+            var res = await httpClient.GetFromJsonAsync<StaffStatus>("/api/admin/me");
+            return (_isStaff = res?.IsStaff ?? false).Value;
+        }
+        catch
+        {
+            return false; // don't cache transient failures
+        }
+    }
+
+    /// <summary>True when the current access token is an admin "sign in as" token.</summary>
+    public bool IsImpersonating => Claim(AppClaims.ImpersonatedBy) is not null;
+
+    /// <summary>
+    /// Enters an impersonated session using a short-lived admin token (no refresh token — it's
+    /// non-refreshable by design). Held in memory only; a reload or expiry returns the staff user to
+    /// their own identity via the untouched refresh cookie.
+    /// </summary>
+    public void BeginImpersonation(string accessToken)
+    {
+        _accessToken = accessToken;
+        _isStaff = null;
+    }
+
+    /// <summary>
+    /// Leaves an impersonated session and restores the staff user from their refresh cookie/store.
+    /// Returns true when the original identity was restored.
+    /// </summary>
+    public async Task<bool> StopImpersonationAsync()
+    {
+        _accessToken = null;
+        _isStaff = null;
+        return await TryRefreshAsync();
+    }
+
     public async Task LogoutAsync()
     {
         try
@@ -238,6 +289,7 @@ public class AuthService(
     private async Task AcceptTokensAsync(TokenResponse payload)
     {
         _accessToken = payload.AccessToken;
+        _isStaff = null; // identity may have changed; re-probe on demand
         if (sessionStore.UsesBodyTransport && !string.IsNullOrEmpty(payload.RefreshToken))
             await sessionStore.SaveRefreshTokenAsync(payload.RefreshToken);
     }
@@ -245,6 +297,7 @@ public class AuthService(
     private async Task ClearSessionAsync()
     {
         _accessToken = null;
+        _isStaff = null;
         if (sessionStore.UsesBodyTransport)
             await sessionStore.ClearAsync();
     }
@@ -296,6 +349,13 @@ public class AuthService(
         {
             return true;
         }
+    }
+
+    // GET /api/admin/me — is the caller platform staff?
+    private sealed record StaffStatus
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("is_staff")]
+        public bool IsStaff { get; init; }
     }
 
     // Mirrors the API's TokenResponse (snake_case JSON).

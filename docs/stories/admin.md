@@ -4,8 +4,10 @@
 > "sign in as" a user for support — the **highest-blast-radius** feature, built entirely on existing
 > guardrails (the audited `QueryAllTenants()` escape hatch, ADR-003; the audit log, ADR-008). Design +
 > constraints in **ADR-014**. Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — ADMIN-1
-> (staff gate + cross-tenant inspection) + ADMIN-2 (short-lived audited impersonation). An admin UI is an
-> API-first follow-up.
+> (staff gate + cross-tenant inspection) + ADMIN-2 (short-lived audited impersonation). **UI shipped**
+> (`feat/ui-4-admin`): a staff-only `/admin` console (`AdminConsole`) — tenant list/detail + **Sign in as**
+> with an impersonation banner + **Stop** — gated by a new non-gating probe `GET /api/admin/me`
+> (`{is_staff}`; allowlist stays config-only). EN/ES; QA-ADMIN-01..03.
 
 **Epic key:** `ADMIN`
 

@@ -110,16 +110,17 @@ yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelem
 health endpoints, the background outbox/inbox/scheduled-jobs, **file storage** — the `IFileStorage`
 seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
 authorization; local-disk only — cloud backends hand out native presigned URLs), and **GDPR data
-export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle),
-**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), and the
-**platform-staff admin surface** (`/api/admin/*`; config-gated
-cross-tenant inspection). These are **covered by
+export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle), and
+**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe). These
+are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12. **MFA now has a web UI** (UI-2) — enrollment/
 disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..03. The **in-app
 notification center now has a web UI** (UI-3) — the header bell (list, unread count, mark-read) and
-Settings delivery-preference switches — covered by QA-NOTIF-01..03.
+Settings delivery-preference switches — covered by QA-NOTIF-01..03. The **platform-staff admin surface
+now has a web UI** (UI-4) — a staff-only `/admin` console (tenant list/detail + impersonation) — covered
+by QA-ADMIN-01..03.
 
 ---
 
@@ -828,6 +829,56 @@ Then the email arrives in Spanish
 
 ---
 
+## 10b. Web — Admin console (platform staff) 🟠
+
+**Precondition:** your account's email must be in the staff allowlist — set `Admin__StaffEmails__0` in the
+repo-root `.env` (see `.env.example`) and restart the API. Non-staff accounts must **not** see any of this.
+
+### QA-ADMIN-01 — Staff sees the console; non-staff don't 🟠 (Web)
+**Gherkin**
+```gherkin
+Given I am signed in as a platform-staff user
+When I look at the header
+Then I see an "Admin" link, and /admin lists every tenant with member counts
+And a non-staff user sees no Admin link and is refused at /admin
+```
+**Walkthrough**
+1. Signed in as **staff**: an **Admin** button shows in the header → open it (or go to `/admin`).
+2. **Expected:** the **Tenants** list shows every tenant (name + member count). Click one → detail panel
+   shows members (name/email + role), subscription status, created date, audit-event count.
+3. Sign in as a **non-staff** user: **no Admin link**; navigating directly to `/admin` shows
+   "You don't have access to the admin console."
+
+### QA-ADMIN-02 — View a tenant is audited in that tenant 🟠 (Web)
+**Gherkin**
+```gherkin
+Given I am staff viewing a tenant's detail in /admin
+When the detail loads
+Then an audit event (admin.tenant.viewed) is recorded in that tenant
+```
+**Walkthrough**
+1. As staff, open a tenant's detail in `/admin`.
+2. **Expected:** an `admin.tenant.viewed` event is written **in that tenant** (visible to that tenant's
+   own audit trail) — the global tenant filter is never loosened; the read enters the target tenant.
+
+### QA-ADMIN-03 — Impersonate a user, then stop 🟠 (Web)
+**Gherkin**
+```gherkin
+Given I am staff on a tenant's detail
+When I "Sign in as" a member and confirm
+Then I browse the app as that user with a persistent impersonation banner
+And "Stop impersonating" returns me to my own staff identity
+```
+**Walkthrough**
+1. In a tenant detail, click **Sign in as** on a member → confirm the dialog.
+2. **Expected:** you land on `/` **as that user** (their name/household in the header); a yellow
+   **impersonation banner** is pinned at the top; the **Admin** link is hidden while impersonating.
+3. Click **Stop impersonating**. **Expected:** you're back as yourself (staff); the banner is gone.
+4. The impersonation token is **short-lived (15 min) and non-refreshable** — a full page reload also
+   returns you to your own identity. Impersonation is **audited** in the target's tenant.
+
+---
+
 ## 11. Emails (Mailpit) — branding & content 🟠
 
 > **Delivery is asynchronous** (the outbox dispatcher) — emails land in Mailpit a few seconds after the
@@ -1065,7 +1116,7 @@ the API directly:
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP | **MFA-01..03** (Settings enroll/QR/confirm/recovery + disable; Login step-up) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Web UI wired on the **OTP** sign-in path; OAuth/magic-link **redirect** step-up remains a UI follow-up. |
 | In-app notifications | **NOTIF-01..03** (header bell: list/unread-count/mark-read; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
-| Admin back-office (API-only) | covered by `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/tenants` (+ `/{id}`) inspection + `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
+| Admin back-office | **ADMIN-01..03** (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}`) inspection, `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1188,3 +1239,12 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   **In-app**/**Email** switches (optimistic save, reverts on error) via `GET|PUT
   /api/notifications/preferences`. **QA-NOTIF-01..03**; EN/ES localized. (No built-in producer — items
   appear once a feature calls `NotifyAsync`.)
+- **Updated 2026-07-01** — **UI-4 (Admin console):** a staff-only `/admin` page (`AdminConsole`) — tenant
+  list + detail (members/subscription/audit count) and **Sign in as** (impersonation). Staff detection
+  uses a new **non-gating** probe `GET /api/admin/me` (`{is_staff}` for any authenticated caller — the
+  only API addition in the UI pass; the allowlist stays config-only, actions still 403 for non-staff), so
+  the header shows an **Admin** link only to staff. Impersonation swaps the in-memory session to the
+  short-lived token (`AuthService.BeginImpersonation`), pins an **impersonation banner** in `MainLayout`
+  (reads the `impersonated_by` claim), and **Stop impersonating** restores the staff identity from the
+  refresh cookie; a reload also reverts (the token is non-refreshable). **QA-ADMIN-01..03**; EN/ES
+  localized. **This completes the UI pass (UI-1..4).**
