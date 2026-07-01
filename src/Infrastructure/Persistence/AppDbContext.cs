@@ -47,6 +47,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     // Tenant API keys for programmatic access (PUBAPI, ADR-015). ITenantScoped; only the hash is stored.
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
+    // Outbound webhook subscriptions (HOOKS, ADR-016). ITenantScoped; signing secret encrypted at rest.
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
+
     // Append-only tenant audit trail (ADR-008). ITenantScoped (auto-filtered per tenant); writes are
     // append-only via AuditAppendOnlyInterceptor.
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -237,6 +240,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             // Auth looks a presented key up by hash (across tenants, pre-scope) — unique + indexed.
             k.HasIndex(x => x.KeyHash).IsUnique();
             k.HasIndex(x => x.TenantId);
+        });
+
+        builder.Entity<WebhookSubscription>(w =>
+        {
+            w.HasKey(x => x.Id);
+            w.Property(x => x.Url).HasMaxLength(2048).IsRequired();
+            w.Property(x => x.EventTypes).HasMaxLength(1024).IsRequired();
+            w.Property(x => x.EncryptedSecret).IsRequired();
+            w.HasIndex(x => x.TenantId);
         });
 
         builder.Entity<AuditEvent>(a =>

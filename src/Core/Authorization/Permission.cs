@@ -35,4 +35,7 @@ public enum Permission
 
     /// <summary>Create/revoke the tenant's API keys — programmatic tenant access (owner-only; PUBAPI).</summary>
     ManageApiKeys,
+
+    /// <summary>Register/remove the tenant's outbound webhook subscriptions (owner-only; HOOKS).</summary>
+    ManageWebhooks,
 }

@@ -734,3 +734,40 @@ the same `tenant_id`-scoped principal means the entire tenant-isolation guarante
 strong config-gating means the template ships the capability **dormant** rather than exposing a surface no
 one asked for. HOOKS (outbound webhooks) is the companion outbound half (ADR-016).
 Stories + slice plan: `docs/stories/pubapi.md` (epic `PUBAPI`).
+
+---
+
+**ADR-016 — Outbound webhooks: tenant subscriptions delivered through the transactional outbox, HMAC-signed, config-gated default-off. (2026-07-01)**
+The **outbound** half of the integration story (ADR-015 is inbound): let a tenant subscribe to events in
+their data so *their* systems are notified (push) instead of polling. Also parked-then-un-parked on
+2026-07-01; **off by default** for the same reason as PUBAPI (a new outbound surface is a deliberate opt-in).
+
+**Decision:**
+1. **`WebhookSubscription : ITenantScoped`** — a tenant registers a `Url` + the `EventTypes` it wants, with
+   a per-subscription **signing secret** stored **encrypted** (Data Protection — the plaintext is needed to
+   HMAC-sign, so it can't be hashed; same approach as the MFA secret), revealed once at creation.
+2. **Delivery IS the outbox pointed outward** (ADR-007) — don't build a second delivery mechanism.
+   `IWebhookPublisher.PublishAsync(eventType, data)` fans out to every active matching subscription,
+   enqueuing **one `"webhook"` outbox message per subscription** (staged on the caller's unit of work, so
+   it's atomic with the triggering change). The `WebhookOutboxHandler` signs + POSTs each; a **non-2xx
+   throws**, so the outbox's existing **retry/backoff + dead-letter** apply for free.
+3. **HMAC-SHA256 signatures.** Each POST carries `X-Webhook-Id` (event id, for receiver dedup — deliveries
+   are at-least-once), `X-Webhook-Event`, and `X-Webhook-Signature: sha256=<hex>` over the raw body. The
+   receiver recomputes with the shared secret to verify authenticity + integrity.
+4. **Owner-only management** (`/api/webhooks`, new **`Permission.ManageWebhooks`**): register/list/remove,
+   plus a **synchronous "send test"** (`/{id}/test`) that POSTs a `ping` and returns the endpoint's status,
+   so the owner gets immediate feedback (real events are async via the outbox).
+5. **Config-gated, STRONG gating.** `Webhooks:Enabled` (default false). Off ⇒ the management routes aren't
+   mapped (404); the delivery handler is registered but dormant (no subscriptions ⇒ nothing to deliver).
+
+**Constraints recorded:**
+1. **Signing secret encrypted at rest**, revealed once; every delivery is signed so receivers can verify.
+2. **At-least-once, out-of-order** delivery (outbox semantics) — receivers dedup on `X-Webhook-Id`.
+3. **Reuses the outbox** — no bespoke retry/backoff/dead-letter; deliveries are durable + tenant-scoped.
+4. **Default off** — the outbound surface doesn't exist until a deployment enables it.
+*Rationale:* webhooks are the "our product notifies your systems" half of being a platform; building them
+as the outbox pointed outward means durability, retries, and atomicity-with-the-change come for free, and
+the only new parts are the subscription model + signed HTTP POST. A tenant-facing **delivery log**
+(per-attempt history) is a natural HOOKS-2 follow-up — until then the outbox's own status/attempt/error
+columns are the record.
+Stories + slice plan: `docs/stories/hooks.md` (epic `HOOKS`).

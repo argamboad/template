@@ -104,7 +104,13 @@ fan-out via the **outbox** (ADR-007) so a domain event can produce both an email
 notification through one reliable path.
 **Deps:** outbox (ADR-007) strongly preferred.
 
-## 6. Outbound webhooks (customer-facing) — `HOOKS`
+## 6. Outbound webhooks (customer-facing) — `HOOKS` → **✅ HOOKS-1 DONE (ADR-016)**
+> **Shipped** (config-gated, default off) — `WebhookSubscription` (encrypted signing secret),
+> `IWebhookPublisher.PublishAsync` fan-out → one `"webhook"` **outbox** message per sub → HMAC-signed POST
+> with retry/dead-letter via the outbox; owner-only `/api/webhooks` (`Permission.ManageWebhooks`) + send-test.
+> Design in **ADR-016**, slices in `docs/stories/hooks.md`. **HOOKS-2 (optional):** tenant-facing delivery
+> log + replay + management UI. Sketch below retained for context.
+
 **What:** let *your* tenants subscribe to events from their data (endpoint registration, signed
 deliveries, retries, a delivery log).
 **Why:** the integration/extensibility story for customers.

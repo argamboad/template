@@ -18,6 +18,7 @@ using Template.Infrastructure.Outbox;
 using Template.Infrastructure.Scheduling;
 using Template.Infrastructure.Persistence;
 using Template.Infrastructure.Repositories;
+using Template.Infrastructure.Webhooks;
 
 namespace Template.Infrastructure;
 
@@ -63,6 +64,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOutboxHandler>(sp =>
             new EmailOutboxHandler(sp.GetRequiredKeyedService<IEmailSender>("smtp")));
         services.AddHostedService<OutboxDispatcher>();
+
+        // Outbound webhook delivery (HOOKS, ADR-016): the "webhook" outbox handler signs + POSTs each
+        // delivery (retry/backoff via the outbox). Always registered — dormant until webhooks are enabled
+        // and a subscription exists; the management routes are the config-gated part (Program.cs).
+        services.AddScoped<IWebhookSecretProtector, WebhookSecretProtector>();
+        services.AddHttpClient<IWebhookSender, WebhookSender>(c => c.Timeout = TimeSpan.FromSeconds(10));
+        services.AddScoped<IOutboxHandler, WebhookOutboxHandler>();
 
         // Inbox dedup gate — idempotent inbound (webhook) deliveries (ADR-007). Used inline by the
         // receiving endpoint inside its unit of work; no background service.
