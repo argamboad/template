@@ -2,14 +2,17 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: IN PROGRESS** — **BILLING-1–5
-> shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal; **seat +
-> metered-usage quotas**). The core loop is closed and self-serve manage/cancel works (changes flow back
-> through the webhook). **BILLING-5** (`feat/billing-5-quotas`): `IQuotaService` — seats (members +
-> pending invites vs the plan's `SeatLimit`) enforced on the invite path (→ 402 `seat_limit_reached`) +
-> metered usage (`TryConsumeAsync`, monthly `UsageCounter`); limits live in `PlanCatalog` (null =
-> unlimited). Only **BILLING-6** (trial/dunning) pending. Design decision and constraints in **ADR-006**.
-> Stories use Gherkin acceptance criteria.
+> flags keyed to plan) and **quotas** (countable limits). **Status: ✅ COMPLETE** — **BILLING-1–6
+> shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal; seat +
+> metered-usage quotas; trial/dunning lifecycle). The core loop is closed and self-serve manage/cancel
+> works (changes flow back through the webhook). **BILLING-5** (`feat/billing-5-quotas`): `IQuotaService`
+> — seats (members + pending invites vs the plan's `SeatLimit`) enforced on the invite path
+> (→ 402 `seat_limit_reached`) + metered usage (`TryConsumeAsync`, monthly `UsageCounter`); limits in
+> `PlanCatalog` (null = unlimited). **BILLING-6** (`feat/billing-6-dunning`): dunning notifications to the
+> owner on past_due/canceled transitions + a `SubscriptionLapseSweepJob` one-time nudge for lapsed
+> periods (via NOTIFY). *Remaining follow-ups (optional):* advance trial-ending nudge, a billing-dissolve
+> `ITenantDataContributor`. Design decision and constraints in **ADR-006**. Stories use Gherkin
+> acceptance criteria.
 
 **Epic key:** `BILLING`
 
@@ -282,20 +285,56 @@ quota-reset scheduling lives in `JOBS-3`.
 
 ---
 
-### BILLING-6 — Trial & dunning lifecycle — DEFERRED within this epic
+### BILLING-6 — Trial & dunning lifecycle — ✅ Implemented (`feat/billing-6-dunning`)
 
 **As a** product owner
 **I want** trials and failed-payment (dunning) handling
 **So that** I can offer trials and recover failed renewals
 
 **Context / notes:** lifecycle transitions (trial → active → past_due → canceled) are driven by
-Stripe and validated with **Stripe Test Clocks** (fast-forward simulated time — ADR-006). Dunning
-**emails** ride the outbox (`JOBS-1`); trial-expiry **sweeps** ride scheduled jobs (`JOBS-3`).
+Stripe (the projection already reflects them via BILLING-3) and validated with **Stripe Test Clocks**
+(fast-forward simulated time — ADR-006). BILLING-6 adds the **owner-facing reaction**: a **dunning
+notification** on the bad transitions + a **scheduled lapse sweep** for periods that end without a
+webhook. Dunning goes through the **notification center** (NOTIFY, in-app + outbox email per prefs); the
+sweep is a scheduled job (JOBS-3).
 
-**Acceptance criteria:** _to be written when this slice is undeferred (use Test Clocks to script the
-timeline)._
-**Out of scope:** everything until BILLING-1..3 ship.
-**Definition of done:** n/a while deferred.
+> **Shipped.** `IBillingNotifier` (`src/Api/Services/BillingNotifier.cs`) notifies the tenant **owner**
+> via `INotificationService.NotifyAsync` (in-app row + outbox email). The **webhook handler** compares the
+> pre-event status and, on a **transition into `past_due` or `canceled`**, notifies (same-status
+> redeliveries don't re-notify; the inbox already dedups by event id). The **`SubscriptionLapseSweepJob`**
+> (`IScheduledJob`, every 6h) scans all tenants (`QueryAllTenants`) for subscriptions still active/trialing
+> whose `CurrentPeriodEnd` has passed, sends a one-time "expired" nudge, and stamps a new
+> `Subscription.LapseNotifiedAt` (migration `AddSubscriptionLapseNotifiedAt`) so it fires once per lapse —
+> **without fabricating a status** (Stripe stays source of truth; entitlements already fail closed on a
+> lapsed period). Tests: `BillingWebhookHandlerTests` (past-due notifies once; no-change doesn't) +
+> `SubscriptionLapseSweepJobTests` (nudge-once + stamp; in-period ignored).
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: A failed payment notifies the owner (dunning)
+  Given my subscription was active
+  When Stripe reports the renewal payment failed (status past_due)
+  Then the household owner gets a notification to update their payment method
+  And a duplicate/again-past_due delivery does not notify a second time
+
+Scenario: A cancellation notifies the owner
+  Given my subscription was active
+  When it transitions to canceled
+  Then the owner is notified and access falls back to Free (fail-closed)
+
+Scenario: A lapsed period is swept and nudged once
+  Given a subscription still marked active/trialing whose period end has passed
+  When the lapse sweep runs
+  Then the owner is nudged once to resubscribe
+  And a later sweep does not nudge again for the same lapse
+```
+
+**Out of scope:** advance "trial ends in N days" nudges (needs a Stripe `trial_will_end` event kind or a
+dedup field per period — a small follow-up); reimplementing Stripe's own retry schedule / card-failure
+emails (**Stripe Smart Retries** owns that); a `BillingDataContributor` for dissolve cleanup (separate).
+**Definition of done:** tests first; dunning on past_due/canceled transitions (once, no spam); lapse sweep
+nudges once + records it; Stripe status never fabricated; merged, app working; ADR-006 referenced.
 
 ---
 
@@ -339,7 +378,11 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
    monthly `UsageCounter`); limits are `PlanCatalog` data (null = unlimited). *Follow-up (not quotas):*
    a `BillingDataContributor : ITenantDataContributor` to cancel the Stripe subscription + wipe the
    projection on tenant dissolve — still open.
-6. **Trial/dunning (BILLING-6).** Undeferred later; Test Clocks + JOBS-1 (emails) + JOBS-3 (sweeps).
+6. ✅ **Trial/dunning (BILLING-6).** — DONE. `IBillingNotifier` dunning on webhook transitions into
+   past_due/canceled (once, no spam) + `SubscriptionLapseSweepJob` (JOBS-3) one-time "expired" nudge for
+   periods that lapse without a webhook (records `LapseNotifiedAt`, never fabricates status). Notifications
+   ride NOTIFY (in-app + outbox email). *Follow-ups:* advance trial-ending nudge; billing-dissolve
+   contributor.
 
 **Known sharp edges (from ADR-006):** webhooks are at-least-once and out-of-order (idempotency is
 mandatory — needs JOBS-2); never grant access on the Checkout redirect, only on the webhook; the DB

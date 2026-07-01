@@ -106,7 +106,7 @@ deferred items without an explicit decision.
 | `docs/ROADMAP.md` | Sequenced plan — pillars done (JOBS/BILLING/OBS) + the next waves (RBAC, files, GDPR, MFA, …) |
 | `docs/PLATFORM_BACKLOG.md` | Per-item design sketches for the future foundation slices (the detail behind ROADMAP) |
 | `docs/stories/` | User stories per epic — generated at build time |
-| `docs/stories/billing.md` | epic `BILLING` — entitlements + Checkout + webhook + Portal (BILLING-1–4 ✅) + seat/usage quotas (BILLING-5 ✅ — `IQuotaService`); only dunning (BILLING-6) pending (ADR-006) |
+| `docs/stories/billing.md` | epic `BILLING` ✅ COMPLETE — entitlements + Checkout + webhook + Portal (1–4) + seat/usage quotas (5, `IQuotaService`) + trial/dunning (6, `IBillingNotifier` + lapse sweep via NOTIFY); ADR-006 |
 | `docs/stories/async-jobs.md` | epic `JOBS` ✅ COMPLETE — outbox+dispatcher, inbox, scheduler (ADR-007) |
 | `docs/stories/observability.md` | epic `OBS` ✅ COMPLETE — logging, OpenTelemetry, health, append-only audit log (ADR-008) |
 | `docs/stories/rbac.md` | epic `RBAC` ✅ COMPLETE — `admin` role + permission seam (RBAC-1) + owner-only role change (RBAC-2) + admin-aware roster UI (RBAC-3); ADR-009 |

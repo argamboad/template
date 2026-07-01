@@ -1164,6 +1164,7 @@ the API directly:
 | Transactional email delivery | (all email cases) | async via the outbox dispatcher (`OutboxMessages`) |
 | Billing — checkout/portal/webhook (API-only) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Billing — quotas (BILLING-5) | **HH-14** (seat limit blocks invite → 402 upgrade message) + `Api.Tests` (`QuotaServiceTests`) | seats (members + pending invites vs `Plan.SeatLimit`) enforced on `POST /api/household/invitations` → 402 `seat_limit_reached`; metered usage via `IQuotaService.TryConsumeAsync` (monthly `UsageCounter`). Limits in `PlanCatalog` (null = unlimited). |
+| Billing — trial/dunning (BILLING-6) | covered by `Api.Tests` (`BillingWebhookHandlerTests`, `SubscriptionLapseSweepJobTests`); manual via Stripe test triggers | webhook transition into `past_due`/`canceled` → owner **notification** (in-app bell + outbox email, NOTIFY) once; `SubscriptionLapseSweepJob` (6h) nudges the owner once when a paid period lapses without a webhook (`LapseNotifiedAt`). Verify with `stripe trigger invoice.payment_failed` (test mode) → owner sees a billing notification in the bell. |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
@@ -1325,3 +1326,11 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   until set (template ships example caps: Free 3/3, Pro 10/100). New entity + migration `AddUsageCounter`.
   Covered by `QuotaServiceTests` (10 cases); **QA-HH-14**; EN/ES. Only **BILLING-6** (trial/dunning) and a
   billing-dissolve contributor remain from the BILLING epic.
+- **Updated 2026-07-01** — **BILLING-6 (trial/dunning):** the owner-facing reaction to the subscription
+  lifecycle. `IBillingNotifier` notifies the tenant **owner** via the notification center (in-app bell +
+  outbox email). The **webhook** notifies once on a transition into `past_due`/`canceled` (no spam;
+  inbox dedups). A **`SubscriptionLapseSweepJob`** (6h) nudges once when a paid period lapses without a
+  webhook, recording `Subscription.LapseNotifiedAt` (migration `AddSubscriptionLapseNotifiedAt`) —
+  Stripe stays source of truth, no fabricated status. Covered by `BillingWebhookHandlerTests` +
+  `SubscriptionLapseSweepJobTests`; manual via `stripe trigger`. **The BILLING epic is now complete**
+  (1–6); only optional follow-ups remain (advance trial nudge; billing-dissolve contributor).

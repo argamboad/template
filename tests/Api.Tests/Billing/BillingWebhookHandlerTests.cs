@@ -81,6 +81,36 @@ public class BillingWebhookHandlerTests(PostgresFixture fixture) : PostgresTestB
         Assert.Empty(await other.Set<Subscription>().ToListAsync()); // scoped by EnterTenant, not leaked
     }
 
+    // --- dunning (BILLING-6): owner notified on failed-payment / cancel transitions ---
+
+    [Fact]
+    public async Task PaymentFailed_NotifiesOwner()
+    {
+        var tenant = Guid.CreateVersion7();
+        var ownerId = await SeedOwnerAsync(tenant);
+
+        await HandleAsync(Event(tenant, SubscriptionStatus.Active, eventId: "evt_a"));
+        await HandleAsync(Event(tenant, SubscriptionStatus.PastDue, eventId: "evt_b"));
+
+        await using var read = Fixture.CreateContext(tenant);
+        var notes = await read.Set<Notification>().Where(n => n.UserId == ownerId).ToListAsync();
+        var note = Assert.Single(notes);
+        Assert.Equal(BillingNotifications.PastDueKind, note.Kind);
+    }
+
+    [Fact]
+    public async Task Renewal_NoStatusChange_DoesNotNotify()
+    {
+        var tenant = Guid.CreateVersion7();
+        var ownerId = await SeedOwnerAsync(tenant);
+
+        await HandleAsync(Event(tenant, SubscriptionStatus.Active, eventId: "evt_a"));
+        await HandleAsync(Event(tenant, SubscriptionStatus.Active, eventId: "evt_b")); // still active
+
+        await using var read = Fixture.CreateContext(tenant);
+        Assert.Empty(await read.Set<Notification>().Where(n => n.UserId == ownerId).ToListAsync());
+    }
+
     // --- helpers ---
 
     private static BillingWebhookEvent Event(Guid tenant, string status, string eventId = "evt_default") =>
@@ -97,9 +127,28 @@ public class BillingWebhookHandlerTests(PostgresFixture fixture) : PostgresTestB
             new EfRepository<Subscription>(db),
             current,
             new EfUnitOfWork(db),
+            BuildNotifier(db),
             TimeProvider.System);
 
         return await handler.HandleAsync(JsonSerializer.Serialize(evt), signature, default);
+    }
+
+    private static IBillingNotifier BuildNotifier(AppDbContext db) =>
+        new BillingNotifier(
+            new TenantRepository(db),
+            new NotificationService(
+                new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db),
+                new UserRepository(db), new NoopEmailSender(), TimeProvider.System));
+
+    private async Task<Guid> SeedOwnerAsync(Guid tenant)
+    {
+        var ownerId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext(tenant);
+        db.Set<Tenant>().Add(new Tenant { Id = tenant, Name = "T", CreatedAt = DateTimeOffset.UtcNow });
+        db.Set<User>().Add(new User { Id = ownerId, Email = $"owner-{ownerId:N}@x.com" });
+        db.Set<TenantMembership>().Add(new TenantMembership { TenantId = tenant, UserId = ownerId, Role = TenantRoles.Owner });
+        await db.SaveChangesAsync();
+        return ownerId;
     }
 
     private async Task<bool> EntitledAsync(Guid tenant)

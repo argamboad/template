@@ -135,6 +135,10 @@ builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IEntitlementService, EntitlementService>();
 // Billing quotas (BILLING-5): seat + metered-usage limits from the plan; used by the invite flow.
 builder.Services.AddScoped<IQuotaService, QuotaService>();
+// Billing dunning (BILLING-6): notify the tenant owner on failed-payment/cancel transitions, and a
+// scheduled sweep that nudges once when a paid period lapses without a webhook.
+builder.Services.AddScoped<IBillingNotifier, BillingNotifier>();
+builder.Services.AddScoped<IScheduledJob, SubscriptionLapseSweepJob>();
 // Billing checkout orchestration (BILLING-2), behind the platform BillingController. The
 // IBillingProvider (Stripe or fake) is registered in AddInfrastructure.
 builder.Services.AddScoped<IBillingService, BillingService>();

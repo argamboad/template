@@ -23,6 +23,13 @@ public class Subscription : ITenantScoped
     /// <summary>End of the paid period; past = lapsed (fails closed to Free even if Status is active).</summary>
     public DateTimeOffset? CurrentPeriodEnd { get; set; }
 
+    /// <summary>
+    /// When the tenant was last notified that this subscription lapsed (BILLING-6). Set by the lapse
+    /// sweep so it nudges once per lapse, not every run; cleared implicitly when a new period starts
+    /// (the sweep re-notifies only if this predates <see cref="CurrentPeriodEnd"/>).
+    /// </summary>
+    public DateTimeOffset? LapseNotifiedAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
