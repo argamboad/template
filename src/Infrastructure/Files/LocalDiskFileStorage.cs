@@ -60,7 +60,7 @@ public sealed class LocalDiskFileStorage(
     {
         var tenantId = currentTenant.TenantId
             ?? throw new InvalidOperationException("No current tenant — file storage requires a tenant context.");
-        ValidateKey(key); // don't mint a URL for a key we'd refuse to serve
+        StorageKeys.Validate(key); // don't mint a URL for a key we'd refuse to serve
 
         var token = tokenizer.Mint(tenantId, key, lifetime);
         var relative = $"api/files/{token}";
@@ -84,7 +84,7 @@ public sealed class LocalDiskFileStorage(
         var tenantId = currentTenant.TenantId
             ?? throw new InvalidOperationException("No current tenant — file storage requires a tenant context.");
 
-        ValidateKey(key);
+        StorageKeys.Validate(key);
 
         var tenantBlobRoot = Path.Combine(_root, "blobs", tenantId.ToString());
         var tenantMetaRoot = Path.Combine(_root, "meta", tenantId.ToString());
@@ -96,22 +96,6 @@ public sealed class LocalDiskFileStorage(
             throw new InvalidStorageKeyException($"Key '{key}' resolves outside the tenant namespace.");
 
         return (blob, meta);
-    }
-
-    private static void ValidateKey(string key)
-    {
-        if (string.IsNullOrWhiteSpace(key))
-            throw new InvalidStorageKeyException("Storage key must not be empty.");
-        if (key.Contains('\\'))
-            throw new InvalidStorageKeyException("Storage key must use '/' separators, not '\\'.");
-        if (Path.IsPathRooted(key))
-            throw new InvalidStorageKeyException("Storage key must be a relative path.");
-
-        var segments = key.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0)
-            throw new InvalidStorageKeyException("Storage key must reference a file.");
-        if (segments.Any(s => s is "." or ".."))
-            throw new InvalidStorageKeyException("Storage key must not contain '.' or '..' segments.");
     }
 
     private static bool IsWithin(string candidate, string root)

@@ -23,12 +23,12 @@ sequenced below by value, not by dependency.
 
 ---
 
-## Wave 1 — Keystones (unlock the rest)
+## Wave 1 — Keystones (unlock the rest) — ✅ COMPLETE
 
 | Item | Epic | Size | Why first | Deps |
 |------|------|------|-----------|------|
 | **RBAC** (admin role + permission seam + roster UI) — ✅ *COMPLETE* (RBAC-1/2/3; ADR-009, `stories/rbac.md`) | `RBAC` | M | B2B table stakes; unblocks Admin + Public API | ready |
-| **File storage** (`IFileStorage`: local / S3-compatible) — 🔲 *in progress* (ADR-010, `stories/files.md`) | `FILES` | S–M | Avatars, attachments, and the GDPR export artifact all need it | ready |
+| **File storage** (`IFileStorage`: local / S3-compatible) — ✅ *COMPLETE* (FILES-1/2/3; ADR-010, `stories/files.md`) | `FILES` | S–M | Avatars, attachments, and the GDPR export artifact all need it | ready |
 
 ## Wave 2 — Compliance & security (enterprise table stakes)
 
@@ -71,7 +71,6 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**RBAC is done** (ADR-009; RBAC-1/2/3 merged). **File storage is underway** (ADR-010 + `stories/files.md`;
-FILES-1 abstraction+local → FILES-2 signed download → FILES-3 S3) — finishing Wave 1. After it lands,
-**GDPR** (legal weight; the export artifact needs File storage, now satisfied) is the natural next;
-**MFA** slots in anywhere as a self-contained win. Re-sequence freely.
+**Wave 1 is done** — RBAC (ADR-009; RBAC-1/2/3) and File storage (ADR-010; FILES-1/2/3) both merged.
+The natural next is **Wave 2**: **GDPR** (legal weight; its export artifact now has File storage to live
+in) and **MFA** (self-contained security win). Re-sequence freely.

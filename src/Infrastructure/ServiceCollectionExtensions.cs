@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Template.Core.Abstractions;
 using Template.Core.Repositories;
 using Template.Infrastructure.Audit;
@@ -86,12 +87,22 @@ public static class ServiceCollectionExtensions
         else
             services.AddScoped<IBillingProvider, FakeBillingProvider>();
 
-        // File/blob storage (ADR-010). Local disk is the dev/test default (zero setup); an
-        // S3-compatible backend is selected when configured (FILES-3) — same config-presence switch as
-        // the billing provider. Keys are tenant-scoped and validated server-side by the impl.
+        // File/blob storage (ADR-010). An S3-compatible backend (AWS/MinIO/R2/B2) is selected when a
+        // bucket is configured; otherwise local disk — the dev/test default with zero setup. Same
+        // config-presence switch as the billing provider. Keys are tenant-scoped and validated
+        // server-side by the impl. The download tokenizer backs the local-disk /api/files endpoint.
         services.Configure<LocalFileStorageSettings>(configuration.GetSection("Storage:Local"));
+        services.Configure<S3StorageSettings>(configuration.GetSection("Storage:S3"));
         services.AddSingleton<IFileDownloadTokenizer, FileDownloadTokenizer>();
-        services.AddScoped<IFileStorage, LocalDiskFileStorage>();
+        if (!string.IsNullOrEmpty(configuration["Storage:S3:Bucket"]))
+        {
+            services.AddSingleton(sp => S3FileStorage.CreateClient(sp.GetRequiredService<IOptions<S3StorageSettings>>().Value));
+            services.AddScoped<IFileStorage, S3FileStorage>();
+        }
+        else
+        {
+            services.AddScoped<IFileStorage, LocalDiskFileStorage>();
+        }
 
         // Clock — repositories/services depend on TimeProvider for testable time. The host
         // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.
