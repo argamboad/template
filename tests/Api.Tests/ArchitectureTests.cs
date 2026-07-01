@@ -17,13 +17,25 @@ public class ArchitectureTests
     public void FeatureSlices_DoNotBypassTheTenantFilter()
     {
         var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
-        var offenders = SourceFiles(featuresDir)
+
+        // IgnoreQueryFilters is never allowed in feature code — even contributors go through QueryAllTenants().
+        var ignoreOffenders = SourceFiles(featuresDir)
             .Where(f => File.ReadAllText(f).Contains("IgnoreQueryFilters"))
             .Select(Path.GetFileName)
             .ToList();
+        Assert.True(ignoreOffenders.Count == 0,
+            $"Feature code must not call IgnoreQueryFilters — use IRepository<T>.QueryAllTenants(). Offenders: {string.Join(", ", ignoreOffenders)}");
 
-        Assert.True(offenders.Count == 0,
-            $"Feature code must not call IgnoreQueryFilters — use IRepository<T>.QueryAllTenants(). Offenders: {string.Join(", ", offenders)}");
+        // QueryAllTenants is the sanctioned cross-tenant hatch, but ONLY inside *DataContributor.cs
+        // (dissolve/export). In request-path slice code it bypasses tenancy identically to
+        // IgnoreQueryFilters, so it is banned there too (v2 audit ADV-2).
+        var queryAllOffenders = SourceFiles(featuresDir)
+            .Where(f => !Path.GetFileName(f)!.EndsWith("DataContributor.cs", StringComparison.Ordinal))
+            .Where(f => File.ReadAllText(f).Contains("QueryAllTenants"))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(queryAllOffenders.Count == 0,
+            $"Request-path feature code must not call QueryAllTenants (allowed only in *DataContributor.cs). Offenders: {string.Join(", ", queryAllOffenders)}");
     }
 
     [Fact]
