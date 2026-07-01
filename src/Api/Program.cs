@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Extensions;
 using Microsoft.OpenApi.Models;
 using Template.Api.Authentication;
 using Template.Api.Configuration;
@@ -36,6 +37,19 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o =>
 {
     o.SwaggerDoc("v1", new OpenApiInfo { Title = "Template API", Version = "v1" });
+    // A curated "public" document with ONLY the /api/public routes (PUBAPI-2) — the customer-facing
+    // contract, served leak-free at /api/public/openapi.json when PUBAPI is enabled (see below).
+    o.SwaggerDoc("public", new OpenApiInfo
+    {
+        Title = "Public API",
+        Version = "v1",
+        Description = "Programmatic API authenticated with a tenant API key sent in the X-Api-Key header.",
+    });
+    o.DocInclusionPredicate((docName, api) =>
+    {
+        var isPublic = api.RelativePath?.StartsWith("api/public", StringComparison.OrdinalIgnoreCase) == true;
+        return docName == "public" ? isPublic : true; // "public" = only /api/public; "v1" = everything
+    });
     o.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -198,7 +212,7 @@ builder.Services.AddScoped<IWebhookPublisher, WebhookPublisher>();
 builder.Services.AddTenantApiAuthorization();
 
 // Throttle the unauthenticated passwordless endpoints (email-bomb / brute-force surface) — CONF-5.
-builder.Services.AddPasswordlessRateLimiter();
+builder.Services.AddApiRateLimiters();
 
 // CORS — allow the Blazor WASM client to send credentialed requests (cookies).
 var allowedOrigins = builder.Configuration
@@ -235,6 +249,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Template API v1");
+        if (publicApiSettings.Enabled)
+            c.SwaggerEndpoint("/swagger/public/swagger.json", "Public API"); // PUBAPI-2
         c.RoutePrefix = string.Empty; // serve the UI at the API root (/)
     });
 }
@@ -271,6 +287,16 @@ if (publicApiSettings.Enabled)
 {
     app.MapApiKeyManagement();
     app.MapPublicApi();
+
+    // The customer-facing OpenAPI contract (PUBAPI-2): emit ONLY the curated "public" document, so the
+    // internal "v1" surface is never exposed in production. Anonymous (a published contract), any env.
+    app.MapGet("/api/public/openapi.json", (Swashbuckle.AspNetCore.Swagger.ISwaggerProvider swagger) =>
+    {
+        var document = swagger.GetSwagger("public");
+        using var writer = new StringWriter();
+        document.SerializeAsV3(new Microsoft.OpenApi.Writers.OpenApiJsonWriter(writer));
+        return Results.Text(writer.ToString(), "application/json");
+    }).AllowAnonymous().WithTags("Public API");
 }
 
 // HOOKS (ADR-016): map webhook management only when enabled — off ⇒ the routes don't exist.

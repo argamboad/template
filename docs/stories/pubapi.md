@@ -3,10 +3,11 @@
 > One file per epic. A **config-gated, default-off** programmatic surface: tenants mint **API keys** and
 > their machines call the API non-interactively. Authenticated by a second auth scheme that mints a
 > `tenant_id`-scoped principal, so the existing tenant isolation applies for free. Design decision +
-> constraints in **ADR-015**. Stories use Gherkin acceptance criteria. **Status: ✅ PUBAPI-1 shipped**
-> (`feat/pubapi-1-keys`) — keys + auth scheme + owner management + a demo public group, all behind
-> `PublicApi:Enabled` (off ⇒ routes 404). The user reversed the earlier "no public API" stance on
-> 2026-07-01.
+> constraints in **ADR-015**. Stories use Gherkin acceptance criteria. **Status: ✅ PUBAPI-1 + PUBAPI-2
+> shipped.** PUBAPI-1 (`feat/pubapi-1-keys`) — keys + auth scheme + owner management + a demo public group,
+> all behind `PublicApi:Enabled` (off ⇒ routes 404). PUBAPI-2 (`feat/pubapi-2-hardening`) — **per-key rate
+> limiting** + a **leak-free public OpenAPI doc** (`/api/public/openapi.json`, only the public routes). The
+> user reversed the earlier "no public API" stance on 2026-07-01.
 
 **Epic key:** `PUBAPI`
 
@@ -72,9 +73,12 @@ Scenario: The public surface is off by default
   Then it does not exist (404) — the scheme isn't added and the routes aren't mapped
 ```
 
-**Out of scope (candidate PUBAPI-2):** per-key **rate limiting** (partition the existing limiter by key
-id); a dedicated **OpenAPI document/UI** for just the public routes; fine-grained scope taxonomies; key
-rotation helpers.
+**PUBAPI-2 (✅ done, `feat/pubapi-2-hardening`):** **per-key rate limiting** (`RateLimiting.PublicApiPolicy`
+partitions the limiter on the key id — one tenant's key can't exhaust another's budget; 60/min default) +
+a **curated, leak-free public OpenAPI document** (`GET /api/public/openapi.json`, anonymous, emits only the
+`/api/public` routes so the internal `v1` surface is never exposed; the dev Swagger UI also lists it).
+Covered by `RateLimitingTests` (per-key isolation); boot-verified the doc serves in Production when enabled
+and 404s when off. **Still out of scope:** fine-grained scope taxonomies; key rotation helpers.
 **Definition of done:** tests first; hash-only storage + one-time reveal; key auth mints a tenant-scoped
 principal; scope gating; owner-only management; **default-off strong gating** (404 when disabled); merged,
 app working; ADR-015 referenced.
@@ -84,7 +88,8 @@ app working; ADR-015 referenced.
 ## Slice plan (implementation map)
 
 1. ✅ **Keys + auth + management + demo public group (PUBAPI-1).** — DONE.
-2. **Hardening (PUBAPI-2, optional).** Per-key rate limiting; public-only OpenAPI doc/UI; key rotation.
+2. ✅ **Hardening (PUBAPI-2).** — DONE. Per-key rate limiting + a leak-free public OpenAPI doc.
+   (Still open: key rotation; scope taxonomies.)
 
 **Known sharp edges (from ADR-015):** store **only the hash**; the key **is** the tenant selector (auth
 reads cross-tenant, pre-scope, then everything is `tenant_id`-scoped); **default off** with **strong
