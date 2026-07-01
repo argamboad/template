@@ -1,0 +1,125 @@
+using Microsoft.EntityFrameworkCore;
+using Template.Api.Services;
+using Template.Api.Tests.Infrastructure;
+using Template.Core.Entities;
+using Template.Infrastructure.Persistence;
+using Template.Infrastructure.Repositories;
+
+namespace Template.Api.Tests.Notify;
+
+/// <summary>
+/// NOTIFY-1 (ADR-013): the per-user notification center. NotifyAsync stages an in-app row (commits with
+/// the caller's unit of work); list is newest-first + paginated; unread count + mark-read/all work; and
+/// everything is scoped to the user — never cross-user. Postgres-backed.
+/// </summary>
+[Collection(PostgresCollection.Name)]
+public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
+{
+    [Fact]
+    public async Task Notify_ThenList_ShowsUnread_NewestFirst()
+    {
+        var userId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+
+        await service.NotifyAsync(userId, "member.invited", "First", "b1");
+        await service.NotifyAsync(userId, "member.joined", "Second", "b2");
+        await db.SaveChangesAsync(); // NotifyAsync stages; the caller's UoW commits
+
+        var list = await service.ListAsync(userId, before: null, limit: 20);
+
+        Assert.Equal(2, list.Count);
+        Assert.Equal("Second", list[0].Title); // newest first
+        Assert.All(list, n => Assert.Null(n.ReadAt));
+        Assert.Equal(2, await service.UnreadCountAsync(userId));
+    }
+
+    [Fact]
+    public async Task List_RespectsLimit_AndBeforeCursor()
+    {
+        var userId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        for (var i = 0; i < 5; i++)
+            await service.NotifyAsync(userId, "k", $"n{i}", "");
+        await db.SaveChangesAsync();
+
+        var firstPage = await service.ListAsync(userId, before: null, limit: 2);
+        Assert.Equal(2, firstPage.Count);
+
+        var nextPage = await service.ListAsync(userId, before: firstPage[^1].CreatedAt, limit: 10);
+        Assert.All(nextPage, n => Assert.True(n.CreatedAt < firstPage[^1].CreatedAt));
+    }
+
+    [Fact]
+    public async Task MarkRead_SetsReadAt_AndDropsUnreadCount()
+    {
+        var userId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        await service.NotifyAsync(userId, "k", "n", "");
+        await db.SaveChangesAsync();
+        var id = (await service.ListAsync(userId, null, 10))[0].Id;
+
+        Assert.True(await service.MarkReadAsync(userId, id));
+        Assert.Equal(0, await service.UnreadCountAsync(userId));
+    }
+
+    [Fact]
+    public async Task MarkAllRead_ClearsUnread()
+    {
+        var userId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        for (var i = 0; i < 3; i++) await service.NotifyAsync(userId, "k", $"n{i}", "");
+        await db.SaveChangesAsync();
+
+        await service.MarkAllReadAsync(userId);
+
+        Assert.Equal(0, await service.UnreadCountAsync(userId));
+    }
+
+    [Fact]
+    public async Task MarkRead_AnotherUsersNotification_ReturnsFalse_AndDoesNotMark()
+    {
+        var mine = Guid.CreateVersion7();
+        var theirs = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        await service.NotifyAsync(theirs, "k", "theirs", "");
+        await db.SaveChangesAsync();
+        var theirId = (await service.ListAsync(theirs, null, 10))[0].Id;
+
+        Assert.False(await service.MarkReadAsync(mine, theirId)); // can't touch another user's
+        Assert.Equal(1, await service.UnreadCountAsync(theirs)); // still unread
+    }
+
+    [Fact]
+    public async Task List_IsPerUser()
+    {
+        var a = Guid.CreateVersion7();
+        var b = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        await service.NotifyAsync(a, "k", "for-a", "");
+        await service.NotifyAsync(b, "k", "for-b", "");
+        await db.SaveChangesAsync();
+
+        var listA = await service.ListAsync(a, null, 10);
+        Assert.Equal("for-a", Assert.Single(listA).Title);
+    }
+
+    [Fact]
+    public async Task Notify_StoresMetadataAsJson()
+    {
+        var userId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = new NotificationService(new EfRepository<Notification>(db), TimeProvider.System);
+        await service.NotifyAsync(userId, "k", "n", "", new { invitation_id = "abc" });
+        await db.SaveChangesAsync();
+
+        var stored = await db.Set<Notification>().SingleAsync(n => n.UserId == userId);
+        Assert.Contains("invitation_id", stored.Metadata);
+        Assert.Contains("abc", stored.Metadata);
+    }
+}

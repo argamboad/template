@@ -19,7 +19,15 @@ user's data. Wiped by account erasure (GDPR-2).
 
 ### NOTIFY-1 — In-app notification center
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/notify-1-center`). `Notification` (per-user: `Kind`/`Title`/`Body`/
+`Metadata` jsonb/`ReadAt`/`CreatedAt`; migration `AddNotifications`). `NotificationService`:
+`NotifyAsync` **stages** the in-app row on the caller's unit of work (transactional, like `IAuditLog`);
+`ListAsync` (newest-first, `before` cursor, ≤100), `UnreadCountAsync`, `MarkReadAsync` (own only),
+`MarkAllReadAsync`. User-scoped `NotificationsController`
+(`GET /api/notifications`, `/unread-count`, `POST /{id}/read`, `/read-all`) — scoped to the
+`NameIdentifier` claim. Account erasure (GDPR-2) wipes notifications. Tests
+`tests/Api.Tests/Notify/NotificationServiceTests.cs` (list/newest-first/paginate, unread count, mark
+one/all, per-user isolation, metadata-as-json).
 
 **As a** user
 **I want** an in-app list of notifications with read/unread state
@@ -109,9 +117,9 @@ email-via-outbox), email uses the outbox sender; merged, app working; ADR-013 re
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. 🔲 **In-app center (NOTIFY-1).** `Notification` (per-user) + migration; `INotificationService.NotifyAsync`
-   (in-app insert) + a user-scoped center API (list/unread-count/mark-read/mark-all); account erasure wipes
-   notifications.
+1. ✅ **In-app center (NOTIFY-1).** — DONE. `Notification` (per-user) + migration `AddNotifications`;
+   `NotificationService.NotifyAsync` (staged in-app insert) + user-scoped center API
+   (list/unread-count/mark-read/mark-all); account erasure wipes notifications.
 2. 🔲 **Preferences + fan-out (NOTIFY-2).** `NotificationPreference` (per-user, default-on) + get/update API;
    `NotifyAsync` fans out to in-app + email (outbox-backed `IEmailSender`) per prefs.
 
