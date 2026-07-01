@@ -1,4 +1,5 @@
 @page "/settings"
+@using System.Net
 @using System.Net.Http.Json
 @using Template.Shared.Ui.Auth
 @inject AuthService Auth
@@ -58,6 +59,17 @@
     {
         <div class="alert alert-danger mt-3 py-2">@_error</div>
     }
+
+    @* ── Danger zone: delete account (GDPR / ADR-011) ── *@
+    <div class="card shadow-sm border-danger-subtle mt-4">
+        <div class="card-body">
+            <h2 class="h6 fw-bold text-danger mb-2">@Localizer["Settings_DangerZone"]</h2>
+            <p class="small text-muted mb-3">@Localizer["Settings_DeleteAccountWarning"]</p>
+            <button class="btn btn-outline-danger" disabled="@_busy" @onclick="DeleteAccount">
+                @Localizer["Settings_DeleteAccount"]
+            </button>
+        </div>
+    </div>
 </div>
 
 @code {
@@ -177,6 +189,40 @@
         }
         catch { _error = Localizer["Settings_ErrUnlink"]; }
         finally { _busy = false; }
+    }
+
+    private async Task DeleteAccount()
+    {
+        if (!await JS.ConfirmAsync(Localizer["Settings_ConfirmDelete"])) return;
+
+        _error = null; _busy = true;
+        try
+        {
+            var res = await Http.DeleteAsync("/api/auth/me");
+            if (res.IsSuccessStatusCode) { await FinishDeletion(); return; }
+
+            if (res.StatusCode == HttpStatusCode.Conflict)
+            {
+                // Solo owner: erasing dissolves the household + its data — require a stronger confirm.
+                if (!await JS.ConfirmAsync(Localizer["Settings_ConfirmDissolve"])) return;
+                var confirmed = await Http.DeleteAsync("/api/auth/me?confirm_dissolve=true");
+                if (confirmed.IsSuccessStatusCode) { await FinishDeletion(); return; }
+                _error = Localizer["Settings_ErrDelete"];
+                return;
+            }
+
+            _error = res.StatusCode == HttpStatusCode.BadRequest
+                ? Localizer["Settings_ErrDeleteTransferFirst"]
+                : Localizer["Settings_ErrDelete"];
+        }
+        catch { _error = Localizer["Settings_ErrDelete"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task FinishDeletion()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
     }
 
     private static string Label(string key) =>

@@ -160,6 +160,31 @@
             </div>
         }
 
+        @* ── Data export (owner only — GDPR / ADR-011) ── *@
+        @if (IsOwner)
+        {
+            <div class="card shadow-sm mb-3">
+                <div class="card-body">
+                    <h2 class="h6 fw-bold mb-2">@Localizer["Household_DataTitle"]</h2>
+                    <p class="small text-muted mb-2">@Localizer["Household_DataSubtitle"]</p>
+                    <button class="btn btn-outline-secondary" disabled="@_busy" @onclick="ExportData">
+                        @if (_busy && _exporting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        @Localizer["Household_ExportData"]
+                    </button>
+                    @if (_exportUrl is not null)
+                    {
+                        <div class="alert alert-success py-2 mt-3 mb-0 d-flex align-items-center gap-2">
+                            <span>@Localizer["Household_ExportReady"]</span>
+                            <a href="@_exportUrl" target="_blank" rel="noopener">@Localizer["Household_ExportDownload"]</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         @* ── Membership lifecycle ── *@
         <div class="card shadow-sm">
             <div class="card-body">
@@ -209,6 +234,8 @@
     private string? _transferTargetId;
     private string? _revealedToken;
     private string? _revealedEmail;
+    private bool _exporting;
+    private string? _exportUrl;
 
     // Client-side mirror of the RolePermissions matrix (ADR-009). The API is the real gate; this just
     // shows/hides controls so the UI matches what the caller can actually do.
@@ -373,6 +400,24 @@
         finally { _busy = false; }
     }
 
+    private async Task ExportData()
+    {
+        _busy = true; _exporting = true; _exportUrl = null;
+        try
+        {
+            var resp = await Http.PostAsync("/api/household/export", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                var body = await resp.Content.ReadFromJsonAsync<ExportResult>();
+                // The URL may be relative (local disk) — resolve it against the API base for the browser.
+                _exportUrl = body?.DownloadUrl is { } u ? new Uri(Http.BaseAddress!, u).ToString() : null;
+            }
+            else { SetStatus(Localizer["Household_ErrExport"], false); }
+        }
+        catch { SetStatus(Localizer["Household_ErrExport"], false); }
+        finally { _busy = false; _exporting = false; }
+    }
+
     private async Task TransferOwnership()
     {
         if (!Guid.TryParse(_transferTargetId, out var target)) return;
@@ -468,5 +513,10 @@
     {
         [JsonPropertyName("token")] public string Token { get; init; } = "";
         [JsonPropertyName("invited_email")] public string InvitedEmail { get; init; } = "";
+    }
+
+    private record ExportResult
+    {
+        [JsonPropertyName("download_url")] public string? DownloadUrl { get; init; }
     }
 }

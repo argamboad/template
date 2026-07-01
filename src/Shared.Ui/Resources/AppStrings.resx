@@ -108,6 +108,13 @@
   <data name="Settings_Link" xml:space="preserve"><value>Link</value></data>
   <data name="Settings_Unlink" xml:space="preserve"><value>Unlink</value></data>
   <data name="Settings_ConfirmUnlink" xml:space="preserve"><value>Unlink this sign-in method?</value></data>
+  <data name="Settings_DangerZone" xml:space="preserve"><value>Danger zone</value></data>
+  <data name="Settings_DeleteAccount" xml:space="preserve"><value>Delete my account</value></data>
+  <data name="Settings_DeleteAccountWarning" xml:space="preserve"><value>Permanently delete your account and personal data. This can't be undone.</value></data>
+  <data name="Settings_ConfirmDelete" xml:space="preserve"><value>Delete your account permanently? This cannot be undone.</value></data>
+  <data name="Settings_ConfirmDissolve" xml:space="preserve"><value>You're the only member, so this also dissolves your household and permanently deletes all its data. Continue?</value></data>
+  <data name="Settings_ErrDeleteTransferFirst" xml:space="preserve"><value>Transfer household ownership before deleting your account.</value></data>
+  <data name="Settings_ErrDelete" xml:space="preserve"><value>Couldn't delete your account. Please try again.</value></data>
   <data name="Settings_LinkedSuccess" xml:space="preserve"><value>{0} linked successfully.</value></data>
   <data name="Settings_LinkErrInUse" xml:space="preserve"><value>That provider account is already linked to a different user.</value></data>
   <data name="Settings_LinkErrExpired" xml:space="preserve"><value>The link request expired — please try again.</value></data>
@@ -145,6 +152,12 @@
   <data name="Household_LeaveDissolve" xml:space="preserve"><value>Leave &amp; dissolve</value></data>
   <data name="Household_DissolveWarning" xml:space="preserve"><value>You're the only member. Leaving permanently deletes this household and its data.</value></data>
   <data name="Household_LeaveAndDelete" xml:space="preserve"><value>Leave and delete</value></data>
+  <data name="Household_DataTitle" xml:space="preserve"><value>Data</value></data>
+  <data name="Household_DataSubtitle" xml:space="preserve"><value>Download an export of this household's data.</value></data>
+  <data name="Household_ExportData" xml:space="preserve"><value>Download household data</value></data>
+  <data name="Household_ExportReady" xml:space="preserve"><value>Your export is ready:</value></data>
+  <data name="Household_ExportDownload" xml:space="preserve"><value>Download</value></data>
+  <data name="Household_ErrExport" xml:space="preserve"><value>Couldn't create the export. Please try again.</value></data>
   <data name="Household_LeaveTitle" xml:space="preserve"><value>Leave household</value></data>
   <data name="Household_LeaveAsMemberNote" xml:space="preserve"><value>The shared household stays intact; you'll get a fresh household of your own.</value></data>
   <data name="Household_Leave" xml:space="preserve"><value>Leave</value></data>

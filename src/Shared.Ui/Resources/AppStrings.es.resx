@@ -108,6 +108,13 @@
   <data name="Settings_Link" xml:space="preserve"><value>Vincular</value></data>
   <data name="Settings_Unlink" xml:space="preserve"><value>Desvincular</value></data>
   <data name="Settings_ConfirmUnlink" xml:space="preserve"><value>¿Desvincular este método de inicio de sesión?</value></data>
+  <data name="Settings_DangerZone" xml:space="preserve"><value>Zona de peligro</value></data>
+  <data name="Settings_DeleteAccount" xml:space="preserve"><value>Eliminar mi cuenta</value></data>
+  <data name="Settings_DeleteAccountWarning" xml:space="preserve"><value>Elimina permanentemente tu cuenta y tus datos personales. Esto no se puede deshacer.</value></data>
+  <data name="Settings_ConfirmDelete" xml:space="preserve"><value>¿Eliminar tu cuenta permanentemente? Esto no se puede deshacer.</value></data>
+  <data name="Settings_ConfirmDissolve" xml:space="preserve"><value>Eres el único miembro, así que esto también disolverá tu hogar y eliminará permanentemente todos sus datos. ¿Continuar?</value></data>
+  <data name="Settings_ErrDeleteTransferFirst" xml:space="preserve"><value>Transfiere la propiedad del hogar antes de eliminar tu cuenta.</value></data>
+  <data name="Settings_ErrDelete" xml:space="preserve"><value>No se pudo eliminar tu cuenta. Inténtalo de nuevo.</value></data>
   <data name="Settings_LinkedSuccess" xml:space="preserve"><value>{0} se vinculó correctamente.</value></data>
   <data name="Settings_LinkErrInUse" xml:space="preserve"><value>Esa cuenta de proveedor ya está vinculada a otro usuario.</value></data>
   <data name="Settings_LinkErrExpired" xml:space="preserve"><value>La solicitud de vinculación caducó; inténtalo de nuevo.</value></data>
@@ -145,6 +152,12 @@
   <data name="Household_LeaveDissolve" xml:space="preserve"><value>Salir y disolver</value></data>
   <data name="Household_DissolveWarning" xml:space="preserve"><value>Eres el único miembro. Si sales, este hogar y sus datos se eliminarán permanentemente.</value></data>
   <data name="Household_LeaveAndDelete" xml:space="preserve"><value>Salir y eliminar</value></data>
+  <data name="Household_DataTitle" xml:space="preserve"><value>Datos</value></data>
+  <data name="Household_DataSubtitle" xml:space="preserve"><value>Descarga una exportación de los datos de este hogar.</value></data>
+  <data name="Household_ExportData" xml:space="preserve"><value>Descargar datos del hogar</value></data>
+  <data name="Household_ExportReady" xml:space="preserve"><value>Tu exportación está lista:</value></data>
+  <data name="Household_ExportDownload" xml:space="preserve"><value>Descargar</value></data>
+  <data name="Household_ErrExport" xml:space="preserve"><value>No se pudo crear la exportación. Inténtalo de nuevo.</value></data>
   <data name="Household_LeaveTitle" xml:space="preserve"><value>Salir del hogar</value></data>
   <data name="Household_LeaveAsMemberNote" xml:space="preserve"><value>El hogar compartido permanece intacto; tendrás un hogar propio nuevo.</value></data>
   <data name="Household_Leave" xml:space="preserve"><value>Salir</value></data>
