@@ -111,14 +111,19 @@ public class AuthController(
             var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
                 claimsExtractor.ExtractDisplayName(User), EmailVerifiedForMerge(provider), cancellationToken);
 
-            var issued = await refreshTokenService.IssueRefreshTokenAsync(user.Id, ClientIp, provider, cancellationToken);
-            cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
-
             // Sign the external carrier cookie out — its job is done.
             await HttpContext.SignOutAsync(ServiceCollectionExtensions.ExternalScheme);
 
-            logger.LogInformation("OAuth callback successful for user: {Email} via {Provider}", email, provider);
+            // MFA step-up (MFA-2/3, ADR-012): a user with MFA enabled gets a signed challenge instead of
+            // a session — bounce to the client's login step-up (which posts to /mfa/verify) rather than
+            // completing sign-in here. Without MFA, issue the session exactly as before. Routing through
+            // CompleteOrChallengeAsync is what stops OAuth from silently bypassing the second factor.
+            var (session, challenge) = await mfaLogin.CompleteOrChallengeAsync(user, provider, ClientIp, native: false, cancellationToken);
+            if (challenge is not null)
+                return Redirect($"{appSettings.ClientUrl}/login?mfa={Uri.EscapeDataString(challenge)}");
 
+            cookieService.SetRefreshTokenCookie(Response, session!.RefreshToken, Request);
+            logger.LogInformation("OAuth callback successful for user: {Email} via {Provider}", email, provider);
             return Redirect($"{appSettings.ClientUrl}/auth-callback");
         }
         catch (UnverifiedEmailConflictException)
@@ -439,7 +444,13 @@ public class AuthController(
         if (user is null)
             return Redirect($"{appSettings.ClientUrl}/login?error=invalid_link");
 
-        await IssueRefreshCookieAsync(user.Id, LoginTokenPurpose.MagicLink, cancellationToken);
+        // MFA step-up (MFA-2/3, ADR-012): challenge instead of a session when the user has MFA on, so a
+        // magic link can't bypass the second factor. The client posts the challenge + code to /mfa/verify.
+        var (session, challenge) = await mfaLogin.CompleteOrChallengeAsync(user, LoginTokenPurpose.MagicLink, ClientIp, native: false, cancellationToken);
+        if (challenge is not null)
+            return Redirect($"{appSettings.ClientUrl}/login?mfa={Uri.EscapeDataString(challenge)}");
+
+        cookieService.SetRefreshTokenCookie(Response, session!.RefreshToken, Request);
         return Redirect($"{appSettings.ClientUrl}/auth-callback");
     }
 
@@ -617,16 +628,6 @@ public class AuthController(
 
     /// <summary>Caller IP for refresh-token auditing; "unknown" when unavailable.</summary>
     private string ClientIp => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
-    /// <summary>
-    /// Issues a refresh token and sets it as the browser cookie — for web-only paths
-    /// (OAuth callback, magic link) where the client then calls /refresh for its JWT.
-    /// </summary>
-    private async Task IssueRefreshCookieAsync(Guid userId, string provider, CancellationToken cancellationToken = default)
-    {
-        var issued = await refreshTokenService.IssueRefreshTokenAsync(userId, ClientIp, provider, cancellationToken);
-        cookieService.SetRefreshTokenCookie(Response, issued.RawToken, Request);
-    }
 
     /// <summary>True when the request comes from a native (desktop/mobile) client.</summary>
     private bool IsNativeClient => Request.Headers[AuthHeaders.NativeClient] == AuthHeaders.NativeClientValue;

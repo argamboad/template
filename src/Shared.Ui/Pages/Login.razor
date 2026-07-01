@@ -170,6 +170,11 @@
     [SupplyParameterFromQuery]
     public string? Error { get; set; }
 
+    // Set by the server when a redirect login (OAuth / magic link) needs a second factor: a signed,
+    // single-use, short-lived MFA challenge. Its presence drops us straight into the step-up prompt.
+    [SupplyParameterFromQuery(Name = "mfa")]
+    public string? MfaChallengeToken { get; set; }
+
     private string? ErrorMessage => Error switch
     {
         "external_failed" => Localizer["Login_ErrExternalFailed"],
@@ -193,6 +198,15 @@
 
     protected override void OnInitialized()
     {
+        // A redirect login (OAuth / magic link) that needs a second factor lands here with ?mfa=<challenge>.
+        // Enter the step-up prompt directly — the user isn't signed in yet (no session was issued).
+        if (!string.IsNullOrEmpty(MfaChallengeToken))
+        {
+            _challenge = MfaChallengeToken;
+            _mode = Mode.MfaChallenge;
+            return;
+        }
+
         if (Auth.IsAuthenticated)
             Nav.NavigateTo("/");
     }

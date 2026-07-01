@@ -725,7 +725,8 @@ And entering a valid code completes sign-in
 2. **Expected:** instead of landing signed-in, a **second prompt** asks for the authenticator code.
 3. Enter the current 6-digit code → you're signed in (lands on `/`).
 4. **Wrong/expired code:** an inline error; you stay on the step-up prompt (no session).
-5. **Note:** OAuth and magic-link (redirect) sign-ins don't yet show this step — flagged follow-up.
+5. **Note:** OAuth and magic-link sign-ins enforce the step-up too (see QA-MFA-04). Native (MAUI) OTP/OAuth
+   step-up is the remaining follow-up.
 
 ### QA-MFA-03 — Use a recovery code, then disable two-factor 🟠 (Web)
 **Gherkin**
@@ -740,6 +741,23 @@ And I can disable two-factor from Settings with a valid code
 2. **Settings** → **Two-factor authentication** (On) → **Disable two-factor** → enter a current TOTP
    (or another recovery code) → **Disable**.
 3. **Expected:** the badge flips to **Off**; a subsequent sign-in no longer asks for a second step.
+
+### QA-MFA-04 — Redirect logins (OAuth / magic link) enforce the step-up 🟠 (Web)
+**Precondition:** an account with two-factor **On**, reachable via an OAuth provider and/or magic link.
+**Gherkin**
+```gherkin
+Given my account has two-factor enabled
+When I sign in with Google/Microsoft or a magic link
+Then I am redirected to the authenticator step-up before any session is issued
+And entering a valid code completes sign-in
+```
+**Walkthrough**
+1. Sign out. Sign in via **Google/Microsoft** (or click a **magic link**).
+2. **Expected:** instead of landing signed-in, you arrive on `/login` showing the **authenticator code
+   prompt** (the URL carries a one-time `?mfa=` challenge). No session exists yet.
+3. Enter the current 6-digit code (or a recovery code) → you're signed in (`/auth-callback` → `/`).
+4. **Security check:** confirm you are **not** signed in until the code is accepted — a wrong/expired code
+   keeps you on the prompt with no session. (This closes the gap where redirect logins skipped MFA.)
 
 ### QA-NOTIF-01 — Notification bell + list 🟠 (Web)
 **Note:** the template has no built-in producer; to see items, a feature must call
@@ -1114,7 +1132,7 @@ the API directly:
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
 | GDPR data export | **HH-13** (owner Household → Data → download) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
-| MFA / TOTP | **MFA-01..03** (Settings enroll/QR/confirm/recovery + disable; Login step-up) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Web UI wired on the **OTP** sign-in path; OAuth/magic-link **redirect** step-up remains a UI follow-up. |
+| MFA / TOTP | **MFA-01..04** (Settings enroll/QR/confirm/recovery + disable; step-up on OTP **and** OAuth/magic-link logins) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). **All web sign-in paths enforce it**: OTP returns the challenge as JSON; OAuth callback + magic-link redirect to `/login?mfa=<challenge>`. Native (MAUI) step-up is the remaining follow-up. |
 | In-app notifications | **NOTIF-01..03** (header bell: list/unread-count/mark-read; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
 | Admin back-office | **ADMIN-01..03** (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}`) inspection, `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
@@ -1248,3 +1266,12 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   (reads the `impersonated_by` claim), and **Stop impersonating** restores the staff identity from the
   refresh cookie; a reload also reverts (the token is non-refreshable). **QA-ADMIN-01..03**; EN/ES
   localized. **This completes the UI pass (UI-1..4).**
+- **Updated 2026-07-01** — **MFA-3 (redirect step-up, security fix):** OAuth callback and magic-link
+  verify now route through `IMfaLoginService.CompleteOrChallengeAsync` (like the OTP path) instead of
+  issuing a session directly — closing the gap where an MFA-enabled user could sign in via Google/
+  magic link and **skip the second factor**. When MFA is on, the server redirects to
+  `/login?mfa=<challenge>` (a signed, single-use, 5-min Data-Protection token — no secret), and
+  `Login.razor` reuses the UI-2 step-up prompt → `POST /api/auth/mfa/verify` → `/auth-callback`.
+  Property covered by `MfaLoginServiceTests` (MFA-on → challenge, never a session); **QA-MFA-04**. The
+  dead `IssueRefreshCookieAsync` helper was removed. **Native (MAUI) OTP/OAuth step-up remains the only
+  open gap** (deferred, web-first).
