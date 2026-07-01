@@ -4,8 +4,10 @@
 > in their data and *their* systems get a signed POST when one fires. **Delivery is the transactional
 > outbox pointed outward** (ADR-007) — durable, retried, atomic with the triggering change. **Config-gated,
 > default off.** Design + constraints in **ADR-016**. Stories use Gherkin acceptance criteria.
-> **Status: ✅ HOOKS-1 shipped** (`feat/hooks-1-outbound`). The user reversed the earlier "no
-> customer-facing API" stance on 2026-07-01.
+> **Status: ✅ HOOKS-1 + HOOKS-2 shipped.** HOOKS-1 (`feat/hooks-1-outbound`) — subscriptions + signed
+> outbox delivery + owner management. HOOKS-2 (`feat/hooks-2-delivery-log`) — a tenant-facing **delivery
+> log** (one row per attempt, success/failure/status) + **replay** (re-enqueue a past delivery's exact
+> payload). The user reversed the earlier "no customer-facing API" stance on 2026-07-01.
 
 **Epic key:** `HOOKS`
 
@@ -67,8 +69,14 @@ Scenario: Management + the surface are owner-only and off by default
   Then I am refused (403) — or, when disabled, the routes do not exist (404)
 ```
 
-**Out of scope (candidate HOOKS-2):** a tenant-facing **delivery log** (per-attempt history + a view/replay
-endpoint — until then the outbox's own status/attempt/error columns are the record); a management **UI**;
+**HOOKS-2 (✅ done, `feat/hooks-2-delivery-log`):** a tenant-facing **delivery log** — `WebhookDelivery`
+(one row per attempt: event, success, status/error, and the sent body; **not** `ITenantScoped`, written
+from the tenant-less dispatcher, read side filters by `TenantId`; migration `AddWebhookDelivery`). The
+outbox handler records each attempt (committed with the message outcome). Owner routes
+`GET /api/webhooks/{id}/deliveries` (recent attempts) + `POST /api/webhooks/deliveries/{id}/replay`
+(re-enqueue the exact stored payload — same event id so the receiver dedups). Covered by
+`WebhookDeliveryLogTests`. **Still out of scope (candidate HOOKS-3):** a Blazor **management UI** (the API +
+public OpenAPI doc make it usable headless — a UI for a default-off developer feature is lower value);
 per-subscription rate limiting; automatic disable after N consecutive failures.
 **Definition of done:** tests first; encrypted secret + one-time reveal; publish fans out to matching active
 subs via the outbox; HMAC-signed deliveries; retry/dead-letter via the outbox; owner-only management;
@@ -79,7 +87,8 @@ subs via the outbox; HMAC-signed deliveries; retry/dead-letter via the outbox; o
 ## Slice plan (implementation map)
 
 1. ✅ **Subscriptions + signed outbox delivery + owner management (HOOKS-1).** — DONE.
-2. **Delivery log + UI (HOOKS-2, optional).** Per-attempt history, a view/replay endpoint, management UI.
+2. ✅ **Delivery log + replay (HOOKS-2).** — DONE. `WebhookDelivery` per-attempt record + view/replay
+   endpoints. (Blazor management UI = candidate HOOKS-3.)
 
 **Known sharp edges (from ADR-016):** delivery is the **outbox pointed outward** (don't build a second
 mechanism); the secret is **encrypted** (needed in plaintext to sign); deliveries are **at-least-once** —

@@ -72,6 +72,14 @@ public static class WebhookEndpoints
             }
         });
 
+        // Delivery log (HOOKS-2): recent attempts for a subscription — the tenant's debug trail.
+        group.MapGet("/{id:guid}/deliveries", async (Guid id, IWebhookSubscriptionService svc, CancellationToken ct) =>
+            Results.Ok((await svc.ListDeliveriesAsync(id, ct)).Select(WebhookDeliveryResponse.From).ToList()));
+
+        // Replay (HOOKS-2): re-enqueue a past delivery's exact payload (async via the outbox).
+        group.MapPost("/deliveries/{deliveryId:guid}/replay", async (Guid deliveryId, IWebhookSubscriptionService svc, CancellationToken ct) =>
+            await svc.ReplayAsync(deliveryId, ct) ? Results.Accepted() : Results.NotFound());
+
         return app;
     }
 
@@ -106,4 +114,26 @@ public sealed record WebhookResponse
     };
 
     public static WebhookResponse FromCreated(WebhookCreated created) => From(created.Subscription) with { Secret = created.Secret };
+}
+
+public sealed record WebhookDeliveryResponse
+{
+    [JsonPropertyName("id")] public required Guid Id { get; init; }
+    [JsonPropertyName("event_type")] public required string EventType { get; init; }
+    [JsonPropertyName("event_id")] public required string EventId { get; init; }
+    [JsonPropertyName("success")] public required bool Success { get; init; }
+    [JsonPropertyName("status_code")] public int? StatusCode { get; init; }
+    [JsonPropertyName("error")] public string? Error { get; init; }
+    [JsonPropertyName("created_at")] public required DateTimeOffset CreatedAt { get; init; }
+
+    public static WebhookDeliveryResponse From(WebhookDelivery d) => new()
+    {
+        Id = d.Id,
+        EventType = d.EventType,
+        EventId = d.EventId,
+        Success = d.Success,
+        StatusCode = d.StatusCode,
+        Error = d.Error,
+        CreatedAt = d.CreatedAt,
+    };
 }

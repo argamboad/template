@@ -21,10 +21,19 @@ public interface IWebhookSubscriptionService
     Task<IReadOnlyList<WebhookSubscription>> ListAsync(CancellationToken cancellationToken = default);
     Task<WebhookSubscription?> GetAsync(Guid id, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Recent delivery attempts for a subscription (newest first, current tenant only) — HOOKS-2.</summary>
+    Task<IReadOnlyList<WebhookDelivery>> ListDeliveriesAsync(Guid subscriptionId, CancellationToken cancellationToken = default);
+
+    /// <summary>Re-enqueues a past delivery's exact payload for delivery again; false if not found — HOOKS-2.</summary>
+    Task<bool> ReplayAsync(Guid deliveryId, CancellationToken cancellationToken = default);
 }
 
 public sealed class WebhookSubscriptionService(
     IRepository<WebhookSubscription> subscriptions,
+    IRepository<WebhookDelivery> deliveries,
+    IOutbox outbox,
+    ICurrentTenant currentTenant,
     ITokenGenerator tokenGenerator,
     IWebhookSecretProtector protector,
     TimeProvider clock) : IWebhookSubscriptionService
@@ -66,6 +75,32 @@ public sealed class WebhookSubscriptionService(
 
         subscriptions.Remove(subscription);
         await subscriptions.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<WebhookDelivery>> ListDeliveriesAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
+    {
+        // WebhookDelivery isn't ITenantScoped, so filter by tenant explicitly (isolation is by TenantId).
+        var tenantId = currentTenant.TenantId ?? Guid.Empty;
+        return await deliveries.Query()
+            .Where(d => d.TenantId == tenantId && d.SubscriptionId == subscriptionId)
+            .OrderByDescending(d => d.CreatedAt)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> ReplayAsync(Guid deliveryId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = currentTenant.TenantId ?? Guid.Empty;
+        var delivery = await deliveries.Query()
+            .FirstOrDefaultAsync(d => d.Id == deliveryId && d.TenantId == tenantId, cancellationToken);
+        if (delivery is null)
+            return false;
+
+        // Re-enqueue the SAME payload (subscription + event id + body) so the receiver can dedup on the id.
+        var payload = new WebhookOutboxPayload(delivery.SubscriptionId, delivery.EventType, delivery.EventId, delivery.Body);
+        await outbox.EnqueueAsync(WebhookOutboxHandler.MessageType, JsonSerializer.Serialize(payload), tenantId, cancellationToken);
+        await deliveries.SaveChangesAsync(cancellationToken); // flush the staged outbox message
         return true;
     }
 
