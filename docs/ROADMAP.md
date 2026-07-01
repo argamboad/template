@@ -42,7 +42,7 @@ sequenced below by value, not by dependency.
 | Item | Epic | Size | Why | Deps |
 |------|------|------|-----|------|
 | **Public API + API keys** | `PUBAPI` | M | Programmatic access distinct from the user session | RBAC (W1) |
-| **In-app notifications** | `NOTIFY` | M | Follow-on to email; fan-out via the outbox | outbox ✅ |
+| **In-app notifications** — 🔲 *in progress* (ADR-013, `stories/notify.md`) | `NOTIFY` | M | Follow-on to email; fan-out via the outbox | outbox ✅ |
 | **Outbound webhooks** (customer-facing) | `HOOKS` | M | Integration story for *your* customers | outbox ✅ |
 | **Admin back-office + impersonation** | `ADMIN` | M–L | Support tooling — all deps ready (audit ✅ + `EnterTenant` ✅); highest blast radius, do deliberately | RBAC, audit ✅, EnterTenant ✅ |
 
@@ -71,7 +71,7 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**Waves 1 & 2 are done** — RBAC + File storage (W1), GDPR + MFA (W2, ADR-011/012). MFA ships enrollment
-+ login step-up on the JSON paths; the OAuth/magic-link **redirect** step-up is a flagged UI follow-up.
-What remains is **Wave 3** (extensibility/ops) — and of that, PUBAPI/HOOKS are parked by choice, leaving
-**NOTIFY** (in-app notifications) and **ADMIN** (back-office/impersonation) as the main open items.
+**Waves 1 & 2 are done** — RBAC + File storage (W1), GDPR + MFA (W2, ADR-011/012). **Wave 3 is underway:
+NOTIFY** (ADR-013 + `stories/notify.md`; NOTIFY-1 in-app center → NOTIFY-2 preferences + email fan-out).
+PUBAPI/HOOKS are parked by choice, leaving **ADMIN** (back-office/impersonation) as the other main open
+Wave 3 item.

@@ -24,7 +24,7 @@
 | 2 | ~~RBAC beyond owner/member~~ → **being built** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
 | 3 | ~~File / blob storage~~ → **✅ DONE** (ADR-010, `stories/files.md`) | `FILES` | Avatars/attachments/exports all block on it | none |
 | 4 | ~~MFA / TOTP 2FA~~ → **✅ DONE** (ADR-012, `stories/mfa.md`) | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
-| 5 | In-app notifications | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
+| 5 | ~~In-app notifications~~ → **being built** (ADR-013, `stories/notify.md`) | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
 | 6 | Outbound webhooks (customer-facing) | `HOOKS` | Integration story for *your* customers | Outbox (ADR-007) required |
 | 7 | Public API + API keys | `PUBAPI` | Programmatic access distinct from the user session | RBAC helps |
 | 8 | Admin back-office + impersonation | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
@@ -90,7 +90,11 @@ enrollment + verify endpoints on the custom auth stack, a step-up check at login
 (reuse the `LoginToken` hashing pattern).
 **Deps:** none.
 
-## 5. In-app notifications — `NOTIFY`
+## 5. In-app notifications — `NOTIFY` → **TAKEN ON (ADR-013)**
+> **Now an active epic** — design decided in **ADR-013**, stories + slice plan in
+> `docs/stories/notify.md` (NOTIFY-1 in-app center → NOTIFY-2 preferences + email fan-out). Sketch below
+> retained for context.
+
 **What:** a per-user notification center + read/unread + per-user delivery preferences (in-app vs
 email).
 **Why:** the usual next ask after transactional email; preferences are legitimately per-user (the one
