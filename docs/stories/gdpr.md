@@ -1,0 +1,142 @@
+# Stories — Account & data lifecycle (GDPR)
+
+> One file per epic. **Data portability** (export "download my data") and **erasure** ("right to be
+> forgotten"), assembled from machinery the platform already has: the `ITenantDataContributor` seam,
+> the transactional **dissolve** flow, the **audit log** (ADR-008), and **file storage** (ADR-010).
+> Design decision + constraints in **ADR-011**. Stories use Gherkin acceptance criteria.
+> **Status: 🔲 in progress.**
+
+**Epic key:** `GDPR`
+
+**Prerequisites (external, before any code):**
+- None to build/run — reuses existing infra. Deps satisfied: **audit** (ADR-008 ✅), **file storage**
+  (ADR-010 ✅, for the export artifact), the **dissolve** flow, and the **permission seam** (ADR-009).
+- No new packages.
+
+**Reuses:** `ITenantDataContributor` (add `ExportAsync` beside `HasDataAsync`/`WipeAsync`),
+`IFileStorage` (store the export, hand back a signed URL), `IAuditLog`, and the single-owner
+transfer/dissolve invariants (ADR-003).
+
+---
+
+### GDPR-1 — Tenant data export ("download my data")
+
+**Status: 🔲 Planned.**
+
+**As a** tenant owner
+**I want** to download an export of my tenant's data
+**So that** I can take it elsewhere or satisfy a data-portability request
+
+**Context / notes:** extend [`ITenantDataContributor`](../../src/Core/Abstractions/ITenantDataContributor.cs)
+with `ExportAsync(tenantId)` + an `ExportKey` (section name); each contributor returns a
+JSON-serializable snapshot of its tenant data — the same "add a feature, no central edits" property as
+wipe. A platform `TenantExportService` assembles the **core** (tenant, memberships + member emails,
+pending invitations) plus every contributor's section into one JSON bundle, writes it via
+[`IFileStorage`](../../src/Core/Abstractions/IFileStorage.cs) under a tenant-scoped key, and returns a
+**signed, time-limited download URL** (ADR-010). Owner-only (new `Permission.ExportData`); the request
+is audited. **No secrets** in the bundle (no token/OTP hashes, no card data).
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: Owner exports the tenant's data
+  Given I am the tenant owner
+  When I request a data export
+  Then I get a signed, time-limited URL
+  And following it downloads a JSON bundle containing the tenant, its members and invitations, and each feature's data
+
+Scenario: Export is owner-only
+  Given I am a member or admin (not the owner)
+  When I request a data export
+  Then I am refused (403)
+
+Scenario: Export contains no secrets
+  Given the tenant has logins, invitations and audit events
+  When I inspect the export
+  Then it contains identifiers and content but no password/OTP/token hashes or card data
+
+Scenario: Export is tenant-scoped
+  Given two tenants
+  When one exports
+  Then the bundle contains only that tenant's data (never the other's)
+
+Scenario: The export request is audited
+  When an export is produced
+  Then an AuditEvent records the actor and the action
+```
+
+**Out of scope:** a scheduled/async export job (synchronous is fine at template scale); per-user
+personal-data export distinct from the tenant export (the member list already carries each user's
+identity); CSV/other formats (JSON only).
+**Definition of done:** tests first; `ExportAsync` on each contributor; assembly + `IFileStorage`
+write + signed URL; owner-gate (403 for non-owner); tenant-scoping; secret-exclusion; audit; merged,
+app working; ADR-011 referenced.
+
+---
+
+### GDPR-2 — Account erasure ("delete my account")
+
+**Status: 🔲 Planned.**
+
+**As a** user
+**I want** to delete my account and personal data
+**So that** I can exercise my right to be forgotten
+
+**Context / notes:** a self-service "delete my account" that removes the caller's **identity/PII**
+(`User`, `UserLogin`, `LoginToken`, `RefreshToken`) in one audited transaction, honoring the
+single-owner invariant (ADR-003): a **sole owner with other members must transfer first**; a **solo
+owner's tenant is dissolved** (its data wiped via the contributors, reusing the dissolve path); a
+**plain member is removed but not re-homed** (the account is going away, unlike leave). Tenant app data
+stays with the tenant. **Audit survives** — actor ids remain (audit holds ids, never PII), so the
+compliance record is not deleted by erasure.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: A member deletes their account
+  Given I am a non-owner member
+  When I delete my account
+  Then my user, logins, tokens and sessions are removed
+  And I am removed from the tenant (not re-homed)
+  And the tenant and its data are untouched for the remaining members
+
+Scenario: A solo owner deletes their account
+  Given I am the only member of my tenant
+  When I delete my account (with the required confirmation)
+  Then my identity is erased and the tenant is dissolved and its data wiped (one transaction)
+
+Scenario: A sole owner with other members must transfer first
+  Given I own a tenant that has other members
+  When I try to delete my account
+  Then I am told to transfer ownership first (the tenant can't be left ownerless)
+
+Scenario: Erasure is audited and leaves no dangling PII
+  When an account is erased
+  Then an AuditEvent records the action with the actor id
+  And existing audit events still reference that id (no PII), never the deleted email
+```
+
+**Out of scope:** admin-initiated erasure of another user (an ADMIN-backoffice concern); a grace
+period / soft-delete + scheduled hard-delete (retention policy — deployment concern); export-on-erase
+bundling (the user can export first via GDPR-1).
+**Definition of done:** tests first; member/solo-owner/blocked-owner paths; identity rows removed;
+tenant data correctly kept (member) or wiped (solo owner); single-owner invariant preserved; audited;
+merged, app working; ADR-011 referenced.
+
+---
+
+## Slice plan (implementation map)
+
+Ordered, each a mergeable vertical slice. TDD throughout.
+
+1. 🔲 **Tenant export (GDPR-1).** `ExportAsync`/`ExportKey` on `ITenantDataContributor`;
+   `TenantExportService` assembles core + contributor sections → `IFileStorage` → signed URL;
+   owner-gated endpoint (`Permission.ExportData`); audited; secret-free.
+2. 🔲 **Account erasure (GDPR-2).** Self-service delete-my-account: wipe identity rows in one
+   transaction, honoring transfer-or-dissolve for owners and remove-without-re-home for members;
+   audited; audit trail (actor ids) survives.
+
+**Known sharp edges (from ADR-011):** export is **owner-only** + returned as a **signed URL** (not
+inline); **no secrets** in the bundle; erasure **never strands a tenant ownerless** (transfer or
+dissolve first); erasing a user removes **identity, not tenant data**; **audit survives** erasure
+(actor ids, never PII).
