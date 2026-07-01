@@ -111,10 +111,58 @@ public class BillingWebhookHandlerTests(PostgresFixture fixture) : PostgresTestB
         Assert.Empty(await read.Set<Notification>().Where(n => n.UserId == ownerId).ToListAsync());
     }
 
+    // --- recency guard (v2 audit LOGIC-B1): out-of-order/redelivered events must not regress state ---
+
+    [Fact]
+    public async Task StaleOutOfOrderEvent_DoesNotClobberNewerStatus()
+    {
+        var tenant = Guid.CreateVersion7();
+        var older = EventEpoch.AddMinutes(10);
+        var newer = EventEpoch.AddMinutes(20);
+
+        // The newer 'active' event lands first: the tenant is entitled.
+        Assert.Equal(WebhookResult.Applied, await HandleAsync(Event(tenant, SubscriptionStatus.Active, "evt_new", newer)));
+        Assert.True(await EntitledAsync(tenant));
+
+        // A stale, out-of-order 'canceled' (older emission, distinct event id) must be ignored — not applied.
+        Assert.Equal(WebhookResult.Ignored, await HandleAsync(Event(tenant, SubscriptionStatus.Canceled, "evt_stale", older)));
+
+        await using var read = Fixture.CreateContext(tenant);
+        Assert.Equal(SubscriptionStatus.Active, (await read.Set<Subscription>().SingleAsync()).Status); // unchanged
+        Assert.True(await EntitledAsync(tenant)); // still entitled
+    }
+
+    [Fact]
+    public async Task StaleEvent_DoesNotReNotifyDunning()
+    {
+        var tenant = Guid.CreateVersion7();
+        var ownerId = await SeedOwnerAsync(tenant);
+        var t1 = EventEpoch.AddMinutes(10);
+        var t2 = EventEpoch.AddMinutes(20);
+
+        await HandleAsync(Event(tenant, SubscriptionStatus.Active, "evt_a", t1));
+        await HandleAsync(Event(tenant, SubscriptionStatus.PastDue, "evt_b", t2)); // real transition → notify once
+
+        // A stale past_due redelivery (older, distinct id) must not fire a second dunning notification.
+        await HandleAsync(Event(tenant, SubscriptionStatus.PastDue, "evt_stale", t1));
+
+        await using var read = Fixture.CreateContext(tenant);
+        Assert.Single(await read.Set<Notification>().Where(n => n.UserId == ownerId).ToListAsync());
+    }
+
     // --- helpers ---
 
-    private static BillingWebhookEvent Event(Guid tenant, string status, string eventId = "evt_default") =>
-        new(eventId, tenant, PlanKeys.Pro, status, "cus_1", "sub_1", DateTimeOffset.UtcNow.AddDays(30));
+    private static int _seq;
+    private static readonly DateTimeOffset EventEpoch = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// Each call gets a strictly-increasing <c>OccurredAt</c> by default (so a later-constructed event is
+    /// "newer", matching provider ordering and the recency guard); pass <paramref name="occurredAt"/> to
+    /// simulate a stale/out-of-order delivery.
+    /// </summary>
+    private static BillingWebhookEvent Event(Guid tenant, string status, string eventId = "evt_default", DateTimeOffset? occurredAt = null) =>
+        new(eventId, tenant, PlanKeys.Pro, status, "cus_1", "sub_1", DateTimeOffset.UtcNow.AddDays(30),
+            occurredAt ?? EventEpoch.AddSeconds(Interlocked.Increment(ref _seq)));
 
     /// <summary>Fresh context+handler per call (a webhook delivery is its own scope); DB is shared.</summary>
     private async Task<WebhookResult> HandleAsync(BillingWebhookEvent evt, string signature = FakeBillingProvider.ValidSignature)

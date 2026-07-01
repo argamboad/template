@@ -61,7 +61,8 @@ public class BillingWebhookControllerTests(PostgresFixture fixture) : PostgresTe
     // --- helpers ---
 
     private static BillingWebhookEvent Event(Guid tenant) =>
-        new("evt_default", tenant, PlanKeys.Pro, SubscriptionStatus.Active, "cus_1", "sub_1", DateTimeOffset.UtcNow.AddDays(30));
+        new("evt_default", tenant, PlanKeys.Pro, SubscriptionStatus.Active, "cus_1", "sub_1",
+            DateTimeOffset.UtcNow.AddDays(30), OccurredAt: DateTimeOffset.UtcNow);
 
     private BillingWebhookController NewController(
         AppDbContext db, ILogger<BillingWebhookController> logger, string remoteIp, string body, string signature)

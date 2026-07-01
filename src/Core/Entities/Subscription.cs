@@ -30,6 +30,13 @@ public class Subscription : ITenantScoped
     /// </summary>
     public DateTimeOffset? LapseNotifiedAt { get; set; }
 
+    /// <summary>
+    /// When the provider emitted the most recently <em>applied</em> webhook event. The webhook handler
+    /// applies an incoming event only if it is strictly newer than this, so a redelivered/out-of-order
+    /// older event cannot clobber newer state (v2 audit LOGIC-B1). Null until the first event is applied.
+    /// </summary>
+    public DateTimeOffset? LastEventAt { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
