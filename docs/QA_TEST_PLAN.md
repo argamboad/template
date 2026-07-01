@@ -120,7 +120,9 @@ disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..0
 notification center now has a web UI** (UI-3) — the header bell (list, unread count, mark-read) and
 Settings delivery-preference switches — covered by QA-NOTIF-01..03. The **platform-staff admin surface
 now has a web UI** (UI-4) — a staff-only `/admin` console (tenant list/detail + impersonation) — covered
-by QA-ADMIN-01..03.
+by QA-ADMIN-01..03. The **public API (PUBAPI)** and **outbound webhooks (HOOKS)** are intentionally
+UI-less (they're for machines) and **config-gated off** — they have **manual curl/Postman cases in §14b**
+(QA-API-01..06), in addition to automated tests.
 
 ---
 
@@ -1141,6 +1143,100 @@ the API directly:
 
 ---
 
+## 14b. API surfaces — PUBAPI + HOOKS (config-gated; curl / Postman) 🟠
+
+> These two surfaces are **off by default** and have **no web UI** by design — they're for machines, so
+> they're QA'd with an HTTP client. Any client works; the steps use `curl`. **Postman:** import
+> `GET /api/public/openapi.json` (once PUBAPI is on) to get a ready collection for the public routes.
+>
+> **Preconditions (do once):** in the repo-root `.env` set `PublicApi__Enabled=true` and
+> `Webhooks__Enabled=true`, then restart the API. Management of keys/webhooks is **owner-only**, so sign in
+> as an owner and grab a JWT access token from `POST /api/auth/refresh` (the Swagger "Authorize" button
+> shows one) to call the `/api/apikeys` and `/api/webhooks` management routes below. Base URL in these
+> steps is `https://localhost:7160` (use `-k` for the dev cert).
+
+### QA-API-01 — Config gate: surfaces are 404 when disabled 🟢 (curl)
+**Gherkin**
+```gherkin
+Given PublicApi:Enabled and Webhooks:Enabled are false (the default)
+When I call any /api/public, /api/apikeys or /api/webhooks route
+Then it does not exist (404) — the routes aren't mapped and the API-key scheme isn't added
+```
+**Walkthrough**
+1. With both flags **unset/false**, restart the API and call
+   `curl -k https://localhost:7160/api/public/openapi.json` and `.../api/apikeys` (with a JWT).
+2. **Expected:** **404** for both. Now set the two flags true, restart, and re-check — they become live
+   (401/200). Leave them **on** for the rest of this section.
+
+### QA-API-02 — Mint an API key (shown once) 🟠 (curl)
+**Gherkin**
+```gherkin
+Given I am the owner with PUBAPI enabled
+When I create an API key
+Then I receive the raw pk_… key exactly once, and listing later shows only its prefix/metadata
+```
+**Walkthrough**
+1. `curl -k -X POST https://localhost:7160/api/apikeys -H "Authorization: Bearer <JWT>" -H "Content-Type: application/json" -d '{"name":"qa","scopes":["read"]}'`
+2. **Expected:** **201** with a `key` field like `pk_…` — **copy it now** (never shown again). `GET /api/apikeys`
+   lists it with `prefix`/`scopes` but **no** `key`.
+3. **Non-owner:** repeat as a member/admin → **403**.
+
+### QA-API-03 — Call the public API with the key; scopes + tenant-scoping 🟠 (curl / Postman)
+**Gherkin**
+```gherkin
+Given a read-only API key for my tenant
+When I call the public API with it
+Then whoami returns my tenant, and a write-scoped route is refused (403 insufficient_scope)
+```
+**Walkthrough**
+1. `curl -k https://localhost:7160/api/public/whoami -H "X-Api-Key: pk_…"` → **200**, body shows my
+   `tenant_id`, the key name, and `["read"]`.
+2. `curl -k -X POST https://localhost:7160/api/public/echo -H "X-Api-Key: pk_…" -d '{"message":"hi"}'`
+   with the **read-only** key → **403 `insufficient_scope`**. (A key created with `"write"` succeeds.)
+3. **No/blank/garbage key** → **401**. **Revoked key** (`DELETE /api/apikeys/{id}`) → **401** afterwards.
+4. **Postman:** import `/api/public/openapi.json`, set an `X-Api-Key` header on the collection, run `whoami`.
+
+### QA-API-04 — Per-key rate limit 🟠 (curl)
+**Walkthrough**
+1. Fire `whoami` with one key ~65 times in a minute (`for i in $(seq 1 65); do curl -k -s -o /dev/null -w "%{http_code}\n" https://localhost:7160/api/public/whoami -H "X-Api-Key: pk_…"; done`).
+2. **Expected:** the first 60 are **200**, then **429**. A **second** key still returns **200** (budgets are
+   per key, not shared).
+
+### QA-API-05 — Register a webhook + send test + verify signature 🟠 (curl)
+**Precondition:** a receiver URL that echoes requests — e.g. create one at **https://webhook.site** and copy it.
+**Gherkin**
+```gherkin
+Given HOOKS is enabled and I own the tenant
+When I register my receiver and send a test event
+Then my endpoint receives a signed POST I can verify with the secret
+```
+**Walkthrough**
+1. `POST /api/webhooks` (JWT) with `{"url":"<webhook.site URL>","event_types":["ping"]}` → **201** with a
+   `secret` (`whsec_…`) **shown once** — copy it.
+2. `POST /api/webhooks/{id}/test` (JWT) → **200** `{ "delivered": true, "status_code": 200 }`.
+3. On webhook.site, confirm the request has headers **`X-Webhook-Id`**, **`X-Webhook-Event: ping`**, and
+   **`X-Webhook-Signature: sha256=…`**. Verify: HMAC-SHA256 of the **raw body** with your `whsec_…` secret
+   equals the signature (any HMAC tool, or the app's `WebhookSignature.Compute`).
+4. **Non-owner** management → **403**. **Bad URL / no event types** on create → **400**.
+
+### QA-API-06 — Delivery log + replay 🟠 (curl)
+**Gherkin**
+```gherkin
+Given I've sent test deliveries to my subscription
+When I view its delivery log and replay one
+Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
+```
+**Walkthrough**
+1. `GET /api/webhooks/{id}/deliveries` (JWT) → a list of attempts, newest first, each with `success`,
+   `status_code`, `error`, `event_id`.
+2. `POST /api/webhooks/deliveries/{deliveryId}/replay` (JWT) → **202**; webhook.site receives the **same**
+   event again (same `X-Webhook-Id`, so a real receiver can dedup).
+3. **Failure path (optional):** point the subscription at a URL that returns 500, send a test → the log
+   shows `success:false` and the outbox retries with backoff (watch the API logs), dead-lettering after
+   the cap. Replay of an unknown/other-tenant delivery id → **404**.
+
+---
+
 ## 15. Traceability matrix (feature → cases → API)
 
 | Feature area | Test cases | Key API endpoints |
@@ -1165,8 +1261,8 @@ the API directly:
 | Billing — checkout/portal/webhook (API-only) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Billing — quotas (BILLING-5) | **HH-14** (seat limit blocks invite → 402 upgrade message) + `Api.Tests` (`QuotaServiceTests`) | seats (members + pending invites vs `Plan.SeatLimit`) enforced on `POST /api/household/invitations` → 402 `seat_limit_reached`; metered usage via `IQuotaService.TryConsumeAsync` (monthly `UsageCounter`). Limits in `PlanCatalog` (null = unlimited). |
 | Billing — trial/dunning (BILLING-6) | covered by `Api.Tests` (`BillingWebhookHandlerTests`, `SubscriptionLapseSweepJobTests`); manual via Stripe test triggers | webhook transition into `past_due`/`canceled` → owner **notification** (in-app bell + outbox email, NOTIFY) once; `SubscriptionLapseSweepJob` (6h) nudges the owner once when a paid period lapses without a webhook (`LapseNotifiedAt`). Verify with `stripe trigger invoice.payment_failed` (test mode) → owner sees a billing notification in the bell. |
-| Public API + API keys (PUBAPI, **config-gated off**) | covered by `Api.Tests` (`ApiKeyServiceTests`, `RateLimitingTests`); boot-verified on/off | `PublicApi:Enabled` toggles it. Owner-only `/api/apikeys` (create → raw `pk_…` once, list, revoke; `Permission.ManageApiKeys`); API-key auth scheme mints a `tenant_id`-scoped principal; demo `/api/public/whoami` (read scope) + `/api/public/echo` (write scope) via `.RequireApiScope`. **PUBAPI-2:** per-key rate limit (60/min, isolated per key → 429) + a leak-free public OpenAPI doc at `/api/public/openapi.json` (only the public routes). **Off (default) ⇒ routes 404.** Manual: `PublicApi__Enabled=true`, mint a key, `curl -H "X-Api-Key: pk_…" /api/public/whoami`; fetch `/api/public/openapi.json`. |
-| Outbound webhooks (HOOKS, **config-gated off**) | covered by `Api.Tests` (`WebhookSubscriptionServiceTests`, `WebhookDeliveryTests`, `WebhookDeliveryLogTests`) + `Core.Tests` (`WebhookSignatureTests`); boot-verified on/off | `Webhooks:Enabled` toggles it. Owner-only `/api/webhooks` (register → signing secret `whsec_…` once, list, delete, **send test**; `Permission.ManageWebhooks`). `IWebhookPublisher.PublishAsync` fans out to matching active subs → one `"webhook"` **outbox** message each → signed POST (`X-Webhook-Signature`), retry/dead-letter via the outbox. **HOOKS-2:** a delivery log (`GET /api/webhooks/{id}/deliveries` — one row per attempt, success/status/error) + **replay** (`POST /api/webhooks/deliveries/{id}/replay` — re-enqueue the exact payload). **Off (default) ⇒ routes 404.** Manual: `Webhooks__Enabled=true`, register a receiver (e.g. a webhook.site URL), hit **send test**, view deliveries, replay one. |
+| Public API + API keys (PUBAPI, **config-gated off**) | **QA-API-01..04** (curl/Postman) + `Api.Tests` (`ApiKeyServiceTests`, `RateLimitingTests`); boot-verified on/off | `PublicApi:Enabled` toggles it. Owner-only `/api/apikeys` (create → raw `pk_…` once, list, revoke; `Permission.ManageApiKeys`); API-key auth scheme mints a `tenant_id`-scoped principal; demo `/api/public/whoami` (read scope) + `/api/public/echo` (write scope) via `.RequireApiScope`. **PUBAPI-2:** per-key rate limit (60/min, isolated per key → 429) + a leak-free public OpenAPI doc at `/api/public/openapi.json` (only the public routes). **Off (default) ⇒ routes 404.** Manual: `PublicApi__Enabled=true`, mint a key, `curl -H "X-Api-Key: pk_…" /api/public/whoami`; fetch `/api/public/openapi.json`. |
+| Outbound webhooks (HOOKS, **config-gated off**) | **QA-API-01, 05, 06** (curl/webhook.site) + `Api.Tests` (`WebhookSubscriptionServiceTests`, `WebhookDeliveryTests`, `WebhookDeliveryLogTests`) + `Core.Tests` (`WebhookSignatureTests`); boot-verified on/off | `Webhooks:Enabled` toggles it. Owner-only `/api/webhooks` (register → signing secret `whsec_…` once, list, delete, **send test**; `Permission.ManageWebhooks`). `IWebhookPublisher.PublishAsync` fans out to matching active subs → one `"webhook"` **outbox** message each → signed POST (`X-Webhook-Signature`), retry/dead-letter via the outbox. **HOOKS-2:** a delivery log (`GET /api/webhooks/{id}/deliveries` — one row per attempt, success/status/error) + **replay** (`POST /api/webhooks/deliveries/{id}/replay` — re-enqueue the exact payload). **Off (default) ⇒ routes 404.** Manual: `Webhooks__Enabled=true`, register a receiver (e.g. a webhook.site URL), hit **send test**, view deliveries, replay one. |
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
@@ -1364,3 +1460,9 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   `AddWebhookDelivery`). Owner routes `GET /api/webhooks/{id}/deliveries` + `POST
   /api/webhooks/deliveries/{id}/replay` (re-enqueue the exact stored payload, same event id). Covered by
   `WebhookDeliveryLogTests`. **Candidate HOOKS-3 (not built):** a Blazor management UI for webhooks/API keys.
+- **Updated 2026-07-01** — added **§14b — manual QA for the API surfaces (PUBAPI + HOOKS)**: curl/Postman
+  cases (QA-API-01..06) for the config gate, minting/using API keys (scopes, tenant-scoping, rate limit),
+  and registering webhooks (send-test, signature verification, delivery log, replay). These surfaces have
+  **no web UI by design** (they're for machines), so this is the human-testable complement to the
+  automated tests — the Postman path is one import of `/api/public/openapi.json` away. Referenced from the
+  §15 PUBAPI/HOOKS rows and the §2 "no client UI" note.
