@@ -99,6 +99,16 @@
   <data name="Mfa_ErrEnterCode" xml:space="preserve"><value>Introduce primero el código.</value></data>
   <data name="Mfa_ErrCodeIncorrect" xml:space="preserve"><value>Ese código es incorrecto o ha caducado.</value></data>
   <data name="Mfa_ErrDisable" xml:space="preserve"><value>No se pudo desactivar la verificación en dos pasos. Inténtalo de nuevo.</value></data>
+  <data name="Notif_Title" xml:space="preserve"><value>Notificaciones</value></data>
+  <data name="Notif_MarkAllRead" xml:space="preserve"><value>Marcar todas como leídas</value></data>
+  <data name="Notif_Empty" xml:space="preserve"><value>Estás al día.</value></data>
+  <data name="Notif_JustNow" xml:space="preserve"><value>ahora mismo</value></data>
+  <data name="NotifPrefs_Title" xml:space="preserve"><value>Notificaciones</value></data>
+  <data name="NotifPrefs_Subtitle" xml:space="preserve"><value>Elige cómo quieres recibir notificaciones.</value></data>
+  <data name="NotifPrefs_InApp" xml:space="preserve"><value>Notificaciones en la app</value></data>
+  <data name="NotifPrefs_Email" xml:space="preserve"><value>Notificaciones por correo</value></data>
+  <data name="NotifPrefs_ErrLoad" xml:space="preserve"><value>No se pudieron cargar tus preferencias de notificación.</value></data>
+  <data name="NotifPrefs_ErrSave" xml:space="preserve"><value>No se pudieron guardar tus preferencias. Inténtalo de nuevo.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>
