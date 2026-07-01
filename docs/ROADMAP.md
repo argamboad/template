@@ -35,7 +35,7 @@ sequenced below by value, not by dependency.
 | Item | Epic | Size | Why | Deps |
 |------|------|------|-----|------|
 | **Account & data lifecycle (GDPR)** — export + erasure — ✅ *COMPLETE* (GDPR-1/2; ADR-011, `stories/gdpr.md`) | `GDPR` | M–L | Legal exposure; reuses dissolve (add `ExportAsync` beside `WipeAsync` on contributors) | audit ✅, File storage (W1) ✅ |
-| **MFA / TOTP 2FA** | `MFA` | M | Security baseline; closes the ADR-C15 "TOTP promised, never built" gap | ready |
+| **MFA / TOTP 2FA** — 🔲 *in progress* (ADR-012, `stories/mfa.md`) | `MFA` | M | Security baseline; closes the ADR-C15 "TOTP promised, never built" gap | ready |
 
 ## Wave 3 — Extensibility & ops (open the platform up)
 
@@ -71,6 +71,6 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**Wave 1 is done** (RBAC + File storage). **Wave 2 is underway: GDPR is done** (ADR-011; GDPR-1 export +
-GDPR-2 account erasure merged). The remaining Wave 2 item is **MFA / TOTP** (self-contained security
-win; closes the ADR-C15 "TOTP promised, never built" gap). Re-sequence freely.
+**Wave 1 is done** (RBAC + File storage). **Wave 2: GDPR is done** (ADR-011); **MFA / TOTP is underway**
+(ADR-012 + `stories/mfa.md`; MFA-1 enrollment → MFA-2 login step-up) — the last Wave 2 item. After it,
+Wave 3 is extensibility/ops (several items — PUBAPI/HOOKS — parked by choice). Re-sequence freely.

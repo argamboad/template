@@ -1,0 +1,135 @@
+# Stories — MFA (authenticator-app TOTP)
+
+> One file per epic. Optional **authenticator-app TOTP** second factor, enforced as a **step-up** after
+> the existing primary auth (ADR-002). Reuses Data Protection (encrypt the secret + sign the challenge)
+> and `ITokenHasher` (recovery codes); only Otp.NET is new. Design decision + constraints in **ADR-012**.
+> Stories use Gherkin acceptance criteria. **Status: 🔲 in progress.**
+
+**Epic key:** `MFA`
+
+**Prerequisites (external, before any code):**
+- None to build/run. Reuses the custom auth stack, Data Protection (✅ wired), and `ITokenHasher` (✅).
+- Packages (latest stable, no previews — ADR-C10): **`Otp.NET`** (TOTP math + secret/URI helpers).
+
+**Reuses:** `SessionService.IssueAsync` (the login convergence point), `IDataProtector` (secret at rest
++ challenge signing), `ITokenHasher` (recovery-code hashing), and the account-erasure identity wipe
+(GDPR-2 — MFA rows are user PII).
+
+---
+
+### MFA-1 — Enrollment & management (TOTP secret, recovery codes)
+
+**Status: 🔲 Planned.**
+
+**As a** user
+**I want** to enable an authenticator app as a second factor
+**So that** my account is protected even if my primary credential leaks
+
+**Context / notes:** `UserMfa` (`UserId`, `EncryptedSecret`, `Enabled`, `EnrolledAt`) — secret
+**encrypted at rest** via `IDataProtector`; `MfaRecoveryCode` (`UserId`, `CodeHash`, `UsedAt`) — hashed
+with `ITokenHasher`, single-use. `IMfaService`: begin enrollment (generate secret → return the
+`otpauth://` provisioning URI; **not yet enabled**), confirm (verify a TOTP code → **enable** + issue +
+return recovery codes **once**), disable (verify a code → wipe secret + codes), status, and a
+`VerifyAsync(userId, code)` used by the login step-up (MFA-2). Endpoints under `/api/auth/mfa/*`
+(authenticated). **Also extends account erasure (GDPR-2)** to wipe `UserMfa` + `MfaRecoveryCode`.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: Enroll and enable TOTP
+  Given I am signed in without MFA
+  When I begin enrollment
+  Then I receive an otpauth:// provisioning URI (secret never returned in plaintext later)
+  And when I confirm with a valid code from my authenticator
+  Then MFA is enabled and I receive a set of one-time recovery codes
+
+Scenario: Enabling requires proving possession
+  Given I began enrollment
+  When I confirm with an invalid code
+  Then MFA is not enabled
+
+Scenario: Recovery codes are single-use and hashed
+  Given MFA is enabled with recovery codes
+  Then the codes are stored only as hashes
+  And a code works exactly once
+
+Scenario: Disable requires a valid code
+  Given MFA is enabled
+  When I disable it with a valid code
+  Then the secret and recovery codes are removed and MFA is off
+
+Scenario: Erasing my account removes MFA data
+  Given MFA is enabled
+  When I delete my account (GDPR-2)
+  Then my UserMfa and recovery codes are wiped
+```
+
+**Out of scope:** login enforcement (MFA-2); SMS/email OTP as a factor (this is authenticator TOTP);
+WebAuthn/passkeys (a separate future epic); per-tenant "require MFA" policy.
+**Definition of done:** tests first; secret encrypted (never round-tripped in plaintext), confirm
+enables only on a valid code, recovery codes hashed + single-use, disable wipes, erasure wipes MFA;
+merged, app working; ADR-012 referenced.
+
+---
+
+### MFA-2 — Login step-up enforcement
+
+**Status: 🔲 Planned.**
+
+**As a** user with MFA enabled
+**I want** to be asked for a code after my primary sign-in
+**So that** a leaked primary credential alone can't access my account
+
+**Context / notes:** at the `SessionService.IssueAsync` convergence, when the user has MFA enabled,
+primary auth returns an **MFA challenge** — a short-lived **signed** token (Data Protection
+time-limited) naming the user — instead of a full session. `POST /api/auth/mfa/verify` accepts the
+challenge + a TOTP **or recovery** code and, on success, issues the real session (`IssueAsync`). Wired
+into the JSON login paths (OTP/magic-link verify, native exchange); the OAuth **redirect** path routes
+the browser to an MFA prompt carrying the challenge. Users **without** MFA are unaffected.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: MFA-enabled login requires the second factor
+  Given I have MFA enabled
+  When I complete primary auth
+  Then I do not get a session yet — I get a short-lived MFA challenge
+  And only after POSTing a valid TOTP (or recovery) code with the challenge do I get the session
+
+Scenario: The challenge is required and time-limited
+  Given a login awaiting MFA
+  When the challenge is missing, expired, tampered, or the code is wrong
+  Then no session is issued (401)
+
+Scenario: Users without MFA are unaffected
+  Given I have no MFA
+  When I complete primary auth
+  Then I get a session directly, as before
+
+Scenario: A recovery code completes the challenge once
+  Given I lost my authenticator
+  When I submit a valid recovery code with the challenge
+  Then I get a session and that recovery code is consumed
+```
+
+**Out of scope:** "remember this device" / trusted devices; step-up for sensitive actions beyond login;
+admin-forced MFA reset.
+**Definition of done:** tests first; challenge issued when MFA on, session withheld until verified,
+expired/tampered/wrong-code rejected, no-MFA path unchanged, recovery-code path consumes one; merged,
+app working; ADR-012 referenced.
+
+---
+
+## Slice plan (implementation map)
+
+Ordered, each a mergeable vertical slice. TDD throughout.
+
+1. 🔲 **Enrollment & management (MFA-1).** `UserMfa` + `MfaRecoveryCode`; `IMfaService` (begin/confirm/
+   disable/status/verify) with Otp.NET + `IDataProtector` secret + `ITokenHasher` recovery codes;
+   `/api/auth/mfa/*` endpoints; extend account erasure (GDPR-2) to wipe MFA rows.
+2. 🔲 **Login step-up (MFA-2).** MFA challenge (signed, short-lived) at the `IssueAsync` convergence;
+   `POST /api/auth/mfa/verify` completes the session; wired into the login paths; no-MFA unaffected.
+
+**Known sharp edges (from ADR-012):** the secret stays **encrypted at rest** (never re-returned/logged);
+recovery codes are **hashed + single-use**; **enable/disable require a valid code** (prove possession);
+the **step-up is server-enforced** (signed challenge required); MFA is **user PII** (wiped by erasure).
