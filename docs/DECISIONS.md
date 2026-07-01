@@ -602,3 +602,50 @@ to be reached." Keying it per-user (ADR-C2) and fanning out through the existing
 reliable addition — a feature gets multi-channel, preference-aware notification from a single call, with
 no new delivery machinery to operate.
 Stories + slice plan: `docs/stories/notify.md` (epic `NOTIFY`).
+
+---
+
+**ADR-014 — Admin back-office: a config-gated platform-staff surface for cross-tenant inspection + audited, short-lived impersonation. (2026-07-01)**
+Support and debugging at scale need a **platform-staff** surface — outside the tenant model — to inspect
+any tenant and, when necessary, "sign in as" a user. This is the **highest-blast-radius** feature in the
+platform, so it is built entirely on the guardrails already in place (the audited cross-tenant escape
+hatch, ADR-003; the audit log, ADR-008) rather than loosening any of them.
+
+**Decision:**
+1. **Platform staff is a config allowlist, not a self-serve role or a DB flag.** The set of staff is
+   configured **out-of-band** (`Admin:StaffEmails`, from `.env`/env vars), checked by
+   `IPlatformStaffService` and enforced by an **`AdminOnly`** authorization gate (403 for anyone not on
+   the list). It is deliberately **not** part of `TenantRoles`/the RBAC matrix (that's tenant-scoped) and
+   **not** a toggle reachable from the app — the highest privilege can only be granted by whoever controls
+   deployment config.
+2. **Cross-tenant reads go through the audited `QueryAllTenants()` escape hatch only (ADR-003).** The
+   global tenant filter is **never loosened**; admin read endpoints use the same audited hatch feature
+   slices are forbidden from using, re-constrained to the target tenant. Admin is read-only over tenant
+   data (inspect, don't mutate).
+3. **Impersonation issues a short-lived, non-refreshable, loudly-audited access token for the target
+   user.** "Sign in as" mints an access token carrying the target's claims **plus an `impersonated_by`
+   claim** (the staff user id) and a **short expiry**, with **no refresh token** — so it auto-expires and
+   can't be silently extended. The impersonator acts as the target within that window; the token scopes
+   naturally via the target's `tenant_id` claim (no filter bypass).
+4. **Every admin action is audited (ADR-008), prominently.** Cross-tenant reads and — especially —
+   impersonation start record an `AuditEvent` with the staff actor + target; impersonation is stamped in
+   the **target's** tenant so that tenant's owner can see "a platform admin accessed this account."
+5. **No standing admin session over tenant data.** Staff authenticate as normal users (their own
+   account); the admin surface is gated per-request by the allowlist. There is no separate admin login.
+
+**Constraints recorded:**
+1. **The global filter is inviolable** — admin never turns it off; cross-tenant reads use the audited
+   hatch, scoped to the target.
+2. **Staff membership is out-of-band config** — never settable via the app, never a tenant role.
+3. **Impersonation is short-lived + non-refreshable + audited** — no refresh token, minutes-not-hours
+   expiry, an `impersonated_by` claim, and a loud audit record in the target's tenant.
+4. **Admin is read-only over tenant data** — inspection + impersonation, not direct cross-tenant writes
+   (a staff member who needs to change tenant data does it *through* impersonation, which is audited).
+5. **No secrets/PII in admin responses or audit metadata** beyond identifiers — same rule as elsewhere.
+*Rationale:* support tooling is necessary but dangerous; the safe way to build it is to reuse the audited
+escape hatch and the audit log instead of adding new privileged paths, and to keep the staff grant in
+deployment config where it can't be escalated from inside the app. Impersonation as a short-lived,
+non-refreshable, audited token gives support what they need while bounding the blast radius and leaving a
+trail the affected tenant can see. Depends on: audit (ADR-008 ✅), the escape hatch (ADR-003 ✅), RBAC
+(ADR-009 ✅).
+Stories + slice plan: `docs/stories/admin.md` (epic `ADMIN`).
