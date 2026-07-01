@@ -463,3 +463,57 @@ tenant-safe, backend-agnostic file handling for free, and swapping local→S3 is
 code change — exactly the property the email and billing seams already give. The signed-URL contract
 keeps large transfers off the API process while staying uniform across dev and prod.
 Stories + slice plan: `docs/stories/files.md` (epic `FILES`).
+
+---
+
+**ADR-011 — Account & data lifecycle (GDPR): tenant data export + account erasure, built on the existing contributor + dissolve machinery. (2026-06-30)**
+Once the template has EU users it needs **data portability** ("download my data") and **erasure**
+("right to be forgotten") — legal requirements with real penalties, and a credible trust feature. The
+platform already has most of the machinery: the `ITenantDataContributor` seam
+(`HasDataAsync`/`WipeAsync`) that each feature registers, the transactional **dissolve** flow, the
+**audit log** (ADR-008), and now **file storage** (ADR-010) for the export artifact. GDPR is assembled
+from these rather than invented.
+
+**Decision:**
+1. **Export mirrors wipe — one more contributor method.** `ITenantDataContributor` gains
+   `ExportAsync(tenantId)` (+ an `ExportKey` section name) alongside `HasDataAsync`/`WipeAsync`, so each
+   feature contributes its data to a tenant export **the same way** it contributes to teardown — adding
+   a feature never means editing a central exporter. A platform `TenantExportService` assembles the
+   **core** tenant data (tenant, memberships + member emails, pending invitations) plus every
+   contributor's section into one JSON bundle.
+2. **The export artifact is a stored file with a signed URL (ADR-010).** The bundle is written via
+   `IFileStorage` under a tenant-scoped key and handed back as a **signed, time-limited download URL** —
+   never streamed inline, never a permanent link. Owner-only (a new `Permission.ExportData`), audited.
+3. **Erasure has two granularities.** **Tenant erasure** is the existing **dissolve** (leave-with-confirm
+   → contributors wipe + core teardown) — GDPR adds the **export-then-wipe** option so a tenant can take
+   its data before deletion. **User (account) erasure** — "delete my account" — removes the user's
+   **identity/PII** (`User`, `UserLogin`, `LoginToken`, `RefreshToken`) but **not** tenant app data
+   (that belongs to the tenant, not the user).
+4. **Account erasure honors the single-owner invariant (ADR-003).** A sole owner of a tenant with other
+   members must **transfer ownership first**; a solo owner's tenant is **dissolved** as part of erasure
+   (its data wiped via the contributors); a plain member is simply removed (**not** re-homed — the
+   account is going away, unlike leave). Then the identity rows are deleted. The whole operation is one
+   transaction and is **audited**.
+5. **Erasure vs. audit/legal-hold tension is resolved explicitly.** The audit trail keeps **actor ids,
+   never PII**, so erasing a user leaves audit events intact (an id that no longer resolves to a person)
+   rather than deleting the compliance record. Where a regulatory **legal hold** requires retaining more,
+   the contributor path supports **export-then-wipe**; retention windows are a deployment policy, not
+   hard-coded.
+
+**Constraints recorded:**
+1. **Export is tenant-scoped and owner-gated** — it contains a whole tenant's data; only the owner may
+   request it, and it comes back as a signed URL, not inline bytes.
+2. **Export contains identifiers + content, never secrets** — no password/OTP/token hashes, no card
+   data, no session tokens; the same rule as audit metadata.
+3. **Single-owner invariant is never violated by erasure** — transfer-or-dissolve first; erasure can't
+   strand a tenant ownerless.
+4. **User app data stays with the tenant** — erasing a user removes their identity, not the
+   tenant-scoped records they created (those are the tenant's, and are removed only by tenant dissolve).
+5. **Audit survives user erasure** — actor ids remain; audit is not a place PII lives.
+*Rationale:* every SaaS with EU users hits this, and re-implementing export/erasure per app is both
+wasteful and risky (the failure mode is a cross-tenant data leak or an orphaned tenant). Building both
+on the contributor seam + dissolve + file storage keeps the common case a one-liner per feature (add an
+`ExportAsync`) and keeps the dangerous invariants (single-owner, tenant isolation, no-secrets) in one
+audited place. Depends on: audit (ADR-008, ✅), file storage (ADR-010, ✅), the dissolve flow, and the
+permission seam (ADR-009).
+Stories + slice plan: `docs/stories/gdpr.md` (epic `GDPR`).

@@ -20,7 +20,7 @@
 
 | # | Item | Epic key | Why it's ranked here | Hard deps |
 |---|------|----------|----------------------|-----------|
-| 1 | Account & data lifecycle (GDPR) | `GDPR` | Legal exposure the moment you have EU users; reuses tenant scoping | Audit (ADR-008) for export completeness |
+| 1 | ~~Account & data lifecycle (GDPR)~~ → **being built** (ADR-011, `stories/gdpr.md`) | `GDPR` | Legal exposure the moment you have EU users; reuses tenant scoping | Audit (ADR-008) for export completeness |
 | 2 | ~~RBAC beyond owner/member~~ → **being built** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
 | 3 | ~~File / blob storage~~ → **✅ DONE** (ADR-010, `stories/files.md`) | `FILES` | Avatars/attachments/exports all block on it | none |
 | 4 | MFA / TOTP 2FA | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
@@ -32,7 +32,10 @@
 
 ---
 
-## 1. Account & data lifecycle (GDPR) — `GDPR`
+## 1. Account & data lifecycle (GDPR) — `GDPR` → **TAKEN ON (ADR-011)**
+> **Now an active epic** — design decided in **ADR-011**, stories + slice plan in
+> `docs/stories/gdpr.md` (GDPR-1 export → GDPR-2 account erasure). Sketch below retained for context.
+
 **What:** self-serve **data export** ("download my data") and **erasure** (right to be forgotten) at
 both user and tenant granularity; a documented data-retention posture.
 **Why:** legal requirement with real penalties; also a credible trust/sales feature.
