@@ -35,7 +35,7 @@ sequenced below by value, not by dependency.
 | Item | Epic | Size | Why | Deps |
 |------|------|------|-----|------|
 | **Account & data lifecycle (GDPR)** — export + erasure — ✅ *COMPLETE* (GDPR-1/2; ADR-011, `stories/gdpr.md`) | `GDPR` | M–L | Legal exposure; reuses dissolve (add `ExportAsync` beside `WipeAsync` on contributors) | audit ✅, File storage (W1) ✅ |
-| **MFA / TOTP 2FA** — 🔲 *in progress* (ADR-012, `stories/mfa.md`) | `MFA` | M | Security baseline; closes the ADR-C15 "TOTP promised, never built" gap | ready |
+| **MFA / TOTP 2FA** — ✅ *COMPLETE* (MFA-1/2; redirect-path step-up = UI follow-up) (ADR-012, `stories/mfa.md`) | `MFA` | M | Security baseline; closes the ADR-C15 "TOTP promised, never built" gap | ready |
 
 ## Wave 3 — Extensibility & ops (open the platform up)
 
@@ -71,6 +71,7 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**Wave 1 is done** (RBAC + File storage). **Wave 2: GDPR is done** (ADR-011); **MFA / TOTP is underway**
-(ADR-012 + `stories/mfa.md`; MFA-1 enrollment → MFA-2 login step-up) — the last Wave 2 item. After it,
-Wave 3 is extensibility/ops (several items — PUBAPI/HOOKS — parked by choice). Re-sequence freely.
+**Waves 1 & 2 are done** — RBAC + File storage (W1), GDPR + MFA (W2, ADR-011/012). MFA ships enrollment
++ login step-up on the JSON paths; the OAuth/magic-link **redirect** step-up is a flagged UI follow-up.
+What remains is **Wave 3** (extensibility/ops) — and of that, PUBAPI/HOOKS are parked by choice, leaving
+**NOTIFY** (in-app notifications) and **ADMIN** (back-office/impersonation) as the main open items.

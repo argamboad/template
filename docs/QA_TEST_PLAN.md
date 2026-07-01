@@ -940,7 +940,7 @@ the API directly:
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
 | GDPR data export (API-only) | covered by `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
-| MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (authenticator TOTP via Otp.NET; secret encrypted at rest; hashed single-use recovery codes; enable/disable require a valid code). **Login step-up = MFA-2.** |
+| MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Wired into OTP-verify + native-exchange; OAuth/magic-link **redirect** step-up is a UI follow-up. |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1020,4 +1020,9 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   `/api/auth/mfa/*` (enroll → provisioning URI/QR; confirm with a code → enable + one-time recovery
   codes; disable; status). Secret **encrypted at rest** (Data Protection); recovery codes **hashed +
   single-use**; MFA rows wiped by account erasure. **API-only** (MFA-1) — covered by `Api.Tests`
-  (`MfaServiceTests`). The **login step-up** that enforces the second factor is **MFA-2** (next slice).
+  (`MfaServiceTests`). **MFA-2 (login step-up):** an MFA-on login returns a **signed challenge** instead
+  of a session; `POST /api/auth/mfa/verify` completes it with a TOTP/recovery code. Wired into
+  **OTP-verify + native-exchange**; the OAuth/magic-link **redirect** paths route to a client `/mfa` page
+  (needs the MFA UI) and are a flagged **follow-up** — no template-web user can enable MFA via those paths
+  today (no enrollment UI). Covered by `MfaChallengeServiceTests` + `MfaLoginServiceTests`.
+  **This completes Wave 2** (GDPR + MFA).

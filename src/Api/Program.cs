@@ -113,6 +113,9 @@ builder.Services.AddScoped<ITenantExportService, TenantExportService>();
 builder.Services.AddScoped<IAccountErasureService, AccountErasureService>();
 // MFA — authenticator-app TOTP (MFA-1, ADR-012). Secret encrypted at rest; hashed recovery codes.
 builder.Services.AddScoped<IMfaService, MfaService>();
+// MFA login step-up (MFA-2). Signed short-lived challenge + verify → completes the session.
+builder.Services.AddSingleton<IMfaChallengeService, MfaChallengeService>();
+builder.Services.AddScoped<IMfaLoginService, MfaLoginService>();
 
 // RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
 // resolves the caller's membership and consults the RolePermissions matrix; fails closed.

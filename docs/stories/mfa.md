@@ -3,7 +3,9 @@
 > One file per epic. Optional **authenticator-app TOTP** second factor, enforced as a **step-up** after
 > the existing primary auth (ADR-002). Reuses Data Protection (encrypt the secret + sign the challenge)
 > and `ITokenHasher` (recovery codes); only Otp.NET is new. Design decision + constraints in **ADR-012**.
-> Stories use Gherkin acceptance criteria. **Status: 🔲 in progress.**
+> Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE (planned scope)** — MFA-1 (enrollment) +
+> MFA-2 (login step-up on the JSON paths). Step-up on the OAuth/magic-link **redirect** paths is a flagged
+> UI follow-up (see MFA-2).
 
 **Epic key:** `MFA`
 
@@ -81,7 +83,20 @@ merged, app working; ADR-012 referenced.
 
 ### MFA-2 — Login step-up enforcement
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented (JSON login paths)** (`feat/mfa-2-login-stepup`). `MfaChallengeService` mints/reads
+a **signed, 5-min** challenge (Data Protection time-limited) binding user + provider + native;
+`MfaLoginService.CompleteOrChallengeAsync` sits at the `SessionService.IssueAsync` point — MFA-off →
+session as before; **MFA-on → a challenge, no session**. `POST /api/auth/mfa/verify` (`VerifyChallengeAsync`)
+checks the challenge + a TOTP/recovery code and issues the session (cookie for browser / body for native,
+from the challenge's native flag); any bad/expired challenge or wrong code is a single **401**. Wired
+into the **JSON login paths** — OTP verify + native exchange. Tests `tests/Api.Tests/Mfa/`
+(`MfaChallengeServiceTests` round-trip/tamper/foreign-signer; `MfaLoginServiceTests` challenge-vs-session,
+valid/​wrong-code, tampered-challenge, native-flag preserved).
+
+> **Follow-up (flagged in ADR-012):** the **redirect** login paths — OAuth callback + magic-link verify —
+> are **not yet gated**; enforcing them means redirecting the browser to a client `/mfa?challenge=…` page,
+> which needs the (not-yet-built) MFA **UI**. Tracked as a fast-follow. Since the template ships no MFA
+> enrollment UI, no template-web user can have MFA on via those paths today.
 
 **As a** user with MFA enabled
 **I want** to be asked for a code after my primary sign-in
@@ -134,8 +149,10 @@ Ordered, each a mergeable vertical slice. TDD throughout.
 1. ✅ **Enrollment & management (MFA-1).** — DONE. `UserMfa` + `MfaRecoveryCode` (migration `AddMfa`);
    `MfaService` (begin/confirm/disable/status/verify) with Otp.NET + `IDataProtector` secret +
    `ITokenHasher` recovery codes; `/api/auth/mfa/*` endpoints; account erasure (GDPR-2) wipes MFA rows.
-2. 🔲 **Login step-up (MFA-2).** MFA challenge (signed, short-lived) at the `IssueAsync` convergence;
-   `POST /api/auth/mfa/verify` completes the session; wired into the login paths; no-MFA unaffected.
+2. ✅ **Login step-up (MFA-2).** — DONE (JSON paths). `MfaChallengeService` (signed, 5-min) +
+   `MfaLoginService` at the `IssueAsync` convergence; `POST /api/auth/mfa/verify` completes the session;
+   wired into OTP verify + native exchange; no-MFA unaffected. **Follow-up:** redirect-path (OAuth/
+   magic-link) step-up needs the MFA client page.
 
 **Known sharp edges (from ADR-012):** the secret stays **encrypted at rest** (never re-returned/logged);
 recovery codes are **hashed + single-use**; **enable/disable require a valid code** (prove possession);
