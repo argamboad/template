@@ -111,14 +111,14 @@ health endpoints, the background outbox/inbox/scheduled-jobs, **file storage** �
 seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
 authorization; local-disk only — cloud backends hand out native presigned URLs), and **GDPR data
 export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle),
-**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), and
-**MFA enrollment/management** (`/api/auth/mfa/*`; authenticator TOTP — secret encrypted, hashed
-single-use recovery codes), the **in-app notification center** (`/api/notifications/*`; per-user
+**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), the
+**in-app notification center** (`/api/notifications/*`; per-user
 list/unread-count/mark-read), and the **platform-staff admin surface** (`/api/admin/*`; config-gated
 cross-tenant inspection). These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
-(RBAC-3) — covered by the household cases QA-HH-09..12.
+(RBAC-3) — covered by the household cases QA-HH-09..12. **MFA now has a web UI** (UI-2) — enrollment/
+disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..03.
 
 ---
 
@@ -693,6 +693,52 @@ Then my account and personal data are deleted and I'm signed out
 4. **Sole owner:** a second confirm warns it also **dissolves the household**; on confirm, the account +
    household are deleted.
 
+### QA-MFA-01 — Enable two-factor (authenticator TOTP) 🟠 (Web)
+**Precondition:** signed in; an authenticator app (Google Authenticator, 1Password, Authy, …) to hand.
+**Gherkin**
+```gherkin
+Given I am signed in on /settings with two-factor Off
+When I enable it, scan the QR (or enter the key) and confirm with a 6-digit code
+Then two-factor turns On and I'm shown one-time recovery codes
+```
+**Walkthrough**
+1. **Settings** → **Two-factor authentication** shows an **Off** badge → **Enable two-factor**.
+2. A **QR code** renders next to a **manual key** (Base32). Scan it (or type the key) into the app.
+3. Enter the app's current **6-digit code** → **Verify & enable**.
+4. **Expected:** a success banner, the badge flips to **On**, and a grid of **recovery codes** appears
+   (shown once). **I've saved my codes** returns to the On state.
+5. **Wrong code:** an inline error ("that code is incorrect or has expired"); nothing changes.
+
+### QA-MFA-02 — Two-factor is required at sign-in 🟠 (Web)
+**Precondition:** an account with two-factor **On** (QA-MFA-01).
+**Gherkin**
+```gherkin
+Given my account has two-factor enabled
+When I sign in with an email OTP
+Then I'm asked for an authenticator code before the session starts
+And entering a valid code completes sign-in
+```
+**Walkthrough**
+1. Sign out. On `/login`, request an **email code**, enter it.
+2. **Expected:** instead of landing signed-in, a **second prompt** asks for the authenticator code.
+3. Enter the current 6-digit code → you're signed in (lands on `/`).
+4. **Wrong/expired code:** an inline error; you stay on the step-up prompt (no session).
+5. **Note:** OAuth and magic-link (redirect) sign-ins don't yet show this step — flagged follow-up.
+
+### QA-MFA-03 — Use a recovery code, then disable two-factor 🟠 (Web)
+**Gherkin**
+```gherkin
+Given my account has two-factor enabled
+When I sign in and enter a recovery code at the step-up
+Then sign-in completes (that code is now spent)
+And I can disable two-factor from Settings with a valid code
+```
+**Walkthrough**
+1. Sign in as in QA-MFA-02; at the step-up, enter one **recovery code** instead of a TOTP → signs in.
+2. **Settings** → **Two-factor authentication** (On) → **Disable two-factor** → enter a current TOTP
+   (or another recovery code) → **Disable**.
+3. **Expected:** the badge flips to **Off**; a subsequent sign-in no longer asks for a second step.
+
 ---
 
 ## 10. Web — Localization (i18n) 🟠
@@ -972,7 +1018,7 @@ the API directly:
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
 | GDPR data export | **HH-13** (owner Household → Data → download) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
-| MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Wired into OTP-verify + native-exchange; OAuth/magic-link **redirect** step-up is a UI follow-up. |
+| MFA / TOTP | **MFA-01..03** (Settings enroll/QR/confirm/recovery + disable; Login step-up) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Web UI wired on the **OTP** sign-in path; OAuth/magic-link **redirect** step-up remains a UI follow-up. |
 | In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). Bell-menu UI = follow-up. |
 | Admin back-office (API-only) | covered by `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/tenants` (+ `/{id}`) inspection + `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
@@ -1082,3 +1128,11 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   **Data → Download household data** button on Household (**QA-HH-13**) and **Settings → Danger zone →
   Delete my account** (**QA-SET-07**) — wired to `POST /api/household/export` and `DELETE /api/auth/me`
   (single-owner-safe, with the dissolve second-confirm). EN/ES localized.
+- **Updated 2026-07-01** — **UI-2 (MFA):** a **Two-factor authentication** card in Settings
+  (`MfaCard` component) — enroll (`POST /api/auth/mfa/enroll`) renders a **client-side QR** of the
+  `otpauth://` URI (vendored `qrcode-generator`, MIT, in `Shared.Ui/wwwroot/js/`; the secret never
+  leaves the browser) alongside a manual key, confirm (`/confirm`) reveals one-time **recovery codes**,
+  and **disable** (`/disable`) needs a live code. The **Login** page now handles the OTP-verify
+  `mfa_required` response with a **step-up code prompt** → `POST /api/auth/mfa/verify` (TOTP or recovery
+  code) → `/auth-callback`. **QA-MFA-01..03**; EN/ES localized. Native OTP + OAuth/magic-link step-up
+  remain follow-ups (web-first).

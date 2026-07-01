@@ -5,7 +5,10 @@
 > and `ITokenHasher` (recovery codes); only Otp.NET is new. Design decision + constraints in **ADR-012**.
 > Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE (planned scope)** — MFA-1 (enrollment) +
 > MFA-2 (login step-up on the JSON paths). Step-up on the OAuth/magic-link **redirect** paths is a flagged
-> UI follow-up (see MFA-2).
+> UI follow-up (see MFA-2). **UI shipped** (`feat/ui-2-mfa`): a Two-factor card in Settings
+> (enroll → client-side QR of the `otpauth://` URI + manual key → confirm → one-time recovery codes →
+> disable) and the OTP sign-in **step-up** prompt on Login (EN/ES; QA-MFA-01..03). Native OTP and the
+> redirect step-up remain follow-ups (web-first).
 
 **Epic key:** `MFA`
 
