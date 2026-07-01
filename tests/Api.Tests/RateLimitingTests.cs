@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -11,10 +12,10 @@ using Template.Api.Configuration;
 namespace Template.Api.Tests;
 
 /// <summary>
-/// Exercises the real <see cref="RateLimiting.PasswordlessPolicy"/> through actual rate-limiter
-/// middleware in a minimal host (no DB / SMTP needed): the passwordless send/verify endpoints must
-/// start returning 429 once a client exceeds the per-window budget (CONF-5 / B2-1). Hosting the
-/// shared <c>AddPasswordlessRateLimiter</c> extension proves the production policy, not a copy.
+/// Exercises the real rate-limiter policies through actual middleware in a minimal host (no DB / SMTP):
+/// the passwordless endpoints throttle per IP (CONF-5), and the public API throttles <b>per key</b>
+/// (PUBAPI-2) so one tenant's key can't exhaust another's budget. Hosting the shared
+/// <c>AddApiRateLimiters</c> extension proves the production policy, not a copy.
 /// </summary>
 public class RateLimitingTests
 {
@@ -26,17 +27,30 @@ public class RateLimitingTests
                .ConfigureServices(services =>
                {
                    services.AddRouting();
-                   services.AddPasswordlessRateLimiter();
+                   services.AddApiRateLimiters();
                })
                .Configure(app =>
                {
                    // UseRateLimiter must run AFTER routing so it can read the endpoint's
                    // RequireRateLimiting metadata (same order as the real Program.cs pipeline).
                    app.UseRouting();
+                   // Simulate API-key auth: a test partitions on the X-Test-Key header (the real public
+                   // policy partitions on the NameIdentifier claim the ApiKey scheme sets).
+                   app.Use(async (ctx, next) =>
+                   {
+                       var key = ctx.Request.Headers["X-Test-Key"].ToString();
+                       if (!string.IsNullOrEmpty(key))
+                           ctx.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, key)], "test"));
+                       await next();
+                   });
                    app.UseRateLimiter();
                    app.UseEndpoints(endpoints =>
+                   {
                        endpoints.MapPost("/otp/send", () => Results.Ok())
-                                .RequireRateLimiting(RateLimiting.PasswordlessPolicy));
+                                .RequireRateLimiting(RateLimiting.PasswordlessPolicy);
+                       endpoints.MapGet("/pub", () => Results.Ok())
+                                .RequireRateLimiting(RateLimiting.PublicApiPolicy);
+                   });
                });
         });
         var host = await builder.StartAsync();
@@ -59,5 +73,29 @@ public class RateLimitingTests
         // ...the next one trips the limiter.
         var tripped = await client.PostAsync("/otp/send", content: null);
         Assert.Equal(HttpStatusCode.TooManyRequests, tripped.StatusCode);
+    }
+
+    [Fact]
+    public async Task PublicApi_ThrottlesPerKey_AndKeysAreIsolated()
+    {
+        using var server = await StartHostAsync();
+        var client = server.CreateClient();
+
+        // Key A spends its whole budget...
+        for (var i = 0; i < RateLimiting.PublicApiPermitLimit; i++)
+            Assert.Equal(HttpStatusCode.OK, (await Get(client, "/pub", "key-A")).StatusCode);
+
+        // ...the next request from A is throttled...
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await Get(client, "/pub", "key-A")).StatusCode);
+
+        // ...but key B has its own untouched budget.
+        Assert.Equal(HttpStatusCode.OK, (await Get(client, "/pub", "key-B")).StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> Get(HttpClient client, string path, string key)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Add("X-Test-Key", key);
+        return client.SendAsync(request);
     }
 }

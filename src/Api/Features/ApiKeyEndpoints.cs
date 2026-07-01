@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.RateLimiting;
 using Template.Api.Authentication;
 using Template.Api.Configuration;
 using Template.Api.Services;
@@ -49,6 +50,7 @@ public static class ApiKeyEndpoints
     {
         var group = app.MapGroup("/api/public")
             .RequireAuthorization(AuthPolicies.PublicApi)
+            .RequireRateLimiting(RateLimiting.PublicApiPolicy) // per-key throttle (PUBAPI-2)
             .WithTags("Public API");
 
         // Demo (read scope): echoes the authenticated tenant + the key's scopes. Replace with real routes.

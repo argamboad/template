@@ -123,8 +123,8 @@ per-subscription retry/backoff, and a deliveries table. Tenant-scoped subscripti
 > **Shipped** (config-gated, default off) — `ApiKey` (hash-only), a second **API-key auth scheme** that
 > mints a `tenant_id`-scoped principal, owner-only `/api/apikeys` management (`Permission.ManageApiKeys`),
 > a demo `/api/public` group with `.RequireApiScope`, all behind `PublicApi:Enabled` (off ⇒ routes 404).
-> Design in **ADR-015**, slices in `docs/stories/pubapi.md`. **PUBAPI-2 (optional):** per-key rate limiting,
-> public-only OpenAPI doc, key rotation. Sketch below retained for context.
+> Design in **ADR-015**, slices in `docs/stories/pubapi.md`. **PUBAPI-2 ✅ DONE:** per-key rate limiting +
+> leak-free public OpenAPI doc. (Still open: key rotation; scope taxonomies.) Sketch below retained for context.
 
 **What:** programmatic access authenticated by tenant-scoped **API keys**, distinct from the
 JWT/cookie user session.
