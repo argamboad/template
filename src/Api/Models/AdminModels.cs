@@ -23,3 +23,10 @@ public record AdminTenantDetailResponse
     [JsonPropertyName("subscription_status")] public required string SubscriptionStatus { get; init; }
     [JsonPropertyName("audit_event_count")] public required int AuditEventCount { get; init; }
 }
+
+public record ImpersonationResponse
+{
+    /// <summary>Short-lived access token for the impersonated user. No refresh token is issued.</summary>
+    [JsonPropertyName("access_token")] public required string AccessToken { get; init; }
+    [JsonPropertyName("expires_in")] public required int ExpiresIn { get; init; }
+}

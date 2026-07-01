@@ -27,7 +27,7 @@
 | 5 | ~~In-app notifications~~ → **✅ DONE** (ADR-013, `stories/notify.md`) | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
 | 6 | Outbound webhooks (customer-facing) | `HOOKS` | Integration story for *your* customers | Outbox (ADR-007) required |
 | 7 | Public API + API keys | `PUBAPI` | Programmatic access distinct from the user session | RBAC helps |
-| 8 | ~~Admin back-office + impersonation~~ → **being built** (ADR-014, `stories/admin.md`) | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
+| 8 | ~~Admin back-office + impersonation~~ → **✅ DONE** (ADR-014, `stories/admin.md`) | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
 | 9 | Distributed cache (Redis) | `CACHE` | Only once you scale past one node | none (defer hard) |
 
 ---
@@ -122,9 +122,11 @@ an OpenAPI/Swagger surface for the public routes. Scope keys to the same entitle
 the UI (BILLING-1/5). Rate-limit per key (extend [`RateLimiting`](../src/Api/Configuration/RateLimiting.cs)).
 **Deps:** RBAC/scopes help; quotas (BILLING-5) for per-key limits.
 
-## 8. Admin back-office + impersonation — `ADMIN` → **TAKEN ON (ADR-014)**
-> **Now an active epic** — design decided in **ADR-014**, stories + slice plan in `docs/stories/admin.md`
-> (ADMIN-1 staff gate + inspection → ADMIN-2 impersonation). Sketch below retained for context.
+## 8. Admin back-office + impersonation — `ADMIN` → **✅ DONE (ADR-014)**
+> **Shipped** — config-gated platform-staff surface: cross-tenant inspection (`EnterTenant`, filter never
+> loosened) + short-lived, non-refreshable, audited impersonation. Design in **ADR-014**, slices in
+> `docs/stories/admin.md` (ADMIN-1/2, merged). Admin UI = API-first follow-up. Sketch below retained for
+> historical context.
 
 **What:** a super-admin surface (cross-tenant, **platform-staff only**) to inspect tenants and
 "sign in as" a user for support.

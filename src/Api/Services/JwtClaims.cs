@@ -12,6 +12,9 @@ public static class JwtClaims
     public const string TenantName = "tenant_name";
     public const string TenantId = "tenant_id";
     public const string Locale = "locale";
+
+    /// <summary>Present only on an impersonation token (ADMIN-2, ADR-014): the staff user id acting as this user.</summary>
+    public const string ImpersonatedBy = "impersonated_by";
 }
 
 /// <summary>HTTP header names used by the auth flow.</summary>

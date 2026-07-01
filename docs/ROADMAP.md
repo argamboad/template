@@ -44,7 +44,7 @@ sequenced below by value, not by dependency.
 | **Public API + API keys** | `PUBAPI` | M | Programmatic access distinct from the user session | RBAC (W1) |
 | **In-app notifications** — ✅ *COMPLETE* (NOTIFY-1/2; ADR-013, `stories/notify.md`) | `NOTIFY` | M | Follow-on to email; fan-out via the outbox | outbox ✅ |
 | **Outbound webhooks** (customer-facing) | `HOOKS` | M | Integration story for *your* customers | outbox ✅ |
-| **Admin back-office + impersonation** — 🔲 *in progress* (ADR-014, `stories/admin.md`) | `ADMIN` | M–L | Support tooling — all deps ready (audit ✅ + `EnterTenant` ✅); highest blast radius, do deliberately | RBAC, audit ✅, EnterTenant ✅ |
+| **Admin back-office + impersonation** — ✅ *COMPLETE* (ADMIN-1/2; ADR-014, `stories/admin.md`) | `ADMIN` | M–L | Support tooling — all deps ready (audit ✅ + `EnterTenant` ✅); highest blast radius, do deliberately | RBAC, audit ✅, EnterTenant ✅ |
 
 ## Finish-the-epic (optional — when a real paid plan exists)
 
@@ -71,7 +71,8 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**Waves 1 & 2 are done** — RBAC + File storage (W1), GDPR + MFA (W2, ADR-011/012). **Wave 3: NOTIFY done**
-(ADR-013); **ADMIN underway** (ADR-014 + `stories/admin.md`; ADMIN-1 staff gate + inspection → ADMIN-2
-impersonation) — the last main open item. With PUBAPI/HOOKS parked by choice, ADMIN closes out the
-planned platform.
+**The planned platform is COMPLETE.** Foundation (JOBS/BILLING/OBS) + Wave 1 (RBAC, FILES) + Wave 2
+(GDPR, MFA) + Wave 3 (NOTIFY, ADMIN) — nine epics, ADRs 006–014, all merged. **Parked by choice:** PUBAPI
++ HOOKS (public/customer-facing API). **Deferred:** CACHE (until multi-node). **Remaining work is
+UI-only** — the API-first surfaces (MFA enroll/step-up, GDPR export/erasure, notification bell menu, admin
+console) need Blazor pages when wanted.
