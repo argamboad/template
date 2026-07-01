@@ -3,7 +3,9 @@
 > One file per epic. A **platform-staff** surface (outside the tenant model) to inspect any tenant and
 > "sign in as" a user for support — the **highest-blast-radius** feature, built entirely on existing
 > guardrails (the audited `QueryAllTenants()` escape hatch, ADR-003; the audit log, ADR-008). Design +
-> constraints in **ADR-014**. Stories use Gherkin acceptance criteria. **Status: 🔲 in progress.**
+> constraints in **ADR-014**. Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — ADMIN-1
+> (staff gate + cross-tenant inspection) + ADMIN-2 (short-lived audited impersonation). An admin UI is an
+> API-first follow-up.
 
 **Epic key:** `ADMIN`
 
@@ -76,7 +78,13 @@ staff, audit on access; merged, app working; ADR-014 referenced.
 
 ### ADMIN-2 — Impersonation ("sign in as")
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/admin-2-impersonation`). `IJwtTokenService.IssueImpersonationToken` mints
+a **short-lived** (15-min) token carrying the target's identity + provider `"impersonation"` + an
+**`impersonated_by`** claim (the staff id), scoped by the target's `tenant_id`. `POST
+/api/admin/impersonate/{userId}` (staff-gated) returns `{ access_token, expires_in }` with **no refresh
+token** (can't be extended), and records `admin.impersonation.started` **in the target's tenant** (via
+`EnterTenant`). Unknown target → 404. Tests `AdminControllerTests` (non-staff→403; token carries
+target + `impersonated_by` + `tenant_id`, 900s; audited in target's tenant; unknown→404).
 
 **As a** platform staff member
 **I want** a short-lived "sign in as" for a user
@@ -129,8 +137,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    `IPlatformStaffService` + `AdminApiControllerBase.RequireStaffAsync` (403); `AdminController`
    list (non-scoped tables) + detail (via `EnterTenant`, audited in-tenant). Read-only; global filter
    never loosened. (Chose `EnterTenant` over `QueryAllTenants` — keeps the filter engaged, scoped.)
-2. 🔲 **Impersonation (ADMIN-2).** `POST /api/admin/impersonate/{userId}` → short-lived,
-   non-refreshable, `impersonated_by`-tagged access token; audited in the target's tenant.
+2. ✅ **Impersonation (ADMIN-2).** — DONE. `IJwtTokenService.IssueImpersonationToken` +
+   `POST /api/admin/impersonate/{userId}` → 15-min, non-refreshable, `impersonated_by`-tagged access
+   token; audited (`admin.impersonation.started`) in the target's tenant. Unknown target → 404.
 
 **Known sharp edges (from ADR-014):** the global filter is **inviolable** (audited hatch only); staff is
 **config-only** (never a role/app toggle); impersonation is **short-lived + non-refreshable + audited**;

@@ -23,8 +23,13 @@ public class AdminController(
     ITenantContext tenantContext,
     IAuditLog audit,
     IRepository<Subscription> subscriptions,
-    IRepository<AuditEvent> auditEvents) : AdminApiControllerBase(staff, errorFactory)
+    IRepository<AuditEvent> auditEvents,
+    IUserRepository users,
+    IJwtTokenService jwt) : AdminApiControllerBase(staff, errorFactory)
 {
+    // Impersonation tokens are deliberately short-lived and non-refreshable (ADR-014).
+    private static readonly TimeSpan ImpersonationLifetime = TimeSpan.FromMinutes(15);
+
     /// <summary>Every tenant with its member count (staff only).</summary>
     [HttpGet("tenants")]
     public async Task<IActionResult> ListTenants(CancellationToken cancellationToken)
@@ -70,5 +75,43 @@ public class AdminController(
                 AuditEventCount = auditCount,
             });
         }
+    }
+
+    /// <summary>
+    /// "Sign in as" a user (staff only). Returns a <b>short-lived, non-refreshable</b> access token
+    /// carrying the target's identity + an <c>impersonated_by</c> claim; loudly audited in the target's
+    /// tenant. No refresh token is issued, so it expires on its own.
+    /// </summary>
+    [HttpPost("impersonate/{userId:guid}")]
+    public async Task<IActionResult> Impersonate(Guid userId, CancellationToken cancellationToken)
+    {
+        var (staffUserId, denied) = await RequireStaffAsync(cancellationToken);
+        if (denied is not null)
+            return denied;
+
+        var target = await users.GetByIdAsync(userId, cancellationToken);
+        if (target is null)
+            return NotFound(ErrorFactory.CreateError("user_not_found", "User not found"));
+
+        var membership = await tenants.GetMembershipAsync(userId, cancellationToken);
+        var tenantId = membership?.TenantId;
+        var tenantName = tenantId is { } tid ? (await tenants.GetByIdAsync(tid, cancellationToken))?.Name : null;
+
+        var token = jwt.IssueImpersonationToken(
+            target.Id, target.Email, staffUserId, ImpersonationLifetime, target.DisplayName, tenantName, tenantId);
+
+        // Loud, in-tenant audit so the target tenant can see a platform admin signed in as this user.
+        if (tenantId is { } t)
+            using (tenantContext.EnterTenant(t))
+            {
+                await audit.RecordAsync("admin.impersonation.started", staffUserId, nameof(User), userId.ToString(), null, cancellationToken);
+                await auditEvents.SaveChangesAsync(cancellationToken);
+            }
+
+        return Ok(new ImpersonationResponse
+        {
+            AccessToken = token,
+            ExpiresIn = (int)ImpersonationLifetime.TotalSeconds,
+        });
     }
 }

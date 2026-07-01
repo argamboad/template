@@ -114,6 +114,6 @@ deferred items without an explicit decision.
 | `docs/stories/gdpr.md` | epic `GDPR` ✅ COMPLETE — tenant data export + account erasure on the contributor/dissolve/file-storage machinery (GDPR-1 export, GDPR-2 erasure); ADR-011 |
 | `docs/stories/mfa.md` | epic `MFA` ✅ COMPLETE — authenticator TOTP; Otp.NET, secret encrypted, hashed recovery codes (MFA-1 enroll/manage, MFA-2 login step-up on JSON paths; redirect step-up = UI follow-up); ADR-012 |
 | `docs/stories/notify.md` | epic `NOTIFY` ✅ COMPLETE — per-user in-app notification center + delivery prefs, fan-out via the outbox (NOTIFY-1 center, NOTIFY-2 prefs+email); ADR-013 |
-| `docs/stories/admin.md` | epic `ADMIN` 🔲 in progress — config-gated platform-staff surface: cross-tenant inspection (audited hatch) + short-lived audited impersonation (ADMIN-1 gate/inspect, ADMIN-2 impersonate); ADR-014 |
+| `docs/stories/admin.md` | epic `ADMIN` ✅ COMPLETE — config-gated platform-staff surface: cross-tenant inspection + short-lived audited impersonation (ADMIN-1 gate/inspect, ADMIN-2 impersonate); ADR-014 |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `src/Infrastructure/Persistence/Migrations/` | Concrete schema — EF Core migrations generated from DATA_MODEL.md |

@@ -944,7 +944,7 @@ the API directly:
 | GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Wired into OTP-verify + native-exchange; OAuth/magic-link **redirect** step-up is a UI follow-up. |
 | In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). Bell-menu UI = follow-up. |
-| Admin back-office (API-only) | covered by `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/tenants` (+ `/{id}`) — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Cross-tenant inspection; detail enters the target tenant (filter never loosened) and is audited in-tenant. Impersonation = ADMIN-2. |
+| Admin back-office (API-only) | covered by `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/tenants` (+ `/{id}`) inspection + `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1042,5 +1042,9 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   (+ `/{id}`) — **staff-only** (config allowlist `Admin:StaffEmails`, out-of-band; non-staff → 403).
   Read-only cross-tenant inspection; the per-tenant detail **enters the target tenant** (the global filter
   is never loosened) and is **audited in that tenant**. **API-only** — covered by `Api.Tests`
-  (`PlatformStaffServiceTests`, `AdminControllerTests`). Impersonation (short-lived, non-refreshable,
-  audited) is **ADMIN-2**.
+  (`PlatformStaffServiceTests`, `AdminControllerTests`).
+- **Updated 2026-07-01** for admin **impersonation** (ADR-014, ADMIN-2): `POST /api/admin/impersonate/{userId}`
+  (staff-only) returns a **short-lived (15-min), non-refreshable** access token carrying the target's
+  identity + an `impersonated_by` claim; **loudly audited in the target's tenant**. Unknown target → 404.
+  Covered by `AdminControllerTests`. **This completes the ADMIN epic — and the planned platform**
+  (nine epics, ADRs 006–014).

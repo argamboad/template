@@ -18,6 +18,14 @@ public interface IJwtTokenService
     /// </summary>
     string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null);
 
+    /// <summary>
+    /// Issues a <b>short-lived</b> access token for <paramref name="targetUserId"/> carrying an
+    /// <c>impersonated_by</c> claim (the staff user id) — for admin "sign in as" (ADMIN-2, ADR-014). No
+    /// refresh token is issued alongside it, so an impersonation session can't be extended.
+    /// </summary>
+    string IssueImpersonationToken(Guid targetUserId, string email, Guid impersonatedByUserId, TimeSpan lifetime,
+        string? displayName = null, string? tenantName = null, Guid? tenantId = null);
+
     /// <summary>Validates a JWT token and returns its claims if valid.</summary>
     ClaimsPrincipal? ValidateToken(string token);
 }
@@ -66,6 +74,40 @@ public class JwtTokenService(IJwtSettings settings, TimeProvider clock, ILogger<
         logger.LogInformation("JWT issued for user {Email} (id: {UserId})", email, userId);
 
         return jwt;
+    }
+
+    public string IssueImpersonationToken(Guid targetUserId, string email, Guid impersonatedByUserId, TimeSpan lifetime,
+        string? displayName = null, string? tenantName = null, Guid? tenantId = null)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            throw new ArgumentException("Email cannot be empty", nameof(email));
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SecretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, targetUserId.ToString()),
+            new(ClaimTypes.Email, email),
+            new(JwtClaims.Provider, "impersonation"),
+            new(JwtClaims.ImpersonatedBy, impersonatedByUserId.ToString()),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(ClaimTypes.Name, string.IsNullOrWhiteSpace(displayName) ? email : displayName),
+        };
+        if (!string.IsNullOrWhiteSpace(tenantName))
+            claims.Add(new Claim(JwtClaims.TenantName, tenantName));
+        if (tenantId is { } tid)
+            claims.Add(new Claim(JwtClaims.TenantId, tid.ToString()));
+
+        var token = new JwtSecurityToken(
+            issuer: settings.Issuer,
+            audience: settings.Issuer,
+            claims: claims,
+            expires: clock.GetUtcNow().UtcDateTime.Add(lifetime),
+            signingCredentials: credentials);
+
+        logger.LogWarning("Impersonation token issued: staff {StaffId} acting as user {UserId}", impersonatedByUserId, targetUserId);
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     public ClaimsPrincipal? ValidateToken(string token)
