@@ -24,6 +24,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
     public DbSet<UserLogin> UserLogins => Set<UserLogin>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<LoginToken> LoginTokens => Set<LoginToken>();
+    public DbSet<UserMfa> UserMfa => Set<UserMfa>();
+    public DbSet<MfaRecoveryCode> MfaRecoveryCodes => Set<MfaRecoveryCode>();
 
     // Transactional outbox — reliable, atomic side effects (ADR-007). Platform infra, not
     // ITenantScoped, so it is outside the global tenant query filter.
@@ -143,6 +145,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentTenant
             t.Ignore(x => x.IsConsumed);
             t.Ignore(x => x.IsExpired);
             t.Ignore(x => x.IsValid);
+        });
+
+        builder.Entity<UserMfa>(m =>
+        {
+            m.HasKey(x => x.Id);
+            m.Property(x => x.EncryptedSecret).IsRequired();
+            // One MFA row per user.
+            m.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        builder.Entity<MfaRecoveryCode>(c =>
+        {
+            c.HasKey(x => x.Id);
+            c.Property(x => x.CodeHash).HasMaxLength(256).IsRequired();
+            c.HasIndex(x => x.UserId);
         });
 
         builder.Entity<OutboxMessage>(o =>

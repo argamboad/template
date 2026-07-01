@@ -38,6 +38,7 @@ public class AuthController(
     IApplicationSettings appSettings,
     IPasswordlessSettings passwordlessSettings,
     IAccountErasureService accountErasure,
+    IMfaService mfa,
     ILogger<AuthController> logger) : ControllerBase
 {
     private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
@@ -271,6 +272,59 @@ public class AuthController(
                 "Deleting your account dissolves your household and permanently deletes its data. "
                 + "Re-send with confirm_dissolve=true to proceed.")),
             _ => Unauthorized(errorFactory.CreateError("user_not_found", "User not found")),
+        };
+    }
+
+    // ── MFA: authenticator-app TOTP (MFA-1, ADR-012) ─────────────────────────
+
+    /// <summary>Whether the signed-in user has MFA enabled.</summary>
+    [HttpGet("mfa")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> MfaStatus(CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        return Ok(new MfaStatusResponse { Enabled = await mfa.IsEnabledAsync(userId, cancellationToken) });
+    }
+
+    /// <summary>Begins TOTP enrollment: returns the provisioning URI + secret (not yet enabled).</summary>
+    [HttpPost("mfa/enroll")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> MfaEnroll(CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var enrollment = await mfa.BeginEnrollmentAsync(userId, cancellationToken);
+        return enrollment is null
+            ? Unauthorized(errorFactory.CreateError("user_not_found", "User not found"))
+            : Ok(new MfaEnrollResponse { ProvisioningUri = enrollment.ProvisioningUri, Secret = enrollment.Secret });
+    }
+
+    /// <summary>Confirms enrollment with a code: enables MFA and returns one-time recovery codes.</summary>
+    [HttpPost("mfa/confirm")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> MfaConfirm([FromBody] MfaCodeRequest req, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var (result, recoveryCodes) = await mfa.ConfirmEnrollmentAsync(userId, req.Code ?? "", cancellationToken);
+        return result switch
+        {
+            MfaConfirmResult.Enabled => Ok(new MfaRecoveryCodesResponse { RecoveryCodes = recoveryCodes }),
+            MfaConfirmResult.NotEnrolled => BadRequest(errorFactory.CreateError("not_enrolled", "Start enrollment first")),
+            _ => BadRequest(errorFactory.CreateError("invalid_code", "That code is not valid")),
+        };
+    }
+
+    /// <summary>Disables MFA (requires a valid TOTP or recovery code).</summary>
+    [HttpPost("mfa/disable")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> MfaDisable([FromBody] MfaCodeRequest req, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        var result = await mfa.DisableAsync(userId, req.Code ?? "", cancellationToken);
+        return result switch
+        {
+            MfaDisableResult.Disabled => NoContent(),
+            MfaDisableResult.NotEnabled => BadRequest(errorFactory.CreateError("mfa_not_enabled", "MFA is not enabled")),
+            _ => BadRequest(errorFactory.CreateError("invalid_code", "That code is not valid")),
         };
     }
 

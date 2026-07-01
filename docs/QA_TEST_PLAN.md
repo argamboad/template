@@ -110,9 +110,10 @@ yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelem
 health endpoints, the background outbox/inbox/scheduled-jobs, **file storage** — the `IFileStorage`
 seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
 authorization; local-disk only — cloud backends hand out native presigned URLs), and **GDPR data
-export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle) +
-**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe).
-These are **covered by
+export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle),
+**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), and
+**MFA enrollment/management** (`/api/auth/mfa/*`; authenticator TOTP — secret encrypted, hashed
+single-use recovery codes). These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12.
@@ -939,6 +940,7 @@ the API directly:
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
 | GDPR data export (API-only) | covered by `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
+| MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (authenticator TOTP via Otp.NET; secret encrypted at rest; hashed single-use recovery codes; enable/disable require a valid code). **Login step-up = MFA-2.** |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1014,3 +1016,8 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   single-owner-safe (owner-with-members → transfer first; solo owner → confirm to dissolve; member
   removed, not re-homed), audited (the audit trail survives — actor ids, never PII). **API-only** —
   covered by `Api.Tests` (`AccountErasureTests`). **GDPR epic complete (export + erasure).**
+- **Updated 2026-07-01** for MFA enrollment (ADR-012, Wave 2): authenticator-app **TOTP** (Otp.NET) —
+  `/api/auth/mfa/*` (enroll → provisioning URI/QR; confirm with a code → enable + one-time recovery
+  codes; disable; status). Secret **encrypted at rest** (Data Protection); recovery codes **hashed +
+  single-use**; MFA rows wiped by account erasure. **API-only** (MFA-1) — covered by `Api.Tests`
+  (`MfaServiceTests`). The **login step-up** that enforces the second factor is **MFA-2** (next slice).

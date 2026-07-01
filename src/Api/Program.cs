@@ -111,6 +111,8 @@ builder.Services.AddScoped<ITenantExportService, TenantExportService>();
 // Account erasure (GDPR-2, ADR-011). "Delete my account" — wipes identity/PII in one audited
 // transaction, honoring the single-owner invariant (transfer-or-dissolve first).
 builder.Services.AddScoped<IAccountErasureService, AccountErasureService>();
+// MFA — authenticator-app TOTP (MFA-1, ADR-012). Secret encrypted at rest; hashed recovery codes.
+builder.Services.AddScoped<IMfaService, MfaService>();
 
 // RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
 // resolves the caller's membership and consults the RolePermissions matrix; fails closed.

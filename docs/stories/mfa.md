@@ -19,7 +19,14 @@
 
 ### MFA-1 — Enrollment & management (TOTP secret, recovery codes)
 
-**Status: 🔲 Planned.**
+**Status: ✅ Implemented** (`feat/mfa-1-enrollment`). Entities `UserMfa` (encrypted secret, `Enabled`)
++ `MfaRecoveryCode` (hashed, single-use) — migration `AddMfa`. `MfaService` (`src/Api/Services/`,
+Otp.NET): begin (secret + `otpauth://` URI, not enabled), confirm (valid code → enable + 10 hashed
+recovery codes returned once), disable (valid code → wipe), status, and `VerifyAsync` (TOTP or a
+single-use recovery code) for the MFA-2 step-up. Secret encrypted via `IDataProtector`; recovery codes
+hashed via `ITokenHasher`. Endpoints `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]`. Account
+erasure (GDPR-2) extended to wipe both tables. Tests `tests/Api.Tests/Mfa/MfaServiceTests.cs`
+(enroll/confirm/verify/recovery-single-use/disable + secret-encrypted + hashed codes).
 
 **As a** user
 **I want** to enable an authenticator app as a second factor
@@ -124,9 +131,9 @@ app working; ADR-012 referenced.
 
 Ordered, each a mergeable vertical slice. TDD throughout.
 
-1. 🔲 **Enrollment & management (MFA-1).** `UserMfa` + `MfaRecoveryCode`; `IMfaService` (begin/confirm/
-   disable/status/verify) with Otp.NET + `IDataProtector` secret + `ITokenHasher` recovery codes;
-   `/api/auth/mfa/*` endpoints; extend account erasure (GDPR-2) to wipe MFA rows.
+1. ✅ **Enrollment & management (MFA-1).** — DONE. `UserMfa` + `MfaRecoveryCode` (migration `AddMfa`);
+   `MfaService` (begin/confirm/disable/status/verify) with Otp.NET + `IDataProtector` secret +
+   `ITokenHasher` recovery codes; `/api/auth/mfa/*` endpoints; account erasure (GDPR-2) wipes MFA rows.
 2. 🔲 **Login step-up (MFA-2).** MFA challenge (signed, short-lived) at the `IssueAsync` convergence;
    `POST /api/auth/mfa/verify` completes the session; wired into the login paths; no-MFA unaffected.
 
