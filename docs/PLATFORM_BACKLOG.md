@@ -23,7 +23,7 @@
 | 1 | ~~Account & data lifecycle (GDPR)~~ → **✅ DONE** (ADR-011, `stories/gdpr.md`) | `GDPR` | Legal exposure the moment you have EU users; reuses tenant scoping | Audit (ADR-008) for export completeness |
 | 2 | ~~RBAC beyond owner/member~~ → **being built** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
 | 3 | ~~File / blob storage~~ → **✅ DONE** (ADR-010, `stories/files.md`) | `FILES` | Avatars/attachments/exports all block on it | none |
-| 4 | ~~MFA / TOTP 2FA~~ → **being built** (ADR-012, `stories/mfa.md`) | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
+| 4 | ~~MFA / TOTP 2FA~~ → **✅ DONE** (ADR-012, `stories/mfa.md`) | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
 | 5 | In-app notifications | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
 | 6 | Outbound webhooks (customer-facing) | `HOOKS` | Integration story for *your* customers | Outbox (ADR-007) required |
 | 7 | Public API + API keys | `PUBAPI` | Programmatic access distinct from the user session | RBAC helps |
@@ -75,9 +75,10 @@ keys** (`{tenantId}/…`) validated server-side (traversal/cross-tenant rejected
 download URLs** (native presigned for cloud; `ITimeLimitedDataProtector` token + `GET /api/files/{token}`
 for local). Slices FILES-1 (abstraction+local) → FILES-2 (signed download) → FILES-3 (S3).
 
-## 4. MFA / TOTP 2FA — `MFA` → **TAKEN ON (ADR-012)**
-> **Now an active epic** — design decided in **ADR-012**, stories + slice plan in `docs/stories/mfa.md`
-> (MFA-1 enrollment/management → MFA-2 login step-up). Sketch below retained for context.
+## 4. MFA / TOTP 2FA — `MFA` → **✅ DONE (ADR-012)**
+> **Shipped** — authenticator TOTP enrollment/management + login step-up (JSON paths). Design in
+> **ADR-012**, slices in `docs/stories/mfa.md` (MFA-1/2, merged). Follow-up: redirect-path step-up
+> (needs the MFA client page). Sketch below retained for historical context.
 
 **What:** authenticator-app TOTP as a second factor (and recovery codes).
 **Why:** security baseline for any serious SaaS. **Note:** ADR-C15 originally claimed TOTP via

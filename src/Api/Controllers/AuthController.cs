@@ -39,6 +39,7 @@ public class AuthController(
     IPasswordlessSettings passwordlessSettings,
     IAccountErasureService accountErasure,
     IMfaService mfa,
+    IMfaLoginService mfaLogin,
     ILogger<AuthController> logger) : ControllerBase
 {
     private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
@@ -481,11 +482,32 @@ public class AuthController(
         }
 
         var native = IsNativeClient;
-        var session = await sessionService.IssueAsync(result.User, LoginTokenPurpose.Otp, ClientIp, native, cancellationToken);
-        if (!native)
-            cookieService.SetRefreshTokenCookie(Response, session.RefreshToken, Request);
+        var (session, challenge) = await mfaLogin.CompleteOrChallengeAsync(
+            result.User, LoginTokenPurpose.Otp, ClientIp, native, cancellationToken);
+        if (challenge is not null)
+            return Ok(new MfaRequiredResponse { Challenge = challenge });
 
-        return Ok(session.Response);
+        if (!native)
+            cookieService.SetRefreshTokenCookie(Response, session!.RefreshToken, Request);
+        return Ok(session!.Response);
+    }
+
+    /// <summary>
+    /// Completes an MFA step-up (MFA-2, ADR-012): verifies the challenge from a login + a TOTP or
+    /// recovery code, and establishes the session (browser gets the refresh cookie; native gets it in
+    /// the body). Any bad/expired challenge or wrong code is a single 401 — no oracle.
+    /// </summary>
+    [HttpPost("mfa/verify")]
+    [EnableRateLimiting(RateLimiting.PasswordlessPolicy)]
+    public async Task<IActionResult> MfaVerify([FromBody] MfaVerifyRequest req, CancellationToken cancellationToken)
+    {
+        var outcome = await mfaLogin.VerifyChallengeAsync(req.Challenge ?? "", req.Code ?? "", ClientIp, cancellationToken);
+        if (outcome is null)
+            return Unauthorized(errorFactory.CreateError("mfa_failed", "Invalid or expired challenge or code."));
+
+        if (!outcome.Native)
+            cookieService.SetRefreshTokenCookie(Response, outcome.Session.RefreshToken, Request);
+        return Ok(outcome.Session.Response);
     }
 
     // ── Native (desktop/mobile) OAuth: loopback / custom-scheme code flow ─────
@@ -584,8 +606,11 @@ public class AuthController(
             return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
 
         // Native exchange always returns the refresh token in the body.
-        var session = await sessionService.IssueAsync(user, grant.Value.Provider, ClientIp, native: true, cancellationToken);
-        return Ok(session.Response);
+        var (session, challenge) = await mfaLogin.CompleteOrChallengeAsync(
+            user, grant.Value.Provider, ClientIp, native: true, cancellationToken);
+        return challenge is not null
+            ? Ok(new MfaRequiredResponse { Challenge = challenge })
+            : Ok(session!.Response);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

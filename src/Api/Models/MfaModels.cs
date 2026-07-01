@@ -26,3 +26,18 @@ public record MfaRecoveryCodesResponse
     /// <summary>One-time recovery codes — shown once. Store them somewhere safe.</summary>
     [JsonPropertyName("recovery_codes")] public required IReadOnlyList<string> RecoveryCodes { get; init; }
 }
+
+/// <summary>Returned by a login when MFA is enabled — the client must complete the step-up.</summary>
+public record MfaRequiredResponse
+{
+    [JsonPropertyName("mfa_required")] public bool MfaRequired => true;
+
+    /// <summary>The signed, short-lived challenge to post back to <c>/api/auth/mfa/verify</c>.</summary>
+    [JsonPropertyName("challenge")] public required string Challenge { get; init; }
+}
+
+public record MfaVerifyRequest
+{
+    [JsonPropertyName("challenge")] public string? Challenge { get; init; }
+    [JsonPropertyName("code")] public string? Code { get; init; }
+}
