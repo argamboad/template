@@ -10,8 +10,10 @@
 > disable) and the OTP sign-in **step-up** prompt on Login (EN/ES; QA-MFA-01..03). **MFA-3**
 > (`feat/mfa-3-redirect-stepup`): OAuth callback + magic-link now route through
 > `CompleteOrChallengeAsync` and redirect to `/login?mfa=<challenge>`, reusing the same prompt
-> (QA-MFA-04). **All web sign-in paths now enforce MFA.** Native (MAUI) OTP/OAuth step-up is the only
-> remaining follow-up (web-first).
+> (QA-MFA-04). **MFA-4** (`feat/mfa-4-native-stepup`): the native (MAUI) client now handles the
+> `{mfa_required, challenge}` response on the OTP + OAuth-exchange paths (`AuthService.VerifyOtpAsync`/
+> `SignInWithOAuthAsync` return a `SignInResult`; `VerifyMfaAsync` completes it) and reuses the same
+> step-up prompt (QA-MFA-05). **MFA is now enforced on every sign-in path, web and native — no gaps.**
 
 **Epic key:** `MFA`
 

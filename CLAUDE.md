@@ -112,7 +112,7 @@ deferred items without an explicit decision.
 | `docs/stories/rbac.md` | epic `RBAC` ✅ COMPLETE — `admin` role + permission seam (RBAC-1) + owner-only role change (RBAC-2) + admin-aware roster UI (RBAC-3); ADR-009 |
 | `docs/stories/files.md` | epic `FILES` ✅ COMPLETE — `IFileStorage` local/S3, tenant-scoped keys, signed URLs (FILES-1 abstraction, FILES-2 download, FILES-3 S3); ADR-010 |
 | `docs/stories/gdpr.md` | epic `GDPR` ✅ COMPLETE — tenant data export + account erasure on the contributor/dissolve/file-storage machinery (GDPR-1 export, GDPR-2 erasure); ADR-011 |
-| `docs/stories/mfa.md` | epic `MFA` ✅ COMPLETE — authenticator TOTP; Otp.NET, secret encrypted, hashed recovery codes (MFA-1 enroll/manage, MFA-2 login step-up on JSON paths; redirect step-up = UI follow-up); ADR-012 |
+| `docs/stories/mfa.md` | epic `MFA` ✅ COMPLETE — authenticator TOTP; Otp.NET, secret encrypted, hashed recovery codes (MFA-1 enroll/manage, MFA-2 JSON-path step-up, MFA-3 OAuth/magic-link redirect step-up, MFA-4 native step-up — enforced on **every** sign-in path); ADR-012 |
 | `docs/stories/notify.md` | epic `NOTIFY` ✅ COMPLETE — per-user in-app notification center + delivery prefs, fan-out via the outbox (NOTIFY-1 center, NOTIFY-2 prefs+email); ADR-013 |
 | `docs/stories/admin.md` | epic `ADMIN` ✅ COMPLETE — config-gated platform-staff surface: cross-tenant inspection + short-lived audited impersonation (ADMIN-1 gate/inspect, ADMIN-2 impersonate); ADR-014 |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |

@@ -5,6 +5,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Template.Shared.Ui.Auth;
 
+/// <summary>Outcome of a native primary-auth attempt: signed in, failed, or owes an MFA step-up.</summary>
+public enum SignInStatus { Success, Failed, MfaRequired }
+
+/// <summary>A native sign-in result; carries the MFA challenge when <see cref="SignInStatus.MfaRequired"/>.</summary>
+public sealed record SignInResult(SignInStatus Status, string? Challenge = null)
+{
+    public static readonly SignInResult Failed = new(SignInStatus.Failed);
+    public static readonly SignInResult Success = new(SignInStatus.Success);
+    public static SignInResult Mfa(string challenge) => new(SignInStatus.MfaRequired, challenge);
+}
+
 /// <summary>
 /// Client-side authentication with refresh-token support.
 /// The access token is held in memory only — never persisted.
@@ -124,38 +135,28 @@ public class AuthService(
     /// one-time code for tokens, and stores them. Returns true on success. Web hosts
     /// sign in by full-page navigation and never call this.
     /// </summary>
-    public async Task<bool> SignInWithOAuthAsync(string provider)
+    public async Task<SignInResult> SignInWithOAuthAsync(string provider)
     {
         if (oauth is null)
         {
             logger.LogError("SignInWithOAuthAsync called with no IOAuthInitiator registered");
-            return false;
+            return SignInResult.Failed;
         }
         try
         {
             var result = await oauth.RunBrowserFlowAsync(provider);
             var code = result is not null && result.TryGetValue("code", out var c) ? c : null;
             if (string.IsNullOrEmpty(code))
-                return false;
+                return SignInResult.Failed;
 
+            // The exchange returns tokens — or, if the user has MFA on, an {mfa_required, challenge}.
             var response = await httpClient.PostAsJsonAsync("/api/auth/native/exchange", new { code });
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogWarning("Native OAuth exchange failed: {StatusCode}", response.StatusCode);
-                return false;
-            }
-
-            var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
-            if (string.IsNullOrEmpty(payload?.AccessToken))
-                return false;
-
-            await AcceptTokensAsync(payload);
-            return true;
+            return await CompleteFromResponseAsync(response);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Native OAuth sign-in failed for {Provider}", provider);
-            return false;
+            return SignInResult.Failed;
         }
     }
 
@@ -189,27 +190,66 @@ public class AuthService(
     /// Verifies an OTP code and establishes the session from the tokens in the response
     /// body. Used by native hosts (the web Login page keeps its cookie + callback flow).
     /// </summary>
-    public async Task<bool> VerifyOtpAsync(string email, string code)
+    public async Task<SignInResult> VerifyOtpAsync(string email, string code)
     {
         try
         {
+            // Returns tokens — or, if the user has MFA on, an {mfa_required, challenge} to step up.
             var response = await httpClient.PostAsJsonAsync("/api/auth/otp/verify",
                 new { email, code });
-            if (!response.IsSuccessStatusCode)
-                return false;
-
-            var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
-            if (string.IsNullOrEmpty(payload?.AccessToken))
-                return false;
-
-            await AcceptTokensAsync(payload);
-            return true;
+            return await CompleteFromResponseAsync(response);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "OTP verification failed");
+            return SignInResult.Failed;
+        }
+    }
+
+    /// <summary>
+    /// Completes a native MFA step-up: posts the challenge from a prior login + a TOTP/recovery code and
+    /// stores the tokens the API returns in the body. Returns true on success. Web hosts complete the
+    /// step-up via the cookie flow (Login page) and don't call this.
+    /// </summary>
+    public async Task<bool> VerifyMfaAsync(string challenge, string code)
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/auth/mfa/verify", new { challenge, code });
+            var result = await CompleteFromResponseAsync(response);
+            return result.Status == SignInStatus.Success;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "MFA verification failed");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Reads a native auth response: an <c>{mfa_required, challenge}</c> body means step up; otherwise the
+    /// tokens are accepted and stored. Shared by the OTP, OAuth-exchange and MFA-verify paths.
+    /// </summary>
+    private async Task<SignInResult> CompleteFromResponseAsync(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("Native auth call failed: {StatusCode}", response.StatusCode);
+            return SignInResult.Failed;
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<NativeAuthResponse>();
+        if (payload is null)
+            return SignInResult.Failed;
+
+        if (payload.MfaRequired && !string.IsNullOrEmpty(payload.Challenge))
+            return SignInResult.Mfa(payload.Challenge);
+
+        if (string.IsNullOrEmpty(payload.AccessToken))
+            return SignInResult.Failed;
+
+        await AcceptTokensAsync(new TokenResponse { AccessToken = payload.AccessToken, RefreshToken = payload.RefreshToken });
+        return SignInResult.Success;
     }
 
     // ── Platform-staff admin surface (ADR-014) ──────────────────────────────
@@ -356,6 +396,22 @@ public class AuthService(
     {
         [System.Text.Json.Serialization.JsonPropertyName("is_staff")]
         public bool IsStaff { get; init; }
+    }
+
+    // A native primary-auth response: either tokens, or an MFA challenge to step up (mfa_required).
+    private sealed record NativeAuthResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("access_token")]
+        public string? AccessToken { get; init; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("refresh_token")]
+        public string? RefreshToken { get; init; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("mfa_required")]
+        public bool MfaRequired { get; init; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("challenge")]
+        public string? Challenge { get; init; }
     }
 
     // Mirrors the API's TokenResponse (snake_case JSON).

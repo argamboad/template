@@ -725,8 +725,7 @@ And entering a valid code completes sign-in
 2. **Expected:** instead of landing signed-in, a **second prompt** asks for the authenticator code.
 3. Enter the current 6-digit code → you're signed in (lands on `/`).
 4. **Wrong/expired code:** an inline error; you stay on the step-up prompt (no session).
-5. **Note:** OAuth and magic-link sign-ins enforce the step-up too (see QA-MFA-04). Native (MAUI) OTP/OAuth
-   step-up is the remaining follow-up.
+5. **Note:** OAuth and magic-link sign-ins enforce the step-up too (QA-MFA-04); native (MAUI) too (QA-MFA-05).
 
 ### QA-MFA-03 — Use a recovery code, then disable two-factor 🟠 (Web)
 **Gherkin**
@@ -758,6 +757,24 @@ And entering a valid code completes sign-in
 3. Enter the current 6-digit code (or a recovery code) → you're signed in (`/auth-callback` → `/`).
 4. **Security check:** confirm you are **not** signed in until the code is accepted — a wrong/expired code
    keeps you on the prompt with no session. (This closes the gap where redirect logins skipped MFA.)
+
+### QA-MFA-05 — Native (MAUI) sign-in enforces the step-up 🟠 (Desktop/Android)
+**Precondition:** an account with two-factor **On**; run the desktop/Android shell (see
+`docs/MOBILE_TESTING.md`). Native has no magic link — use **email OTP** or **OAuth**.
+**Gherkin**
+```gherkin
+Given my account has two-factor enabled
+When I sign in on the native app with an email code or OAuth
+Then the app shows the authenticator step-up in-app before completing sign-in
+And a valid code (or recovery code) finishes sign-in
+```
+**Walkthrough**
+1. In the native app, sign in with an **email code** (or a provider). 
+2. **Expected:** the app stays on the login screen and shows the **authenticator code prompt** (it does
+   not sign in yet). No session/token is stored.
+3. Enter the current 6-digit code (or a recovery code) → you're signed in (lands on `/`).
+4. **Wrong/expired code:** inline error; you remain on the prompt (no session). Tokens arrive in the
+   response body (native transport), same as a normal native login.
 
 ### QA-NOTIF-01 — Notification bell + list 🟠 (Web)
 **Note:** the template has no built-in producer; to see items, a feature must call
@@ -1132,7 +1149,7 @@ the API directly:
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
 | GDPR data export | **HH-13** (owner Household → Data → download) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
-| MFA / TOTP | **MFA-01..04** (Settings enroll/QR/confirm/recovery + disable; step-up on OTP **and** OAuth/magic-link logins) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). **All web sign-in paths enforce it**: OTP returns the challenge as JSON; OAuth callback + magic-link redirect to `/login?mfa=<challenge>`. Native (MAUI) step-up is the remaining follow-up. |
+| MFA / TOTP | **MFA-01..05** (Settings enroll/QR/confirm/recovery + disable; step-up on OTP, OAuth/magic-link, **and** native logins) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). **Every sign-in path enforces it** (web + native): OTP returns the challenge as JSON; OAuth callback + magic-link redirect to `/login?mfa=<challenge>`; native OTP/OAuth-exchange return the challenge in the body and the MAUI client steps up in-app. |
 | In-app notifications | **NOTIF-01..03** (header bell: list/unread-count/mark-read; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
 | Admin back-office | **ADMIN-01..03** (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}`) inspection, `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
@@ -1273,5 +1290,11 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   `/login?mfa=<challenge>` (a signed, single-use, 5-min Data-Protection token — no secret), and
   `Login.razor` reuses the UI-2 step-up prompt → `POST /api/auth/mfa/verify` → `/auth-callback`.
   Property covered by `MfaLoginServiceTests` (MFA-on → challenge, never a session); **QA-MFA-04**. The
-  dead `IssueRefreshCookieAsync` helper was removed. **Native (MAUI) OTP/OAuth step-up remains the only
-  open gap** (deferred, web-first).
+  dead `IssueRefreshCookieAsync` helper was removed.
+- **Updated 2026-07-01** — **MFA-4 (native step-up):** the MAUI client now handles the
+  `{mfa_required, challenge}` response on the native **OTP** and **OAuth-exchange** paths.
+  `AuthService.VerifyOtpAsync`/`SignInWithOAuthAsync` now return a `SignInResult` (Success / Failed /
+  MfaRequired+challenge) and a new `VerifyMfaAsync` completes the step-up (tokens in the body, native
+  transport); `Login.razor`'s native branches reuse the same code prompt. Client-only — no API change;
+  build-verified (native is E2E/manual per `MOBILE_TESTING.md`); **QA-MFA-05**. **MFA is now enforced on
+  every sign-in path, web and native — the epic is fully closed, no open gaps.**

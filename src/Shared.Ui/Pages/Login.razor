@@ -261,10 +261,16 @@
         {
             if (Auth.IsNative)
             {
-                // Native: tokens come back in the body and AuthService stores them.
-                if (await Auth.VerifyOtpAsync(_email.Trim(), _otpCode.Trim()))
+                // Native: tokens come back in the body and AuthService stores them — unless MFA is on,
+                // in which case we get a challenge and step up with a code (same prompt as the web path).
+                var result = await Auth.VerifyOtpAsync(_email.Trim(), _otpCode.Trim());
+                if (result.Status == SignInStatus.Success) { Nav.NavigateTo("/"); return; }
+                if (result.Status == SignInStatus.MfaRequired)
                 {
-                    Nav.NavigateTo("/");
+                    _challenge = result.Challenge;
+                    _mfaCode = string.Empty;
+                    _error = null; _otpError = false;
+                    _mode = Mode.MfaChallenge;
                     return;
                 }
                 _otpError = true;
@@ -309,8 +315,17 @@
         _busy = true;
         try
         {
-            // Web-only step-up: the API sets the refresh cookie on success, then
-            // /auth-callback exchanges it for the session (mirrors the OTP path).
+            if (Auth.IsNative)
+            {
+                // Native: tokens come back in the body and AuthService stores them.
+                if (await Auth.VerifyMfaAsync(_challenge!, _mfaCode.Trim())) { Nav.NavigateTo("/"); return; }
+                _otpError = true;
+                _error = Localizer["Login_ErrCodeIncorrect"];
+                return;
+            }
+
+            // Web: the API sets the refresh cookie on success, then /auth-callback
+            // exchanges it for the session (mirrors the OTP path).
             var res = await Http.PostAsJsonAsync("/api/auth/mfa/verify",
                 new { challenge = _challenge, code = _mfaCode.Trim() });
             if (res.IsSuccessStatusCode)
@@ -333,9 +348,18 @@
         _oauthBusy = true;
         try
         {
-            if (await Auth.SignInWithOAuthAsync(provider))
+            var result = await Auth.SignInWithOAuthAsync(provider);
+            if (result.Status == SignInStatus.Success)
             {
                 Nav.NavigateTo("/");
+                return;
+            }
+            if (result.Status == SignInStatus.MfaRequired)
+            {
+                // MFA on: step up with a code (same prompt as the OTP path).
+                _challenge = result.Challenge;
+                _mfaCode = string.Empty;
+                _mode = Mode.MfaChallenge;
                 return;
             }
             _error = Localizer["Login_ErrOAuthCancelled"];
