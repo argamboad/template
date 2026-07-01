@@ -76,6 +76,29 @@
   <data name="Login_ErrOAuthCancelled" xml:space="preserve"><value>El inicio de sesión se canceló o no se completó. Inténtalo de nuevo.</value></data>
   <data name="Common_Loading" xml:space="preserve"><value>Cargando…</value></data>
   <data name="Common_Working" xml:space="preserve"><value>Procesando…</value></data>
+  <data name="Common_Cancel" xml:space="preserve"><value>Cancelar</value></data>
+  <data name="Login_MfaPrompt" xml:space="preserve"><value>Introduce el código de 6 dígitos de tu app de autenticación (o un código de recuperación).</value></data>
+  <data name="Mfa_Title" xml:space="preserve"><value>Verificación en dos pasos</value></data>
+  <data name="Mfa_Subtitle" xml:space="preserve"><value>Añade un segundo paso al iniciar sesión con una app de autenticación (TOTP).</value></data>
+  <data name="Mfa_On" xml:space="preserve"><value>Activada</value></data>
+  <data name="Mfa_Off" xml:space="preserve"><value>Desactivada</value></data>
+  <data name="Mfa_Enable" xml:space="preserve"><value>Activar dos pasos</value></data>
+  <data name="Mfa_Step1" xml:space="preserve"><value>Escanea el código QR con tu app de autenticación, o introduce la clave manualmente.</value></data>
+  <data name="Mfa_Step2" xml:space="preserve"><value>Introduce el código de 6 dígitos que muestra para confirmar.</value></data>
+  <data name="Mfa_ManualKey" xml:space="preserve"><value>O introduce esta clave manualmente:</value></data>
+  <data name="Mfa_EnterCode" xml:space="preserve"><value>Código de verificación</value></data>
+  <data name="Mfa_Verify" xml:space="preserve"><value>Verificar y activar</value></data>
+  <data name="Mfa_EnabledNow" xml:space="preserve"><value>La verificación en dos pasos ya está activada.</value></data>
+  <data name="Mfa_RecoveryIntro" xml:space="preserve"><value>Guarda estos códigos de recuperación en un lugar seguro: cada uno funciona una vez si pierdes tu autenticador. No se volverán a mostrar.</value></data>
+  <data name="Mfa_SavedCodes" xml:space="preserve"><value>He guardado mis códigos</value></data>
+  <data name="Mfa_Disable" xml:space="preserve"><value>Desactivar dos pasos</value></data>
+  <data name="Mfa_DisablePrompt" xml:space="preserve"><value>Introduce un código de tu app (o de recuperación) para desactivarla.</value></data>
+  <data name="Mfa_ConfirmDisable" xml:space="preserve"><value>Desactivar</value></data>
+  <data name="Mfa_ErrLoad" xml:space="preserve"><value>No se pudo cargar el estado de la verificación en dos pasos.</value></data>
+  <data name="Mfa_ErrEnroll" xml:space="preserve"><value>No se pudo iniciar el registro. Inténtalo de nuevo.</value></data>
+  <data name="Mfa_ErrEnterCode" xml:space="preserve"><value>Introduce primero el código.</value></data>
+  <data name="Mfa_ErrCodeIncorrect" xml:space="preserve"><value>Ese código es incorrecto o ha caducado.</value></data>
+  <data name="Mfa_ErrDisable" xml:space="preserve"><value>No se pudo desactivar la verificación en dos pasos. Inténtalo de nuevo.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>

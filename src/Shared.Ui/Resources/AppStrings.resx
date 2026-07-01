@@ -76,6 +76,29 @@
   <data name="Login_ErrOAuthCancelled" xml:space="preserve"><value>Sign-in was cancelled or didn't complete. Please try again.</value></data>
   <data name="Common_Loading" xml:space="preserve"><value>Loading…</value></data>
   <data name="Common_Working" xml:space="preserve"><value>Working…</value></data>
+  <data name="Common_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Login_MfaPrompt" xml:space="preserve"><value>Enter the 6-digit code from your authenticator app (or a recovery code).</value></data>
+  <data name="Mfa_Title" xml:space="preserve"><value>Two-factor authentication</value></data>
+  <data name="Mfa_Subtitle" xml:space="preserve"><value>Add a second step at sign-in using an authenticator app (TOTP).</value></data>
+  <data name="Mfa_On" xml:space="preserve"><value>On</value></data>
+  <data name="Mfa_Off" xml:space="preserve"><value>Off</value></data>
+  <data name="Mfa_Enable" xml:space="preserve"><value>Enable two-factor</value></data>
+  <data name="Mfa_Step1" xml:space="preserve"><value>Scan the QR code with your authenticator app, or enter the key manually.</value></data>
+  <data name="Mfa_Step2" xml:space="preserve"><value>Enter the 6-digit code it shows to confirm.</value></data>
+  <data name="Mfa_ManualKey" xml:space="preserve"><value>Or enter this key manually:</value></data>
+  <data name="Mfa_EnterCode" xml:space="preserve"><value>Verification code</value></data>
+  <data name="Mfa_Verify" xml:space="preserve"><value>Verify &amp; enable</value></data>
+  <data name="Mfa_EnabledNow" xml:space="preserve"><value>Two-factor authentication is now on.</value></data>
+  <data name="Mfa_RecoveryIntro" xml:space="preserve"><value>Save these recovery codes somewhere safe — each works once if you lose your authenticator. They won't be shown again.</value></data>
+  <data name="Mfa_SavedCodes" xml:space="preserve"><value>I've saved my codes</value></data>
+  <data name="Mfa_Disable" xml:space="preserve"><value>Disable two-factor</value></data>
+  <data name="Mfa_DisablePrompt" xml:space="preserve"><value>Enter a code from your app (or a recovery code) to turn it off.</value></data>
+  <data name="Mfa_ConfirmDisable" xml:space="preserve"><value>Disable</value></data>
+  <data name="Mfa_ErrLoad" xml:space="preserve"><value>Couldn't load your two-factor status.</value></data>
+  <data name="Mfa_ErrEnroll" xml:space="preserve"><value>Couldn't start enrollment. Please try again.</value></data>
+  <data name="Mfa_ErrEnterCode" xml:space="preserve"><value>Enter the code first.</value></data>
+  <data name="Mfa_ErrCodeIncorrect" xml:space="preserve"><value>That code is incorrect or has expired.</value></data>
+  <data name="Mfa_ErrDisable" xml:space="preserve"><value>Couldn't disable two-factor. Please try again.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Household</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
