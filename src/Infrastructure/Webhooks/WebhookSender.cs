@@ -1,0 +1,33 @@
+using System.Text;
+using Template.Core.Webhooks;
+
+namespace Template.Infrastructure.Webhooks;
+
+/// <summary>
+/// Performs a single signed webhook HTTP POST (HOOKS, ADR-016) and returns the endpoint's status code.
+/// Shared by the async outbox handler (which throws on a non-2xx to trigger the outbox's retry/backoff)
+/// and the synchronous "send test" endpoint (which surfaces the status to the owner). Signs the raw body
+/// with HMAC-SHA256 and stamps the id/event/signature headers.
+/// </summary>
+public interface IWebhookSender
+{
+    /// <summary>POSTs <paramref name="body"/> to <paramref name="url"/>, signed with <paramref name="secret"/>; returns the HTTP status code.</summary>
+    Task<int> SendAsync(string url, string secret, string eventType, string eventId, string body, CancellationToken cancellationToken = default);
+}
+
+public sealed class WebhookSender(HttpClient httpClient) : IWebhookSender
+{
+    public async Task<int> SendAsync(string url, string secret, string eventType, string eventId, string body, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation(WebhookSignature.IdHeaderName, eventId);
+        request.Headers.TryAddWithoutValidation(WebhookSignature.EventHeaderName, eventType);
+        request.Headers.TryAddWithoutValidation(WebhookSignature.HeaderName, WebhookSignature.Compute(secret, body));
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        return (int)response.StatusCode;
+    }
+}

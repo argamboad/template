@@ -186,6 +186,14 @@ if (publicApiSettings.Enabled)
     authBuilder.AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
         ApiKeyAuthenticationHandler.SchemeName, _ => { });
 
+// HOOKS (ADR-016): outbound webhooks. Default OFF — a deployment opts in via Webhooks:Enabled. The
+// delivery machinery is always registered (dormant); only the management routes (below) are gated.
+var webhooksSettings = new WebhooksSettings();
+builder.Configuration.GetSection(WebhooksSettings.SectionName).Bind(webhooksSettings);
+builder.Services.AddSingleton(webhooksSettings);
+builder.Services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
+builder.Services.AddScoped<IWebhookPublisher, WebhookPublisher>();
+
 // Single tenant-API authorization policy, shared by the platform controllers and feature groups.
 builder.Services.AddTenantApiAuthorization();
 
@@ -264,5 +272,9 @@ if (publicApiSettings.Enabled)
     app.MapApiKeyManagement();
     app.MapPublicApi();
 }
+
+// HOOKS (ADR-016): map webhook management only when enabled — off ⇒ the routes don't exist.
+if (webhooksSettings.Enabled)
+    app.MapWebhookManagement();
 
 app.Run();
