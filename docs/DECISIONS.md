@@ -694,3 +694,43 @@ non-refreshable, audited token gives support what they need while bounding the b
 trail the affected tenant can see. Depends on: audit (ADR-008 ✅), the escape hatch (ADR-003 ✅), RBAC
 (ADR-009 ✅).
 Stories + slice plan: `docs/stories/admin.md` (epic `ADMIN`).
+
+---
+
+**ADR-015 — Public API + API keys: a config-gated, default-off programmatic surface authenticated by tenant-scoped API keys. (2026-07-01)**
+Everything so far serves an interactive human (JWT/cookie session). A **public API** serves *machines* —
+a customer's backend, a script, CI, an integration — which need a non-interactive credential. The user
+initially parked this (no customer-facing API) and **reversed that on 2026-07-01**; it's built now, but
+**off by default** since a public surface is a deliberate, security-relevant opt-in.
+
+**Decision:**
+1. **`ApiKey : ITenantScoped`** — store only the **hash** (like `RefreshToken`/`TenantInvitation`; reuse
+   `ITokenHasher`), plus a non-secret `Prefix` for display, granted `Scopes`, optional `ExpiresAt`, and a
+   `RevokedAt`. The raw key (`pk_…`) is shown **once** at creation, never again.
+2. **A second authentication scheme** (`ApiKeyAuthenticationHandler`, scheme `"ApiKey"`) alongside JWT
+   Bearer. A key in `X-Api-Key` (or `Authorization: Bearer pk_…`) resolves — **across tenants, pre-scope**
+   (the key selects its tenant) — to a principal carrying the **`tenant_id` claim**, so the existing global
+   query filter scopes the request with no extra wiring. Bad/expired/revoked ⇒ 401.
+3. **Scopes gate routes.** Keys carry example scopes (`read`/`write`); a public route declares its
+   requirement with **`.RequireApiScope(...)`** (→ 403 `insufficient_scope`). Scopes are a superset seam —
+   an all-scope key = full access — so it's mechanism-first without committing to a scope taxonomy.
+4. **Owner-only management.** `/api/apikeys` (create/list/revoke) is JWT-authed and gated by a new
+   **`Permission.ManageApiKeys`** (owner-only by construction — owner gets every permission). Keys grant
+   programmatic tenant access, so minting them is as sensitive as billing/role changes.
+5. **Config-gated, STRONG gating.** `PublicApi:Enabled` (default false). When off, the API-key scheme
+   isn't added and neither the management nor public routes are mapped — they return **404, they don't
+   exist** (not merely 403). Minimal-API groups (not controllers) make the conditional mapping clean.
+
+**Constraints recorded:**
+1. **Only the hash is stored**; the raw key is revealed once. Revoked/expired keys never authenticate.
+2. **API-key requests are tenant-scoped exactly like user requests** (same `tenant_id` claim → same global
+   filter); a key can never reach another tenant's data.
+3. **Default off** — a deployment opts into the public surface deliberately; the attack surface (a
+   long-lived credential + published routes) doesn't exist until then.
+4. **Reuses existing rails** — token hashing, the tenant filter, RBAC (`.RequirePermission`), and the
+   minimal-API feature-group convention. No new crypto.
+*Rationale:* a public API is the "others build on this" layer; doing it as a second auth scheme that mints
+the same `tenant_id`-scoped principal means the entire tenant-isolation guarantee applies for free, and
+strong config-gating means the template ships the capability **dormant** rather than exposing a surface no
+one asked for. HOOKS (outbound webhooks) is the companion outbound half (ADR-016).
+Stories + slice plan: `docs/stories/pubapi.md` (epic `PUBAPI`).

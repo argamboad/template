@@ -41,7 +41,7 @@ sequenced below by value, not by dependency.
 
 | Item | Epic | Size | Why | Deps |
 |------|------|------|-----|------|
-| **Public API + API keys** | `PUBAPI` | M | Programmatic access distinct from the user session | RBAC (W1) |
+| **Public API + API keys** — ✅ *PUBAPI-1 DONE* (config-gated off; ADR-015, `stories/pubapi.md`) | `PUBAPI` | M | Programmatic access distinct from the user session | RBAC (W1) |
 | **In-app notifications** — ✅ *COMPLETE* (NOTIFY-1/2; ADR-013, `stories/notify.md`) | `NOTIFY` | M | Follow-on to email; fan-out via the outbox | outbox ✅ |
 | **Outbound webhooks** (customer-facing) | `HOOKS` | M | Integration story for *your* customers | outbox ✅ |
 | **Admin back-office + impersonation** — ✅ *COMPLETE* (ADMIN-1/2; ADR-014, `stories/admin.md`) | `ADMIN` | M–L | Support tooling — all deps ready (audit ✅ + `EnterTenant` ✅); highest blast radius, do deliberately | RBAC, audit ✅, EnterTenant ✅ |

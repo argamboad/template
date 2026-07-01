@@ -32,4 +32,7 @@ public enum Permission
 
     /// <summary>Dissolve the tenant and delete its data (owner-only).</summary>
     DissolveTenant,
+
+    /// <summary>Create/revoke the tenant's API keys — programmatic tenant access (owner-only; PUBAPI).</summary>
+    ManageApiKeys,
 }

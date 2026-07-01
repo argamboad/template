@@ -1,0 +1,104 @@
+using Microsoft.EntityFrameworkCore;
+using Template.Core.Entities;
+using Template.Core.Repositories;
+
+namespace Template.Api.Services;
+
+/// <summary>A freshly created key: the persisted row plus the one-time raw value (never stored).</summary>
+public sealed record ApiKeyCreated(ApiKey Key, string RawKey);
+
+/// <summary>Resolved identity behind a valid API key — what the auth handler turns into a principal.</summary>
+public sealed record ApiKeyAuthResult(Guid KeyId, Guid TenantId, string Name, IReadOnlySet<string> Scopes);
+
+/// <summary>
+/// Manages tenant API keys (PUBAPI, ADR-015). Management (create/list/revoke) runs in the current tenant's
+/// scope (owner-gated at the endpoint); <see cref="AuthenticateAsync"/> runs <b>before</b> any tenant scope
+/// — the presented key selects its tenant — so it reads across tenants by hash. Only the hash is stored;
+/// the raw key (prefixed <c>pk_</c>) is returned once at creation.
+/// </summary>
+public interface IApiKeyService
+{
+    Task<ApiKeyCreated> CreateAsync(Guid createdByUserId, string name, IEnumerable<string>? scopes, DateTimeOffset? expiresAt, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ApiKey>> ListAsync(CancellationToken cancellationToken = default);
+    Task<bool> RevokeAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Resolves a raw key to its tenant + scopes, or null if unknown/revoked/expired.</summary>
+    Task<ApiKeyAuthResult?> AuthenticateAsync(string rawKey, CancellationToken cancellationToken = default);
+}
+
+public sealed class ApiKeyService(
+    IRepository<ApiKey> keys,
+    ITokenGenerator tokenGenerator,
+    ITokenHasher tokenHasher,
+    TimeProvider clock) : IApiKeyService
+{
+    private const string RawPrefix = "pk_";
+
+    public async Task<ApiKeyCreated> CreateAsync(Guid createdByUserId, string name, IEnumerable<string>? scopes, DateTimeOffset? expiresAt, CancellationToken cancellationToken = default)
+    {
+        var raw = RawPrefix + tokenGenerator.GenerateToken();
+        var granted = NormalizeScopes(scopes);
+        var key = new ApiKey
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? "API key" : name.Trim(),
+            KeyHash = tokenHasher.HashToken(raw),
+            Prefix = raw[..Math.Min(raw.Length, 12)], // e.g. "pk_ab12cd34" — non-secret, for display
+            Scopes = string.Join(',', granted),
+            CreatedByUserId = createdByUserId,
+            CreatedAt = clock.GetUtcNow(),
+            ExpiresAt = expiresAt,
+        };
+        await keys.AddAsync(key, cancellationToken); // TenantId stamped to the current tenant by the interceptor
+        await keys.SaveChangesAsync(cancellationToken);
+        return new ApiKeyCreated(key, raw);
+    }
+
+    public async Task<IReadOnlyList<ApiKey>> ListAsync(CancellationToken cancellationToken = default) =>
+        await keys.Query().OrderByDescending(k => k.CreatedAt).ToListAsync(cancellationToken);
+
+    public async Task<bool> RevokeAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var key = await keys.Query().FirstOrDefaultAsync(k => k.Id == id, cancellationToken); // tenant-scoped
+        if (key is null)
+            return false;
+
+        if (key.RevokedAt is null)
+        {
+            key.RevokedAt = clock.GetUtcNow();
+            keys.Update(key);
+            await keys.SaveChangesAsync(cancellationToken);
+        }
+        return true;
+    }
+
+    public async Task<ApiKeyAuthResult?> AuthenticateAsync(string rawKey, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(rawKey) || !rawKey.StartsWith(RawPrefix, StringComparison.Ordinal))
+            return null;
+
+        var hash = tokenHasher.HashToken(rawKey);
+        var now = clock.GetUtcNow();
+
+        // Pre-tenant-scope: the key itself selects the tenant, so resolve across all tenants by hash.
+        var key = await keys.QueryAllTenants().FirstOrDefaultAsync(k => k.KeyHash == hash, cancellationToken);
+        if (key is null || !key.IsActive(now))
+            return null;
+
+        // Best-effort last-used stamp via a direct UPDATE (no change-tracking / tenant interceptor needed).
+        await keys.QueryAllTenants().Where(k => k.Id == key.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(k => k.LastUsedAt, now), cancellationToken);
+
+        return new ApiKeyAuthResult(key.Id, key.TenantId, key.Name, ApiScopes.Parse(key.Scopes));
+    }
+
+    // Keep only scopes the app knows about; empty request defaults to all known scopes.
+    private static IReadOnlyList<string> NormalizeScopes(IEnumerable<string>? scopes)
+    {
+        var requested = (scopes ?? ApiScopes.All)
+            .Select(s => s.Trim().ToLowerInvariant())
+            .Where(ApiScopes.All.Contains)
+            .Distinct()
+            .ToList();
+        return requested.Count == 0 ? ApiScopes.All : requested;
+    }
+}

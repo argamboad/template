@@ -112,7 +112,13 @@ deliveries, retries, a delivery log).
 per-subscription retry/backoff, and a deliveries table. Tenant-scoped subscriptions.
 **Deps:** outbox (ADR-007) — required, don't build a second delivery mechanism.
 
-## 7. Public API + API keys — `PUBAPI`
+## 7. Public API + API keys — `PUBAPI` → **✅ PUBAPI-1 DONE (ADR-015)**
+> **Shipped** (config-gated, default off) — `ApiKey` (hash-only), a second **API-key auth scheme** that
+> mints a `tenant_id`-scoped principal, owner-only `/api/apikeys` management (`Permission.ManageApiKeys`),
+> a demo `/api/public` group with `.RequireApiScope`, all behind `PublicApi:Enabled` (off ⇒ routes 404).
+> Design in **ADR-015**, slices in `docs/stories/pubapi.md`. **PUBAPI-2 (optional):** per-key rate limiting,
+> public-only OpenAPI doc, key rotation. Sketch below retained for context.
+
 **What:** programmatic access authenticated by tenant-scoped **API keys**, distinct from the
 JWT/cookie user session.
 **Why:** scripts, integrations, and CI need non-interactive auth.

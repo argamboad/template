@@ -59,7 +59,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         await using var db = CreateContext();
         await db.Database.ExecuteSqlRawAsync(
             """
-            TRUNCATE TABLE "AuditEvents", "Subscriptions", "UsageCounters", "InboxMessages", "OutboxMessages", "Notes",
+            TRUNCATE TABLE "AuditEvents", "Subscriptions", "UsageCounters", "ApiKeys", "InboxMessages", "OutboxMessages", "Notes",
                           "Notifications", "NotificationPreferences", "TenantInvitations", "TenantMemberships",
                           "MfaRecoveryCodes", "UserMfa", "UserLogins", "RefreshTokens", "LoginTokens",
                           "Users", "Tenants"
