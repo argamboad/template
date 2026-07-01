@@ -91,6 +91,20 @@ public sealed class StripeBillingProvider(IOptions<StripeSettings> options) : IB
             CurrentPeriodEnd: item?.CurrentPeriodEnd is { } end ? new DateTimeOffset(end, TimeSpan.Zero) : null);
     }
 
+    public async Task CancelSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken = default)
+    {
+        var client = new StripeClient(_settings.SecretKey, apiBase: _settings.ApiBase);
+        var subscriptions = new SubscriptionService(client);
+        try
+        {
+            await subscriptions.CancelAsync(stripeSubscriptionId, cancellationToken: cancellationToken);
+        }
+        catch (StripeException ex) when (ex.StripeError?.Type == "invalid_request_error")
+        {
+            // Already canceled / unknown id — the effect is already achieved; don't fail the retry.
+        }
+    }
+
     /// <summary>Map Stripe's subscription status to our (fail-closed) <see cref="SubscriptionStatus"/>.</summary>
     private static string MapStatus(string stripeStatus) => stripeStatus switch
     {

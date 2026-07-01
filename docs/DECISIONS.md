@@ -296,8 +296,18 @@ active/trialing subscriptions whose `CurrentPeriodEnd` has passed, sends a one-t
 records `Subscription.LapseNotifiedAt` so it fires once per lapse — **without fabricating a status**
 (Stripe stays the money-truth; a later webhook corrects the projection). Deliberately **not** built:
 Stripe's own retry schedule / card-failure emails (**Smart Retries** owns that), and the advance
-"trial-ends-in-N-days" nudge (a small follow-up — needs a Stripe `trial_will_end` event kind). **Still
-open from point 6:** a `BillingDataContributor` (cancel Stripe sub + wipe projection on dissolve).
+"trial-ends-in-N-days" nudge (a small follow-up — needs a Stripe `trial_will_end` event kind).
+
+*Addendum (BILLING-7, 2026-07-01) — billing participates in tenant dissolve (point 6 delivered).* The
+design (point 6) always said the `Subscription` should be torn down on dissolve; it's now built.
+**`BillingDataContributor : ITenantDataContributor`** wipes the tenant's `Subscription` projection and —
+if it has a live provider subscription — **cancels it at the provider**, so a dissolved tenant stops being
+billed (the "delete account → Stripe keeps charging" bug). The cancel is **not** an external call inside
+the dissolve transaction: it's a `"billing.cancel"` **outbox** message (staged with the teardown, then run
+out-of-band with retry by `BillingCancelOutboxHandler` → new idempotent `IBillingProvider.CancelSubscriptionAsync`).
+`HasDataAsync` returns **false** — a subscription is billing plumbing, not tenant content, so it never trips
+the "would abandon data" guard; it's cleaned up automatically instead. Export (GDPR-1) gains a `billing`
+section (plan/status/period — never Stripe ids or card data). **This closes the BILLING epic (1–7).**
 
 **ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**
 Side effects that must not be lost (email, billing webhooks, future integrations) move off the

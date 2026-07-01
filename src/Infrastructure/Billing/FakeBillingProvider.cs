@@ -26,6 +26,9 @@ public sealed class FakeBillingProvider : IBillingProvider
     /// <summary>Every portal request received, for assertions.</summary>
     public ConcurrentQueue<BillingPortalRequest> PortalRequests { get; } = new();
 
+    /// <summary>Every subscription id a cancel was requested for, for assertions.</summary>
+    public ConcurrentQueue<string> CanceledSubscriptions { get; } = new();
+
     public Task<BillingCheckoutSession> CreateCheckoutSessionAsync(BillingCheckoutRequest request, CancellationToken cancellationToken = default)
     {
         Requests.Enqueue(request);
@@ -46,5 +49,11 @@ public sealed class FakeBillingProvider : IBillingProvider
         return string.IsNullOrWhiteSpace(payload)
             ? null // authentic but irrelevant
             : JsonSerializer.Deserialize<BillingWebhookEvent>(payload);
+    }
+
+    public Task CancelSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken = default)
+    {
+        CanceledSubscriptions.Enqueue(stripeSubscriptionId);
+        return Task.CompletedTask;
     }
 }

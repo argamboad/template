@@ -29,6 +29,13 @@ public interface IBillingProvider
     /// is not authentic — the caller must reject those (HTTP 400) and apply nothing.
     /// </summary>
     BillingWebhookEvent? ParseWebhookEvent(string payload, string? signature);
+
+    /// <summary>
+    /// Cancels a subscription at the provider (BILLING-7) — used when a tenant is dissolved so the customer
+    /// stops being billed. Idempotent: canceling an already-canceled/absent subscription is a no-op, not an
+    /// error (delivery is at-least-once via the outbox).
+    /// </summary>
+    Task CancelSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken = default);
 }
 
 /// <param name="TenantId">The tenant being subscribed — carried into the session for webhook reconciliation.</param>

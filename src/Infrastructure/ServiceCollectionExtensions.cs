@@ -72,6 +72,9 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<IWebhookSender, WebhookSender>(c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IOutboxHandler, WebhookOutboxHandler>();
 
+        // Cancel a provider subscription out-of-band when a tenant is dissolved (BILLING-7).
+        services.AddScoped<IOutboxHandler, Billing.BillingCancelOutboxHandler>();
+
         // Inbox dedup gate — idempotent inbound (webhook) deliveries (ADR-007). Used inline by the
         // receiving endpoint inside its unit of work; no background service.
         services.AddScoped<IInbox, EfInbox>();
