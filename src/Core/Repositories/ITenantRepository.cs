@@ -46,6 +46,12 @@ public interface ITenantRepository
     /// <summary>The tenant's members joined to their user display info.</summary>
     Task<List<TenantMemberDetail>> GetMemberDetailsAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every tenant with its member count — for the platform-staff admin surface (ADR-014). Tenants and
+    /// memberships are not tenant-scoped, so this is a plain cross-tenant read (no filter to bypass).
+    /// </summary>
+    Task<List<TenantSummary>> ListAllAsync(CancellationToken cancellationToken = default);
+
     Task UpdateTenantAsync(Tenant tenant, CancellationToken cancellationToken = default);
 
     Task RemoveMemberAsync(TenantMembership member, CancellationToken cancellationToken = default);
@@ -62,3 +68,6 @@ public interface ITenantRepository
 /// <summary>A roster row: membership joined to the user's display info.</summary>
 public record TenantMemberDetail(
     Guid UserId, string? DisplayName, string Email, string Role, DateTimeOffset JoinedAt);
+
+/// <summary>A tenant summary for the admin tenant list.</summary>
+public record TenantSummary(Guid Id, string Name, DateTimeOffset CreatedAt, int MemberCount);

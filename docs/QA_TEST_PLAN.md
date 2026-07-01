@@ -113,8 +113,9 @@ authorization; local-disk only — cloud backends hand out native presigned URLs
 export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle),
 **account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe), and
 **MFA enrollment/management** (`/api/auth/mfa/*`; authenticator TOTP — secret encrypted, hashed
-single-use recovery codes), and the **in-app notification center** (`/api/notifications/*`; per-user
-list/unread-count/mark-read). These are **covered by
+single-use recovery codes), the **in-app notification center** (`/api/notifications/*`; per-user
+list/unread-count/mark-read), and the **platform-staff admin surface** (`/api/admin/*`; config-gated
+cross-tenant inspection). These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12.
@@ -943,6 +944,7 @@ the API directly:
 | GDPR account erasure (API-only) | covered by `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP (API-only) | covered by `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). Wired into OTP-verify + native-exchange; OAuth/magic-link **redirect** step-up is a UI follow-up. |
 | In-app notifications (API-only) | covered by `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). Bell-menu UI = follow-up. |
+| Admin back-office (API-only) | covered by `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/tenants` (+ `/{id}`) — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Cross-tenant inspection; detail enters the target tenant (filter never loosened) and is audited in-tenant. Impersonation = ADMIN-2. |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
@@ -1036,3 +1038,9 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   on) + `NotifyAsync` **fan-out** — in-app row + email via the outbox-backed `IEmailSender`, gated by
   prefs. Covered by `NotificationFanOutTests`. Bell-menu UI is an API-first follow-up. **NOTIFY epic +
   Wave 3's first item complete.**
+- **Updated 2026-07-01** for the platform-staff admin surface (ADR-014, Wave 3): `GET /api/admin/tenants`
+  (+ `/{id}`) — **staff-only** (config allowlist `Admin:StaffEmails`, out-of-band; non-staff → 403).
+  Read-only cross-tenant inspection; the per-tenant detail **enters the target tenant** (the global filter
+  is never loosened) and is **audited in that tenant**. **API-only** — covered by `Api.Tests`
+  (`PlatformStaffServiceTests`, `AdminControllerTests`). Impersonation (short-lived, non-refreshable,
+  audited) is **ADMIN-2**.
