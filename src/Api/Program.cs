@@ -108,6 +108,9 @@ builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
 // Tenant data export (GDPR-1, ADR-011). Assembles core + each contributor's section into a JSON
 // bundle stored via IFileStorage, returned as a signed URL. Owner-gated at the endpoint.
 builder.Services.AddScoped<ITenantExportService, TenantExportService>();
+// Account erasure (GDPR-2, ADR-011). "Delete my account" — wipes identity/PII in one audited
+// transaction, honoring the single-owner invariant (transfer-or-dissolve first).
+builder.Services.AddScoped<IAccountErasureService, AccountErasureService>();
 
 // RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
 // resolves the caller's membership and consults the RolePermissions matrix; fails closed.
