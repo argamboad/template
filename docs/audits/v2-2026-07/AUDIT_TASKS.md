@@ -151,7 +151,7 @@ Each spec from `LOGIC_AND_TEST_REPORT.md` Part B not already created by B1–B7.
 - [x] **B8-3 · Migration `Down` rollback** — High — `Migrations_Down_RevertCleanly_ToEmptySchema` (`4464021`).
 - [x] **B8-4 · Fail-open / SSRF / stale-webhook / clock** — covered by B5-1/2/4 + B4-1 tests; no duplication.
 - [ ] **B8-5 · E2E journeys** — ⬜ **scoped** (D7-adjacent): specify + wire the missing Playwright journeys (OAuth, magic-link, tenant-isolation, RBAC three-tier, MFA enroll+step-up, GDPR export/erasure, admin impersonation, i18n) behind a bootable CI job; billing E2E blocked on a fake-provider E2E seam (note the dependency, don't silently skip).
-- [ ] **B8-6 · Harness gaps** — ⬜ **scoped**: extend `ServiceHarness` to cover MFA/notifications/files/webhooks/api-keys so slices touching them don't hand-assemble.
+- [x] **B8-6 · Harness gaps** — delivered as `IntegrationTestFactory` (`WebApplicationFactory<Program>` + throwaway Postgres): boots the real app, seeds tenants/users, mints real tokens, and asserts the full auth→tenant-filter→controller→Postgres pipeline at the wire (`HarnessSmokeTests`). Supersedes the narrower "extend `ServiceHarness`" plan and unblocks B8-2/B9-1.
   - **Exit check (V2-B8):** every Critical/High spec in Part B exists and is green (or E2E explicitly tracked in CI).
 
 ## V2-B9 — Debt & SOLID
