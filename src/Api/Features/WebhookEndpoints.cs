@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Template.Api.Authentication;
 using Template.Api.Configuration;
 using Template.Api.Services;
 using Template.Core.Authorization;
@@ -84,8 +84,7 @@ public static class WebhookEndpoints
         return app;
     }
 
-    private static Guid? CurrentUserId(HttpContext http) =>
-        Guid.TryParse(http.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+    private static Guid? CurrentUserId(HttpContext http) => http.User.GetUserId();
 }
 
 public sealed record CreateWebhookRequest

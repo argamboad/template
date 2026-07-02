@@ -45,20 +45,37 @@ This hybrid is pinned in **ADR-004**. The platform is the durable chassis (JWT a
 tenancy, the global tenant query filter, email, persistence); features bolt on and *reuse* it.
 
 **A feature slice** (`src/Api/Features/<Feature>/`) typically contains:
-- `<Feature>Endpoints.cs` — a minimal-API `MapGroup("/api/<feature>").RequireAuthorization(...)`,
-  registered with `app.Map<Feature>()` in `Program.cs`. Features are minimal-API groups; the
-  platform stays controllers.
+- `<Feature>Endpoints.cs` — a minimal-API group registered via
+  **`app.MapTenantFeatureGroup("/api/<feature>")`** (NOT a raw
+  `MapGroup(...).RequireAuthorization(...)` — the helper applies the shared `AuthPolicies.TenantApi`
+  policy so a slice can't forget auth), called from `app.Map<Feature>()` in `Program.cs`. Gate
+  individual endpoints with the **`.RequirePermission(Permission.X)`** (→ 403; ADR-009) and
+  **`.RequireEntitlement(...)`** (→ 402; ADR-006) endpoint filters as needed. Features are minimal-API
+  groups; the platform stays controllers.
 - `<Feature>Handler.cs` — the orchestration/logic; injects `IRepository<T>` (whose `Query()` is
   already tenant-filtered), `ICurrentTenant`, `IUnitOfWork`, and platform services as needed.
 - `<Feature>Models.cs` — request/response DTOs + validation, co-located.
 - `<Feature>DataContributor.cs` — an `ITenantDataContributor` so the feature's data participates in
-  tenant dissolve (registered in DI; no central wipe method to edit).
+  tenant export **and** dissolve (registered in DI; no central wipe method to edit). It **requires
+  four members**: `HasDataAsync`, `WipeAsync`, **`ExportKey`** (the section name in a tenant export),
+  and **`ExportAsync`** (GDPR-1, ADR-011). A slice built from the old two-method recipe won't compile.
 - The **entity** lives in `src/Core/Entities/` (it's the EF model + migration source) and implements
   **`ITenantScoped`** so the global query filter scopes it automatically.
 
 **A feature must NOT** reach into another feature's folder, edit a central "has data / wipe data"
-method, author a bespoke per-entity repository (use `IRepository<T>`), or inline UI in the Web app
-(UI components go in the Shared.Ui RCL).
+method, author a bespoke per-entity repository (use `IRepository<T>`), use `IgnoreQueryFilters()`
+(banned in `src/Api/Features/**` — use `IRepository<T>.QueryAllTenants()`), or inline UI in the Web
+app (UI components go in the Shared.Ui RCL).
+
+**Add-a-slice mechanical checklist:**
+1. **Entity** → `src/Core/Entities/<Entity>.cs`, implementing `ITenantScoped`.
+2. **DbSet + config** → add the `DbSet<>` to `AppDbContext` and any `IEntityTypeConfiguration`.
+3. **Migration** → `dotnet ef migrations add Add<Entity>` (in `src/Infrastructure/Persistence/Migrations/`).
+4. **DI wiring** → register the handler/services (`Add*`) and map the group (`app.Map<Feature>()`) in
+   `Program.cs`.
+5. **Contributor** → register the `ITenantDataContributor` (all four members) in DI.
+6. **Fixture reset** → add the new table(s) to the test fixture's reset/truncate list.
+7. **UI** → nav entry + component in the Shared.Ui RCL, and add the resx (`.resx`) strings (EN/ES).
 
 **Reference:** `src/Api/Features/Notes` is a complete, working example (marked "🗑️ DELETE-ME").
 Copy its shape; delete it when you ship your first real feature.

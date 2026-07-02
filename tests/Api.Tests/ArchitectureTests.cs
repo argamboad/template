@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Template.Api.Controllers;
 using Template.Api.Tests.Infrastructure;
 using Template.Core.Entities;
 using Template.Infrastructure.Persistence;
@@ -103,6 +105,91 @@ public class ArchitectureTests
 
         Assert.True(inline.Count == 0,
             $"Blazor components belong in Shared.Ui, not the web app: {string.Join(", ", inline)}");
+    }
+
+    // ── v2 audit enforcement gates (B11) — lock in the B1–B7 fixes so they cannot silently regress ──
+
+    [Fact]
+    public void EveryEntityWithATenantId_IsScopedOrAllowlisted()
+    {
+        // R2/ARCH-2: an entity carrying a TenantId must be structurally filtered (ITenantScoped) or be on
+        // an explicit allowlist of by-convention exceptions, so a new tenant-relevant table can't quietly
+        // rely on hand-written filtering.
+        var allow = new HashSet<string> { nameof(TenantMembership), nameof(WebhookDelivery) };
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql("Host=localhost;Database=arch-check") // model-only; never connects
+            .Options;
+        using var ctx = new AppDbContext(options, new TestCurrentTenant());
+
+        var offenders = ctx.Model.GetEntityTypes() // mapped entities only — excludes transient DTOs
+            .Where(e => e.ClrType.GetProperty("TenantId")?.PropertyType == typeof(Guid))
+            .Where(e => !typeof(ITenantScoped).IsAssignableFrom(e.ClrType) && !allow.Contains(e.ClrType.Name))
+            .Select(e => e.ClrType.Name)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Entities with a TenantId must implement ITenantScoped or be allowlisted: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void EveryController_DerivesFromATenantOrAdminBase_OrIsAllowlisted()
+    {
+        // R4: a copied controller must not silently skip tenant/staff auth — it derives from a base that
+        // applies it, or it is an explicitly-allowlisted system/anonymous surface.
+        var allow = new HashSet<string>
+        {
+            nameof(AuthController), "FilesController", nameof(BillingWebhookController), nameof(NotificationsController),
+        };
+
+        var offenders = typeof(TenantApiControllerBase).Assembly.GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(ControllerBase).IsAssignableFrom(t))
+            .Where(t => !typeof(TenantApiControllerBase).IsAssignableFrom(t)
+                     && !typeof(AdminApiControllerBase).IsAssignableFrom(t)
+                     && !allow.Contains(t.Name))
+            .Select(t => t.Name)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Controllers must derive from TenantApiControllerBase/AdminApiControllerBase or be allowlisted: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void ServerServices_UseInjectedClock_NotAmbientUtcNow()
+    {
+        // R15/GAP-4/LOGIC-B3: server code takes TimeProvider, so a cookie/URL/token lifetime can't drift
+        // from the injected clock. Entity default-value helpers and the WASM client (no injected clock)
+        // live in Core/Shared.Ui and are outside this scan; migrations are excluded.
+        var dirs = new[] { Path.Combine(RepoRoot(), "src", "Api"), Path.Combine(RepoRoot(), "src", "Infrastructure") };
+
+        var offenders = dirs.SelectMany(d => SourceFiles(d))
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}"))
+            .Where(f => File.ReadAllText(f) is var t && (t.Contains("DateTime.UtcNow") || t.Contains("DateTimeOffset.UtcNow")))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Server services must use an injected TimeProvider, not ambient UtcNow: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void PlatformTests_DoNotDependOnTheDeleteMeNotesSample()
+    {
+        // R9/TR-1: the tenancy/GDPR/outbox tests use the harness TestWidget fixture, not the DELETE-ME
+        // Notes sample — so a downstream app can delete the sample without breaking the isolation guards.
+        var testsDir = Path.Combine(RepoRoot(), "tests");
+        string[] banned = ["Features.Notes", "Set<Note>", "new Note", "EfRepository<Note>", "IRepository<Note>"];
+
+        // NotesSliceTests legitimately tests the sample; this file lists the banned patterns as literals.
+        var exempt = new HashSet<string> { "NotesSliceTests.cs", "ArchitectureTests.cs" };
+        var offenders = SourceFiles(testsDir)
+            .Where(f => !exempt.Contains(Path.GetFileName(f)!))
+            .Where(f => File.ReadAllText(f) is var t && Array.Exists(banned, t.Contains))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Platform tests must use the harness TestWidget fixture, not the DELETE-ME Notes sample: {string.Join(", ", offenders)}");
     }
 
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>

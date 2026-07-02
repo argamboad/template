@@ -41,10 +41,17 @@ These are intent questions the audit cannot settle; each blocks only its own tas
 | **V2-B5** | Correctness: SSRF, fail-open, quota, clocks | B5-1…B5-5 | High | mixed | ✅ Done (`bbc1196`) |
 | **V2-B6** | GDPR per-user erasure seam | B6-1 | High | yes (Core seam) | ✅ Done (`483e516`) |
 | **V2-B7** | Harness de-couple from Notes | B7-1…B7-2 | High | tests only | ✅ Done (`72cba09`) |
-| **V2-B8** | Test-completeness (test-first) | B8-1…B8-6 | Critical (tests) | tests only | ⬜ Pending |
-| **V2-B9** | Debt & SOLID | B9-1…B9-7 | High | yes | ⬜ Pending |
-| **V2-B10** | Docs reconcile | B10-1…B10-8 | High | no | ⬜ Pending |
-| **V2-B11** | Enforcement & Definition of Solid | B11-1…B11-9 | — | tests/CI | ⬜ Pending |
+| **V2-B8** | Test-completeness (test-first) | B8-1…B8-6 | Critical (tests) | tests only | ✅ Core done (`4464021`) — MFA-controller/E2E scoped¹ |
+| **V2-B9** | Debt & SOLID | B9-1…B9-7 | High | yes | ◐ DEBT-2 done (`184e325`) — larger refactors scoped¹ |
+| **V2-B10** | Docs reconcile | B10-1…B10-8 | High | no | ✅ Done (`41cf3eb`) |
+| **V2-B11** | Enforcement & Definition of Solid | B11-1…B11-9 | — | tests/CI | ✅ Arch gates + Def-of-Solid done (`fc2d839`) — CI-infra scoped¹ |
+
+> **Landing note:** B8–B11 were originally opened as stacked PRs #59–#62, which auto-merged into their intermediate base branches instead of `develop`. The four commits were re-landed onto `develop` via a single consolidation PR (this branch); the hashes above are the re-landed commits.
+
+¹ **Scoped follow-ups** (need infra beyond a single PR; tracked here so nothing is silently dropped):
+- **B8:** MFA step-up controller-HTTP integration (needs a `WebApplicationFactory` harness; the step-up logic is already service-tested) and E2E-in-CI journeys (bootable app + Playwright, the roadmap's known E2E debt).
+- **B9:** the AuthController god-class split (SOLID-2), config-binding unification (DEBT-1), `IEntityTypeConfiguration` extraction (DEBT-4), RBAC-403 filter unification (DEBT-5), and the PUBAPI/HOOKS→`src/Api/Endpoints/` move (D7/DEBT-6) — large pure/structural refactors of routing+DI, deferred until the B8 HTTP harness exists so they ship with end-to-end coverage. R6 (Features `MapTenantFeatureGroup` gate) waits on the PUBAPI/HOOKS move.
+- **B11:** CI-infra gates — doc-sync/config-key/secret-scan steps, Central Package Management + lockfile + license scan, the MailKit-outside-Email ban, MA0048 file-name analyzer.
 
 **Recommended order:** V2-B1 → B2 → B3 → B4 → B5 → B6 → B7 → (B8 interleaved as each fix's tests are its own precondition) → B9 → B10 → **B11 last**. B7 before B8's tenancy tests (they need the test-only fixture entity). B11 locks in everything.
 

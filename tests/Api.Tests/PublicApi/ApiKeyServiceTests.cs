@@ -131,6 +131,23 @@ public class ApiKeyServiceTests(PostgresFixture fixture) : PostgresTestBase(fixt
     }
 
     [Fact]
+    public async Task Revoke_CannotRevokeAnotherTenantsKey()
+    {
+        // v2 audit B8: write-side tenancy negative — a caller cannot revoke a key owned by another tenant.
+        var tenantB = Guid.CreateVersion7();
+        Guid bKeyId;
+        await using (var db = Fixture.CreateContext(tenantB))
+            bKeyId = (await Build(db).CreateAsync(Creator, "b-key", null, null, default))!.Key.Id;
+
+        var tenantA = Guid.CreateVersion7();
+        await using (var db = Fixture.CreateContext(tenantA))
+            Assert.False(await Build(db).RevokeAsync(bKeyId, default)); // not found under tenant A → no-op
+
+        await using var read = Fixture.CreateContext(tenantB);
+        Assert.Null((await new EfRepository<ApiKey>(read).Query().SingleAsync()).RevokedAt); // B's key untouched
+    }
+
+    [Fact]
     public async Task List_IsTenantScoped()
     {
         var mine = Guid.CreateVersion7();

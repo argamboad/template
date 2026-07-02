@@ -190,6 +190,23 @@ models/data makes them easy to add, understand, and delete without touching cent
 generic repository + global tenant filter let a slice be added without authoring a repository pair
 or remembering to scope. This is the architectural convention for app work on top of the template.
 
+*Amendment (v2 audit, 2026-07-01, per v2 decision D7) — config-gated minimal-API PLATFORM surfaces are a
+sanctioned exception; "zero central edits" is really a ~5-touchpoint slice contract.* Two clarifications
+to reconcile this ADR with what shipped:
+1. **Platform is not *exclusively* controllers.** PUBAPI (ADR-015) and HOOKS (ADR-016) are horizontal
+   **platform** capabilities but ship as **minimal-API groups** (`ApiKeyEndpoints`, `WebhookEndpoints`),
+   not controllers, because their routes must be **conditionally mapped** behind a config gate
+   (`PublicApi:Enabled` / `Webhooks:Enabled`) — off ⇒ the routes don't exist (404), which minimal-API
+   conditional mapping expresses cleanly. So the rule is: platform HTTP is controllers **by default**,
+   with **config-gated minimal-API groups as an explicit exception** for surfaces that must appear/vanish
+   by configuration. Downstream *app* vertical features remain `src/Api/Features/<X>/` slices.
+2. **"Without touching central code" is a bounded contract, not literally zero edits.** Adding a slice
+   still touches a small, fixed set of central seams — roughly: register the `DbSet`/config, add a
+   migration, wire DI (`Add*`) + map the group in `Program.cs`, register the `ITenantDataContributor`,
+   and reset the table in the test fixture (the "add-a-slice checklist" in `docs/WAYS_OF_WORKING.md`).
+   The point stands — you never edit a central *wipe/has-data/export* method or author a repository pair
+   — but it's ~5 mechanical touchpoints, not none.
+
 **ADR-005 — Apple Sign In fits the agnostic provider model; implementation DEFERRED, web-first. (2026-06-24)**
 A third OAuth provider (Apple) was assessed against the provider-agnostic auth stack (ADR-002). The
 verdict: the **backend absorbs it with small, mechanical additions** — `.AddApple(...)` in
@@ -321,6 +338,12 @@ rather than a silent 400. Consequence: a **production/staging deploy MUST config
 (it no longer silently falls back to the fake). Dev/E2E are unchanged. Tests: `BillingProviderRegistrationTests`,
 `BillingWebhookControllerTests`.
 
+*Amendment (v2 audit, 2026-07-01) — the stripe-mock request/response test stack (point 7) was deferred.*
+The test stack as built is `FakeBillingProvider` (unit) + Stripe test-mode/CLI for E2E; **stripe-mock**
+(Stripe's official offline mock server, sketched in point 7 for `Api.Tests` request/response coverage) is
+**not** in the test stack — it was deferred in BILLING-2 over Testcontainers friction (see the note in
+`docs/ROADMAP.md` under "Test & hardening debt"). The rest of point 7 holds.
+
 **ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**
 Side effects that must not be lost (email, billing webhooks, future integrations) move off the
 request thread through a **transactional outbox**: an **`OutboxMessage`** is written in the **same EF
@@ -401,7 +424,15 @@ means every feature inherits them, and audit slots naturally onto the existing i
 tenant-scoping machinery (ADR-003 amendment).
 Stories + slice plan: `docs/stories/observability.md` (epic `OBS`).
 
----
+*Amendment (v2 audit, 2026-07-01) — (b) the declarative SaveChanges audit-writer was deferred; audit
+writes are explicit only.* Decision point (b) above sketched an EF `SaveChanges` interceptor that would
+write audit rows declaratively *plus* an explicit `IAuditLog.RecordAsync` for semantic events. As
+shipped, only the **explicit `IAuditLog.RecordAsync`** path exists — audit events are always written
+deliberately at the call site (member invited/removed, role changed, subscription changed, tenant
+dissolved, admin access). The `AuditAppendOnlyInterceptor` is present but **only GUARDS** append-only
+(it throws on any tracked update/delete of an `AuditEvent`); it does **not** author audit rows. A
+declarative auto-audit-on-SaveChanges interceptor remains an optional future add (also noted in
+`docs/ROADMAP.md`).
 
 **ADR-009 — RBAC: a third `admin` role + a permission seam (capability checks, not role checks). (2026-06-30)**
 The template shipped with exactly two tenant roles — `owner` and `member` — enforced by `IsOwner(...)`
@@ -717,6 +748,15 @@ trail the affected tenant can see. Depends on: audit (ADR-008 ✅), the escape h
 (ADR-009 ✅).
 Stories + slice plan: `docs/stories/admin.md` (epic `ADMIN`).
 
+*Amendment (v2 audit, 2026-07-01) — impersonation + tenant-detail reads use `EnterTenant`, not
+`QueryAllTenants()` "only".* Decision point 2 above describes cross-tenant reads going through the
+audited `QueryAllTenants()` hatch. As shipped, the **tenant list** uses non-scoped tables directly
+(`ITenantRepository.ListAllAsync`, no hatch), while **tenant-detail inspection and impersonation
+audit-writes enter the target tenant via `ITenantContext.EnterTenant`** (ADR-003 amendment 2026-06-25)
+so the scoped reads/writes go through the normal filter engaged — rather than loosening it. The filter
+is still never disabled; `EnterTenant` was chosen over the hatch precisely because it keeps scoping
+*on*. The `docs/stories/admin.md` Gherkin/prose has been reconciled to name `EnterTenant`.
+
 ---
 
 **ADR-015 — Public API + API keys: a config-gated, default-off programmatic surface authenticated by tenant-scoped API keys. (2026-07-01)**
@@ -757,6 +797,14 @@ strong config-gating means the template ships the capability **dormant** rather 
 one asked for. HOOKS (outbound webhooks) is the companion outbound half (ADR-016).
 Stories + slice plan: `docs/stories/pubapi.md` (epic `PUBAPI`).
 
+*Amendment (v2 audit, 2026-07-01) — PUBAPI-2 shipped: per-key rate limiting + a leak-free public
+OpenAPI doc.* Hardening beyond PUBAPI-1: a **per-API-key rate-limit policy** (`RateLimiting.PublicApiPolicy`,
+partitioned by key so one tenant's key can't exhaust another's budget) on the public routes, and a
+**curated, leak-free public OpenAPI document** served **anonymously** at `GET /api/public/openapi.json`
+that emits **only** the public routes (never the internal/management surface). Both live behind the same
+`PublicApi:Enabled` gate (off ⇒ absent). Still open: key **rotation** and a real scope taxonomy. Tests:
+`RateLimitingTests` (per-key isolation). See `docs/stories/pubapi.md`.
+
 ---
 
 **ADR-016 — Outbound webhooks: tenant subscriptions delivered through the transactional outbox, HMAC-signed, config-gated default-off. (2026-07-01)**
@@ -793,3 +841,11 @@ the only new parts are the subscription model + signed HTTP POST. A tenant-facin
 (per-attempt history) is a natural HOOKS-2 follow-up — until then the outbox's own status/attempt/error
 columns are the record.
 Stories + slice plan: `docs/stories/hooks.md` (epic `HOOKS`).
+
+*Amendment (v2 audit, 2026-07-01) — HOOKS-2 shipped: delivery log + replay.* The "natural follow-up"
+above is now built. A **`WebhookDelivery`** record is written per delivery attempt (retries add rows):
+event type/id, the exact `Body` sent, `success`, `status_code`, `error`, `created_at`. Owner endpoints
+under `/api/webhooks` view the log and **replay** a delivery (re-enqueues the retained body through the
+outbox). Like `OutboxMessage`, `WebhookDelivery` is deliberately **not** `ITenantScoped` (it's written
+from the tenant-less outbox dispatcher); its `TenantId` is a plain filter column the read side scopes
+on. See `docs/DATA_MODEL.md` and `docs/stories/hooks.md`.
