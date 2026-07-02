@@ -40,8 +40,16 @@ public interface ITenantInvitationService
     /// tenant (controller → 404).</summary>
     Task<bool> RevokeAsync(Guid tenantId, Guid invitationId, CancellationToken cancellationToken = default);
 
-    /// <summary>Redeems a token for the signed-in user, moving their membership to the
-    /// inviting tenant.</summary>
+    /// <summary>
+    /// Redeems a token for the signed-in user, moving their membership to the inviting tenant.
+    /// <para>
+    /// By design this is a <b>bearer capability</b> (D4 / LOGIC-S3, "leave bearer"): whoever holds a
+    /// valid, unexpired token can accept — acceptance is NOT bound to the invited email address, so the
+    /// signed-in user need not match <c>InvitedEmail</c>. This is intentional (email-binding was
+    /// deferred); the token is single-use, hashed, and time-limited, which is the security boundary.
+    /// Don't "fix" this to require an email match without revisiting D4.
+    /// </para>
+    /// </summary>
     Task<AcceptStatus> AcceptAsync(Guid userId, string token, CancellationToken cancellationToken = default);
 }
 

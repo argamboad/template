@@ -34,7 +34,7 @@ public interface IAccountErasureService
 public sealed class AccountErasureService(
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
-    IEnumerable<ITenantDataContributor> dataContributors,
+    ITenantDissolutionService dissolution,
     IEnumerable<IUserDataContributor> userDataContributors,
     IAuditLog audit,
     IRepository<User> users,
@@ -68,11 +68,10 @@ public sealed class AccountErasureService(
 
         if (soloOwner && membership is not null)
         {
-            // Dissolve: each feature wipes its domain data first, then the core teardown. The audit
-            // trail for this tenant goes with it (AuditDataContributor) — no surviving place to record.
-            foreach (var contributor in dataContributors)
-                await contributor.WipeAsync(membership.TenantId, cancellationToken);
-            await tenants.WipeDataAsync(membership.TenantId, cancellationToken);
+            // Dissolve: each feature wipes its domain data first, then the core teardown (DEBT-7 —
+            // shared with sole-owner leave). The audit trail for this tenant goes with it
+            // (AuditDataContributor) — no surviving place to record. Runs inside this transaction.
+            await dissolution.DissolveAsync(membership.TenantId, cancellationToken);
         }
         else if (membership is not null)
         {

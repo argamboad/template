@@ -325,16 +325,3 @@ public class AuthController(
     private bool EmailVerifiedForMerge(string provider) =>
         claimsExtractor.IsEmailVerified(User) || providerEmailTrust.TrustsEmailWithoutClaim(provider);
 }
-
-public record EmailRequest(string Email, string? Culture = null);
-
-public record OtpVerifyRequest(string Email, string Code);
-
-public record RefreshRequest(
-    [property: System.Text.Json.Serialization.JsonPropertyName("refresh_token")] string? RefreshToken);
-
-public record NativeExchangeRequest(
-    [property: System.Text.Json.Serialization.JsonPropertyName("code")] string Code);
-
-public record LocaleRequest(
-    [property: System.Text.Json.Serialization.JsonPropertyName("locale")] string? Locale);

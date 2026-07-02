@@ -1,9 +1,9 @@
-using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Template.Core.Abstractions;
 using Template.Core.Entities;
 using Template.Core.Repositories;
+using Template.Infrastructure.Email;
 
 namespace Template.Api.Services;
 
@@ -69,8 +69,12 @@ public sealed class NotificationService(
         {
             var user = await users.GetByIdAsync(userId, cancellationToken);
             if (user is not null)
-                // The app-facing IEmailSender is the outbox-backed decorator (ADR-007) — reliable + retried.
-                await emailSender.SendAsync(user.Email, title, $"<p>{WebUtility.HtmlEncode(body)}</p>", cancellationToken: cancellationToken);
+            {
+                // Brand the copy via the shared template (title/body are HTML-encoded inside). The
+                // app-facing IEmailSender is the outbox-backed decorator (ADR-007) — reliable + retried.
+                var emailBody = BrandedEmail.Notification(title, body, BrandedEmail.ResolveCulture(user.Locale));
+                await emailSender.SendAsync(user.Email, emailBody.Subject, emailBody.Html, emailBody.InlineImages, cancellationToken);
+            }
         }
     }
 

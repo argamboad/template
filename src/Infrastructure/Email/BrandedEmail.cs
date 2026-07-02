@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Reflection;
 using System.Resources;
 using Template.Core.Abstractions;
@@ -95,6 +96,20 @@ public static class BrandedEmail
            <div style="display:inline-block;background:{Surface};border:1px solid {Border};border-radius:8px;padding:10px 16px;font-family:'Courier New',monospace;font-size:13px;color:{Green};word-break:break-all;">{token}</div>
          </td></tr></table>
          {IgnoreNote(T("Common_IgnoreNoteUnexpected", culture))}
+         """);
+
+    /// <summary>
+    /// A branded in-app notification copy (NOTIFY-2). <paramref name="title"/>/<paramref name="body"/>
+    /// are dynamic user-facing content, so they are HTML-encoded before interpolation — email content
+    /// can't inject markup. The subject is the (plain) title.
+    /// </summary>
+    public static EmailBody Notification(string title, string body, CultureInfo culture) => Compose(
+        title,
+        WebUtility.HtmlEncode(title),
+        $"""
+         {Heading(WebUtility.HtmlEncode(title))}
+         {Paragraph(WebUtility.HtmlEncode(body))}
+         {IgnoreNote(T("Common_IgnoreNote", culture))}
          """);
 
     // ── shell + pieces ────────────────────────────────────────────────────────
