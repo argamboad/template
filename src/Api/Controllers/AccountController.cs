@@ -20,7 +20,6 @@ public class AccountController(
     IAccountErasureService accountErasure,
     IUserLoginRepository userLoginRepository,
     ILinkTokenService linkTokenService,
-    IErrorResponseFactory errorFactory,
     ILogger<AccountController> logger) : AuthControllerBase
 {
     private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
@@ -34,11 +33,11 @@ public class AccountController(
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         if (User.GetUserId() is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         var user = await userService.GetUserByIdAsync(userId, cancellationToken);
         if (user == null)
-            return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
+            return Unauthorized(new ErrorResponse("user_not_found", "User not found"));
 
         var (_, tenantName) = await sessionService.ResolveTenantAsync(user.Id, cancellationToken);
         return Ok(new UserProfileResponse
@@ -58,19 +57,19 @@ public class AccountController(
     public async Task<IActionResult> DeleteAccount([FromQuery(Name = "confirm_dissolve")] bool confirmDissolve, CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId))
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         var result = await accountErasure.EraseAsync(userId, confirmDissolve, cancellationToken);
         return result switch
         {
             EraseAccountResult.Erased => NoContent(),
-            EraseAccountResult.MustTransferFirst => BadRequest(errorFactory.CreateError(
+            EraseAccountResult.MustTransferFirst => BadRequest(new ErrorResponse(
                 "must_transfer_first", "Transfer ownership before deleting your account — other members remain")),
-            EraseAccountResult.DissolveConfirmationRequired => Conflict(errorFactory.CreateError(
+            EraseAccountResult.DissolveConfirmationRequired => Conflict(new ErrorResponse(
                 "confirmation_required",
                 "Deleting your account dissolves your household and permanently deletes its data. "
                 + "Re-send with confirm_dissolve=true to proceed.")),
-            _ => Unauthorized(errorFactory.CreateError("user_not_found", "User not found")),
+            _ => Unauthorized(new ErrorResponse("user_not_found", "User not found")),
         };
     }
 
@@ -86,7 +85,7 @@ public class AccountController(
 
         var locale = req.Locale?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(locale) || !SupportedLocales.Contains(locale))
-            return BadRequest(errorFactory.CreateError("unsupported_locale", "Unsupported locale."));
+            return BadRequest(new ErrorResponse("unsupported_locale", "Unsupported locale."));
 
         await userService.UpdateLocaleAsync(userId, locale, cancellationToken);
         return Ok();
@@ -118,7 +117,7 @@ public class AccountController(
     {
         provider = provider.ToLowerInvariant();
         if (!AuthProviders.IsSupported(provider))
-            return BadRequest(errorFactory.CreateError("unsupported_provider", "Unknown provider."));
+            return BadRequest(new ErrorResponse("unsupported_provider", "Unknown provider."));
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
         var token = linkTokenService.Issue(userId);

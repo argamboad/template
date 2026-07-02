@@ -16,13 +16,8 @@ namespace Template.Api.Controllers;
 /// derived controllers.
 /// </summary>
 [Authorize(AuthPolicies.TenantApi)]
-public abstract class TenantApiControllerBase(
-    ITenantRepository tenants,
-    IErrorResponseFactory errorFactory) : ControllerBase
+public abstract class TenantApiControllerBase(ITenantRepository tenants) : ControllerBase
 {
-    /// <summary>The error-response factory, for derived controllers to build envelopes.</summary>
-    protected IErrorResponseFactory ErrorFactory { get; } = errorFactory;
-
     /// <summary>Tenant/membership repository, for derived controllers that read tenant data.</summary>
     protected ITenantRepository Tenants { get; } = tenants;
 
@@ -39,20 +34,11 @@ public abstract class TenantApiControllerBase(
     protected static bool HasPermission(TenantMembership membership, Permission permission) =>
         RolePermissions.Grants(membership.Role, permission);
 
-    /// <summary>
-    /// Authorization gate for controllers (ADR-009): returns <c>null</c> when the caller's role grants
-    /// <paramref name="permission"/>, otherwise a ready-to-return <b>403</b> with the standard envelope.
-    /// The controller counterpart to the minimal-API <c>.RequirePermission(...)</c> filter — one
-    /// enforcement path backed by the same <see cref="RolePermissions"/> matrix.
-    /// </summary>
-    protected IActionResult? RequirePermission(TenantMembership membership, Permission permission, string forbiddenMessage) =>
-        HasPermission(membership, permission) ? null : Forbid403(forbiddenMessage);
-
     /// <summary>401 with the standard envelope — the caller's token is missing/invalid.</summary>
     protected IActionResult InvalidToken() =>
-        Unauthorized(ErrorFactory.CreateError("invalid_token", "Invalid user identity"));
+        Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
     /// <summary>403 with the standard envelope.</summary>
     protected IActionResult Forbid403(string message) =>
-        StatusCode(StatusCodes.Status403Forbidden, ErrorFactory.CreateError("forbidden", message));
+        StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse("forbidden", message));
 }

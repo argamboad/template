@@ -14,10 +14,8 @@ namespace Template.Api.Controllers;
 /// </summary>
 [ApiController]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-public abstract class AdminApiControllerBase(IPlatformStaffService staff, IErrorResponseFactory errorFactory) : ControllerBase
+public abstract class AdminApiControllerBase(IPlatformStaffService staff) : ControllerBase
 {
-    protected IErrorResponseFactory ErrorFactory { get; } = errorFactory;
-
     protected Guid? CurrentUserId => User.GetUserId();
 
     /// <summary>
@@ -35,11 +33,11 @@ public abstract class AdminApiControllerBase(IPlatformStaffService staff, IError
     protected async Task<(Guid StaffUserId, IActionResult? Denied)> RequireStaffAsync(CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
-            return (default, Unauthorized(ErrorFactory.CreateError("invalid_token", "Invalid user identity")));
+            return (default, Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity")));
 
         if (!await staff.IsStaffAsync(userId, cancellationToken))
             return (default, StatusCode(StatusCodes.Status403Forbidden,
-                ErrorFactory.CreateError("forbidden", "Platform-staff only")));
+                new ErrorResponse("forbidden", "Platform-staff only")));
 
         return (userId, null);
     }

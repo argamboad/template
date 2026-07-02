@@ -18,14 +18,13 @@ namespace Template.Api.Controllers;
 [Route("api/admin")]
 public class AdminController(
     IPlatformStaffService staff,
-    IErrorResponseFactory errorFactory,
     ITenantRepository tenants,
     ITenantContext tenantContext,
     IAuditLog audit,
     IRepository<Subscription> subscriptions,
     IRepository<AuditEvent> auditEvents,
     IUserRepository users,
-    IJwtTokenService jwt) : AdminApiControllerBase(staff, errorFactory)
+    IJwtTokenService jwt) : AdminApiControllerBase(staff)
 {
     // Impersonation tokens are deliberately short-lived and non-refreshable (ADR-014).
     private static readonly TimeSpan ImpersonationLifetime = TimeSpan.FromMinutes(15);
@@ -38,7 +37,7 @@ public class AdminController(
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         if (CurrentUserId is null)
-            return Unauthorized(ErrorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         return Ok(new AdminStatusResponse { IsStaff = await IsCurrentUserStaffAsync(cancellationToken) });
     }
@@ -68,7 +67,7 @@ public class AdminController(
         {
             var tenant = await tenants.GetByIdAsync(id, cancellationToken);
             if (tenant is null)
-                return NotFound(ErrorFactory.CreateError("tenant_not_found", "Tenant not found"));
+                return NotFound(new ErrorResponse("tenant_not_found", "Tenant not found"));
 
             var members = await tenants.GetMemberDetailsAsync(id, cancellationToken);
             var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken);
@@ -104,7 +103,7 @@ public class AdminController(
 
         var target = await users.GetByIdAsync(userId, cancellationToken);
         if (target is null)
-            return NotFound(ErrorFactory.CreateError("user_not_found", "User not found"));
+            return NotFound(new ErrorResponse("user_not_found", "User not found"));
 
         var membership = await tenants.GetMembershipAsync(userId, cancellationToken);
         var tenantId = membership?.TenantId;

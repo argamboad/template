@@ -43,14 +43,13 @@ public class BillingControllerTests(PostgresFixture fixture) : PostgresTestBase(
         await SeedMembershipAsync(tenantId, TenantRoles.Owner);            // tenant must have an owner
         var memberId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
         await using var db = Fixture.CreateContext();
-        var fake = new FakeBillingProvider();
-        var controller = NewController(db, fake, memberId);
 
-        var result = await controller.Checkout(new CreateCheckoutRequest { PlanKey = PlanKeys.Pro }, default);
+        // The owner gate now lives in [RequireTenantPermission] (B9-5); run it as the pipeline would.
+        var result = await TenantPermissionGate.RunAsync(
+            typeof(BillingController), nameof(BillingController.Checkout), new TenantRepository(db), memberId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
-        Assert.Empty(fake.Requests);
     }
 
     [Fact]
@@ -106,21 +105,19 @@ public class BillingControllerTests(PostgresFixture fixture) : PostgresTestBase(
         var memberId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
 
         await using var db = Fixture.CreateContext(tenantId);
-        var fake = new FakeBillingProvider();
-        var controller = NewController(db, fake, memberId);
 
-        var result = await controller.Portal(default);
+        // The owner gate now lives in [RequireTenantPermission] (B9-5); run it as the pipeline would.
+        var result = await TenantPermissionGate.RunAsync(
+            typeof(BillingController), nameof(BillingController.Portal), new TenantRepository(db), memberId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
-        Assert.Empty(fake.PortalRequests);
     }
 
     private static BillingController NewController(AppDbContext db, FakeBillingProvider billing, Guid currentUserId)
     {
         var controller = new BillingController(
             new TenantRepository(db),
-            new ErrorResponseFactory(),
             new BillingService(billing, new TestAppSettings(), new EfRepository<Subscription>(db)));
 
         var user = new ClaimsPrincipal(new ClaimsIdentity(

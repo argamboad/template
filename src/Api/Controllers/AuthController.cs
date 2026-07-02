@@ -29,7 +29,6 @@ public class AuthController(
     IPasswordlessService passwordless,
     ILinkTokenService linkTokenService,
     IEmailSender emailSender,
-    IErrorResponseFactory errorFactory,
     IApplicationSettings appSettings,
     IPasswordlessSettings passwordlessSettings,
     IMfaLoginService mfaLogin,
@@ -147,7 +146,7 @@ public class AuthController(
             var native = IsNativeClient;
             var rawToken = native ? req?.RefreshToken : cookieService.GetRefreshTokenFromCookies(Request);
             if (string.IsNullOrEmpty(rawToken))
-                return Unauthorized(errorFactory.CreateError("no_refresh_token", "Refresh token not found"));
+                return Unauthorized(new ErrorResponse("no_refresh_token", "Refresh token not found"));
 
             var inspection = await refreshTokenService.InspectRefreshTokenAsync(rawToken, cancellationToken);
             if (inspection.Status == RefreshTokenStatus.Reuse)
@@ -158,12 +157,12 @@ public class AuthController(
                 logger.LogWarning("Refresh-token reuse detected for user {UserId}; revoked all sessions", inspection.Token.UserId);
             }
             if (inspection.Status != RefreshTokenStatus.Valid)
-                return Unauthorized(errorFactory.CreateError("invalid_refresh_token", "Refresh token is invalid or expired"));
+                return Unauthorized(new ErrorResponse("invalid_refresh_token", "Refresh token is invalid or expired"));
 
             var validToken = inspection.Token!;
             var user = await userService.GetUserByIdAsync(validToken.UserId, cancellationToken);
             if (user == null)
-                return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
+                return Unauthorized(new ErrorResponse("user_not_found", "User not found"));
 
             // Rotate: revoke the used token, then issue a fresh session.
             await refreshTokenService.RevokeRefreshTokenAsync(validToken.Id, cancellationToken);
@@ -182,7 +181,7 @@ public class AuthController(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Token refresh failed");
-            return StatusCode(500, errorFactory.CreateError("refresh_failed", "Failed to refresh token"));
+            return StatusCode(500, new ErrorResponse("refresh_failed", "Failed to refresh token"));
         }
     }
 
@@ -218,7 +217,7 @@ public class AuthController(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Logout failed");
-            return StatusCode(500, errorFactory.CreateError("logout_failed", "Failed to logout"));
+            return StatusCode(500, new ErrorResponse("logout_failed", "Failed to logout"));
         }
     }
 
@@ -233,7 +232,7 @@ public class AuthController(
     public async Task<IActionResult> SendMagicLink([FromBody] EmailRequest req, CancellationToken cancellationToken)
     {
         if (!IsLikelyEmail(req.Email))
-            return BadRequest(errorFactory.CreateError("invalid_email", "A valid email address is required."));
+            return BadRequest(new ErrorResponse("invalid_email", "A valid email address is required."));
 
         var email = req.Email.Trim();
         var token = await passwordless.IssueMagicLinkTokenAsync(email, cancellationToken);
@@ -276,7 +275,7 @@ public class AuthController(
     public async Task<IActionResult> SendOtp([FromBody] EmailRequest req, CancellationToken cancellationToken)
     {
         if (!IsLikelyEmail(req.Email))
-            return BadRequest(errorFactory.CreateError("invalid_email", "A valid email address is required."));
+            return BadRequest(new ErrorResponse("invalid_email", "A valid email address is required."));
 
         var email = req.Email.Trim();
         var code = await passwordless.IssueOtpAsync(email, cancellationToken);
@@ -303,7 +302,7 @@ public class AuthController(
             // Collapse "no active code" and "wrong code" to one client error so the response can't
             // be used to probe whether an address has an outstanding OTP (CONF-6).
             var code = OtpErrors.ClientCode(result.Status);
-            return Unauthorized(errorFactory.CreateError(code, "The code is incorrect or has expired."));
+            return Unauthorized(new ErrorResponse(code, "The code is incorrect or has expired."));
         }
 
         var native = IsNativeClient;

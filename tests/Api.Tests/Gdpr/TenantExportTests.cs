@@ -106,14 +106,13 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         var callerId = await SeedMembershipAsync(tenantId, role);
 
         await using var db = Fixture.CreateContext(tenantId);
-        var stub = new StubExportService();
-        var controller = NewController(db, stub, callerId);
 
-        var result = await controller.Export(default);
+        // ExportData gate moved to [RequireTenantPermission] (B9-5); run it as the pipeline would.
+        var result = await TenantPermissionGate.RunAsync(
+            typeof(HouseholdController), nameof(HouseholdController.Export), new TenantRepository(db), callerId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
-        Assert.False(stub.Called);
     }
 
     // --- construction ---
@@ -140,7 +139,7 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
     private HouseholdController NewController(AppDbContext db, ITenantExportService export, Guid currentUserId)
     {
         var controller = new HouseholdController(
-            new ServiceHarness(db).TenantService(), new TenantRepository(db), new ErrorResponseFactory(), export);
+            new ServiceHarness(db).TenantService(), new TenantRepository(db), export);
         var user = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, currentUserId.ToString())], authenticationType: "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };

@@ -24,7 +24,6 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IProviderEmailTrust, ProviderEmailTrust>();
         services.AddScoped<IPasswordlessService, PasswordlessService>();
         services.AddScoped<ICookieService, CookieService>();
-        services.AddScoped<IErrorResponseFactory, ErrorResponseFactory>();
         services.AddScoped<ITokenGenerator, TokenGenerator>();
         services.AddScoped<ITokenHasher, TokenHasher>();
         services.AddSingleton<ILinkTokenService, LinkTokenService>();
