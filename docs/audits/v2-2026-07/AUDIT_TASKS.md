@@ -146,7 +146,7 @@ The one Critical. Fixes the default-config unauthenticated cross-tenant write.
 
 ## V2-B8 — Test-completeness (test-first specs → tests)
 Each spec from `LOGIC_AND_TEST_REPORT.md` Part B not already created by B1–B7. Land as failing-then-green.
-- [~] **B8-1 · Write-side tenancy negatives per epic** — Critical(test) — ✅ shipped: `Revoke_CannotRevokeAnotherTenantsKey` (ApiKey), `Delete_CannotDeleteAnotherTenantsSubscription` + `Replay_UnknownOrOtherTenant_ReturnsFalse` (Webhook). ⬜ pending: `Subscription_TenantA_CannotReadOrWriteTenantBSubscription`, `Notification_TenantAUser_CannotListTenantBNotifications`.
+- [x] **B8-1 · Write-side tenancy negatives per epic** — Critical(test) — ✅ complete: `Revoke_CannotRevokeAnotherTenantsKey` (ApiKey), `Delete_CannotDeleteAnotherTenantsSubscription` + `Replay_UnknownOrOtherTenant_ReturnsFalse` (Webhook), `Subscription_TenantA_CannotRead/Update/DeleteTenantBSubscription` (Billing), `List_TenantAUser_CannotSeeTenantBUsersNotifications` (Notify, user-keyed boundary).
 - [ ] **B8-2 · MFA step-up on every path (integration)** — High — ⬜ **scoped** (needs the HTTP harness): the four `MfaStepUp_*Path*` tests (OTP, magic-link, OAuth callback, native exchange). Step-up *logic* is already service-tested.
 - [x] **B8-3 · Migration `Down` rollback** — High — `Migrations_Down_RevertCleanly_ToEmptySchema` (`4464021`).
 - [x] **B8-4 · Fail-open / SSRF / stale-webhook / clock** — covered by B5-1/2/4 + B4-1 tests; no duplication.
