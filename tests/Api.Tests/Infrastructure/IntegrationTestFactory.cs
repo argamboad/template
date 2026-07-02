@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Template.Api.Services;
 using Template.Core.Entities;
 using Template.Infrastructure.Persistence;
@@ -18,15 +19,28 @@ namespace Template.Api.Tests.Infrastructure;
 /// wire, and de-risks routing/DI refactors by asserting routes stay stable end-to-end.
 ///
 /// The app boots in Development (so the fake billing provider is allowed — B1) and runs its real
-/// startup migrations against the fresh container, exercising the migration path too. Config is
-/// overridden last (in-memory) so the test's connection string + Jwt secret win over any repo <c>.env</c>.
+/// startup migrations against the fresh container, exercising the migration path too.
+///
+/// Two seams are needed because <c>Program</c> reads config <b>before</b> <c>builder.Build()</c> (so the
+/// factory's Build-time config hooks are too late): (1) <c>Jwt:Secret</c> is supplied as an environment
+/// variable so it exists at CreateBuilder time — its value is irrelevant, since minting and validation
+/// both resolve the app's own settings; (2) the <c>AppDbContext</c> registration is replaced in
+/// <c>ConfigureTestServices</c> to point at the throwaway container, which is env-independent and (unlike
+/// a config override) can't be defeated by a repo <c>.env</c>, so the container is always the DB used.
 /// </summary>
 public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    // Long enough for HMAC-SHA256 (JwtSettings requires ≥32 chars); value is irrelevant, only length + stability.
+    // Long enough for HMAC-SHA256 (JwtSettings requires ≥32 chars); value is irrelevant, only length + validity.
     private const string TestJwtSecret = "integration-test-jwt-secret-key-0123456789";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17").Build();
+
+    public IntegrationTestFactory()
+    {
+        // Must be present when Program reads Jwt:Secret at CreateBuilder time (before Build) — env vars
+        // are a CreateBuilder config source; the WebApplicationFactory config hooks run too late.
+        Environment.SetEnvironmentVariable("Jwt__Secret", TestJwtSecret);
+    }
 
     public async Task InitializeAsync()
     {
@@ -39,18 +53,15 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
         await _container.DisposeAsync();
     }
 
-    protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-        builder.ConfigureAppConfiguration((_, config) =>
+        builder.ConfigureTestServices(services =>
         {
-            // Added last → highest precedence, so the container + test secret override appsettings/.env.
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = _container.GetConnectionString(),
-                ["Jwt:Secret"] = TestJwtSecret,
-                ["Jwt:Issuer"] = "Template",
-            });
+            // Repoint the DbContext at the throwaway container — bulletproof regardless of config/.env.
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<AppDbContext>();
+            services.AddDbContext<AppDbContext>(o => o.UseNpgsql(_container.GetConnectionString()));
         });
     }
 
