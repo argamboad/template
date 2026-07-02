@@ -78,6 +78,24 @@ jobs:
             | tar -xz gitleaks
           ./gitleaks detect --no-banner --redact --config .gitleaks.toml
 
+  # QA artifacts (v2 audit B11-8). The two printable PDFs (QA_TEST_GUIDE, QA_RUN_LOG) are generated from
+  # docs/QA_TEST_PLAN.md; this job regenerates them and fails if the committed PDFs' text has drifted from
+  # the plan — i.e. the plan was edited without re-running the generators (plan ⇄ PDFs must change
+  # together). reportlab/pypdf are pinned so regeneration matches the committed artifacts.
+  qa-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check QA PDFs are in sync with QA_TEST_PLAN.md
+        run: |
+          python -m pip install --quiet "reportlab==5.0.0" "pypdf==6.14.2"
+          cd docs && python check_qa_artifacts.py
+
   # Dependency license scan (v2 audit B11-6, R26). Inventories every NuGet license in the main app's
   # graph (direct + transitive) and FAILS only on clearly-incompatible copyleft licenses
   # (GPL/AGPL/LGPL/SSPL) — a prohibited-list, not an allow-list, so Microsoft/permissive-OSS
