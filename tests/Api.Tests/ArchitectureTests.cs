@@ -142,7 +142,10 @@ public class ArchitectureTests
         // applies it, or it is an explicitly-allowlisted system/anonymous surface.
         var allow = new HashSet<string>
         {
-            nameof(AuthController), "FilesController", nameof(BillingWebhookController), nameof(NotificationsController),
+            // The /api/auth surface is split across focused controllers (B9-1/SOLID-2) that all derive from
+            // AuthControllerBase — an anonymous/JWT auth surface, not a tenant-scoped one.
+            nameof(AuthController), nameof(AccountController), nameof(MfaController), nameof(NativeAuthController),
+            "FilesController", nameof(BillingWebhookController), nameof(NotificationsController),
         };
 
         var offenders = typeof(TenantApiControllerBase).Assembly.GetTypes()
@@ -243,13 +246,19 @@ public class ArchitectureTests
         var controllersDir = Path.Combine(RepoRoot(), "src", "Api", "Controllers");
         var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
 
+        // A single logical surface may be split across several focused controllers that share one [Route]
+        // prefix (e.g. the /api/auth family, B9-1/SOLID-2) — that's SRP, not a collision. Distinct the
+        // controller prefixes so a shared prefix counts once; the guard still catches a feature-group
+        // MapGroup colliding with a controller prefix, or two feature groups sharing a prefix.
         var controllerRoutes = SourceFiles(controllersDir)
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\[Route\(""([^""]+)""\)\]").Select(m => m.Groups[1].Value));
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\[Route\(""([^""]+)""\)\]").Select(m => m.Groups[1].Value))
+            .Select(r => "/" + r.Trim('/').ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal);
         var groupRoutes = SourceFiles(featuresDir)
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"MapGroup\(""([^""]+)""\)").Select(m => m.Groups[1].Value));
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"MapGroup\(""([^""]+)""\)").Select(m => m.Groups[1].Value))
+            .Select(r => "/" + r.Trim('/').ToLowerInvariant());
 
         var all = controllerRoutes.Concat(groupRoutes)
-            .Select(r => "/" + r.Trim('/').ToLowerInvariant()) // normalize leading slash + case
             .ToList();
 
         var dupes = all.GroupBy(r => r, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
