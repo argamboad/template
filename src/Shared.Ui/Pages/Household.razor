@@ -18,7 +18,7 @@
 
     @if (!string.IsNullOrEmpty(_status))
     {
-        <div class="alert @(_statusOk ? "alert-success" : "alert-danger") py-2">@_status</div>
+        <div class="alert @(_statusOk ? "alert-success" : "alert-danger") py-2" data-testid="household-status">@_status</div>
     }
 
     @if (_loading)
@@ -36,8 +36,8 @@
                 {
                     <label class="form-label fw-medium">@Localizer["Household_NameLabel"]</label>
                     <div class="d-flex gap-2 flex-wrap">
-                        <input class="form-control" style="max-width:320px" @bind="_name" />
-                        <button class="btn btn-primary"
+                        <input class="form-control" style="max-width:320px" @bind="_name" data-testid="household-rename-input" />
+                        <button class="btn btn-primary" data-testid="household-rename-save"
                                 disabled="@(_busy || string.IsNullOrWhiteSpace(_name) || _name.Trim() == _household.Name)"
                                 @onclick="SaveName">@Localizer["Household_Rename"]</button>
                     </div>
@@ -56,7 +56,7 @@
                 <ul class="list-group list-group-flush">
                     @foreach (var m in _household.Members)
                     {
-                        <li class="list-group-item d-flex align-items-center justify-content-between px-0">
+                        <li class="list-group-item d-flex align-items-center justify-content-between px-0" data-testid="member-row">
                             <div>
                                 <div class="fw-medium">@(string.IsNullOrWhiteSpace(m.DisplayName) ? m.Email : m.DisplayName)</div>
                                 @if (!string.IsNullOrWhiteSpace(m.DisplayName))
@@ -67,15 +67,15 @@
                             <div class="d-flex align-items-center gap-2">
                                 @if (m.Role == "owner")
                                 {
-                                    <span class="badge bg-primary-subtle text-primary-emphasis">@Localizer["Household_RoleOwner"]</span>
+                                    <span class="badge bg-primary-subtle text-primary-emphasis" data-testid="member-role" data-role="owner">@Localizer["Household_RoleOwner"]</span>
                                 }
                                 else if (m.Role == "admin")
                                 {
-                                    <span class="badge bg-info-subtle text-info-emphasis">@Localizer["Household_RoleAdmin"]</span>
+                                    <span class="badge bg-info-subtle text-info-emphasis" data-testid="member-role" data-role="admin">@Localizer["Household_RoleAdmin"]</span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">@Localizer["Household_RoleMember"]</span>
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis" data-testid="member-role" data-role="member">@Localizer["Household_RoleMember"]</span>
                                 }
                                 @* Actions target everyone but the owner, and never self. Roles are owner-only
                                    (ManageRoles); remove is owner+admin (ManageMembers). *@
@@ -85,18 +85,18 @@
                                     {
                                         @if (m.Role == "admin")
                                         {
-                                            <button class="btn btn-outline-secondary btn-sm" disabled="@_busy"
+                                            <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" data-testid="member-demote"
                                                     @onclick="() => Demote(m)">@Localizer["Household_MakeMember"]</button>
                                         }
                                         else
                                         {
-                                            <button class="btn btn-outline-secondary btn-sm" disabled="@_busy"
+                                            <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" data-testid="member-promote"
                                                     @onclick="() => Promote(m)">@Localizer["Household_MakeAdmin"]</button>
                                         }
                                     }
                                     @if (CanManageMembers)
                                     {
-                                        <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
+                                        <button class="btn btn-outline-danger btn-sm" disabled="@_busy" data-testid="member-remove"
                                                 @onclick="() => RemoveMember(m)">@Localizer["Household_Remove"]</button>
                                     }
                                 }
@@ -114,10 +114,10 @@
                 <div class="card-body">
                     <h2 class="h6 fw-bold mb-3">@Localizer["Household_Invitations"]</h2>
                     <div class="d-flex gap-2 flex-wrap mb-3">
-                        <input class="form-control" style="max-width:320px" type="email"
+                        <input class="form-control" style="max-width:320px" type="email" data-testid="invite-email"
                                placeholder="email@example.com" @bind="_inviteEmail" />
                         <button class="btn btn-outline-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_inviteEmail))"
-                                @onclick="SendInvite">@Localizer["Household_Invite"]</button>
+                                data-testid="invite-send" @onclick="SendInvite">@Localizer["Household_Invite"]</button>
                     </div>
 
                     @if (_revealedToken is not null)
@@ -125,7 +125,7 @@
                         <div class="alert alert-success py-2">
                             <div class="fw-medium mb-1">@Localizer["Household_InviteTokenFor", _revealedEmail ?? ""]</div>
                             <div class="d-flex align-items-center gap-2">
-                                <code class="text-break">@_revealedToken</code>
+                                <code class="text-break" data-testid="invite-token">@_revealedToken</code>
                                 <button class="btn btn-outline-secondary btn-sm" @onclick="() => CopyToken(_revealedToken)">@Localizer["Household_Copy"]</button>
                             </div>
                             <div class="small text-muted mt-1">@Localizer["Household_EmailedJoinLink"]</div>
@@ -141,15 +141,15 @@
                         <ul class="list-group list-group-flush">
                             @foreach (var inv in _pending)
                             {
-                                <li class="list-group-item d-flex align-items-center justify-content-between px-0">
+                                <li class="list-group-item d-flex align-items-center justify-content-between px-0" data-testid="pending-invite-row">
                                     <div>
                                         <div class="fw-medium">@inv.InvitedEmail</div>
                                         <div class="small text-muted">@Localizer["Household_Expires", inv.ExpiresAt.ToLocalTime().ToString("d")]</div>
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <button class="btn btn-outline-secondary btn-sm" disabled="@_busy"
+                                        <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" data-testid="invite-regenerate"
                                                 @onclick="() => RegenerateInvite(inv)">@Localizer["Household_Regenerate"]</button>
-                                        <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
+                                        <button class="btn btn-outline-danger btn-sm" disabled="@_busy" data-testid="invite-revoke"
                                                 @onclick="() => RevokeInvite(inv)">@Localizer["Household_Revoke"]</button>
                                     </div>
                                 </li>
