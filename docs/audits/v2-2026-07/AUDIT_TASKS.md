@@ -41,10 +41,12 @@ These are intent questions the audit cannot settle; each blocks only its own tas
 | **V2-B5** | Correctness: SSRF, fail-open, quota, clocks | B5-1…B5-5 | High | mixed | ✅ Done (`bbc1196`) |
 | **V2-B6** | GDPR per-user erasure seam | B6-1 | High | yes (Core seam) | ✅ Done (`483e516`) |
 | **V2-B7** | Harness de-couple from Notes | B7-1…B7-2 | High | tests only | ✅ Done (`72cba09`) |
-| **V2-B8** | Test-completeness (test-first) | B8-1…B8-6 | Critical (tests) | tests only | ✅ Core done (PR #59) — MFA-controller/E2E scoped¹ |
-| **V2-B9** | Debt & SOLID | B9-1…B9-7 | High | yes | ◐ DEBT-2 done (PR #60) — larger refactors scoped¹ |
-| **V2-B10** | Docs reconcile | B10-1…B10-8 | High | no | ✅ Done (PR #61) |
-| **V2-B11** | Enforcement & Definition of Solid | B11-1…B11-9 | — | tests/CI | ✅ Arch gates + Def-of-Solid done (PR #62) — CI-infra scoped¹ |
+| **V2-B8** | Test-completeness (test-first) | B8-1…B8-6 | Critical (tests) | tests only | ✅ Core done (`4464021`) — MFA-controller/E2E scoped¹ |
+| **V2-B9** | Debt & SOLID | B9-1…B9-7 | High | yes | ◐ DEBT-2 done (`184e325`) — larger refactors scoped¹ |
+| **V2-B10** | Docs reconcile | B10-1…B10-8 | High | no | ✅ Done (`41cf3eb`) |
+| **V2-B11** | Enforcement & Definition of Solid | B11-1…B11-9 | — | tests/CI | ✅ Arch gates + Def-of-Solid done (`fc2d839`) — CI-infra scoped¹ |
+
+> **Landing note:** B8–B11 were originally opened as stacked PRs #59–#62, which auto-merged into their intermediate base branches instead of `develop`. The four commits were re-landed onto `develop` via a single consolidation PR (this branch); the hashes above are the re-landed commits.
 
 ¹ **Scoped follow-ups** (need infra beyond a single PR; tracked here so nothing is silently dropped):
 - **B8:** MFA step-up controller-HTTP integration (needs a `WebApplicationFactory` harness; the step-up logic is already service-tested) and E2E-in-CI journeys (bootable app + Playwright, the roadmap's known E2E debt).
