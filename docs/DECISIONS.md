@@ -885,11 +885,14 @@ jobs (outbox dispatcher / scheduler / lapse sweep) must not be silently broken.*
    request cold-starts (~30–60 s) and the outbox/scheduler pause while asleep (queued sends resume on
    wake). Acceptable for staging QA; **prod requires an always-on plan (~$7/mo) or equivalent — never
    ship paid users on a sleeping instance.** The image is plain Docker, so the exit cost is nil.
-3. **Neon free** is the Postgres (17). Chosen over Supabase for this role: it is *just* Postgres (no
-   redundant auth/storage platform beside our own), and it **auto-wakes in ~1 s** from autosuspend vs
-   Supabase's 7-day idle pause needing a manual unpause. **Constraint:** connect via the
-   **session-mode pooler** over TLS — transaction-mode pooling breaks Npgsql prepared statements.
-   Bonus noted for later: Neon DB branching enables free per-preview-environment databases.
+3. **Neon free** is the Postgres (17), used as plain Postgres (Neon Auth stays off — this template owns
+   auth, ADR-002). Chosen over Supabase for this role: it is *just* Postgres (no redundant auth/storage
+   platform beside our own), and it **auto-wakes in ~1 s** from autosuspend vs Supabase's 7-day idle
+   pause needing a manual unpause. **Connection:** use the **direct** endpoint over TLS — a single
+   instance keeps its own Npgsql pool, and this app polls (no `LISTEN/NOTIFY`) and uses no server-side
+   prepared statements, so it doesn't need PgBouncer. (Neon's pooled `-pooler` endpoint is
+   transaction-mode; the app is compatible with it but only benefits it at many-instance scale.) Bonus
+   noted for later: Neon DB branching enables free per-preview-environment databases.
 4. **Brevo** (free, 300 mails/day) is staging + prod SMTP through the existing `IEmailSender` — it was
    already the template's assumed real provider in the `.env` docs. **Consequence:** staging has no
    Mailpit, so email-based QA cases use real (plus-addressed) inboxes there, and the automated
