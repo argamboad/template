@@ -1,0 +1,150 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Template.Api.Authentication;
+using Template.Api.Models;
+using Template.Api.Services;
+using Template.Core.Abstractions;
+using Template.Core.Repositories;
+
+namespace Template.Api.Controllers;
+
+/// <summary>
+/// Signed-in account surface: profile, erasure, locale preference, and OAuth login links.
+/// </summary>
+[ApiController]
+[Route("api/auth")]
+public class AccountController(
+    IUserService userService,
+    ISessionService sessionService,
+    IAccountErasureService accountErasure,
+    IUserLoginRepository userLoginRepository,
+    ILinkTokenService linkTokenService,
+    IErrorResponseFactory errorFactory,
+    ILogger<AccountController> logger) : AuthControllerBase
+{
+    private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
+
+    /// <summary>
+    /// Returns the signed-in user's display info for the client top bar.
+    /// Authenticated via the JWT Bearer access token.
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    {
+        if (User.GetUserId() is not { } userId)
+            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+
+        var user = await userService.GetUserByIdAsync(userId, cancellationToken);
+        if (user == null)
+            return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
+
+        var (_, tenantName) = await sessionService.ResolveTenantAsync(user.Id, cancellationToken);
+        return Ok(new UserProfileResponse
+        {
+            UserName = user.DisplayName ?? user.Email,
+            TenantName = tenantName ?? string.Empty
+        });
+    }
+
+    /// <summary>
+    /// Deletes the signed-in user's account and personal data (GDPR-2, ADR-011). Removes identity/PII
+    /// in one audited transaction; honors the single-owner invariant — an owner with other members must
+    /// transfer first, and a solo owner must confirm dissolution (which wipes the tenant's data).
+    /// </summary>
+    [HttpDelete("me")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> DeleteAccount([FromQuery(Name = "confirm_dissolve")] bool confirmDissolve, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+
+        var result = await accountErasure.EraseAsync(userId, confirmDissolve, cancellationToken);
+        return result switch
+        {
+            EraseAccountResult.Erased => NoContent(),
+            EraseAccountResult.MustTransferFirst => BadRequest(errorFactory.CreateError(
+                "must_transfer_first", "Transfer ownership before deleting your account — other members remain")),
+            EraseAccountResult.DissolveConfirmationRequired => Conflict(errorFactory.CreateError(
+                "confirmation_required",
+                "Deleting your account dissolves your household and permanently deletes its data. "
+                + "Re-send with confirm_dissolve=true to proceed.")),
+            _ => Unauthorized(errorFactory.CreateError("user_not_found", "User not found")),
+        };
+    }
+
+    /// <summary>
+    /// Saves the signed-in user's preferred UI language so it follows them across
+    /// devices. The new value lands in the JWT on the next refresh.
+    /// </summary>
+    [HttpPut("locale")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> SetLocale([FromBody] LocaleRequest req, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        var locale = req.Locale?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(locale) || !SupportedLocales.Contains(locale))
+            return BadRequest(errorFactory.CreateError("unsupported_locale", "Unsupported locale."));
+
+        await userService.UpdateLocaleAsync(userId, locale, cancellationToken);
+        return Ok();
+    }
+
+    // ── Account linking ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Lists the OAuth providers linked to the signed-in account (for the settings page).
+    /// </summary>
+    [HttpGet("logins")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> Logins(CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        var logins = await userLoginRepository.GetForUserAsync(userId, cancellationToken);
+        return Ok(logins.Select(l => new { provider = l.Provider, linkedAt = l.CreatedAt }));
+    }
+
+    /// <summary>
+    /// Issues a single-use link token for the current user and returns the provider
+    /// sign-in URL carrying it. The client full-page-navigates there to link the
+    /// provider to this account (no new user is created).
+    /// </summary>
+    [HttpPost("link/{provider}")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public IActionResult StartLink(string provider)
+    {
+        provider = provider.ToLowerInvariant();
+        if (!AuthProviders.IsSupported(provider))
+            return BadRequest(errorFactory.CreateError("unsupported_provider", "Unknown provider."));
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        var token = linkTokenService.Issue(userId);
+        var url = $"{Request.Scheme}://{Request.Host}/api/auth/login/{provider}" +
+                  $"?link_token={Uri.EscapeDataString(token)}";
+        // url: web full-page navigates to it. token: native carries it through the
+        // loopback OAuth flow (native/login?...&link_token=) instead.
+        return Ok(new { url, token });
+    }
+
+    /// <summary>
+    /// Unlinks an OAuth provider from the account. Sign-in by email (magic link / OTP)
+    /// always remains available, so removing a provider can't lock the user out.
+    /// </summary>
+    [HttpDelete("logins/{provider}")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> Unlink(string provider, CancellationToken cancellationToken)
+    {
+        provider = provider.ToLowerInvariant();
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        var login = await userLoginRepository.GetByProviderForUserAsync(userId, provider, cancellationToken);
+        if (login is null) return NotFound();
+
+        await userLoginRepository.DeleteAsync(login, cancellationToken);
+        logger.LogInformation("Unlinked {Provider} from user {UserId}", provider, userId);
+        return Ok();
+    }
+}

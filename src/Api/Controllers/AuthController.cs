@@ -1,17 +1,13 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
-using Template.Api.Authentication;
 using Template.Api.Configuration;
 using Template.Api.Models;
 using Template.Api.Services;
 using Template.Core.Abstractions;
 using Template.Core.Entities;
-using Template.Core.Repositories;
 using Template.Infrastructure;
 using Template.Infrastructure.Email;
 
@@ -32,19 +28,13 @@ public class AuthController(
     IProviderEmailTrust providerEmailTrust,
     IPasswordlessService passwordless,
     ILinkTokenService linkTokenService,
-    INativeAuthCodeService nativeAuthCodeService,
-    IUserLoginRepository userLoginRepository,
     IEmailSender emailSender,
     IErrorResponseFactory errorFactory,
     IApplicationSettings appSettings,
     IPasswordlessSettings passwordlessSettings,
-    IAccountErasureService accountErasure,
-    IMfaService mfa,
     IMfaLoginService mfaLogin,
-    ILogger<AuthController> logger) : ControllerBase
+    ILogger<AuthController> logger) : AuthControllerBase
 {
-    private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
-
     /// <summary>
     /// Starts the OAuth flow: challenges the matching scheme. The callback route
     /// carries the provider so the callback can resolve the right identity.
@@ -232,182 +222,6 @@ public class AuthController(
         }
     }
 
-    /// <summary>
-    /// Returns the signed-in user's display info for the client top bar.
-    /// Authenticated via the JWT Bearer access token.
-    /// </summary>
-    [HttpGet("me")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> Me(CancellationToken cancellationToken)
-    {
-        if (User.GetUserId() is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
-
-        var user = await userService.GetUserByIdAsync(userId, cancellationToken);
-        if (user == null)
-            return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
-
-        var (_, tenantName) = await sessionService.ResolveTenantAsync(user.Id, cancellationToken);
-        return Ok(new UserProfileResponse
-        {
-            UserName = user.DisplayName ?? user.Email,
-            TenantName = tenantName ?? string.Empty
-        });
-    }
-
-    /// <summary>
-    /// Deletes the signed-in user's account and personal data (GDPR-2, ADR-011). Removes identity/PII
-    /// in one audited transaction; honors the single-owner invariant — an owner with other members must
-    /// transfer first, and a solo owner must confirm dissolution (which wipes the tenant's data).
-    /// </summary>
-    [HttpDelete("me")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> DeleteAccount([FromQuery(Name = "confirm_dissolve")] bool confirmDissolve, CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
-
-        var result = await accountErasure.EraseAsync(userId, confirmDissolve, cancellationToken);
-        return result switch
-        {
-            EraseAccountResult.Erased => NoContent(),
-            EraseAccountResult.MustTransferFirst => BadRequest(errorFactory.CreateError(
-                "must_transfer_first", "Transfer ownership before deleting your account — other members remain")),
-            EraseAccountResult.DissolveConfirmationRequired => Conflict(errorFactory.CreateError(
-                "confirmation_required",
-                "Deleting your account dissolves your household and permanently deletes its data. "
-                + "Re-send with confirm_dissolve=true to proceed.")),
-            _ => Unauthorized(errorFactory.CreateError("user_not_found", "User not found")),
-        };
-    }
-
-    // ── MFA: authenticator-app TOTP (MFA-1, ADR-012) ─────────────────────────
-
-    /// <summary>Whether the signed-in user has MFA enabled.</summary>
-    [HttpGet("mfa")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> MfaStatus(CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-        return Ok(new MfaStatusResponse { Enabled = await mfa.IsEnabledAsync(userId, cancellationToken) });
-    }
-
-    /// <summary>Begins TOTP enrollment: returns the provisioning URI + secret (not yet enabled).</summary>
-    [HttpPost("mfa/enroll")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> MfaEnroll(CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-        var enrollment = await mfa.BeginEnrollmentAsync(userId, cancellationToken);
-        return enrollment is null
-            ? Unauthorized(errorFactory.CreateError("user_not_found", "User not found"))
-            : Ok(new MfaEnrollResponse { ProvisioningUri = enrollment.ProvisioningUri, Secret = enrollment.Secret });
-    }
-
-    /// <summary>Confirms enrollment with a code: enables MFA and returns one-time recovery codes.</summary>
-    [HttpPost("mfa/confirm")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> MfaConfirm([FromBody] MfaCodeRequest req, CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-        var (result, recoveryCodes) = await mfa.ConfirmEnrollmentAsync(userId, req.Code ?? "", cancellationToken);
-        return result switch
-        {
-            MfaConfirmResult.Enabled => Ok(new MfaRecoveryCodesResponse { RecoveryCodes = recoveryCodes }),
-            MfaConfirmResult.NotEnrolled => BadRequest(errorFactory.CreateError("not_enrolled", "Start enrollment first")),
-            _ => BadRequest(errorFactory.CreateError("invalid_code", "That code is not valid")),
-        };
-    }
-
-    /// <summary>Disables MFA (requires a valid TOTP or recovery code).</summary>
-    [HttpPost("mfa/disable")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> MfaDisable([FromBody] MfaCodeRequest req, CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-        var result = await mfa.DisableAsync(userId, req.Code ?? "", cancellationToken);
-        return result switch
-        {
-            MfaDisableResult.Disabled => NoContent(),
-            MfaDisableResult.NotEnabled => BadRequest(errorFactory.CreateError("mfa_not_enabled", "MFA is not enabled")),
-            _ => BadRequest(errorFactory.CreateError("invalid_code", "That code is not valid")),
-        };
-    }
-
-    /// <summary>
-    /// Saves the signed-in user's preferred UI language so it follows them across
-    /// devices. The new value lands in the JWT on the next refresh.
-    /// </summary>
-    [HttpPut("locale")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> SetLocale([FromBody] LocaleRequest req, CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-
-        var locale = req.Locale?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(locale) || !SupportedLocales.Contains(locale))
-            return BadRequest(errorFactory.CreateError("unsupported_locale", "Unsupported locale."));
-
-        await userService.UpdateLocaleAsync(userId, locale, cancellationToken);
-        return Ok();
-    }
-
-    // ── Account linking ──────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Lists the OAuth providers linked to the signed-in account (for the settings page).
-    /// </summary>
-    [HttpGet("logins")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> Logins(CancellationToken cancellationToken)
-    {
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-
-        var logins = await userLoginRepository.GetForUserAsync(userId, cancellationToken);
-        return Ok(logins.Select(l => new { provider = l.Provider, linkedAt = l.CreatedAt }));
-    }
-
-    /// <summary>
-    /// Issues a single-use link token for the current user and returns the provider
-    /// sign-in URL carrying it. The client full-page-navigates there to link the
-    /// provider to this account (no new user is created).
-    /// </summary>
-    [HttpPost("link/{provider}")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public IActionResult StartLink(string provider)
-    {
-        provider = provider.ToLowerInvariant();
-        if (!AuthProviders.IsSupported(provider))
-            return BadRequest(errorFactory.CreateError("unsupported_provider", "Unknown provider."));
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-
-        var token = linkTokenService.Issue(userId);
-        var url = $"{Request.Scheme}://{Request.Host}/api/auth/login/{provider}" +
-                  $"?link_token={Uri.EscapeDataString(token)}";
-        // url: web full-page navigates to it. token: native carries it through the
-        // loopback OAuth flow (native/login?...&link_token=) instead.
-        return Ok(new { url, token });
-    }
-
-    /// <summary>
-    /// Unlinks an OAuth provider from the account. Sign-in by email (magic link / OTP)
-    /// always remains available, so removing a provider can't lock the user out.
-    /// </summary>
-    [HttpDelete("logins/{provider}")]
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public async Task<IActionResult> Unlink(string provider, CancellationToken cancellationToken)
-    {
-        provider = provider.ToLowerInvariant();
-        if (!TryGetUserId(out var userId)) return Unauthorized();
-
-        var login = await userLoginRepository.GetByProviderForUserAsync(userId, provider, cancellationToken);
-        if (login is null) return NotFound();
-
-        await userLoginRepository.DeleteAsync(login, cancellationToken);
-        logger.LogInformation("Unlinked {Provider} from user {UserId}", provider, userId);
-        return Ok();
-    }
-
     // ── Passwordless: magic link (web) ───────────────────────────────────────
 
     /// <summary>
@@ -503,143 +317,7 @@ public class AuthController(
         return Ok(session!.Response);
     }
 
-    /// <summary>
-    /// Completes an MFA step-up (MFA-2, ADR-012): verifies the challenge from a login + a TOTP or
-    /// recovery code, and establishes the session (browser gets the refresh cookie; native gets it in
-    /// the body). Any bad/expired challenge or wrong code is a single 401 — no oracle.
-    /// </summary>
-    [HttpPost("mfa/verify")]
-    [EnableRateLimiting(RateLimiting.PasswordlessPolicy)]
-    public async Task<IActionResult> MfaVerify([FromBody] MfaVerifyRequest req, CancellationToken cancellationToken)
-    {
-        var outcome = await mfaLogin.VerifyChallengeAsync(req.Challenge ?? "", req.Code ?? "", ClientIp, cancellationToken);
-        if (outcome is null)
-            return Unauthorized(errorFactory.CreateError("mfa_failed", "Invalid or expired challenge or code."));
-
-        if (!outcome.Native)
-            cookieService.SetRefreshTokenCookie(Response, outcome.Session.RefreshToken, Request);
-        return Ok(outcome.Session.Response);
-    }
-
-    // ── Native (desktop/mobile) OAuth: loopback / custom-scheme code flow ─────
-
-    /// <summary>
-    /// Starts OAuth for a native client. The app opens this URL in the system browser
-    /// (passing a loopback <paramref name="redirect"/> it's listening on); the provider
-    /// round-trip lands on the native callback, which hands back a one-time code.
-    /// </summary>
-    [HttpGet("native/login/{provider}")]
-    public IActionResult NativeLogin(string provider, [FromQuery] string redirect,
-        [FromQuery(Name = "link_token")] string? linkToken = null)
-    {
-        provider = provider.ToLowerInvariant();
-        if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
-            return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
-
-        var callback = $"/api/auth/native/callback/{provider}?redirect={Uri.EscapeDataString(redirect)}";
-        if (!string.IsNullOrEmpty(linkToken))
-            callback += $"&link_token={Uri.EscapeDataString(linkToken)}";
-        var properties = new AuthenticationProperties { RedirectUri = callback };
-
-        var scheme = AuthProviders.SchemeFor(provider);
-        return scheme is null
-            ? BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider."))
-            : Challenge(properties, scheme);
-    }
-
-    /// <summary>
-    /// Native OAuth callback. Resolves/creates the account, mints a single-use code,
-    /// and redirects to the app's loopback/scheme URL carrying ONLY that code — tokens
-    /// never travel in the URL. The app exchanges the code at /native/exchange.
-    /// </summary>
-    [HttpGet("native/callback/{provider}")]
-    [Authorize(AuthenticationSchemes = ServiceCollectionExtensions.ExternalScheme)]
-    public async Task<IActionResult> NativeCallback(string provider, [FromQuery] string redirect,
-        CancellationToken cancellationToken, [FromQuery(Name = "link_token")] string? linkToken = null)
-    {
-        provider = provider.ToLowerInvariant();
-        try
-        {
-            if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
-                return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
-
-            var (providerUserId, email) = claimsExtractor.ExtractClaims(User);
-            await HttpContext.SignOutAsync(ServiceCollectionExtensions.ExternalScheme);
-
-            if (string.IsNullOrEmpty(providerUserId) || string.IsNullOrEmpty(email))
-                return Redirect(AppendQuery(redirect, "error", "auth_failed"));
-
-            // LINK MODE: attach this identity to the initiating account, don't sign in.
-            if (!string.IsNullOrEmpty(linkToken))
-            {
-                var linkUserId = linkTokenService.Redeem(linkToken);
-                if (linkUserId is null)
-                    return Redirect(AppendQuery(redirect, "error", "expired"));
-
-                var linkResult = await userService.LinkLoginAsync(linkUserId.Value, provider, providerUserId, cancellationToken);
-                logger.LogInformation("Native link {Provider} to user {UserId}: {Result}", provider, linkUserId, linkResult);
-                return linkResult == LinkLoginResult.OwnedByAnotherAccount
-                    ? Redirect(AppendQuery(redirect, "error", "in_use"))
-                    : Redirect(AppendQuery(redirect, "linked", provider));
-            }
-
-            var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
-                claimsExtractor.ExtractDisplayName(User), EmailVerifiedForMerge(provider), cancellationToken);
-
-            var code = nativeAuthCodeService.Issue(user.Id, provider);
-            logger.LogInformation("Native OAuth callback successful for {Email} via {Provider}", email, provider);
-            return Redirect(AppendQuery(redirect, "code", code));
-        }
-        catch (UnverifiedEmailConflictException)
-        {
-            return Redirect(AppendQuery(redirect, "error", "email_unverified"));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Native OAuth callback failed");
-            return Redirect(AppendQuery(redirect, "error", "auth_failed"));
-        }
-    }
-
-    /// <summary>
-    /// Exchanges a single-use native-auth code for an access token + refresh token
-    /// (both in the body). The code is consumed on first use.
-    /// </summary>
-    [HttpPost("native/exchange")]
-    public async Task<IActionResult> NativeExchange([FromBody] NativeExchangeRequest req, CancellationToken cancellationToken)
-    {
-        var grant = nativeAuthCodeService.Redeem(req.Code);
-        if (grant is null)
-            return Unauthorized(errorFactory.CreateError("invalid_code", "The code is invalid or has expired."));
-
-        var user = await userService.GetUserByIdAsync(grant.Value.UserId, cancellationToken);
-        if (user is null)
-            return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
-
-        // Native exchange always returns the refresh token in the body.
-        var (session, challenge) = await mfaLogin.CompleteOrChallengeAsync(
-            user, grant.Value.Provider, ClientIp, native: true, cancellationToken);
-        return challenge is not null
-            ? Ok(new MfaRequiredResponse { Challenge = challenge })
-            : Ok(session!.Response);
-    }
-
     // ── Helpers ──────────────────────────────────────────────────────────────
-
-    /// <summary>Caller IP for refresh-token auditing; "unknown" when unavailable.</summary>
-    private string ClientIp => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
-    /// <summary>True when the request comes from a native (desktop/mobile) client.</summary>
-    private bool IsNativeClient => Request.Headers[AuthHeaders.NativeClient] == AuthHeaders.NativeClientValue;
-
-    /// <summary>
-    /// Whether the native client's redirect target is permitted. Loopback HTTP
-    /// (127.0.0.1 / localhost, any port) is always allowed — the desktop pattern
-    /// (RFC 8252 §7.3). A configured custom scheme (mobile) is allowed too. Anything
-    /// else is rejected to prevent the callback being used as an open redirect.
-    /// </summary>
-    private bool IsAllowedNativeRedirect(string? redirect) =>
-        NativeRedirectPolicy.IsAllowed(redirect, appSettings.NativeCallbackScheme);
 
     // Whether to treat the provider's email as verified for auto-linking to an existing same-email
     // account: the explicit email_verified="true" claim (fail-closed default, MITI-3) OR a provider
@@ -647,22 +325,6 @@ public class AuthController(
     // but omits the claim). Untrusted/unknown providers still require the claim.
     private bool EmailVerifiedForMerge(string provider) =>
         claimsExtractor.IsEmailVerified(User) || providerEmailTrust.TrustsEmailWithoutClaim(provider);
-
-    private static string AppendQuery(string url, string key, string value)
-    {
-        var separator = url.Contains('?') ? '&' : '?';
-        return $"{url}{separator}{key}={Uri.EscapeDataString(value)}";
-    }
-
-    private bool TryGetUserId(out Guid userId)
-    {
-        var id = User.GetUserId();
-        userId = id ?? default;
-        return id is not null;
-    }
-
-    private static bool IsLikelyEmail(string? email) =>
-        !string.IsNullOrWhiteSpace(email) && System.Net.Mail.MailAddress.TryCreate(email.Trim(), out _);
 }
 
 public record EmailRequest(string Email, string? Culture = null);

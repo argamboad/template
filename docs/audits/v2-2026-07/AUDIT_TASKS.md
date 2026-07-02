@@ -155,7 +155,7 @@ Each spec from `LOGIC_AND_TEST_REPORT.md` Part B not already created by B1–B7.
   - **Exit check (V2-B8):** every Critical/High spec in Part B exists and is green (or E2E explicitly tracked in CI).
 
 ## V2-B9 — Debt & SOLID
-- [ ] **B9-1 · Split `AuthController`** — High · (SOLID-2) · touches core — ⬜ **scoped** (gated on the B8 HTTP harness): into `MfaController`/`AccountController`/`NativeAuthController` along the section comments; routes unchanged (assert via existing auth tests).
+- [x] **B9-1 · Split `AuthController`** — High · (SOLID-2) · touches core — the 679-line god class became a shared `AuthControllerBase` + focused `AuthController` (login/callback/refresh/logout/passwordless, 341 lines), `MfaController`, `AccountController`, `NativeAuthController` — all `[Route("api/auth")]`, so the 22 routes are byte-identical; each ctor takes only its own deps. Route-stability + behavior asserted end-to-end by the B8 harness (integration + arch suites green).
 - [ ] **B9-2 · One config-binding pattern** — Medium · (DEBT-1, R22) — ⬜ **scoped**: typed options `.BindConfiguration().ValidateOnStart()`; reuse the single `JwtSettings` instance.
 - [x] **B9-3 · `ClaimsPrincipal.GetUserId()` helper** — Medium · (DEBT-2) — deleted the 6 copies; centralized in `ClaimsPrincipalExtensions.GetUserId()` (`184e325`).
 - [ ] **B9-4 · Per-epic `Add*()/Map*()` extensions + `IEntityTypeConfiguration<>`** — Medium · (DEBT-3/4, R34) — ⬜ **scoped**: shrink `Program.cs` + `OnModelCreating`.
