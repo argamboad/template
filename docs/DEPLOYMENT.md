@@ -75,9 +75,15 @@ Tear down with `docker compose --profile app down`.
 ## 2. Brevo (SMTP, free — 300/day)
 
 1. Sign up at <https://brevo.com>, create an **SMTP key** (Senders & API → SMTP).
-2. Set: `Email__Smtp__Host=smtp-relay.brevo.com`, `Email__Smtp__Port=587`,
-   `Email__Smtp__Username=<your Brevo login>`, `Email__Smtp__Password=<the SMTP key>`.
-3. For real deliverability later, verify a sender domain (SPF/DKIM) — optional for staging QA.
+2. **Verify a sender** (Senders, Domains & Dedicated IPs → **Senders** → add + verify your email).
+   Brevo refuses to relay from an unverified sender, so this is required before any mail flows.
+3. Set: `Email__Smtp__Host=smtp-relay.brevo.com`, `Email__Smtp__Port=587`,
+   `Email__Smtp__Username=<your Brevo login>`, `Email__Smtp__Password=<the SMTP key>`, and
+   **`Email__Smtp__FromAddress=<the verified sender>`** (optionally `Email__Smtp__FromName`). Without a
+   valid, verified `FromAddress` the send is **rejected by Brevo** — and because mail is async via the
+   outbox, the request still returns success while the email never arrives (it retries/dead-letters in
+   `OutboxMessages`). If a code doesn't turn up, check that first.
+4. For real deliverability later, verify a sender **domain** (SPF/DKIM) — optional for staging QA.
 
 ## 3. Stripe (test mode) — REQUIRED
 
@@ -121,6 +127,8 @@ URIs are correct.
 | `Jwt__Secret` | yes | ≥32 chars; Render auto-generates |
 | `Billing__Stripe__SecretKey` | **yes** | fail-closed guard; a `sk_test_…` key for staging |
 | `Email__Smtp__Host/Port/Username/Password` | yes | Brevo |
+| `Email__Smtp__FromAddress` | yes | a Brevo-**verified** sender; sends fail without it |
+| `Email__Smtp__FromName` | no | display name on outgoing mail |
 | `Auth__AppBaseUrl` | yes | the public URL — used to build email links |
 | `Hosting__ServeWebClient` | yes | `true` (baked into the image; keep set) |
 | `Proxy__Enabled` | behind a proxy | `true` on Render — honor `X-Forwarded-*` |

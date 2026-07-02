@@ -37,6 +37,10 @@ services:
         sync: false                 # Brevo SMTP login
       - key: Email__Smtp__Password
         sync: false                 # Brevo SMTP key
+      - key: Email__Smtp__FromAddress
+        sync: false                 # REQUIRED — a Brevo-VERIFIED sender address, else sends are rejected
+      - key: Email__Smtp__FromName
+        value: Perezosoft           # display name on outgoing mail — rename per your brand
       # ── Optional — uncomment/set to enable ──
       # - key: Authentication__Google__ClientId
       #   sync: false
