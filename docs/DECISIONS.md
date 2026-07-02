@@ -867,3 +867,51 @@ under `/api/webhooks` view the log and **replay** a delivery (re-enqueues the re
 outbox). Like `OutboxMessage`, `WebhookDelivery` is deliberately **not** `ITenantScoped` (it's written
 from the tenant-less outbox dispatcher); its `TenantId` is a plain filter column the read side scopes
 on. See `docs/DATA_MODEL.md` and `docs/stories/hooks.md`.
+
+**ADR-017 — Hosting: free-tier single-origin deployment — Render (API serving the WASM bundle) + Neon Postgres + Brevo. (2026-07-02)**
+Resolves the hosting decision deferred in `docs/TECH_STACK.md` ("pick near deploy"). The driver set:
+**$0/mo, no credit card, the refresh-token cookie must stay first-party, and the in-process background
+jobs (outbox dispatcher / scheduler / lapse sweep) must not be silently broken.** Decided:
+
+1. **Single origin.** The API container **also serves the published Blazor WASM bundle** (framework
+   files + SPA fallback to `index.html`, with `/api/**` excluded from the fallback). One origin means
+   the refresh cookie is always first-party — the entire third-party-cookie failure class (Safari ITP,
+   Chrome's phase-out) vanishes, and per-environment CORS configuration disappears. **This does not
+   weaken the clean-API-boundary rule (golden rule 2 / ADR-004):** the UI still consumes the API over
+   HTTP only; the API merely serves its static files. Local dev keeps the separate `src/Web` dev
+   server (hot reload), and the `BlazorClient` CORS policy remains for it + native clients.
+2. **Render free** hosts the container (512 MB, TLS + subdomain included, deploy hooks, no card
+   required). **Accepted trade-off, recorded:** free instances sleep after ~15 min idle — first
+   request cold-starts (~30–60 s) and the outbox/scheduler pause while asleep (queued sends resume on
+   wake). Acceptable for staging QA; **prod requires an always-on plan (~$7/mo) or equivalent — never
+   ship paid users on a sleeping instance.** The image is plain Docker, so the exit cost is nil.
+3. **Neon free** is the Postgres (17). Chosen over Supabase for this role: it is *just* Postgres (no
+   redundant auth/storage platform beside our own), and it **auto-wakes in ~1 s** from autosuspend vs
+   Supabase's 7-day idle pause needing a manual unpause. **Constraint:** connect via the
+   **session-mode pooler** over TLS — transaction-mode pooling breaks Npgsql prepared statements.
+   Bonus noted for later: Neon DB branching enables free per-preview-environment databases.
+4. **Brevo** (free, 300 mails/day) is staging + prod SMTP through the existing `IEmailSender` — it was
+   already the template's assumed real provider in the `.env` docs. **Consequence:** staging has no
+   Mailpit, so email-based QA cases use real (plus-addressed) inboxes there, and the automated
+   post-deploy smoke checks health/app-shell only, never email journeys.
+5. **Environments follow the git model:** `develop` auto-deploys **staging** (behind CI + a
+   post-deploy smoke gate); `main` deploys **prod** behind a required-approval GitHub environment —
+   preserving "`main` is deploy-only". The template proves the machinery on staging; actual prod
+   provisioning is each downstream app's first deployment step (runbook: `docs/DEPLOYMENT.md`).
+6. **Proxy correctness, gated:** `UseForwardedHeaders` (for/proto) is added **config-gated, default
+   off** — required behind Render's TLS-terminating proxy (else the per-IP passwordless rate limiter
+   collapses into one shared bucket and OAuth redirect URIs generate as `http`), but an IP-spoofing
+   vector if honored when *not* behind a proxy.
+
+**Alternatives rejected:** **Vercel / Cloudflare Pages for the WASM** — split origins make the refresh
+cookie cross-site (broken in Safari today, Chrome tomorrow) unless a custom domain unifies the two
+hosts; with single-origin hosting a second platform is pure liability. **Railway** — excellent DX but
+no longer free ($5/mo Hobby after the one-time trial credit). **Google Cloud Run** — a real free tier,
+but CPU is throttled to ~zero between requests, which breaks the in-process outbox *subtly* (worse
+than Render's honest sleep), and it requires a card. **Supabase as the DB** — workable, but free
+projects pause after 7 idle days (manual unpause) and we would use ~10 % of the platform. **Oracle
+Cloud Always Free VM** — the only truly-free *always-on* option; rejected for account-reclamation
+risk, noted in the runbook as the self-host escape hatch. A **custom domain** (~$10/yr) is the
+deliberate first paid upgrade (pretty URLs + DKIM deliverability); nothing in the architecture
+depends on it.
+Stories + slice plan: `docs/stories/deploy.md` (epic `DEPLOY`).

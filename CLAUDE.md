@@ -95,7 +95,8 @@ deferred items without an explicit decision.
 - Seed data (if any) — _TODO_.
 - Concrete schema (EF Core migrations) — generated from `docs/DATA_MODEL.md`.
 - **User stories: generated per-epic at build time**, under `docs/stories/` (one file per epic).
-- Deferred sub-decisions: non-web framework commitment, hosting (see `docs/TECH_STACK.md`).
+- Deferred sub-decisions: non-web framework commitment (see `docs/TECH_STACK.md`). Hosting is now
+  **decided** (ADR-017: Render free single-origin + Neon + Brevo) — built by epic `DEPLOY`.
 
 ## Doc map
 | File | Purpose |
@@ -125,5 +126,6 @@ deferred items without an explicit decision.
 | `docs/stories/admin.md` | epic `ADMIN` ✅ COMPLETE — config-gated platform-staff surface: cross-tenant inspection + short-lived audited impersonation (ADMIN-1 gate/inspect, ADMIN-2 impersonate); ADR-014 |
 | `docs/stories/pubapi.md` | epic `PUBAPI` — public API + tenant API keys, **config-gated default-off** (PUBAPI-1 ✅ — hash-only keys, API-key auth scheme → `tenant_id`-scoped principal, owner mgmt, scoped `/api/public`; PUBAPI-2 ✅ — per-key rate limit + anonymous public OpenAPI doc `/api/public/openapi.json`); ADR-015 |
 | `docs/stories/hooks.md` | epic `HOOKS` — outbound webhooks, **config-gated default-off** (HOOKS-1 ✅ — `WebhookSubscription` encrypted secret, `IWebhookPublisher` fan-out → outbox → HMAC-signed POST w/ retry, owner `/api/webhooks` + send-test; HOOKS-2 ✅ — delivery log + replay); ADR-016 |
+| `docs/stories/deploy.md` | epic `DEPLOY` 📝 PLANNED — staging/prod on the free tier: DEPLOY-1 single-origin (API serves the WASM) + config-gated forwarded headers; DEPLOY-2 Dockerfile + Render/Neon/Brevo staging + `docs/DEPLOYMENT.md` runbook; DEPLOY-3 deploy pipeline (develop→staging auto + smoke, main→prod gated) + QA staging section; ADR-017 |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `src/Infrastructure/Persistence/Migrations/` | Concrete schema — EF Core migrations generated from DATA_MODEL.md |

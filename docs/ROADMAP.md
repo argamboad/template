@@ -82,3 +82,16 @@ were un-parked and shipped on 2026-07-01 (config-gated **default-off**). The API
 enroll/step-up, GDPR export/erasure, notification bell menu, admin console) all have their Blazor UI now.
 **Open items:** HOOKS-3 (a Blazor webhook/API-key management UI) and API-key rotation. **Deferred:**
 CACHE (Redis — until multi-node).
+
+## Next up: DEPLOY (planned 2026-07-02)
+
+The one untested dimension left: the app has only ever run on localhost + CI. Epic **`DEPLOY`**
+(ADR-017, `stories/deploy.md`) takes it to a real **staging** environment on an all-free-tier stack —
+**Render free** (one container, the API serving the WASM bundle **single-origin**, which kills the
+cross-site refresh-cookie failure class outright) + **Neon** Postgres (session pooler) + **Brevo**
+SMTP — with a repeatable prod recipe. Three slices: **DEPLOY-1** single-origin hosting + config-gated
+forwarded headers (pure code, harness-tested); **DEPLOY-2** Dockerfile + compose parity + staging
+bring-up + a `docs/DEPLOYMENT.md` runbook; **DEPLOY-3** the deploy pipeline (develop → staging auto
+with a post-deploy smoke gate; main → prod behind environment approval) + a staging section in the QA
+plan. Free-tier trade-offs are recorded decisions, not surprises (instance sleep pauses the outbox —
+staging-acceptable, never prod; real SMTP means email QA cases stay manual on staging).
