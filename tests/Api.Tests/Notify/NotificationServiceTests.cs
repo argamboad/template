@@ -114,6 +114,27 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
         Assert.Equal("for-a", Assert.Single(listA).Title);
     }
 
+    // v2 audit B8-1: the notification center is keyed by UserId, not TenantId (ADR-C2), so the
+    // isolation boundary is the user — a member of one tenant can never enumerate a member of another
+    // tenant's notifications, because the tenant never enters the query at all. This pins that: even
+    // with the two recipients placed in different tenants, listing is strictly the caller's own rows.
+    [Fact]
+    public async Task List_TenantAUser_CannotSeeTenantBUsersNotifications()
+    {
+        var tenantAUser = Guid.CreateVersion7();
+        var tenantBUser = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        await service.NotifyAsync(tenantAUser, "k", "for-a", "");
+        await service.NotifyAsync(tenantBUser, "k", "for-b", "");
+        await db.SaveChangesAsync();
+
+        var listForA = await service.ListAsync(tenantAUser, null, 10);
+        Assert.Equal("for-a", Assert.Single(listForA).Title); // A sees exactly its own, never B's
+        Assert.Equal(1, await service.UnreadCountAsync(tenantAUser));
+        Assert.Equal(1, await service.UnreadCountAsync(tenantBUser)); // B's notification untouched by A's read
+    }
+
     [Fact]
     public async Task Notify_StoresMetadataAsJson()
     {
