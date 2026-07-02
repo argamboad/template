@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using OtpNet;
 using Template.Api.Services;
 using Template.Core.Entities;
+using Template.Infrastructure;
 using Template.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -62,8 +65,44 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<AppDbContext>();
             services.AddDbContext<AppDbContext>(o => o.UseNpgsql(_container.GetConnectionString()));
+
+            // Swap the External (OAuth carrier) cookie scheme's handler for a test one that authenticates
+            // from headers — so the OAuth callback's [Authorize(External)] can be driven without a real
+            // provider round-trip. The scheme's cookie options are left intact (the handler ignores them).
+            services.PostConfigure<AuthenticationOptions>(o =>
+            {
+                if (o.SchemeMap.TryGetValue(ServiceCollectionExtensions.ExternalScheme, out var scheme))
+                    scheme.HandlerType = typeof(TestExternalAuthHandler);
+            });
+
+            // Give every request a unique source IP. The passwordless rate limiter partitions on
+            // RemoteIpAddress (null in TestServer → one shared bucket), which would otherwise trip 429
+            // across the auth-flow tests. This keeps the limiter active but non-colliding — the limiter
+            // itself is tested in isolation by RateLimitingTests.
+            services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter, UniqueClientIpStartupFilter>();
         });
     }
+
+    /// <summary>Seeds a tenant + owner and enrolls+enables real TOTP MFA; returns the plaintext secret.</summary>
+    public async Task<(SeededUser User, string Secret)> SeedMfaUserAsync(string? email = null)
+    {
+        var user = await SeedUserAsync(TenantRoles.Owner, email);
+        using var scope = Services.CreateScope();
+        var mfa = scope.ServiceProvider.GetRequiredService<IMfaService>();
+        var enrollment = await mfa.BeginEnrollmentAsync(user.UserId)
+            ?? throw new InvalidOperationException("MFA enrollment failed to start.");
+        var (result, _) = await mfa.ConfirmEnrollmentAsync(user.UserId, Totp(enrollment.Secret));
+        if (result != MfaConfirmResult.Enabled)
+            throw new InvalidOperationException($"MFA enrollment did not enable: {result}.");
+        return (user, enrollment.Secret);
+    }
+
+    /// <summary>Computes the current TOTP for a Base32 secret (same library the app uses).</summary>
+    public static string Totp(string base32Secret) => new Totp(Base32Encoding.ToBytes(base32Secret)).ComputeTotp();
+
+    /// <summary>A client that does NOT auto-follow redirects, so a 302 Location can be inspected.</summary>
+    public HttpClient CreateNoRedirectClient() =>
+        CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
     /// <summary>Seeds a tenant + a user who owns it, and returns the identifiers a token needs.</summary>
     public async Task<SeededUser> SeedUserAsync(string role = TenantRoles.Owner, string? email = null)
@@ -102,6 +141,57 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
 
 /// <summary>Identifiers for a seeded user, enough to mint a token and assert tenant scoping.</summary>
 public sealed record SeededUser(Guid UserId, Guid TenantId, string Email, string Role);
+
+/// <summary>
+/// Assigns each request a unique loopback-range source IP before the app pipeline runs, so the
+/// IP-partitioned passwordless rate limiter never collides across integration tests (see the harness
+/// comment). Deterministic (counter-based) so runs are reproducible.
+/// </summary>
+internal sealed class UniqueClientIpStartupFilter : Microsoft.AspNetCore.Hosting.IStartupFilter
+{
+    private int _counter;
+
+    public Action<Microsoft.AspNetCore.Builder.IApplicationBuilder> Configure(Action<Microsoft.AspNetCore.Builder.IApplicationBuilder> next) => app =>
+    {
+        Microsoft.AspNetCore.Builder.UseExtensions.Use(app, async (ctx, nextMw) =>
+        {
+            var i = System.Threading.Interlocked.Increment(ref _counter);
+            ctx.Connection.RemoteIpAddress = new System.Net.IPAddress([10, (byte)(i >> 16), (byte)(i >> 8), (byte)i]);
+            await nextMw();
+        });
+        next(app);
+    };
+}
+
+/// <summary>
+/// Test stand-in for the External OAuth carrier scheme: authenticates from the <c>X-Test-Provider-User</c>
+/// and <c>X-Test-Email</c> headers so an integration test can drive the OAuth callback (which is
+/// <c>[Authorize(External)]</c>) without a real provider round-trip. Extends the cookie handler so the
+/// scheme's existing <see cref="Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions"/>
+/// still resolve; the header logic replaces the cookie read.
+/// </summary>
+public sealed class TestExternalAuthHandler(
+    Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions> options,
+    Microsoft.Extensions.Logging.ILoggerFactory logger,
+    System.Text.Encodings.Web.UrlEncoder encoder)
+    : Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationHandler(options, logger, encoder)
+{
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    {
+        var providerUserId = Request.Headers["X-Test-Provider-User"].ToString();
+        var email = Request.Headers["X-Test-Email"].ToString();
+        if (string.IsNullOrEmpty(providerUserId) || string.IsNullOrEmpty(email))
+            return Task.FromResult(AuthenticateResult.NoResult());
+
+        var identity = new System.Security.Claims.ClaimsIdentity(
+        [
+            new(System.Security.Claims.ClaimTypes.NameIdentifier, providerUserId),
+            new(System.Security.Claims.ClaimTypes.Email, email),
+        ], Scheme.Name);
+        var ticket = new AuthenticationTicket(new System.Security.Claims.ClaimsPrincipal(identity), Scheme.Name);
+        return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+}
 
 [CollectionDefinition(IntegrationCollection.Name)]
 public sealed class IntegrationCollection : ICollectionFixture<IntegrationTestFactory>
