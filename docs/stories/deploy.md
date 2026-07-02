@@ -43,6 +43,19 @@ runs against a URL, not just a dev box) and records the prod recipe downstream a
 
 ### DEPLOY-1 — Production topology in code: single-origin hosting + proxy correctness
 
+**Status: ✅ Implemented** (`feat/deploy-1-single-origin`). Config-gated single-origin hosting: when
+`Hosting:ServeWebClient` is true the API serves the published Blazor WASM bundle
+(`UseBlazorFrameworkFiles` + `UseStaticFiles` + `MapFallbackToFile("index.html")`) with a more-specific
+`/api/{**rest}` fallback so an unmatched API route stays an API-shaped 404 (never the shell); default off
+(local dev keeps the `src/Web` dev server). `src/Web` `ApiBaseUrl` now defaults to
+`HostEnvironment.BaseAddress` when unset (explicit config still wins — local dev + e2e CI). Config-gated
+`UseForwardedHeaders` (`Proxy:Enabled`, default off) via `ProxyForwardingExtensions` — honors
+X-Forwarded-For/-Proto behind a proxy, ignored otherwise (anti-spoofing). `.env.example` documents both
+keys. Tests: `tests/Api.Tests/Integration/SingleOriginHostingTests.cs` (serve-off default, SPA fallback,
+framework assets, `/api` not shadowed, known API route still authenticates — real Program routing via
+`WithWebHostBuilder`) + `tests/Api.Tests/Hosting/ProxyForwardingTests.cs` (forwarded headers honored
+on / ignored off — minimal TestServer).
+
 **As an** operator
 **I want** the API container to serve the Blazor WASM client and behave correctly behind a TLS-terminating proxy
 **So that** one free host runs the whole app with first-party cookies and honest client IPs — no CORS/SameSite/cookie drama per environment
@@ -209,9 +222,10 @@ ADR-017 referenced.
 
 Ordered, each a mergeable vertical slice that leaves the app working. TDD throughout.
 
-1. 📝 **Single-origin + proxy correctness (DEPLOY-1).** Pure code, no infra — API serves the WASM
-   bundle (SPA fallback, `/api` excluded), `ApiBaseUrl` defaults to same-origin, config-gated
-   `UseForwardedHeaders`. Proven by integration tests in the existing harness.
+1. ✅ **Single-origin + proxy correctness (DEPLOY-1).** — DONE. API serves the WASM bundle (SPA
+   fallback, `/api` excluded), `ApiBaseUrl` defaults to same-origin, config-gated `UseForwardedHeaders`.
+   Both config-gated **off** by default (additive — local dev unchanged). Proven by integration tests
+   in the existing harness (`SingleOriginHostingTests`) + a focused middleware test (`ProxyForwardingTests`).
 2. 📝 **Container + staging bring-up (DEPLOY-2).** Multi-stage Dockerfile + compose parity, then the
    real thing: Neon (session pooler) + Render (render.yaml) + Brevo, `docs/DEPLOYMENT.md` runbook,
    `.env.example` staging section. Ends with a live staging URL and a manual OTP sign-in on it.
