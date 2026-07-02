@@ -59,11 +59,15 @@ Tear down with `docker compose --profile app down`.
 
 ## 1. Neon (Postgres, free)
 
-1. Create a project at <https://neon.tech> (Postgres 17).
-2. Copy the connection string for the **Pooled** connection, and ensure it's the **session** pooler
-   (not transaction) — Npgsql uses prepared statements, which transaction pooling breaks. Keep
-   `?sslmode=require`. Shape:
-   `Host=<ep>-pooler.<region>.aws.neon.tech;Database=<db>;Username=<user>;Password=<pw>;SSL Mode=Require`.
+1. Create a project at <https://neon.tech> (Postgres 17). **Do not enable Neon Auth** — this template
+   ships its own auth (ADR-002); a second identity source would only conflict. Use Neon as plain Postgres.
+2. Copy the **Direct connection** string (the host **without** `-pooler`). That's the right default here:
+   a single Render instance keeps its own Npgsql connection pool, and the app **polls** (no
+   `LISTEN/NOTIFY`) and uses no server-side prepared statements, so it doesn't need PgBouncer. Keep
+   `SSL Mode=Require`. Shape:
+   `Host=<ep>.<region>.aws.neon.tech;Port=5432;Database=<db>;Username=<user>;Password=<pw>;SSL Mode=Require;Trust Server Certificate=true`.
+   *(Only switch to the pooled `-pooler` host if you later run many instances — Neon's pooler is
+   transaction-mode PgBouncer, which this app is compatible with but doesn't require.)*
 3. This becomes `ConnectionStrings__DefaultConnection`. Migrations apply automatically on first boot.
 
 > Free Neon autosuspends when idle and **auto-wakes in ~1 s** on the next query — no manual unpause.
