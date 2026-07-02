@@ -21,12 +21,12 @@
 | # | Item | Epic key | Why it's ranked here | Hard deps |
 |---|------|----------|----------------------|-----------|
 | 1 | ~~Account & data lifecycle (GDPR)~~ → **✅ DONE** (ADR-011, `stories/gdpr.md`) | `GDPR` | Legal exposure the moment you have EU users; reuses tenant scoping | Audit (ADR-008) for export completeness |
-| 2 | ~~RBAC beyond owner/member~~ → **being built** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
+| 2 | ~~RBAC beyond owner/member~~ → **✅ DONE** (ADR-009, `stories/rbac.md`) | `RBAC` | Most B2B asks for an admin tier almost immediately | none |
 | 3 | ~~File / blob storage~~ → **✅ DONE** (ADR-010, `stories/files.md`) | `FILES` | Avatars/attachments/exports all block on it | none |
 | 4 | ~~MFA / TOTP 2FA~~ → **✅ DONE** (ADR-012, `stories/mfa.md`) | `MFA` | Security baseline; ADR-C15 promised TOTP that was never built | none |
 | 5 | ~~In-app notifications~~ → **✅ DONE** (ADR-013, `stories/notify.md`) | `NOTIFY` | Natural follow-on to transactional email | Outbox (ADR-007) ideal |
-| 6 | Outbound webhooks (customer-facing) | `HOOKS` | Integration story for *your* customers | Outbox (ADR-007) required |
-| 7 | Public API + API keys | `PUBAPI` | Programmatic access distinct from the user session | RBAC helps |
+| 6 | ~~Outbound webhooks (customer-facing)~~ → **✅ DONE** (ADR-016, `stories/hooks.md`) | `HOOKS` | Integration story for *your* customers | Outbox (ADR-007) required |
+| 7 | ~~Public API + API keys~~ → **✅ DONE** (ADR-015, `stories/pubapi.md`) | `PUBAPI` | Programmatic access distinct from the user session | RBAC helps |
 | 8 | ~~Admin back-office + impersonation~~ → **✅ DONE** (ADR-014, `stories/admin.md`) | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
 | 9 | Distributed cache (Redis) | `CACHE` | Only once you scale past one node | none (defer hard) |
 
@@ -48,9 +48,10 @@ sole owner without dissolving/transferring). **Tension with audit (ADR-008):** e
 legal-hold — export-then-wipe; decide retention windows here.
 **Deps:** audit log (ADR-008) so export is complete; the dissolve flow as the wipe backbone.
 
-## 2. RBAC beyond owner/member — `RBAC` → **TAKEN ON (ADR-009)**
-> **Now an active epic** — design decided in **ADR-009**, stories + slice plan in
-> `docs/stories/rbac.md`. The sketch below is retained for context; the ADR supersedes it.
+## 2. RBAC beyond owner/member — `RBAC` → **✅ DONE (ADR-009)**
+> **Shipped** — `admin` role + a `Permission`/`RolePermissions` seam (RBAC-1), owner-only role change
+> (RBAC-2), admin-aware roster UI (RBAC-3). Design in **ADR-009**, stories + slice plan in
+> `docs/stories/rbac.md` (all merged). The sketch below is retained for context; the ADR supersedes it.
 
 **What:** at least owner / **admin** / member, plus a permission-check seam finer than the current
 two-role `TenantMembership.Role`.
@@ -76,9 +77,10 @@ download URLs** (native presigned for cloud; `ITimeLimitedDataProtector` token +
 for local). Slices FILES-1 (abstraction+local) → FILES-2 (signed download) → FILES-3 (S3).
 
 ## 4. MFA / TOTP 2FA — `MFA` → **✅ DONE (ADR-012)**
-> **Shipped** — authenticator TOTP enrollment/management + login step-up (JSON paths). Design in
-> **ADR-012**, slices in `docs/stories/mfa.md` (MFA-1/2, merged). Follow-up: redirect-path step-up
-> (needs the MFA client page). Sketch below retained for historical context.
+> **Shipped** — authenticator TOTP enrollment/management + login step-up on **every** sign-in path:
+> JSON (MFA-1/2), web OAuth-callback + magic-link redirect (MFA-3), and native (MFA-4). Design in
+> **ADR-012**, slices in `docs/stories/mfa.md` (MFA-1..4, merged). Sketch below retained for historical
+> context.
 
 **What:** authenticator-app TOTP as a second factor (and recovery codes).
 **Why:** security baseline for any serious SaaS. **Note:** ADR-C15 originally claimed TOTP via
@@ -92,8 +94,9 @@ enrollment + verify endpoints on the custom auth stack, a step-up check at login
 
 ## 5. In-app notifications — `NOTIFY` → **✅ DONE (ADR-013)**
 > **Shipped** — per-user notification center + delivery preferences, fan-out (in-app + email) through the
-> outbox. Design in **ADR-013**, slices in `docs/stories/notify.md` (NOTIFY-1/2, merged). A bell-menu UI
-> is an API-first follow-up. Sketch below retained for historical context.
+> outbox. Design in **ADR-013**, slices in `docs/stories/notify.md` (NOTIFY-1/2, merged). The header
+> **bell-menu UI shipped** (UI-3: list, unread count, mark-read + Settings preference switches). Sketch
+> below retained for historical context.
 
 **What:** a per-user notification center + read/unread + per-user delivery preferences (in-app vs
 email).
@@ -138,8 +141,9 @@ the UI (BILLING-1/5). Rate-limit per key (extend [`RateLimiting`](../src/Api/Con
 ## 8. Admin back-office + impersonation — `ADMIN` → **✅ DONE (ADR-014)**
 > **Shipped** — config-gated platform-staff surface: cross-tenant inspection (`EnterTenant`, filter never
 > loosened) + short-lived, non-refreshable, audited impersonation. Design in **ADR-014**, slices in
-> `docs/stories/admin.md` (ADMIN-1/2, merged). Admin UI = API-first follow-up. Sketch below retained for
-> historical context.
+> `docs/stories/admin.md` (ADMIN-1/2, merged). The staff-only `/admin` **console UI shipped** (UI-4:
+> tenant list/detail + "Sign in as" with an impersonation banner). Sketch below retained for historical
+> context.
 
 **What:** a super-admin surface (cross-tenant, **platform-staff only**) to inspect tenants and
 "sign in as" a user for support.

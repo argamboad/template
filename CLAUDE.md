@@ -26,8 +26,11 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 ## Golden rules — constant (do not violate)
 1. **Tenant-scoped, not user-scoped.** App data belongs to the tenant; never leak across tenants.
    Tenant entities implement `ITenantScoped` and are filtered automatically by a global EF query
-   filter (see ADR-003); genuinely cross-tenant/pre-auth lookups opt out with
-   `IgnoreQueryFilters()`. Only preferences are per-user.
+   filter (see ADR-003); genuinely cross-tenant/pre-auth reads use the sanctioned escape hatch
+   `IRepository<T>.QueryAllTenants()`, and signature-/system-authenticated tenant-scoped writes
+   (the billing webhook, admin impersonation) enter their tenant via `ITenantContext.EnterTenant`.
+   `IgnoreQueryFilters()` is **banned in `src/Api/Features/**`** (fails CI). Only preferences are
+   per-user.
 2. **Clean API boundary.** The UI is a client of the API and never accesses the DB directly.
 3. **Blazor UI components live in the shared RCL**, not inline in the web app — keeps non-web
    clients cheap.
@@ -115,7 +118,7 @@ deferred items without an explicit decision.
 | `docs/stories/mfa.md` | epic `MFA` ✅ COMPLETE — authenticator TOTP; Otp.NET, secret encrypted, hashed recovery codes (MFA-1 enroll/manage, MFA-2 JSON-path step-up, MFA-3 OAuth/magic-link redirect step-up, MFA-4 native step-up — enforced on **every** sign-in path); ADR-012 |
 | `docs/stories/notify.md` | epic `NOTIFY` ✅ COMPLETE — per-user in-app notification center + delivery prefs, fan-out via the outbox (NOTIFY-1 center, NOTIFY-2 prefs+email); ADR-013 |
 | `docs/stories/admin.md` | epic `ADMIN` ✅ COMPLETE — config-gated platform-staff surface: cross-tenant inspection + short-lived audited impersonation (ADMIN-1 gate/inspect, ADMIN-2 impersonate); ADR-014 |
-| `docs/stories/pubapi.md` | epic `PUBAPI` — public API + tenant API keys, **config-gated default-off** (PUBAPI-1 ✅ — hash-only keys, API-key auth scheme → `tenant_id`-scoped principal, owner mgmt, scoped `/api/public`); ADR-015 |
+| `docs/stories/pubapi.md` | epic `PUBAPI` — public API + tenant API keys, **config-gated default-off** (PUBAPI-1 ✅ — hash-only keys, API-key auth scheme → `tenant_id`-scoped principal, owner mgmt, scoped `/api/public`; PUBAPI-2 ✅ — per-key rate limit + anonymous public OpenAPI doc `/api/public/openapi.json`); ADR-015 |
 | `docs/stories/hooks.md` | epic `HOOKS` — outbound webhooks, **config-gated default-off** (HOOKS-1 ✅ — `WebhookSubscription` encrypted secret, `IWebhookPublisher` fan-out → outbox → HMAC-signed POST w/ retry, owner `/api/webhooks` + send-test; HOOKS-2 ✅ — delivery log + replay); ADR-016 |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `src/Infrastructure/Persistence/Migrations/` | Concrete schema — EF Core migrations generated from DATA_MODEL.md |

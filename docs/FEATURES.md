@@ -40,6 +40,10 @@ Flow:
 Notes:
 - Adding a provider = one `.AddXxx()` in `ServiceCollectionExtensions` + provider registration.
 - A user can link multiple providers (rows in `UserLogin`); there is no `AspNetUserLogins`.
+- **MFA step-up (ADR-012):** if the resolved user has MFA enabled, primary auth does **not** issue a
+  full session — it returns a short-lived signed **challenge** and the callback redirects to
+  `/login?mfa=<challenge>`; the client completes step-up via `POST /api/auth/mfa/verify` (a TOTP or
+  recovery code). See §6 for enroll/manage.
 
 ### 2. Sign in via magic link (web, passwordless)
 **Goal:** a user signs in without a password by clicking an emailed link.
@@ -57,6 +61,8 @@ Flow:
 Notes:
 - Only the token **hash** is stored; lifetime is `Auth:MagicLink:TokenLifespanMinutes`.
 - Single-use: a redeemed or expired link no longer works.
+- **MFA step-up (ADR-012):** an MFA-enabled user is redirected to `/login?mfa=<challenge>` instead of
+  a session; the client completes it via `POST /api/auth/mfa/verify`.
 
 ### 3. Email OTP sign-in (web + native)
 **Goal:** authenticate with a one-time 6-digit code — the only passwordless method on native
@@ -68,8 +74,12 @@ Flow:
 2. User enters the code: `POST /api/auth/otp/verify`. On match it's consumed and the session is
    issued; wrong codes increment `attempt_count` and lock out after the max (default 5).
 
-Notes: TOTP / authenticator apps are **not** implemented. SMS OTP is deferred (needs a phone
-field + an SMS provider).
+Notes:
+- **MFA step-up (ADR-012):** on a correct OTP, if the user has MFA enabled the API returns an
+  `{ mfa_required, challenge }` response (JSON path) rather than a session; the client completes it via
+  `POST /api/auth/mfa/verify` with a TOTP or recovery code. Enforced on **every** sign-in path.
+- Email OTP here is the passwordless *primary* factor; authenticator-app **TOTP** is the optional
+  *second* factor (enroll/manage in §6). SMS OTP is deferred (needs a phone field + an SMS provider).
 
 ### 4. New-tenant onboarding (automatic)
 **Goal:** a newly authenticated user lands in their own tenant with no extra step.
@@ -81,12 +91,14 @@ Flow:
    the membership. The user can rename the household later on `/household`.
 
 ### 5. Invite a member to the household
-**Goal:** an existing owner invites someone to their tenant.
+**Goal:** an owner **or admin** invites someone to their tenant.
 
 Flow:
-1. Owner submits an email: `POST /api/household/invitations`. A `TenantInvitation` is created
-   (status `pending`, hashed token); inviting an existing member is refused (409), and a pending
-   invite for the same email is refreshed, not duplicated.
+1. An owner or admin submits an email: `POST /api/household/invitations` (gated by
+   `Permission.ManageMembers`, which both owner and admin hold — RBAC, ADR-009). A `TenantInvitation`
+   is created (status `pending`, hashed token); inviting an existing member is refused (409), a pending
+   invite for the same email is refreshed, not duplicated, and hitting the plan's seat cap returns
+   **402 `seat_limit_reached`** (BILLING-5 — pending invites reserve a seat).
 2. The raw token is returned once (revealed in the UI) **and** emailed as `/join?token=...`.
 3. The invitee opens `/join`, signs in if needed, then `POST /api/household/invitations/accept`
    validates the token, moves their `TenantMembership` to the inviting tenant, and consumes the
@@ -94,7 +106,7 @@ Flow:
 
 Notes:
 - `TenantInvitation.is_valid` = `status == pending AND !is_expired` (derived, not stored).
-- Owners can regenerate (new token; the old one dies) or revoke a pending invite.
+- An owner or admin can regenerate (new token; the old one dies) or revoke a pending invite.
 - A user is always in exactly one tenant — accepting **moves** them, never adds a second.
 
 ### 6. Account settings (linked providers + language)
@@ -106,6 +118,11 @@ Notes:
   you out).
 - **Language:** the switcher persists the user's locale via `PUT /api/auth/locale`; it lands in the
   JWT on the next refresh and localizes the UI and outgoing emails. See `docs/LOCALIZATION.md`.
+- **MFA (authenticator TOTP; ADR-012):** enroll via `POST /api/auth/mfa/enroll` (returns an
+  `otpauth://…` provisioning URI to render as a QR + one-time recovery codes), confirm possession with
+  a valid code to enable, and disable/regenerate recovery codes from Settings. Once enabled, every
+  sign-in path (§§1–3) requires the step-up (`POST /api/auth/mfa/verify`). The secret is encrypted at
+  rest and never returned after enrollment; recovery codes are hashed + single-use.
 
 ---
 
@@ -122,6 +139,7 @@ _TODO_
 
 ## Out of scope
 - SMS OTP — deferred until phone-based OTP is needed (no phone field / SMS provider yet).
-- TOTP / authenticator apps — not implemented.
 - Social login beyond Google + Microsoft — infrastructure is provider-agnostic; add per-app.
 - See the OUT list in `PROJECT_BRIEF.md`.
+
+_(Authenticator-app **TOTP MFA** is **implemented** — ADR-012, §6 + the sign-in step-up in §§1–3.)_

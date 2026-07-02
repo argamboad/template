@@ -107,14 +107,13 @@ beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — s
 
 **Platform services with no client UI (API-/operational-level, not manually testable through the app
 yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
-health endpoints, the background outbox/inbox/scheduled-jobs, **file storage** — the `IFileStorage`
+health endpoints, the background outbox/inbox/scheduled-jobs, and **file storage** — the `IFileStorage`
 seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
-authorization; local-disk only — cloud backends hand out native presigned URLs), and **GDPR data
-export** (`POST /api/household/export`, owner-only; returns a signed download URL to a JSON bundle), and
-**account erasure** (`DELETE /api/auth/me`; wipes the caller's identity/PII, single-owner-safe). These
-are **covered by
+authorization; local-disk only — cloud backends hand out native presigned URLs). These are **covered by
 automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
-cases for the rest will be added when client UI exists. **RBAC role management now has a web UI**
+cases for the rest will be added when client UI exists. **GDPR data export** (`POST /api/household/export`)
+and **account erasure** (`DELETE /api/auth/me`) now **have a web UI** (UI-1: owner Household → Data,
+Settings → Danger zone) — covered by the manual cases QA-HH-13 + QA-SET-07. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12. **MFA now has a web UI** (UI-2) — enrollment/
 disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..03. The **in-app
 notification center now has a web UI** (UI-3) — the header bell (list, unread count, mark-read) and

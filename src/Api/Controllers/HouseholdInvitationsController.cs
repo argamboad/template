@@ -8,8 +8,8 @@ using Template.Core.Repositories;
 namespace Template.Api.Controllers;
 
 /// <summary>
-/// Tenant ("household") invitations. Owners invite by email, list, regenerate and
-/// revoke pending invites; any authenticated user accepts with a token to join.
+/// Tenant ("household") invitations. Owners or admins (Permission.ManageMembers) invite by email,
+/// list, regenerate and revoke pending invites; any authenticated user accepts with a token to join.
 /// The raw token is surfaced once on create/regenerate (also emailed to the
 /// invitee); the list never returns tokens.
 /// </summary>
@@ -20,14 +20,14 @@ public class HouseholdInvitationsController(
     ITenantRepository tenants,
     IErrorResponseFactory errorFactory) : TenantApiControllerBase(tenants, errorFactory)
 {
-    /// <summary>Creates an invitation (owner only). Returns the raw token once and emails it.</summary>
+    /// <summary>Creates an invitation (owner or admin). Returns the raw token once and emails it.</summary>
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateInvitationRequest request, CancellationToken cancellationToken)
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can invite members") is { } forbidden)
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner or admin can invite members") is { } forbidden)
             return forbidden;
 
         var result = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "", cancellationToken);
@@ -46,28 +46,28 @@ public class HouseholdInvitationsController(
         };
     }
 
-    /// <summary>Lists the tenant's pending invitations (owner only). Token is not returned.</summary>
+    /// <summary>Lists the tenant's pending invitations (owner or admin). Token is not returned.</summary>
     [HttpGet]
     public async Task<IActionResult> GetPending(CancellationToken cancellationToken)
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can view invitations") is { } forbidden)
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner or admin can view invitations") is { } forbidden)
             return forbidden;
 
         var pending = await service.GetPendingAsync(membership.TenantId, cancellationToken);
         return Ok((IReadOnlyList<InvitationResponse>)pending.Select(InvitationResponse.From).ToList());
     }
 
-    /// <summary>Regenerates the token for a pending invitation (owner only). Issues a new raw token once.</summary>
+    /// <summary>Regenerates the token for a pending invitation (owner or admin). Issues a new raw token once.</summary>
     [HttpPost("{id:guid}/regenerate")]
     public async Task<IActionResult> Regenerate(Guid id, CancellationToken cancellationToken)
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can regenerate invitation tokens") is { } forbidden)
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner or admin can regenerate invitation tokens") is { } forbidden)
             return forbidden;
 
         var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId, cancellationToken);
@@ -82,14 +82,14 @@ public class HouseholdInvitationsController(
         };
     }
 
-    /// <summary>Revokes a pending invitation (owner only).</summary>
+    /// <summary>Revokes a pending invitation (owner or admin).</summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Revoke(Guid id, CancellationToken cancellationToken)
     {
         var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
             return InvalidToken();
-        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner can revoke invitations") is { } forbidden)
+        if (RequirePermission(membership, Permission.ManageMembers, "Only the household owner or admin can revoke invitations") is { } forbidden)
             return forbidden;
 
         var found = await service.RevokeAsync(membership.TenantId, id, cancellationToken);
