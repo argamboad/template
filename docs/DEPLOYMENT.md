@@ -116,9 +116,9 @@ later wire real billing, add `Billing__Stripe__WebhookSecret` and point a Stripe
 
 ## 5. OAuth — Google / Microsoft (optional)
 
-OAuth is **config-gated**: a provider is only registered when its `ClientId` is set. Until then the
-sign-in buttons still render but `GET /api/auth/login/{provider}` returns **500** (challenging an
-unregistered scheme). Magic link + OTP work without any of this — set up OAuth only if you want it.
+OAuth is **config-gated**: a provider is only registered when its `ClientId` is set, and the login +
+settings pages read `GET /api/auth/providers` so an unconfigured provider simply **shows no button**
+(no dead button that 500s). Magic link + OTP work without any of this — set up OAuth only if you want it.
 
 Per provider:
 

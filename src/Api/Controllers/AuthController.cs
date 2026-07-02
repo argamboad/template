@@ -35,6 +35,16 @@ public class AuthController(
     ILogger<AuthController> logger) : AuthControllerBase
 {
     /// <summary>
+    /// The OAuth providers this deployment has actually configured (lowercase keys, e.g. "google").
+    /// Anonymous — the login page reads it pre-auth to render only the providers that will work, instead
+    /// of a dead button that 500s on challenge. Empty when none are configured.
+    /// </summary>
+    [HttpGet("providers")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Providers([FromServices] IAuthenticationSchemeProvider schemeProvider) =>
+        Ok(new { providers = await AuthProviders.EnabledAsync(schemeProvider) });
+
+    /// <summary>
     /// Starts the OAuth flow: challenges the matching scheme. The callback route
     /// carries the provider so the callback can resolve the right identity.
     /// </summary>

@@ -19,6 +19,9 @@
         <div class="alert @(_banner.Value.Ok ? "alert-success" : "alert-danger")">@_banner.Value.Text</div>
     }
 
+    @* Linked external accounts — only when the server has OAuth providers configured (else nothing to link). *@
+    @if (_loading || _enabledProviders.Count > 0)
+    {
     <div class="card shadow-sm">
         <div class="card-body p-0">
             @if (_loading)
@@ -30,7 +33,7 @@
             else
             {
                 <ul class="list-group list-group-flush">
-                    @foreach (var p in Providers)
+                    @foreach (var p in Providers.Where(p => _enabledProviders.Contains(p.Key)))
                     {
                         var linked = _linked.Contains(p.Key);
                         <li class="list-group-item d-flex align-items-center justify-content-between py-3">
@@ -54,6 +57,7 @@
             }
         </div>
     </div>
+    }
 
     @if (!string.IsNullOrEmpty(_error))
     {
@@ -89,6 +93,8 @@
     ];
 
     private HashSet<string> _linked = new();
+    // OAuth providers the server configured — the list is filtered to these (no dead link buttons).
+    private HashSet<string> _enabledProviders = new(StringComparer.OrdinalIgnoreCase);
     private bool _loading = true;
     private bool _busy;
     private string? _error;
@@ -103,6 +109,7 @@
         }
 
         SetBannerFromQuery();
+        _enabledProviders = new HashSet<string>(await Auth.GetEnabledProvidersAsync(), StringComparer.OrdinalIgnoreCase);
         await LoadLogins();
     }
 

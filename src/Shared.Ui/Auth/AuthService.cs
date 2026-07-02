@@ -278,6 +278,25 @@ public class AuthService(
         }
     }
 
+    /// <summary>
+    /// The OAuth providers the server has actually configured (lowercase, e.g. "google"). Anonymous
+    /// probe of <c>GET /api/auth/providers</c> — the login + settings pages render only these, so an
+    /// unconfigured provider shows no dead button (challenging it 500s). Empty on any error (fail closed
+    /// to no OAuth rather than a broken button).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetEnabledProvidersAsync()
+    {
+        try
+        {
+            var res = await httpClient.GetFromJsonAsync<ProvidersResponse>("/api/auth/providers");
+            return res?.Providers ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     /// <summary>True when the current access token is an admin "sign in as" token.</summary>
     public bool IsImpersonating => Claim(AppClaims.ImpersonatedBy) is not null;
 
@@ -396,6 +415,13 @@ public class AuthService(
     {
         [System.Text.Json.Serialization.JsonPropertyName("is_staff")]
         public bool IsStaff { get; init; }
+    }
+
+    // GET /api/auth/providers — the OAuth providers this deployment configured.
+    private sealed record ProvidersResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("providers")]
+        public IReadOnlyList<string>? Providers { get; init; }
     }
 
     // A native primary-auth response: either tokens, or an MFA challenge to step up (mfa_required).
