@@ -98,6 +98,31 @@ Follow `docs/MOBILE_TESTING.md`. The essential bits:
 - Provider redirect URIs registered: `http://localhost:5238/signin-google` and
   `http://localhost:5238/signin-microsoft`.
 
+### 1.5 Environment B — deployed staging (DEPLOY, ADR-017)
+
+Everything above is **Environment A** (local). The same suite also runs against the **deployed staging**
+environment — one Render container serving the API + WASM **single-origin** over real HTTPS, backed by
+Neon Postgres and Brevo email. Point the browser at the staging URL (e.g.
+`https://<app>-staging.onrender.com`) and execute the cases exactly as written. What differs from local:
+
+- **One origin, real TLS.** Web + API share the host, so there's no separate API port and no CORS step.
+- **Email is real (Brevo), not Mailpit.** Use **real or plus-addressed inboxes** you can open (e.g.
+  `you+qa1@gmail.com`); there's no mail-trap UI. If a code/link doesn't arrive, check **Brevo → Transactional
+  → Logs** (and that a verified sender + `Email__Smtp__FromAddress` are set). Email cases are therefore
+  slower than local — pace them (the passwordless rate limit still applies).
+- **Cold start.** Free instances sleep after ~15 min idle; the **first** request of a session can take
+  ~30–60 s. That's expected, not a failure — retry once it wakes.
+- **OAuth** buttons appear **only** for providers configured on staging (Google/Microsoft need their
+  redirect URIs registered against the staging host). If unconfigured, the buttons are simply absent
+  (by design) — record those provider cases **N-A** for this environment.
+- **Billing** uses Stripe **test mode** — exercise webhooks with `stripe trigger …` against the staging
+  `/api/billing/webhook`.
+
+**Auto-deploy + smoke gate.** A merge to `develop` that passes CI auto-deploys staging and runs an
+automated post-deploy smoke (liveness/readiness, SPA shell + deep-link, `/api` returns an API-shaped 404,
+`/api/auth/providers`). A red smoke blocks — so a broken deploy is caught before manual QA starts. Manual
+QA on staging complements it (the human-only paths: real email, OAuth, billing, visual checks).
+
 ---
 
 ## 2. Scope

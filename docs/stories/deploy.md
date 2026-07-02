@@ -3,7 +3,10 @@
 > One file per epic. Takes the template from "tested locally + in CI" to **running on a real
 > staging environment** on an all-free-tier stack, with a repeatable path to prod. Design decision +
 > constraints in **ADR-017** (hosting: Render free + Neon Postgres + Brevo, **single-origin**).
-> Stories use Gherkin acceptance criteria. **Status: 📝 PLANNED.**
+> Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — DEPLOY-1 (single-origin + proxy),
+> DEPLOY-2 (container + live staging, all four sign-in paths verified), DEPLOY-3 (CI deploy pipeline +
+> post-deploy smoke + QA staging §1.5). Ongoing operator config (deploy-hook secret, prod environment)
+> per `docs/DEPLOYMENT.md`.
 
 **Epic key:** `DEPLOY`
 
@@ -180,6 +183,23 @@ merged; ADR-017 referenced.
 
 ### DEPLOY-3 — Deploy pipeline + post-deploy smoke + QA integration
 
+**Status: ✅ Implemented** (`feat/deploy-3-pipeline`). Deploy jobs live in `.github/workflows/ci.yml`
+(not a separate `deploy.yml` — same-workflow `needs` is the reliable way to gate deploy on the test/build
+jobs). **`deploy-staging`**: on a push to `develop`, after every test gate is green, POSTs the Render
+deploy hook (`RENDER_DEPLOY_HOOK_STAGING`), then polls `STAGING_BASE_URL/health/ready` and smoke-tests
+(liveness, readiness, SPA shell + deep-link, `/api/*` → 404 not the shell, `/api/auth/providers`); a red
+smoke fails the run. **`deploy-prod`**: on a push to `main`, behind the `production` GitHub Environment
+(add a required reviewer → manual approval; `main` stays deploy-only). Both **skip cleanly** (log a notice,
+pass) when their hook/URL aren't set, so the template is green out of the box and a downstream app opts in.
+QA plan gained **§1.5 "Environment B — deployed staging"** (real-Brevo inboxes, cold-start, config-gated
+OAuth, Stripe test triggers), with the PDFs regenerated (B11-8 gate). Verified live end-to-end during
+DEPLOY-2 bring-up (all four sign-in paths on the real staging URL).
+
+**Operator setup (one-time, flagged):** repo secret `RENDER_DEPLOY_HOOK_STAGING` (Render → service →
+Settings → Deploy Hook) + repo variable `STAGING_BASE_URL`; for prod, a `production` environment with a
+required reviewer + `RENDER_DEPLOY_HOOK_PROD`. Turn **off** Render's native auto-deploy on the service so
+CI is the only trigger. Steps in `docs/DEPLOYMENT.md`.
+
 **As a** maintainer
 **I want** merges to `develop` to auto-deploy staging (with a smoke gate) and a protected manual path for prod
 **So that** staging always reflects `develop` for QA, and prod stays a deliberate act from `main`
@@ -242,8 +262,10 @@ Ordered, each a mergeable vertical slice that leaves the app working. TDD throug
    `.dockerignore` + compose `app`-profile parity + `render.yaml` + `docs/DEPLOYMENT.md`, verified in
    Production mode against compose Postgres. Cloud half (Neon + Render + Brevo + Stripe-test accounts →
    live URL + manual OTP sign-in) is the operator's step per the runbook.
-3. 📝 **Pipeline + smoke + QA (DEPLOY-3).** `deploy.yml` (develop → staging auto + smoke;
-   main → prod behind environment approval), QA plan "Environment B: staging" (+ PDF regen).
+3. ✅ **Pipeline + smoke + QA (DEPLOY-3).** — DONE. `ci.yml` `deploy-staging` (develop → Render hook +
+   post-deploy smoke) and `deploy-prod` (main → behind the `production` environment approval); both skip
+   until their secrets exist. QA plan §1.5 "Environment B — deployed staging" (+ PDF regen). Operator
+   adds the deploy-hook secret + `STAGING_BASE_URL` var to activate.
 
 **Known sharp edges (from ADR-017):**
 - **Forwarded headers are a spoofing vector when not behind a proxy** — config-gated, default off.
