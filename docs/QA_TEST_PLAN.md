@@ -16,6 +16,11 @@
   **sign-off sheet (§14)**: Pass / Fail / Blocked / N-A, plus tester, build/commit, date, notes.
 - **Priority:** 🔴 Smoke (critical path) · 🟠 Core (run every regression) · 🟢 Edge (run on full
   regression or when the area changed).
+- **⚙️ Automated in CI** on a case title means a Playwright journey in `tests/E2E.Tests` now exercises
+  the same path on every push (the `e2e` job in `.github/workflows/ci.yml`). Human QA can **spot-check**
+  these rather than run them in full each cycle; they still need a manual pass on Desktop/Android (the
+  E2E job runs Web only) and whenever the area changes. See §15 for the exact list and §17 for the run
+  procedure.
 - **Both formats describe the same test.** Read whichever suits you; the Gherkin is the source of
   truth for automation.
 - **"App" = whichever client the suite header names.** Most behavior is identical across clients
@@ -123,6 +128,13 @@ by QA-ADMIN-01..03. The **public API (PUBAPI)** and **outbound webhooks (HOOKS)*
 UI-less (they're for machines) and **config-gated off** — they have **manual curl/Postman cases in §14b**
 (QA-API-01..06), in addition to automated tests.
 
+**Automated in CI (Web):** a Playwright/NUnit E2E suite (`tests/E2E.Tests`) now runs the core auth,
+MFA, and i18n journeys against the real booted stack on every push — the `e2e` job in
+`.github/workflows/ci.yml`. The cases it covers are marked **⚙️ Automated in CI** (QA-SMK-01,
+QA-SMK-03, QA-AUTH-09, QA-MFA-01, QA-MFA-02, QA-I18N-01; see the §15 note). Human QA can spot-check
+those on Web and focus effort on the un-automated cases and the Desktop/Android clients, which the CI
+job does not exercise.
+
 ---
 
 ## 3. Test data conventions
@@ -137,7 +149,7 @@ UI-less (they're for machines) and **config-gated off** — they have **manual c
 
 The critical path: can a user get in by each method, reach the app, and get out.
 
-### QA-SMK-01 — Web: OTP sign-in happy path 🔴 (Web)
+### QA-SMK-01 — Web: OTP sign-in happy path 🔴 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am an anonymous user on the /login page of the web app
@@ -168,7 +180,7 @@ Then I am returned to the app, signed in, on the home page
 3. Choose `qa.owner@gmail.com`, approve.
 4. **Expected:** redirected back into the app, signed in, on the home page with the header chrome.
 
-### QA-SMK-03 — Web: Sign out 🔴 (Web)
+### QA-SMK-03 — Web: Sign out 🔴 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am signed in to the web app
@@ -348,7 +360,7 @@ Then a human-readable error banner is shown
 - `/login?error=invalid_link` → invalid/expired link message.
 - `/login?error=somethingelse` → generic "something went wrong" fallback.
 
-### QA-AUTH-09 — Email-format validation 🟢 (Web)
+### QA-AUTH-09 — Email-format validation 🟢 (Web) ⚙️ Automated in CI
 **Walkthrough:** on `/login`, click a send button with an empty or malformed email (e.g. `abc`).
 **Expected:** inline "enter a valid email" validation; no request sent.
 
@@ -715,7 +727,7 @@ Then my account and personal data are deleted and I'm signed out
 4. **Sole owner:** a second confirm warns it also **dissolves the household**; on confirm, the account +
    household are deleted.
 
-### QA-MFA-01 — Enable two-factor (authenticator TOTP) 🟠 (Web)
+### QA-MFA-01 — Enable two-factor (authenticator TOTP) 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** signed in; an authenticator app (Google Authenticator, 1Password, Authy, …) to hand.
 **Gherkin**
 ```gherkin
@@ -731,7 +743,7 @@ Then two-factor turns On and I'm shown one-time recovery codes
    (shown once). **I've saved my codes** returns to the On state.
 5. **Wrong code:** an inline error ("that code is incorrect or has expired"); nothing changes.
 
-### QA-MFA-02 — Two-factor is required at sign-in 🟠 (Web)
+### QA-MFA-02 — Two-factor is required at sign-in 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** an account with two-factor **On** (QA-MFA-01).
 **Gherkin**
 ```gherkin
@@ -844,7 +856,7 @@ Then the choice is saved and survives a reload
 
 ## 10. Web — Localization (i18n) 🟠
 
-### QA-I18N-01 — Switch language on the login page 🟠 (Web)
+### QA-I18N-01 — Switch language on the login page 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am on /login in English
@@ -1275,6 +1287,22 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
 Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
 
+**Automated (E2E CI ⚙️):** the following manual cases have an equivalent Playwright/NUnit journey in
+`tests/E2E.Tests`, run on every push by the `e2e` job (`.github/workflows/ci.yml`) against a booted
+Postgres + Mailpit + API + Web stack — so they are continuously regression-guarded on **Web**:
+
+| Manual case | E2E test |
+|---|---|
+| QA-SMK-01 (OTP sign-in happy path) | `AuthFlowTests.Otp_SignIn_LandsInTheApp` (+ `Login_Page_Renders`) |
+| QA-SMK-03 (sign out) | `AuthFlowTests.SignOut_ReturnsToLogin` |
+| QA-AUTH-09 (email-format validation) | `AuthFlowTests.Invalid_Email_IsRejected_NoCodeStep` |
+| QA-MFA-01 (enable TOTP) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` (enroll leg) |
+| QA-MFA-02 (step-up enforced at sign-in) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` + `StepUp_WithWrongCode_DoesNotSignIn` |
+| QA-I18N-01 (switch language on login) | `I18nTests.Switching_Language_ReRendersTheUi` |
+
+These still need a manual pass on **Desktop/Android** (the CI job runs Web only) and whenever the area
+changes. All other cases remain manual-only or API-test-backed as noted per row.
+
 ---
 
 ## 16. Sign-off sheet
@@ -1294,10 +1322,14 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
 
 ## 17. Notes for maintainers
 - This plan is the manual counterpart to the automated `tests/E2E.Tests` (Playwright/NUnit) suite.
-  That suite now covers the OTP auth happy-path and guards (`AuthFlowTests` over `LoginPage`, reading
-  codes from Mailpit via the `Mailpit` REST client) — see `tests/E2E.Tests/README.md` for the run
-  procedure (it documents the same Mailpit SMTP override noted in §1.1). The Gherkin blocks here are
-  written to be lifted directly into new E2E scenarios — keep the two in sync as automation grows.
+  That suite now covers the **OTP auth happy-path + guards** (`AuthFlowTests`), the **MFA enroll →
+  step-up** journey incl. the wrong-code negative (`MfaJourneyTests`), and the **language switch**
+  (`I18nTests`) — all over the page objects in `Pages/`, reading codes from Mailpit via the `Mailpit`
+  REST client, and **run in CI** by the `e2e` job (`.github/workflows/ci.yml`, Web only). See
+  `tests/E2E.Tests/README.md` for the run procedure (it documents the same Mailpit SMTP override noted
+  in §1.1). The cases these journeys mirror are marked **⚙️ Automated in CI** and listed in §15. The
+  Gherkin blocks here are written to be lifted directly into new E2E scenarios — keep the two in sync
+  as automation grows.
 - When you add an app-specific domain feature on top of this template, add a matching suite here and
   a row in the traceability matrix (§15) so "entire functionality" stays honest.
 - `docs/FEATURES.md` describes the same JWT-based flows at the design level; this plan is their
@@ -1473,3 +1505,12 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   **no web UI by design** (they're for machines), so this is the human-testable complement to the
   automated tests — the Postman path is one import of `/api/public/openapi.json` away. Referenced from the
   §15 PUBAPI/HOOKS rows and the §2 "no client UI" note.
+- **Updated 2026-07-02** — **E2E-in-CI (v2 audit B8-5/B8-6):** the Playwright suite is now booted and run
+  on every push (the `e2e` job in `.github/workflows/ci.yml` — Postgres + Mailpit + API + Web) and was
+  expanded beyond the auth happy-path to the **MFA enroll → step-up** journey (`MfaJourneyTests`, incl. a
+  wrong-code negative) and the **login-page language switch** (`I18nTests`). Six manual cases now have a
+  continuously-run Web equivalent and are marked **⚙️ Automated in CI**: QA-SMK-01, QA-SMK-03, QA-AUTH-09,
+  QA-MFA-01, QA-MFA-02, QA-I18N-01 (mapping table added under §15; how-to note in §2/§1 "How to use").
+  These stay in the manual plan for **Desktop/Android** (CI runs Web only) and area-change re-runs; human
+  QA can spot-check them on Web rather than run them in full each cycle. `data-testid` hooks were added to
+  `MfaCard` and `LanguageSwitcher` to keep the selectors stable.
