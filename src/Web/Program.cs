@@ -10,8 +10,12 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-var apiBase = builder.Configuration["ApiBaseUrl"]
-    ?? throw new InvalidOperationException("ApiBaseUrl not configured in wwwroot/appsettings.json.");
+// Same-origin by default (DEPLOY-1, ADR-017): when the API serves this bundle (single-origin
+// deployment), the API lives on this app's own origin, so fall back to the host base address. An
+// explicit ApiBaseUrl (local dev's wwwroot/appsettings.json, the e2e CI override) still takes precedence.
+var apiBase = builder.Configuration["ApiBaseUrl"] is { Length: > 0 } configured
+    ? configured
+    : builder.HostEnvironment.BaseAddress;
 
 // Delegating handlers:
 //  - CookieHandler includes browser credentials (the HttpOnly refresh cookie).

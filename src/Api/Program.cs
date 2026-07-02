@@ -153,6 +153,10 @@ builder.Services.AddTenantApiAuthorization();
 // Throttle the unauthenticated passwordless endpoints (email-bomb / brute-force surface) — CONF-5.
 builder.Services.AddApiRateLimiters(builder.Configuration);
 
+// Reverse-proxy correctness (DEPLOY-1, ADR-017), config-gated off. Behind Render/nginx, honor the
+// proxy's X-Forwarded-For/-Proto so the rate limiter sees the real client IP and OAuth URIs use https.
+builder.Services.AddProxyForwarding(builder.Configuration);
+
 // CORS — allow the Blazor WASM client to send credentialed requests (cookies).
 var allowedOrigins = builder.Configuration
     .GetSection("Auth:AllowedOrigins")
@@ -180,6 +184,21 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     if (db.Database.IsRelational())
         db.Database.Migrate();
+}
+
+// Forwarded headers must run FIRST — before HTTPS redirect, auth, or the rate limiter read the
+// IP/scheme. No-op unless Proxy:Enabled (see AddProxyForwarding).
+app.UseProxyForwarding(app.Configuration);
+
+// Single-origin hosting (DEPLOY-1, ADR-017), config-gated off. When enabled, the API also serves the
+// published Blazor WASM client so the whole app is one origin (first-party refresh cookie, no CORS).
+// Default off — local dev uses the separate `src/Web` dev server; the deployed container sets this true
+// and ships the published wwwroot alongside the API. Static assets are served before auth.
+var serveWebClient = app.Configuration.GetValue("Hosting:ServeWebClient", false);
+if (serveWebClient)
+{
+    app.UseBlazorFrameworkFiles();
+    app.UseStaticFiles();
 }
 
 if (app.Environment.IsDevelopment())
@@ -241,5 +260,14 @@ if (publicApiSettings.Enabled)
 // HOOKS (ADR-016): map webhook management only when enabled — off ⇒ the routes don't exist.
 if (webhooksSettings.Enabled)
     app.MapWebhookManagement();
+
+// Single-origin SPA fallback (DEPLOY-1). An unmatched /api/* must be a real API-shaped 404 — never the
+// SPA shell (the more specific fallback out-precedences the catch-all file fallback for /api paths).
+// Everything else (client-side routes) falls back to index.html so deep links load the WASM app.
+if (serveWebClient)
+{
+    app.MapFallback("/api/{**rest}", () => Results.NotFound());
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();
