@@ -83,96 +83,27 @@ builder.Services.AddAppTelemetry(builder.Configuration);
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
-// Typed settings (read configuration once at startup).
-builder.Services.AddSingleton<IJwtSettings>(new JwtSettings(builder.Configuration));
-builder.Services.AddSingleton<IRefreshTokenSettings>(new RefreshTokenSettings(builder.Configuration));
-builder.Services.AddSingleton<IApplicationSettings>(new ApplicationSettings(builder.Configuration));
-builder.Services.AddSingleton<IPasswordlessSettings>(new PasswordlessSettings(builder.Configuration));
-builder.Services.AddSingleton<IInvitationSettings>(new InvitationSettings(builder.Configuration));
+// Typed settings (read configuration once at startup). Returns the single IJwtSettings instance so
+// the JWT-bearer handler below reuses it (no duplicate construction — DEBT-1).
+var jwtSettings = builder.Services.AddAppSettings(builder.Configuration);
 
 // Clock — injected so services are testable.
 builder.Services.AddSingleton(TimeProvider.System);
 
-// Auth services.
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-builder.Services.AddScoped<ISessionService, SessionService>();
-builder.Services.AddScoped<IClaimsExtractor, ClaimsExtractor>();
-// Per-provider email-trust policy (tenant-gated for Microsoft) layered on the fail-closed claim check.
-builder.Services.AddSingleton<IProviderEmailTrust, ProviderEmailTrust>();
-builder.Services.AddScoped<IPasswordlessService, PasswordlessService>();
-builder.Services.AddScoped<ICookieService, CookieService>();
-builder.Services.AddScoped<IErrorResponseFactory, ErrorResponseFactory>();
-builder.Services.AddScoped<ITokenGenerator, TokenGenerator>();
-builder.Services.AddScoped<ITokenHasher, TokenHasher>();
-builder.Services.AddSingleton<ILinkTokenService, LinkTokenService>();
-builder.Services.AddSingleton<INativeAuthCodeService, NativeAuthCodeService>();
-
-// Tenant ("household") management services.
-// Current-tenant accessor — reads the JWT tenant_id claim; drives the global tenant
-// query filter in AppDbContext and is the slice-facing tenancy entry point.
-builder.Services.AddHttpContextAccessor();
-// One scoped HttpCurrentTenant backs both interfaces, so entering a tenant via ITenantContext is seen
-// by ICurrentTenant (and thus the AppDbContext filter/stamping) within the same scope.
-builder.Services.AddScoped<HttpCurrentTenant>();
-builder.Services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<HttpCurrentTenant>());
-builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpCurrentTenant>());
-builder.Services.AddScoped<ITenantService, TenantService>();
-builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
-
-// Tenant data export (GDPR-1, ADR-011). Assembles core + each contributor's section into a JSON
-// bundle stored via IFileStorage, returned as a signed URL. Owner-gated at the endpoint.
-builder.Services.AddScoped<ITenantExportService, TenantExportService>();
-// Account erasure (GDPR-2, ADR-011). "Delete my account" — wipes identity/PII in one audited
-// transaction, honoring the single-owner invariant (transfer-or-dissolve first).
-builder.Services.AddScoped<IAccountErasureService, AccountErasureService>();
-// MFA — authenticator-app TOTP (MFA-1, ADR-012). Secret encrypted at rest; hashed recovery codes.
-builder.Services.AddScoped<IMfaService, MfaService>();
-// Per-user data teardown for account erasure (GDPR-2): each concern that stores user-keyed PII
-// registers an IUserDataContributor so AccountErasureService wipes it without a hard-coded list.
-builder.Services.AddScoped<IUserDataContributor, MfaUserDataContributor>();
-builder.Services.AddScoped<IUserDataContributor, NotificationUserDataContributor>();
-// MFA login step-up (MFA-2). Signed short-lived challenge + verify → completes the session.
-builder.Services.AddSingleton<IMfaChallengeService, MfaChallengeService>();
-builder.Services.AddScoped<IMfaLoginService, MfaLoginService>();
-// Per-user in-app notifications (NOTIFY-1, ADR-013). NotifyAsync stages an in-app row on the caller's
-// unit of work; the center API reads/marks the caller's own notifications.
-builder.Services.AddScoped<INotificationService, NotificationService>();
-
-// Platform-staff admin surface (ADMIN, ADR-014). Staff is an out-of-band config allowlist; the admin
-// endpoints gate on it per-request. Cross-tenant reads use EnterTenant / non-scoped tables — the global
-// filter is never loosened.
-builder.Services.Configure<PlatformAdminSettings>(builder.Configuration.GetSection("Admin"));
-builder.Services.AddScoped<IPlatformStaffService, PlatformStaffService>();
-
-// RBAC permission seam (ADR-009). Server-side role→permission check behind .RequirePermission(...);
-// resolves the caller's membership and consults the RolePermissions matrix; fails closed.
-builder.Services.AddScoped<IPermissionService, PermissionService>();
-
-// Billing entitlements (ADR-006). Server-side plan gate behind .RequireEntitlement(...); reads the
-// tenant's Subscription projection and fails closed to Free.
-builder.Services.AddScoped<IEntitlementService, EntitlementService>();
-// Billing quotas (BILLING-5): seat + metered-usage limits from the plan; used by the invite flow.
-builder.Services.AddScoped<IQuotaService, QuotaService>();
-// Billing dunning (BILLING-6): notify the tenant owner on failed-payment/cancel transitions, and a
-// scheduled sweep that nudges once when a paid period lapses without a webhook.
-builder.Services.AddScoped<IBillingNotifier, BillingNotifier>();
-builder.Services.AddScoped<IScheduledJob, SubscriptionLapseSweepJob>();
-// Billing checkout orchestration (BILLING-2), behind the platform BillingController. The
-// IBillingProvider (Stripe or fake) is registered in AddInfrastructure.
-builder.Services.AddScoped<IBillingService, BillingService>();
-// Billing webhook handler (BILLING-3): verify → inbox-dedup → EnterTenant → upsert Subscription.
-builder.Services.AddScoped<BillingWebhookHandler>();
+// Per-epic service registrations — the DI wiring, grouped by concern (see ServiceRegistrationExtensions).
+builder.Services.AddAuthServices();
+builder.Services.AddTenantServices();
+builder.Services.AddMfaServices();
+builder.Services.AddNotificationServices();
+builder.Services.AddPlatformAdminServices(builder.Configuration);
+builder.Services.AddRbacServices();
+builder.Services.AddBillingServices();
 
 // 🗑️ DELETE-ME: sample feature slice (Features/Notes) — the reference for how a vertical
-// slice wires up: a handler + a tenant-data contributor, with endpoints mapped below.
+// slice wires up: a handler + a tenant-data contributor, with endpoints mapped below. Kept inline
+// here (not in ServiceRegistrationExtensions) because only Program.cs may reference Features.* (R8).
 builder.Services.AddScoped<NotesHandler>();
 builder.Services.AddScoped<ITenantDataContributor, NotesDataContributor>();
-
-// Billing participates in tenant dissolve (BILLING-7): wipe the Subscription projection + cancel the
-// provider subscription (via the outbox) so a dissolved tenant stops being billed.
-builder.Services.AddScoped<ITenantDataContributor, BillingDataContributor>();
 
 // Caches + session (LinkTokenService uses IMemoryCache; session backed by distributed cache).
 builder.Services.AddMemoryCache();
@@ -189,8 +120,8 @@ builder.Services.AddSession(options =>
 });
 
 // JWT Bearer — authenticates /api/* endpoints with the app-issued access token.
-// Validation mirrors JwtTokenService (issuer = audience = Jwt:Issuer).
-var jwtSettings = new JwtSettings(builder.Configuration);
+// Validation mirrors JwtTokenService (issuer = audience = Jwt:Issuer). Reuses the SAME
+// IJwtSettings instance registered as the DI singleton above (AddAppSettings) — one source of truth.
 var authBuilder = builder.Services.AddAuthentication()
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
