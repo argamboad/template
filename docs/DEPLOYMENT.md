@@ -137,6 +137,23 @@ Per provider:
 Because `Proxy__Enabled=true`, the app sees the real `https` scheme behind Render's proxy, so the
 generated redirect URIs match what you register. Render redeploys on the env change; the buttons then work.
 
+## 6. Continuous deployment (DEPLOY-3, optional)
+
+By default you deploy by pushing to the branch Render tracks. To instead gate deploys on **green CI** and
+run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.yml`:
+
+1. In Render → your staging service → **Settings → Deploy Hook**, copy the hook URL, and **turn off
+   "Auto-Deploy"** (so CI is the only trigger — no double deploys).
+2. Repo → **Settings → Secrets and variables → Actions**:
+   - Secret **`RENDER_DEPLOY_HOOK_STAGING`** = the deploy hook URL.
+   - Variable **`STAGING_BASE_URL`** = `https://<app>-staging.onrender.com`.
+3. Now a push to `develop` that passes every CI gate triggers the deploy and smoke-tests the live URL
+   (liveness/readiness, SPA shell + deep-link, `/api/*` → 404, `/api/auth/providers`). A red smoke fails
+   the run. Until the secret + variable exist, the `deploy-staging` job logs a notice and passes.
+4. **Prod** (when you have a prod service): create a **`production`** GitHub Environment (repo Settings →
+   Environments) with a **required reviewer**, and add secret **`RENDER_DEPLOY_HOOK_PROD`**. A push to
+   `main` then waits for your approval before deploying — keeping `main` deploy-only and deliberate.
+
 ---
 
 ## Environment variables (reference)
@@ -144,7 +161,7 @@ generated redirect URIs match what you register. Render redeploys on the env cha
 | Key | Required | Notes |
 |---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | yes | `Production` (set by `render.yaml`) |
-| `ConnectionStrings__DefaultConnection` | yes | Neon **session** pooler, `sslmode=require` |
+| `ConnectionStrings__DefaultConnection` | yes | Neon **direct** endpoint, `SSL Mode=Require` |
 | `Jwt__Secret` | yes | ≥32 chars; Render auto-generates |
 | `Billing__Stripe__SecretKey` | **yes** | fail-closed guard; a `sk_test_…` key for staging |
 | `Email__Smtp__Host/Port/Username/Password` | yes | Brevo |

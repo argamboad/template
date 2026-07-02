@@ -217,3 +217,77 @@ jobs:
       - name: Server logs (on failure)
         if: failure()
         run: tail -80 api.log web.log || true
+
+  # Deploy staging (DEPLOY-3, ADR-017). Runs ONLY on a push to develop, and only after every test/build
+  # gate above is green — so staging always reflects a passing develop. Triggers the Render deploy via a
+  # deploy hook (repo secret), then polls the public URL and smoke-tests it. Both the hook and the base
+  # URL are optional: absent ⇒ the job logs a notice and passes, so the template is green out of the box
+  # and a downstream app opts in by adding the secret + variable (see docs/DEPLOYMENT.md).
+  deploy-staging:
+    needs: [build-test, secret-scan, qa-artifacts, license-scan, docker-build, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::notice::RENDER_DEPLOY_HOOK_STAGING not set — skipping staging deploy. Add the secret to enable."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "Triggered Render staging deploy."
+
+      - name: Wait for staging + smoke test
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}
+          BASE: ${{ vars.STAGING_BASE_URL }}
+        run: |
+          if [ -z "$HOOK" ] || [ -z "$BASE" ]; then
+            echo "::notice::Deploy hook or STAGING_BASE_URL not set — skipping post-deploy smoke."
+            exit 0
+          fi
+          echo "Waiting for $BASE to report healthy (Render free: build + cold boot can take minutes)…"
+          ready=0
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$BASE/health/ready" || echo 000)
+            if [ "$code" = "200" ]; then ready=1; echo "  ready after ~$((i*10))s"; break; fi
+            echo "  [$i] /health/ready → $code; retry in 10s"
+            sleep 10
+          done
+          [ "$ready" = "1" ] || { echo "::error::staging did not become ready in time"; exit 1; }
+
+          fail=0
+          assert() { # label expected url
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$3")
+            if [ "$code" = "$2" ]; then echo "PASS  $1  ($3 → $code)"
+            else echo "::error::FAIL $1 ($3 → $code, want $2)"; fail=1; fi
+          }
+          assert liveness         200 "$BASE/health"
+          assert readiness        200 "$BASE/health/ready"
+          assert spa-shell        200 "$BASE/"
+          assert spa-deeplink     200 "$BASE/settings"
+          assert api-not-shadowed 404 "$BASE/api/does-not-exist"
+          assert providers        200 "$BASE/api/auth/providers"
+          exit $fail
+
+  # Deploy prod (DEPLOY-3). Runs ONLY on a push to main, behind the `production` GitHub Environment — add a
+  # required reviewer to that environment (repo Settings → Environments) to make prod a manual approval, so
+  # main stays deploy-only + deliberate. Skips cleanly until a prod service + its deploy hook exist.
+  deploy-prod:
+    needs: [build-test, secret-scan, qa-artifacts, license-scan, docker-build, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Render prod deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_PROD }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::notice::RENDER_DEPLOY_HOOK_PROD not set — no prod service yet. Skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "Triggered Render prod deploy."
