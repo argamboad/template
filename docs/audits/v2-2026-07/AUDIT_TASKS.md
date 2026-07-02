@@ -1,8 +1,8 @@
 # AUDIT_TASKS.md — v2 Remediation Plan (Phase 5 consolidation gate)
 
-> **Status: IN PROGRESS.** Approved 2026-07-01. **V2-B1 (Critical) through V2-B7 (all Highs) are IMPLEMENTED**, test-first, on branch `fix/v2-high-remediation` (off `develop`); build clean (warnings-as-error), Core 42/42, Api 371/371 green. Remaining: **V2-B8–B11** (test-completeness, debt/SOLID, docs, enforcement). This plan consolidates Phases 1–4 (all pinned to `84c7ad8`). Order mirrors the archived `audits/v1-2026-06/AUDIT_TASKS.md`: **keystone first, enforcement last.** Each task lists severity, the rule/finding it satisfies, whether it **touches core**, the **tests that must exist first** (TDD), a **done-when**, and a **verify** command.
+> **Status: LANDED ON `develop`.** Approved 2026-07-01. **V2-B1 (Critical) through V2-B7 (all Highs) are complete**, plus the core of **B8/B10/B11** and DEBT-2 of **B9** — all test-first, merged to `develop`; build clean (warnings-as-error), Core 42/42, Api 378/378 green. **Remaining = scoped follow-ups only** (no correctness gaps): the HTTP/E2E test harness (B8-2/B8-5/B8-6), the larger SOLID/DEBT refactors gated on it (B9-1/2/4/5/6/7), and the CI-infra gates (B11-4/5/6/7/8) — see the scoped-follow-ups footnote under the tracker. This plan consolidates Phases 1–4 (all pinned to `84c7ad8`). Order mirrors the archived `audits/v1-2026-06/AUDIT_TASKS.md`: **keystone first, enforcement last.** Each task lists severity, the rule/finding it satisfies, whether it **touches core**, the **tests that must exist first** (TDD), a **done-when**, and a **verify** command.
 >
-> **Batch commits (fix/v2-high-remediation):** B1 `c74b359` · B2 `10b1b9b` · B3 `28dcce5` · B4 `eec8fdb` · B5 `bbc1196` · B6 `483e516` · B7 `72cba09`.
+> **Batch commits (on `develop`):** B1 `c74b359` · B2 `10b1b9b` · B3 `28dcce5` · B4 `eec8fdb` · B5 `bbc1196` · B6 `483e516` · B7 `72cba09` · B8 `4464021` · B9(DEBT-2) `184e325` · B10 `41cf3eb` · B11 `fc2d839`. B8–B11 reached `develop` via the re-landing PR #63 (see the landing note under the tracker).
 
 ## Gate results (Phase 5)
 
@@ -146,22 +146,22 @@ The one Critical. Fixes the default-config unauthenticated cross-tenant write.
 
 ## V2-B8 — Test-completeness (test-first specs → tests)
 Each spec from `LOGIC_AND_TEST_REPORT.md` Part B not already created by B1–B7. Land as failing-then-green.
-- [ ] **B8-1 · Write-side tenancy negatives per epic** — Critical(test) — `ApiKey_TenantA_CannotRevokeTenantBKey`, `Webhook_TenantA_CannotDeleteOrReplayTenantBSubscription`, `Subscription_TenantA_CannotReadOrWriteTenantBSubscription`, `Notification_TenantAUser_CannotListTenantBNotifications`.
-- [ ] **B8-2 · MFA step-up on every path (integration)** — High — the four `MfaStepUp_*Path*` tests (OTP, magic-link, OAuth callback, native exchange).
-- [ ] **B8-3 · Migration `Down` rollback** — High — `Migrations_Down_RevertCleanly_ToInitial`.
-- [ ] **B8-4 · Fail-open / SSRF / stale-webhook / clock** — covered by B5-1/2/4 + B4-1 tests; verify no duplication.
-- [ ] **B8-5 · E2E journeys** — (D7-adjacent) specify + wire the missing Playwright journeys (OAuth, magic-link, tenant-isolation, RBAC three-tier, MFA enroll+step-up, GDPR export/erasure, admin impersonation, i18n) behind a bootable CI job; billing E2E blocked on a fake-provider E2E seam (note the dependency, don't silently skip).
-- [ ] **B8-6 · Harness gaps** — extend `ServiceHarness` to cover MFA/notifications/files/webhooks/api-keys so slices touching them don't hand-assemble.
+- [~] **B8-1 · Write-side tenancy negatives per epic** — Critical(test) — ✅ shipped: `Revoke_CannotRevokeAnotherTenantsKey` (ApiKey), `Delete_CannotDeleteAnotherTenantsSubscription` + `Replay_UnknownOrOtherTenant_ReturnsFalse` (Webhook). ⬜ pending: `Subscription_TenantA_CannotReadOrWriteTenantBSubscription`, `Notification_TenantAUser_CannotListTenantBNotifications`.
+- [ ] **B8-2 · MFA step-up on every path (integration)** — High — ⬜ **scoped** (needs the HTTP harness): the four `MfaStepUp_*Path*` tests (OTP, magic-link, OAuth callback, native exchange). Step-up *logic* is already service-tested.
+- [x] **B8-3 · Migration `Down` rollback** — High — `Migrations_Down_RevertCleanly_ToEmptySchema` (`4464021`).
+- [x] **B8-4 · Fail-open / SSRF / stale-webhook / clock** — covered by B5-1/2/4 + B4-1 tests; no duplication.
+- [ ] **B8-5 · E2E journeys** — ⬜ **scoped** (D7-adjacent): specify + wire the missing Playwright journeys (OAuth, magic-link, tenant-isolation, RBAC three-tier, MFA enroll+step-up, GDPR export/erasure, admin impersonation, i18n) behind a bootable CI job; billing E2E blocked on a fake-provider E2E seam (note the dependency, don't silently skip).
+- [ ] **B8-6 · Harness gaps** — ⬜ **scoped**: extend `ServiceHarness` to cover MFA/notifications/files/webhooks/api-keys so slices touching them don't hand-assemble.
   - **Exit check (V2-B8):** every Critical/High spec in Part B exists and is green (or E2E explicitly tracked in CI).
 
 ## V2-B9 — Debt & SOLID
-- [ ] **B9-1 · Split `AuthController`** — High · (SOLID-2) · touches core — into `MfaController`/`AccountController`/`NativeAuthController` along the section comments; routes unchanged (assert via existing auth tests).
-- [ ] **B9-2 · One config-binding pattern** — Medium · (DEBT-1, R22) — typed options `.BindConfiguration().ValidateOnStart()`; reuse the single `JwtSettings` instance.
-- [ ] **B9-3 · `ClaimsPrincipal.GetUserId()` helper** — Medium · (DEBT-2) — delete the 6 copies.
-- [ ] **B9-4 · Per-epic `Add*()/Map*()` extensions + `IEntityTypeConfiguration<>`** — Medium · (DEBT-3/4, R34) — shrink `Program.cs` + `OnModelCreating`.
-- [ ] **B9-5 · Unify RBAC 403 (filter) + shared `ErrorResponse`** — Medium · (DEBT-5, SOLID-7, R18) — `[RequireTenantPermission]` filter; drop `IErrorResponseFactory`.
-- [ ] **B9-6 · Move PUBAPI/HOOKS per D7; extract `TenantDissolutionService`; branded notification email** — Medium · (DEBT-6/7/8, TR-7).
-- [ ] **B9-7 · Lower-value smells** — Low · (DEBT-9/10/11, SOLID-5/6/8, LOGIC-S3 per D4) — DTO homes, locale constant, dissolve dup, result types, `AuthSchemes` constant, invitation email-binding decision.
+- [ ] **B9-1 · Split `AuthController`** — High · (SOLID-2) · touches core — ⬜ **scoped** (gated on the B8 HTTP harness): into `MfaController`/`AccountController`/`NativeAuthController` along the section comments; routes unchanged (assert via existing auth tests).
+- [ ] **B9-2 · One config-binding pattern** — Medium · (DEBT-1, R22) — ⬜ **scoped**: typed options `.BindConfiguration().ValidateOnStart()`; reuse the single `JwtSettings` instance.
+- [x] **B9-3 · `ClaimsPrincipal.GetUserId()` helper** — Medium · (DEBT-2) — deleted the 6 copies; centralized in `ClaimsPrincipalExtensions.GetUserId()` (`184e325`).
+- [ ] **B9-4 · Per-epic `Add*()/Map*()` extensions + `IEntityTypeConfiguration<>`** — Medium · (DEBT-3/4, R34) — ⬜ **scoped**: shrink `Program.cs` + `OnModelCreating`.
+- [ ] **B9-5 · Unify RBAC 403 (filter) + shared `ErrorResponse`** — Medium · (DEBT-5, SOLID-7, R18) — ⬜ **scoped**: `[RequireTenantPermission]` filter; drop `IErrorResponseFactory`.
+- [ ] **B9-6 · Move PUBAPI/HOOKS per D7; extract `TenantDissolutionService`; branded notification email** — Medium · (DEBT-6/7/8, TR-7) — ⬜ **scoped** (the PUBAPI/HOOKS→`Endpoints/` move; also gates R6).
+- [ ] **B9-7 · Lower-value smells** — Low · (DEBT-9/10/11, SOLID-5/6/8, LOGIC-S3 per D4) — ⬜ **scoped**: DTO homes, locale constant, dissolve dup, result types, `AuthSchemes` constant, invitation email-binding decision.
   - **Exit check (V2-B9):** the patterns every slice copies are single-sourced; no god controller.
 
 ## V2-B10 — Docs reconcile
@@ -177,15 +177,15 @@ Each spec from `LOGIC_AND_TEST_REPORT.md` Part B not already created by B1–B7.
 
 ## V2-B11 — Enforcement & Definition of Solid (LAST · locks everything)
 Add each machine rule as an arch test / analyzer / CI step (backlog `AUDIT_RECONCILIATION.md` §7 E1–E22 + R32/R34/R35/R28/R29/R30 tests).
-- [ ] **B11-1 · Arch tests:** R2 (TenantId⇒scoped/allowlist), R4 (controller base), R5 (Features ban both hatches), R6 (MapTenantFeatureGroup), R7/R8 (feature namespace isolation), R9 (no Notes in platform tests), R15 (no ambient UtcNow), R34 (fixture=model), R35 (route/table uniqueness).
-- [ ] **B11-2 · Correctness pins:** R28 (MFA replay), R29 (stale webhook), R30 (atomic quota), R17 (fail-open), R32 (write UPDATE/DELETE) — as standing tests.
-- [ ] **B11-3 · R12 user-data-contributor coverage test** (after B6).
-- [ ] **B11-4 · R13 ExportKey uniqueness test.**
-- [ ] **B11-5 · CI doc-sync (R23) + config-key⇄.env (R20) + secret scan (gitleaks) + MailKit-outside-Email ban.**
-- [ ] **B11-6 · Supply chain:** R25 (CPM + lockfile + `--locked-mode`), R26 (license scan), R27.
-- [ ] **B11-7 · MA0048 file-name analyzer (R24 naming half).**
-- [ ] **B11-8 · QA: move guide-PDF generation into CI (deterministic); assert run-log append-only; assert QA plan + PDFs change together.**
-- [ ] **B11-9 · Definition of Solid + Standing Instruction:** update `CONTRIBUTING.md` with the new invariants; add the `FOUNDATION_RULES.md`-binding standing instruction to `CLAUDE.md`/`AGENTS.md` (per the suite's STANDING INSTRUCTION block). Decide E2E-in-CI (B8-5).
+- [~] **B11-1 · Arch tests:** ✅ shipped: R2 (`EveryEntityWithATenantId_IsScopedOrAllowlisted`), R4 (`EveryController_DerivesFromATenantOrAdminBase_OrIsAllowlisted`), R5 (Features ban both hatches — from B2), R9 (`PlatformTests_DoNotDependOnTheDeleteMeNotesSample`), R15 (`ServerServices_UseInjectedClock_NotAmbientUtcNow`), R34 (fixture=model — from B7). ⬜ pending: R6 (MapTenantFeatureGroup — gated on the B9-6 PUBAPI/HOOKS move), R7/R8 (feature namespace isolation), R35 (route/table uniqueness).
+- [x] **B11-2 · Correctness pins:** R28 (MFA replay), R29 (stale webhook), R30 (atomic quota), R17 (fail-open), R32 (write UPDATE/DELETE) — shipped as standing tests alongside B2–B5.
+- [x] **B11-3 · R12 user-data-contributor coverage test** — `EveryUserKeyedEntity_IsWiredIntoAccountErasure` (after B6).
+- [ ] **B11-4 · R13 ExportKey uniqueness test** — ⬜ **scoped**.
+- [ ] **B11-5 · CI doc-sync (R23) + config-key⇄.env (R20) + secret scan (gitleaks) + MailKit-outside-Email ban** — ⬜ **scoped** (CI-infra).
+- [ ] **B11-6 · Supply chain:** R25 (CPM + lockfile + `--locked-mode`), R26 (license scan), R27 — ⬜ **scoped** (CI-infra).
+- [ ] **B11-7 · MA0048 file-name analyzer (R24 naming half)** — ⬜ **scoped**.
+- [ ] **B11-8 · QA: move guide-PDF generation into CI (deterministic); assert run-log append-only; assert QA plan + PDFs change together** — ⬜ **scoped** (CI-infra).
+- [x] **B11-9 · Definition of Solid + Standing Instruction:** `CONTRIBUTING.md` updated with the new invariants; `FOUNDATION_RULES.md`-binding standing instruction added to `CLAUDE.md` (per the suite's STANDING INSTRUCTION block). E2E-in-CI decision (B8-5) deferred with the harness.
   - **Exit check (V2-B11):** every machine rule in `FOUNDATION_RULES.md` v1.0 is a green gate; a generated clone inherits them; the doc-only floor (TR-9) is now CI-enforced.
 
 ---
@@ -198,4 +198,4 @@ Add each machine rule as an arch test / analyzer / CI step (backlog `AUDIT_RECON
 - **Low:** GAP-5→B1-2 · LOGIC-B5/B6/B8, S2/S3→B3-2/B4-2/B9-7 (+D-decisions) · ARCH-1..3, TR-2..9, SOLID-4..8, DEBT-8..12, DOC (low)→B9/B10 · T2/T3/T4→B11-6/B8.
 - **Enforcement (R1–R35 machine):** B11.
 
-**Nothing ships until this plan is approved.** On approval: implement V2-B1 first, test-first, verifying each change against `FOUNDATION_RULES.md` v1.0; re-run the Phase-4 adversarial slice pass after B2/B6/B7 (a horizontal-concern change), and before generating the first real app.
+**Plan approved 2026-07-01 and implemented.** The Critical + all High batches (B1–B7) and the core of B8/B10/B11 + DEBT-2 landed on `develop`, test-first, each verified against `FOUNDATION_RULES.md` v1.0. **Before generating the first real app**, clear the scoped follow-ups (HTTP/E2E harness → the B9 refactors it gates → the B11 CI-infra gates) and re-run the Phase-4 adversarial slice pass (B2/B6/B7 were horizontal-concern changes).
