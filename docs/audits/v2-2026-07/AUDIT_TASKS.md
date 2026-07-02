@@ -177,10 +177,10 @@ Each spec from `LOGIC_AND_TEST_REPORT.md` Part B not already created by B1–B7.
 
 ## V2-B11 — Enforcement & Definition of Solid (LAST · locks everything)
 Add each machine rule as an arch test / analyzer / CI step (backlog `AUDIT_RECONCILIATION.md` §7 E1–E22 + R32/R34/R35/R28/R29/R30 tests).
-- [~] **B11-1 · Arch tests:** ✅ shipped: R2 (`EveryEntityWithATenantId_IsScopedOrAllowlisted`), R4 (`EveryController_DerivesFromATenantOrAdminBase_OrIsAllowlisted`), R5 (Features ban both hatches — from B2), R9 (`PlatformTests_DoNotDependOnTheDeleteMeNotesSample`), R15 (`ServerServices_UseInjectedClock_NotAmbientUtcNow`), R34 (fixture=model — from B7). ⬜ pending: R6 (MapTenantFeatureGroup — gated on the B9-6 PUBAPI/HOOKS move), R7/R8 (feature namespace isolation), R35 (route/table uniqueness).
+- [~] **B11-1 · Arch tests:** ✅ shipped: R2 (`EveryEntityWithATenantId_IsScopedOrAllowlisted`), R4 (`EveryController_DerivesFromATenantOrAdminBase_OrIsAllowlisted`), R5 (Features ban both hatches — from B2), R7 (`FeatureFolders_DoNotReferenceEachOthersNamespaces`), R8 (`OnlyProgram_ReferencesFeatureNamespaces_FromOutsideFeatures`), R9 (`PlatformTests_DoNotDependOnTheDeleteMeNotesSample`), R15 (`ServerServices_UseInjectedClock_NotAmbientUtcNow`), R34 (fixture=model — from B7), R35 (`RouteGroupPrefixes_AreUnique` + `TenantScopedEntities_MapToDistinctTables`). ⬜ pending: R6 (MapTenantFeatureGroup — gated on the B9-6 PUBAPI/HOOKS move).
 - [x] **B11-2 · Correctness pins:** R28 (MFA replay), R29 (stale webhook), R30 (atomic quota), R17 (fail-open), R32 (write UPDATE/DELETE) — shipped as standing tests alongside B2–B5.
 - [x] **B11-3 · R12 user-data-contributor coverage test** — `EveryUserKeyedEntity_IsWiredIntoAccountErasure` (after B6).
-- [ ] **B11-4 · R13 ExportKey uniqueness test** — ⬜ **scoped**.
+- [x] **B11-4 · R13 ExportKey uniqueness test** — `TenantDataContributors_HaveUniqueExportKeys`.
 - [ ] **B11-5 · CI doc-sync (R23) + config-key⇄.env (R20) + secret scan (gitleaks) + MailKit-outside-Email ban** — ⬜ **scoped** (CI-infra).
 - [ ] **B11-6 · Supply chain:** R25 (CPM + lockfile + `--locked-mode`), R26 (license scan), R27 — ⬜ **scoped** (CI-infra).
 - [ ] **B11-7 · MA0048 file-name analyzer (R24 naming half)** — ⬜ **scoped**.
