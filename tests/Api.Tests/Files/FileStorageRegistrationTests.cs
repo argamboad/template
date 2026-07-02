@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Template.Api.Tests.Infrastructure;
 using Template.Core.Abstractions;
 using Template.Infrastructure;
 using Template.Infrastructure.Files;
@@ -37,7 +39,7 @@ public class FileStorageRegistrationTests
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
 
         var services = new ServiceCollection();
-        services.AddInfrastructure(configuration);
+        services.AddInfrastructure(configuration, new FakeHostEnvironment(Environments.Development));
 
         return services.LastOrDefault(d => d.ServiceType == typeof(IFileStorage))?.ImplementationType;
     }

@@ -15,7 +15,7 @@ namespace Template.Infrastructure.Files;
 /// <b>native presigned GET URL</b>, so the <c>/api/files/{token}</c> endpoint is the local-disk path
 /// only. Streams to/from S3; fails closed without a tenant.
 /// </summary>
-public sealed class S3FileStorage(IAmazonS3 s3, ICurrentTenant currentTenant, IOptions<S3StorageSettings> options) : IFileStorage
+public sealed class S3FileStorage(IAmazonS3 s3, ICurrentTenant currentTenant, IOptions<S3StorageSettings> options, TimeProvider clock) : IFileStorage
 {
     private readonly string _bucket = options.Value.Bucket;
 
@@ -78,7 +78,7 @@ public sealed class S3FileStorage(IAmazonS3 s3, ICurrentTenant currentTenant, IO
             Key = ObjectKey(key),
             Verb = HttpVerb.GET,
             Protocol = _protocol,
-            Expires = DateTime.UtcNow.Add(lifetime),
+            Expires = clock.GetUtcNow().UtcDateTime.Add(lifetime), // injected clock (v2 audit GAP-4)
         });
         return Task.FromResult(new Uri(url));
     }

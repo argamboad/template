@@ -66,14 +66,14 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
         var tenantId = Guid.CreateVersion7();
         var (ownerId, email) = await SeedUserWithEmailAsync(tenantId, TenantRoles.Owner);
         await SeedIdentityAsync(ownerId, email);
-        await SeedNoteAsync(tenantId);
+        await SeedWidgetAsync(tenantId);
 
         await using (var db = Fixture.CreateContext(tenantId))
             Assert.Equal(EraseAccountResult.Erased, await NewService(db).EraseAsync(ownerId, confirmDissolve: true));
 
         Assert.False(await ExistsAsync<User>(u => u.Id == ownerId));
         Assert.False(await ExistsAsync<Tenant>(t => t.Id == tenantId));
-        Assert.Equal(0, await CountIgnoringFiltersAsync<Note>(n => n.TenantId == tenantId));   // domain data wiped
+        Assert.Equal(0, await CountIgnoringFiltersAsync<TestWidget>(w => w.TenantId == tenantId));   // domain data wiped
         Assert.Equal(0, await CountAsync<TenantMembership>(m => m.UserId == ownerId));
     }
 
@@ -106,18 +106,19 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
             new EfUnitOfWork(db),
             new ITenantDataContributor[]
             {
-                new Template.Api.Features.Notes.NotesDataContributor(new EfRepository<Note>(db)),
+                new TestWidgetDataContributor(new EfRepository<TestWidget>(db)),
                 new AuditDataContributor(new EfRepository<AuditEvent>(db)),
+            },
+            new IUserDataContributor[]
+            {
+                new MfaUserDataContributor(new EfRepository<UserMfa>(db), new EfRepository<MfaRecoveryCode>(db)),
+                new NotificationUserDataContributor(new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db)),
             },
             new AuditLog(new EfRepository<AuditEvent>(db), TimeProvider.System),
             new EfRepository<User>(db),
             new EfRepository<UserLogin>(db),
             new EfRepository<RefreshToken>(db),
-            new EfRepository<LoginToken>(db),
-            new EfRepository<UserMfa>(db),
-            new EfRepository<MfaRecoveryCode>(db),
-            new EfRepository<Notification>(db),
-            new EfRepository<NotificationPreference>(db));
+            new EfRepository<LoginToken>(db));
 
     // --- seeding ---
 
@@ -158,10 +159,10 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
         await db.SaveChangesAsync();
     }
 
-    private async Task SeedNoteAsync(Guid tenantId)
+    private async Task SeedWidgetAsync(Guid tenantId)
     {
         await using var db = Fixture.CreateContext(tenantId);
-        db.Set<Note>().Add(new Note { Title = "n", Content = "c", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow });
+        db.Set<TestWidget>().Add(new TestWidget { Name = "w", CreatedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
     }
 

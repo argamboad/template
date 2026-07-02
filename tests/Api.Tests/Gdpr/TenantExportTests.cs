@@ -31,7 +31,7 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         var tenantId = Guid.CreateVersion7();
         var ownerId = await SeedMembershipAsync(tenantId, TenantRoles.Owner);
         await SeedMembershipAsync(tenantId, TenantRoles.Member);
-        await SeedNoteAsync(tenantId, "My Note", "note body text");
+        await SeedWidgetAsync(tenantId, "My Note / note body text");
         await SeedInvitationAsync(tenantId, "invitee@x.com");
         await SeedAuditAsync(tenantId, "test.seeded");
 
@@ -47,7 +47,7 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         var json = Encoding.UTF8.GetString(storage.Content!);
         Assert.Contains("\"members\"", json);
         Assert.Contains("invitee@x.com", json);      // invitation email present
-        Assert.Contains("My Note", json);            // notes section (contributor)
+        Assert.Contains("My Note", json);            // contributor section (fixture widget)
         Assert.Contains("note body text", json);
         Assert.Contains("test.seeded", json);        // audit section (contributor)
         Assert.DoesNotContain(InvitationTokenHash, json); // secret NEVER exported
@@ -64,11 +64,11 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
     {
         var mine = Guid.CreateVersion7();
         var ownerId = await SeedMembershipAsync(mine, TenantRoles.Owner);
-        await SeedNoteAsync(mine, "Mine", "mine-only");
+        await SeedWidgetAsync(mine, "mine-only");
 
         var other = Guid.CreateVersion7();
         await SeedMembershipAsync(other, TenantRoles.Owner);
-        await SeedNoteAsync(other, "Theirs", "OTHER-TENANT-SECRET");
+        await SeedWidgetAsync(other, "OTHER-TENANT-SECRET");
 
         await using var db = Fixture.CreateContext(mine);
         var storage = new CapturingFileStorage();
@@ -124,7 +124,7 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         var harness = new ServiceHarness(db);
         var contributors = new ITenantDataContributor[]
         {
-            new Template.Api.Features.Notes.NotesDataContributor(new EfRepository<Note>(db)),
+            new TestWidgetDataContributor(new EfRepository<TestWidget>(db)),
             new AuditDataContributor(new EfRepository<AuditEvent>(db)),
         };
         return new TenantExportService(
@@ -161,10 +161,10 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         return userId;
     }
 
-    private async Task SeedNoteAsync(Guid tenantId, string title, string content)
+    private async Task SeedWidgetAsync(Guid tenantId, string name)
     {
         await using var db = Fixture.CreateContext(tenantId); // interceptor stamps TenantId
-        db.Set<Note>().Add(new Note { Title = title, Content = content, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow });
+        db.Set<TestWidget>().Add(new TestWidget { Name = name, CreatedAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
     }
 

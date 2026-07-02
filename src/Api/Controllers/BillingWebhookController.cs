@@ -14,7 +14,7 @@ namespace Template.Api.Controllers;
 [ApiController]
 [AllowAnonymous]
 [Route("api/billing/webhook")]
-public class BillingWebhookController(BillingWebhookHandler handler) : ControllerBase
+public class BillingWebhookController(BillingWebhookHandler handler, ILogger<BillingWebhookController> logger) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Receive(CancellationToken cancellationToken)
@@ -24,8 +24,15 @@ public class BillingWebhookController(BillingWebhookHandler handler) : Controlle
         var signature = Request.Headers["Stripe-Signature"].ToString();
 
         var result = await handler.HandleAsync(payload, signature, cancellationToken);
-        return result == WebhookResult.InvalidSignature
-            ? BadRequest(new { error = "invalid_signature" })
-            : Ok(); // Applied / Duplicate / Ignored all acknowledge, so the provider stops retrying
+        if (result == WebhookResult.InvalidSignature)
+        {
+            // Anonymous endpoint (GAP-5): a rejected signature is a forged-webhook probe — make it
+            // observable with the source IP rather than a silent 400. No payload contents are logged.
+            var sourceIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            logger.LogWarning("Rejected billing webhook with an invalid signature from {SourceIp}.", sourceIp);
+            return BadRequest(new { error = "invalid_signature" });
+        }
+
+        return Ok(); // Applied / Duplicate / Ignored all acknowledge, so the provider stops retrying
     }
 }

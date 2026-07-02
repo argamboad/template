@@ -49,24 +49,39 @@ public sealed class BillingWebhookHandler(
 
         // No JWT here — enter the (signature-authenticated) tenant so the write is stamped + scoped
         // by the normal interceptor/filter, not the cross-tenant escape hatch (ADR-003).
+        bool applied;
         using (tenantContext.EnterTenant(evt.TenantId))
         {
-            var previousStatus = await UpsertSubscriptionAsync(evt, cancellationToken);
+            string? previousStatus;
+            (applied, previousStatus) = await UpsertSubscriptionAsync(evt, cancellationToken);
             // Dunning (BILLING-6): notify the owner when the status *transitions into* a bad state — a
-            // failed payment or a cancellation. Same-status redeliveries don't re-notify (no oracle,
-            // no spam); the inbox already dedups by event id.
-            await MaybeNotifyDunningAsync(evt, previousStatus, cancellationToken);
+            // failed payment or a cancellation. Only fire on an *applied* event (a stale/out-of-order
+            // event is a no-op, so it must not re-notify); same-status redeliveries don't re-notify.
+            if (applied)
+                await MaybeNotifyDunningAsync(evt, previousStatus, cancellationToken);
             await transaction.CommitAsync(cancellationToken); // claim + projection + notification commit atomically
         }
 
-        return WebhookResult.Applied;
+        // A stale/out-of-order event is authentic and claimed, but superseded — acknowledged, not applied.
+        return applied ? WebhookResult.Applied : WebhookResult.Ignored;
     }
 
-    /// <summary>Upserts the projection and returns the status it had before this event (null if new).</summary>
-    private async Task<string?> UpsertSubscriptionAsync(BillingWebhookEvent evt, CancellationToken cancellationToken)
+    /// <summary>
+    /// Upserts the projection. Returns whether the event was applied and the status the projection had
+    /// before it. A stale/out-of-order event (not strictly newer than the last applied) is a no-op —
+    /// <c>Applied</c> is false — so it never regresses state (v2 audit LOGIC-B1).
+    /// </summary>
+    private async Task<(bool Applied, string? PreviousStatus)> UpsertSubscriptionAsync(BillingWebhookEvent evt, CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
         var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken); // entered-tenant scoped
+
+        // Recency guard: webhooks are at-least-once and unordered, so apply only strictly-newer events.
+        // A redelivered older event (e.g. a stale 'canceled' after a live 'active') is acknowledged but
+        // not applied — the inbox already claimed its id, so it won't be reprocessed.
+        if (subscription is not null && subscription.LastEventAt is { } last && evt.OccurredAt <= last)
+            return (false, subscription.Status);
+
         var previousStatus = subscription?.Status;
 
         if (subscription is null)
@@ -78,6 +93,7 @@ public sealed class BillingWebhookHandler(
                 StripeCustomerId = evt.StripeCustomerId,
                 StripeSubscriptionId = evt.StripeSubscriptionId,
                 CurrentPeriodEnd = evt.CurrentPeriodEnd,
+                LastEventAt = evt.OccurredAt,
                 CreatedAt = now,
                 UpdatedAt = now,
             }, cancellationToken); // TenantId stamped to the entered tenant by the interceptor
@@ -89,12 +105,13 @@ public sealed class BillingWebhookHandler(
             subscription.StripeCustomerId = evt.StripeCustomerId;
             subscription.StripeSubscriptionId = evt.StripeSubscriptionId;
             subscription.CurrentPeriodEnd = evt.CurrentPeriodEnd;
+            subscription.LastEventAt = evt.OccurredAt;
             subscription.UpdatedAt = now;
             subscriptions.Update(subscription);
         }
 
         await subscriptions.SaveChangesAsync(cancellationToken);
-        return previousStatus;
+        return (true, previousStatus);
     }
 
     private async Task MaybeNotifyDunningAsync(BillingWebhookEvent evt, string? previousStatus, CancellationToken cancellationToken)

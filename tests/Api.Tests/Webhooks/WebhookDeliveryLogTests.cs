@@ -28,7 +28,7 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
 
         await using (var db = Fixture.CreateContext())
         {
-            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.OK))), protector, TimeProvider.System);
+            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.OK)), new AllowAllUrlGuard()), protector, TimeProvider.System);
             await handler.HandleAsync(Message(tenant, subId, "{}"), default);
             await db.SaveChangesAsync(); // stands in for the OutboxProcessor's commit
         }
@@ -49,7 +49,7 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
 
         await using (var db = Fixture.CreateContext())
         {
-            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.InternalServerError))), protector, TimeProvider.System);
+            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.InternalServerError)), new AllowAllUrlGuard()), protector, TimeProvider.System);
             try { await handler.HandleAsync(Message(tenant, subId, "{}"), default); }
             catch (InvalidOperationException) { /* expected — triggers the outbox retry */ }
             await db.SaveChangesAsync(); // the failed attempt is still recorded
@@ -114,7 +114,8 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
     private static WebhookSubscriptionService BuildService(Template.Infrastructure.Persistence.AppDbContext db, Guid tenant) =>
         new(new EfRepository<WebhookSubscription>(db), new EfRepository<WebhookDelivery>(db),
             new EfOutbox(db, TimeProvider.System), new TestCurrentTenant { TenantId = tenant },
-            new TokenGenerator(), new WebhookSecretProtector(new EphemeralDataProtectionProvider()), TimeProvider.System);
+            new TokenGenerator(), new WebhookSecretProtector(new EphemeralDataProtectionProvider()),
+            new AllowAllUrlGuard(), TimeProvider.System);
 
     private async Task<Guid> SeedSubscriptionAsync(Guid tenant, WebhookSecretProtector protector)
     {

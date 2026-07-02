@@ -17,13 +17,25 @@ public class ArchitectureTests
     public void FeatureSlices_DoNotBypassTheTenantFilter()
     {
         var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
-        var offenders = SourceFiles(featuresDir)
+
+        // IgnoreQueryFilters is never allowed in feature code — even contributors go through QueryAllTenants().
+        var ignoreOffenders = SourceFiles(featuresDir)
             .Where(f => File.ReadAllText(f).Contains("IgnoreQueryFilters"))
             .Select(Path.GetFileName)
             .ToList();
+        Assert.True(ignoreOffenders.Count == 0,
+            $"Feature code must not call IgnoreQueryFilters — use IRepository<T>.QueryAllTenants(). Offenders: {string.Join(", ", ignoreOffenders)}");
 
-        Assert.True(offenders.Count == 0,
-            $"Feature code must not call IgnoreQueryFilters — use IRepository<T>.QueryAllTenants(). Offenders: {string.Join(", ", offenders)}");
+        // QueryAllTenants is the sanctioned cross-tenant hatch, but ONLY inside *DataContributor.cs
+        // (dissolve/export). In request-path slice code it bypasses tenancy identically to
+        // IgnoreQueryFilters, so it is banned there too (v2 audit ADV-2).
+        var queryAllOffenders = SourceFiles(featuresDir)
+            .Where(f => !Path.GetFileName(f)!.EndsWith("DataContributor.cs", StringComparison.Ordinal))
+            .Where(f => File.ReadAllText(f).Contains("QueryAllTenants"))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(queryAllOffenders.Count == 0,
+            $"Request-path feature code must not call QueryAllTenants (allowed only in *DataContributor.cs). Offenders: {string.Join(", ", queryAllOffenders)}");
     }
 
     [Fact]
@@ -42,6 +54,37 @@ public class ArchitectureTests
 
         Assert.True(missing.Count == 0,
             $"ITenantScoped entities missing the global tenant query filter: {string.Join(", ", missing)}");
+    }
+
+    [Fact]
+    public void EveryUserKeyedEntity_IsWiredIntoAccountErasure()
+    {
+        // Every entity with a user-owned key ("UserId") must be erased on account deletion (GDPR-2) —
+        // by AccountErasureService's identity-core deletes, an IUserDataContributor, or tenant-membership
+        // teardown. This canary fails when a NEW user-keyed entity appears, so its author must wire the
+        // erasure and list it here (v2 audit SOLID-1 / R12). Actor references (CreatedByUserId /
+        // InvitedByUserId) are deliberately excluded — they are tenant data, not the user's own PII.
+        var handled = new HashSet<string>
+        {
+            nameof(UserLogin), nameof(RefreshToken),          // identity-core (AccountErasureService)
+            nameof(TenantMembership),                          // tenant-membership teardown
+            nameof(UserMfa), nameof(MfaRecoveryCode),          // MfaUserDataContributor
+            nameof(Notification), nameof(NotificationPreference), // NotificationUserDataContributor
+        };
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql("Host=localhost;Database=arch-check") // model-only; never connects
+            .Options;
+        using var ctx = new AppDbContext(options, new TestCurrentTenant());
+
+        var uncovered = ctx.Model.GetEntityTypes()
+            .Where(e => e.ClrType.GetProperty("UserId") is not null)
+            .Select(e => e.ClrType.Name)
+            .Where(name => !handled.Contains(name))
+            .ToList();
+
+        Assert.True(uncovered.Count == 0,
+            $"User-keyed entities not wired into account erasure — add an IUserDataContributor (or identity-core delete) and list it: {string.Join(", ", uncovered)}");
     }
 
     [Fact]

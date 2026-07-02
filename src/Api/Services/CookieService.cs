@@ -5,7 +5,7 @@ namespace Template.Api.Services;
 /// <summary>
 /// Manages refresh token cookie operations.
 /// </summary>
-public class CookieService(IRefreshTokenSettings settings) : ICookieService
+public class CookieService(IRefreshTokenSettings settings, TimeProvider clock) : ICookieService
 {
     private const string RefreshTokenCookieName = "refresh_token";
 
@@ -33,7 +33,9 @@ public class CookieService(IRefreshTokenSettings settings) : ICookieService
             Secure = request.IsHttps,
             SameSite = SameSiteMode.Lax,
             Path = "/api/auth",
-            Expires = DateTimeOffset.UtcNow.AddDays(settings.ExpiryDays)
+            // Injected clock so the cookie lifetime matches the server-side token expiry, which is also
+            // computed from TimeProvider (v2 audit LOGIC-B3) — the two must not drift under a virtual clock.
+            Expires = clock.GetUtcNow().AddDays(settings.ExpiryDays)
         });
     }
 

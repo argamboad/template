@@ -40,28 +40,47 @@ public sealed class QuotaService(
         var plan = await ResolvePlanAsync(cancellationToken);
         if (plan.UsageLimit(usageKey) is not { } limit)
             return true; // unlimited for this key — allow without tracking
+        if (amount <= 0)
+            return true;
+        if (amount > limit)
+            return false; // a single request already exceeds the cap
 
         var now = clock.GetUtcNow();
         var period = now.ToString("yyyy-MM");
-        var counter = await usage.Query()
-            .FirstOrDefaultAsync(c => c.Key == usageKey && c.Period == period, cancellationToken);
 
-        var current = counter?.Count ?? 0;
-        if (current + amount > limit)
-            return false; // would exceed — deny, do not increment
+        // Atomic path: a single conditional UPDATE increments the existing counter only if it stays within
+        // the cap. Postgres row-locks the counter, so concurrent consumers serialize and there is no
+        // lost update (v2 audit LOGIC-B7); "atomically consumes" is now true under concurrency.
+        if (await TryIncrementAsync(usageKey, period, amount, limit, now, cancellationToken))
+            return true;
 
-        if (counter is null)
-            await usage.AddAsync(new UsageCounter { Key = usageKey, Period = period, Count = amount, UpdatedAt = now }, cancellationToken);
-        else
+        // Nothing incremented: either the counter is at/over the cap, or there is no row yet this period.
+        if (await usage.Query().AnyAsync(c => c.Key == usageKey && c.Period == period, cancellationToken))
+            return false; // row exists → the cap is reached
+
+        // First consume this period — create the row (amount <= limit, checked above). If a concurrent
+        // request created it first, the unique (TenantId, Key, Period) index rejects our insert; detach it
+        // and retry the conditional increment against the now-existing row.
+        var row = new UsageCounter { Key = usageKey, Period = period, Count = amount, UpdatedAt = now };
+        try
         {
-            counter.Count += amount;
-            counter.UpdatedAt = now;
-            usage.Update(counter);
+            await usage.AddAsync(row, cancellationToken); // TenantId stamped by the interceptor
+            await usage.SaveChangesAsync(cancellationToken);
+            return true;
         }
-
-        await usage.SaveChangesAsync(cancellationToken);
-        return true;
+        catch (DbUpdateException)
+        {
+            usage.Remove(row); // detach the failed insert so it doesn't linger in the change tracker
+            return await TryIncrementAsync(usageKey, period, amount, limit, now, cancellationToken);
+        }
     }
+
+    private async Task<bool> TryIncrementAsync(string usageKey, string period, int amount, int limit, DateTimeOffset now, CancellationToken cancellationToken) =>
+        await usage.Query()
+            .Where(c => c.Key == usageKey && c.Period == period && c.Count + amount <= limit)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(c => c.Count, c => c.Count + amount)
+                .SetProperty(c => c.UpdatedAt, now), cancellationToken) == 1;
 
     private async Task<Plan> ResolvePlanAsync(CancellationToken cancellationToken)
     {

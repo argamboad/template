@@ -84,7 +84,7 @@ public sealed class MfaService(
         var record = await mfa.Query().FirstOrDefaultAsync(m => m.UserId == userId, cancellationToken);
         if (record is null)
             return (MfaConfirmResult.NotEnrolled, []);
-        if (!TryVerifyTotp(record, code))
+        if (!TryVerifyTotp(record, code, out _)) // enrollment proof — not a login, so no anti-replay step recorded
             return (MfaConfirmResult.InvalidCode, []);
 
         record.Enabled = true;
@@ -125,8 +125,19 @@ public sealed class MfaService(
         if (record is null)
             return false;
 
-        if (TryVerifyTotp(record, code))
+        if (TryVerifyTotp(record, code, out var timeStep))
+        {
+            // Anti-replay (v2 audit LOGIC-S1): a TOTP is valid for a ~90s window (±1 step), so the same
+            // code must not mint more than one session. Reject a step already accepted (or an older one),
+            // and record the accepted step so the next replay within the window fails.
+            if (record.LastVerifiedTimeStep is { } last && timeStep <= last)
+                return false;
+
+            record.LastVerifiedTimeStep = timeStep;
+            mfa.Update(record);
+            await mfa.SaveChangesAsync(cancellationToken);
             return true;
+        }
 
         // Otherwise try a single-use recovery code.
         var hash = hasher.HashToken(code.Trim());
@@ -141,12 +152,14 @@ public sealed class MfaService(
         return true;
     }
 
-    private bool TryVerifyTotp(UserMfa record, string code)
+    /// <summary>True if <paramref name="code"/> is a valid TOTP; <paramref name="timeStep"/> is the matched step.</summary>
+    private bool TryVerifyTotp(UserMfa record, string code, out long timeStep)
     {
+        timeStep = 0;
         string secret;
         try { secret = _protector.Unprotect(record.EncryptedSecret); }
         catch (CryptographicException) { return false; }
 
-        return new Totp(Base32Encoding.ToBytes(secret)).VerifyTotp(code.Trim(), out _, Window);
+        return new Totp(Base32Encoding.ToBytes(secret)).VerifyTotp(code.Trim(), out timeStep, Window);
     }
 }

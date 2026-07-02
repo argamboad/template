@@ -309,6 +309,18 @@ out-of-band with retry by `BillingCancelOutboxHandler` → new idempotent `IBill
 the "would abandon data" guard; it's cleaned up automatically instead. Export (GDPR-1) gains a `billing`
 section (plan/status/period — never Stripe ids or card data). **This closes the BILLING epic (1–7).**
 
+*Amendment (v2 audit GAP-1, 2026-07-01) — the fake provider is Development-only; production without a key fails fast.* The
+original wiring registered `FakeBillingProvider` whenever `Billing:Stripe:SecretKey` was absent — including in
+production. Because the fake **trusts a literal webhook signature** (`Stripe-Signature: valid`) and the webhook
+endpoint is anonymous and always mapped, a production deploy that hadn't yet configured Stripe would accept
+**forged, unauthenticated cross-tenant subscription writes** (an attacker could grant/rewrite any tenant's plan).
+`AddInfrastructure` now takes `IHostEnvironment` and registers the fake **only when `environment.IsDevelopment()`**;
+outside Development with no key it **throws at startup** (the app cannot boot with the fake). The webhook controller
+also **logs a warning with the source IP** on a rejected signature (GAP-5), so a forged-webhook probe is observable
+rather than a silent 400. Consequence: a **production/staging deploy MUST configure a real `Billing__Stripe__SecretKey`**
+(it no longer silently falls back to the fake). Dev/E2E are unchanged. Tests: `BillingProviderRegistrationTests`,
+`BillingWebhookControllerTests`.
+
 **ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**
 Side effects that must not be lost (email, billing webhooks, future integrations) move off the
 request thread through a **transactional outbox**: an **`OutboxMessage`** is written in the **same EF

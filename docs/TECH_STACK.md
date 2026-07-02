@@ -136,7 +136,9 @@ Production reads the same keys from real environment variables, never a committe
   ADR-007 / `docs/stories/async-jobs.md`. Hangfire/Quartz/MassTransit are the documented swap-ins at scale.
 - **`Stripe.net` 52.x** — billing/subscriptions (ADR-006 / `docs/stories/billing.md`). Registered only
   when `Billing:Stripe:SecretKey` is set; otherwise an in-memory `FakeBillingProvider` keeps the app
-  bootable and tests offline. Stripe is the source of truth for money; our `Subscription` is a projection.
+  bootable and tests offline **in Development only**. The fake trusts a literal webhook signature, so
+  outside Development a missing key **fails fast at startup** (v2 audit GAP-1) — production/staging **must**
+  set `Billing__Stripe__SecretKey`. Stripe is the source of truth for money; our `Subscription` is a projection.
 - **OpenTelemetry 1.16** (`OpenTelemetry.Extensions.Hosting` + AspNetCore/Http instrumentation + OTLP/
   Console exporters) — traces + metrics (OBS-2 / ADR-008). Npgsql DB spans via its built-in `"Npgsql"`
   `ActivitySource` (not the beta EF Core instrumentation). Exporter config-gated: OTLP when

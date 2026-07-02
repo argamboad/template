@@ -66,9 +66,10 @@ public static class WebhookEndpoints
                 var status = await sender.SendAsync(subscription.Url, secret, WebhookEvents.Ping, eventId, body, ct);
                 return Results.Ok(new { delivered = status is >= 200 and < 300, status_code = status });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return Results.Ok(new { delivered = false, error = ex.Message });
+                // Don't leak internal DNS/connection detail to the tenant (GAP-3) — keep it in server logs.
+                return Results.Ok(new { delivered = false, error = "delivery_failed" });
             }
         });
 

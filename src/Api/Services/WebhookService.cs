@@ -36,16 +36,19 @@ public sealed class WebhookSubscriptionService(
     ICurrentTenant currentTenant,
     ITokenGenerator tokenGenerator,
     IWebhookSecretProtector protector,
+    IOutboundUrlGuard urlGuard,
     TimeProvider clock) : IWebhookSubscriptionService
 {
     public async Task<WebhookCreated?> CreateAsync(Guid createdByUserId, string url, IEnumerable<string>? eventTypes, CancellationToken cancellationToken = default)
     {
-        if (!IsValidUrl(url))
+        // Reject a malformed / non-https / SSRF-targeting URL up front (GAP-2). The sender re-checks at
+        // send time too (DNS rebinding), so this is early feedback, not the only line of defense.
+        if (!await urlGuard.IsAllowedAsync(url, cancellationToken))
             return null;
 
         var types = NormalizeEventTypes(eventTypes);
-        if (types.Count == 0)
-            return null;
+        if (types is null)
+            return null; // event types were provided but none are known — reject, don't subscribe to all
 
         var secret = "whsec_" + tokenGenerator.GenerateToken();
         var subscription = new WebhookSubscription
@@ -104,18 +107,19 @@ public sealed class WebhookSubscriptionService(
         return true;
     }
 
-    private static bool IsValidUrl(string? url) =>
-        Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
-
-    // Keep only known event types; empty request defaults to all known events.
-    private static IReadOnlyList<string> NormalizeEventTypes(IEnumerable<string>? eventTypes)
+    // A null request defaults to all known event types; a request that names types but none are known is
+    // REJECTED (null), never silently subscribed to everything — v2 audit SOLID-3.
+    private static IReadOnlyList<string>? NormalizeEventTypes(IEnumerable<string>? eventTypes)
     {
-        var requested = (eventTypes ?? WebhookEvents.Known)
+        if (eventTypes is null)
+            return WebhookEvents.Known.ToList();
+
+        var requested = eventTypes
             .Select(t => t.Trim().ToLowerInvariant())
             .Where(WebhookEvents.Known.Contains)
             .Distinct()
             .ToList();
-        return requested.Count == 0 ? WebhookEvents.Known.ToList() : requested;
+        return requested.Count == 0 ? null : requested; // provided but all-invalid → reject
     }
 }
 

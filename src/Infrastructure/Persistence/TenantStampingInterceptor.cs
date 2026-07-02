@@ -7,12 +7,14 @@ namespace Template.Infrastructure.Persistence;
 /// <summary>
 /// Write-side half of tenant isolation. The global query filter scopes <em>reads</em>; this
 /// interceptor scopes <em>writes</em>, so a feature slice can no more persist a row under the
-/// wrong tenant than it can read one. For every <c>Added</c> entity implementing
-/// <see cref="ITenantScoped"/> while a tenant is current:
+/// wrong tenant than it can read one. For every <c>Added</c>, <c>Modified</c>, or <c>Deleted</c>
+/// entity implementing <see cref="ITenantScoped"/> while a tenant is current:
 /// <list type="bullet">
-///   <item>unset <c>TenantId</c> (default) → stamped with the current tenant; and</item>
-///   <item>a <c>TenantId</c> belonging to a <em>different</em> tenant → throws (fail closed),
-///   so the change never reaches the database.</item>
+///   <item>a new row with unset <c>TenantId</c> (default) → stamped with the current tenant;</item>
+///   <item>any row (new, updated, or deleted) whose <c>TenantId</c> belongs to a <em>different</em>
+///   tenant → throws (fail closed), so the change never reaches the database. This blocks a row
+///   loaded cross-tenant via the escape hatch (<c>QueryAllTenants()</c>/<c>IgnoreQueryFilters()</c>)
+///   from being updated or deleted under the wrong tenant (v2 audit ADV-1) — not just inserted.</item>
 /// </list>
 /// <para>
 /// When there is no current tenant (<see cref="AppDbContext.CurrentTenantId"/> is
@@ -50,22 +52,29 @@ public sealed class TenantStampingInterceptor : SaveChangesInterceptor
 
         foreach (var entry in db.ChangeTracker.Entries<ITenantScoped>())
         {
-            if (entry.State != EntityState.Added) continue;
+            if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+                continue;
 
             var tenantProperty = entry.Property(nameof(ITenantScoped.TenantId));
             var tenantId = (Guid)tenantProperty.CurrentValue!;
 
-            if (tenantId == Guid.Empty)
+            // A new row may leave TenantId unset → stamp the current tenant.
+            if (entry.State == EntityState.Added && tenantId == Guid.Empty)
             {
-                tenantProperty.CurrentValue = currentTenantId; // stamp the owning tenant
+                tenantProperty.CurrentValue = currentTenantId;
+                continue;
             }
-            else if (tenantId != currentTenantId)
+
+            // An explicitly-tenanted insert, or any update/delete, must belong to the current tenant.
+            // (Bulk ExecuteUpdate/ExecuteDelete bypass the change tracker and are unaffected; legitimate
+            // cross-tenant teardown runs on a system context and returned early above.)
+            if (tenantId != currentTenantId)
             {
                 throw new InvalidOperationException(
-                    $"Refusing to persist a {entry.Entity.GetType().Name} for tenant {tenantId} " +
-                    $"while the current tenant is {currentTenantId}. A tenant-scoped entity may only " +
-                    "be written under its owning tenant; cross-tenant writes must run on a system " +
-                    "context (no current tenant).");
+                    $"Refusing to {entry.State.ToString().ToLowerInvariant()} a {entry.Entity.GetType().Name} " +
+                    $"for tenant {tenantId} while the current tenant is {currentTenantId}. A tenant-scoped " +
+                    "entity may only be written under its owning tenant; cross-tenant writes must run on a " +
+                    "system context (no current tenant).");
             }
         }
     }

@@ -1,4 +1,5 @@
 using System.Text;
+using Template.Core.Abstractions;
 using Template.Core.Webhooks;
 
 namespace Template.Infrastructure.Webhooks;
@@ -15,10 +16,14 @@ public interface IWebhookSender
     Task<int> SendAsync(string url, string secret, string eventType, string eventId, string body, CancellationToken cancellationToken = default);
 }
 
-public sealed class WebhookSender(HttpClient httpClient) : IWebhookSender
+public sealed class WebhookSender(HttpClient httpClient, IOutboundUrlGuard urlGuard) : IWebhookSender
 {
     public async Task<int> SendAsync(string url, string secret, string eventType, string eventId, string body, CancellationToken cancellationToken = default)
     {
+        // Re-check at send time so DNS rebinding can't point a previously-valid URL at an internal host (GAP-2).
+        if (!await urlGuard.IsAllowedAsync(url, cancellationToken))
+            throw new InvalidOperationException("Refusing to send a webhook to a disallowed URL.");
+
         using var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),

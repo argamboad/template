@@ -87,7 +87,9 @@ public class QuotaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         Assert.True(await quota.TryConsumeAsync(UsageKeys.Export));
         Assert.True(await quota.TryConsumeAsync(UsageKeys.Export));
 
-        var count = (await new EfRepository<UsageCounter>(db).Query().ToListAsync())
+        // Read on a fresh context — the atomic ExecuteUpdate writes straight to the DB.
+        await using var read = Fixture.CreateContext(tenant);
+        var count = (await new EfRepository<UsageCounter>(read).Query().ToListAsync())
             .Where(c => c.Key == UsageKeys.Export).Sum(c => c.Count);
         Assert.Equal(2, count);
     }
@@ -106,9 +108,40 @@ public class QuotaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtu
 
         Assert.False(await quota.TryConsumeAsync(UsageKeys.Export)); // 4th denied
 
-        var count = (await new EfRepository<UsageCounter>(db).Query().ToListAsync())
+        await using var read = Fixture.CreateContext(tenant);
+        var count = (await new EfRepository<UsageCounter>(read).Query().ToListAsync())
             .Where(c => c.Key == UsageKeys.Export).Sum(c => c.Count);
         Assert.Equal(3, count); // not incremented past the limit
+    }
+
+    [Fact]
+    public async Task TryConsume_ConcurrentAtLimit_AllowsExactlyOne()
+    {
+        // v2 audit LOGIC-B7: consumption must be atomic — two racing consumers at the last unit must not
+        // both succeed (no lost update past the cap).
+        var tenant = Guid.CreateVersion7();
+        await SeedTenantWithMembersAsync(tenant, members: 1);
+
+        await using (var seed = Fixture.CreateContext(tenant))
+        {
+            var q = BuildQuota(seed, tenant); // consume 2 of Free export=3 → room for exactly one more
+            Assert.True(await q.TryConsumeAsync(UsageKeys.Export));
+            Assert.True(await q.TryConsumeAsync(UsageKeys.Export));
+        }
+
+        async Task<bool> ConsumeOnOwnConnectionAsync()
+        {
+            await using var db = Fixture.CreateContext(tenant); // separate connection → real DB race
+            return await BuildQuota(db, tenant).TryConsumeAsync(UsageKeys.Export);
+        }
+
+        var results = await Task.WhenAll(ConsumeOnOwnConnectionAsync(), ConsumeOnOwnConnectionAsync());
+
+        Assert.Equal(1, results.Count(r => r)); // exactly one consumer wins the last unit
+        await using var read = Fixture.CreateContext(tenant);
+        var total = (await new EfRepository<UsageCounter>(read).Query().ToListAsync())
+            .Where(c => c.Key == UsageKeys.Export).Sum(c => c.Count);
+        Assert.Equal(3, total); // never past the cap
     }
 
     [Fact]

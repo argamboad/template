@@ -63,6 +63,8 @@ public sealed record BillingPortalSession(string Url);
 /// <param name="TenantId">The tenant this event reconciles, from the signed metadata.</param>
 /// <param name="PlanKey">The plan the subscription grants (a <c>PlanKeys</c> value).</param>
 /// <param name="Status">Normalized status — a <c>SubscriptionStatus</c> value (active/trialing/past_due/canceled).</param>
+/// <param name="OccurredAt">When the provider emitted this event. Webhooks are at-least-once and unordered,
+/// so the handler applies an event only if it is strictly newer than the last one applied (v2 audit LOGIC-B1).</param>
 public sealed record BillingWebhookEvent(
     string EventId,
     Guid TenantId,
@@ -70,7 +72,8 @@ public sealed record BillingWebhookEvent(
     string Status,
     string? StripeCustomerId,
     string? StripeSubscriptionId,
-    DateTimeOffset? CurrentPeriodEnd);
+    DateTimeOffset? CurrentPeriodEnd,
+    DateTimeOffset OccurredAt);
 
 /// <summary>Thrown when a webhook payload fails signature verification (not authentic).</summary>
 public sealed class BillingWebhookSignatureException(string message) : Exception(message);

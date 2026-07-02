@@ -35,15 +35,12 @@ public sealed class AccountErasureService(
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
     IEnumerable<ITenantDataContributor> dataContributors,
+    IEnumerable<IUserDataContributor> userDataContributors,
     IAuditLog audit,
     IRepository<User> users,
     IRepository<UserLogin> logins,
     IRepository<RefreshToken> refreshTokens,
-    IRepository<LoginToken> loginTokens,
-    IRepository<UserMfa> userMfa,
-    IRepository<MfaRecoveryCode> mfaRecoveryCodes,
-    IRepository<Notification> notifications,
-    IRepository<NotificationPreference> notificationPreferences) : IAccountErasureService
+    IRepository<LoginToken> loginTokens) : IAccountErasureService
 {
     public async Task<EraseAccountResult> EraseAsync(Guid userId, bool confirmDissolve, CancellationToken cancellationToken = default)
     {
@@ -85,15 +82,17 @@ public sealed class AccountErasureService(
             await tenants.RemoveMemberAsync(membership, cancellationToken);
         }
 
-        // Wipe identity/PII. LoginTokens are email-keyed; the rest are user-keyed. Children before the
+        // Per-user PII owned by other platform concerns (MFA, notifications, …) is wiped via contributors,
+        // so a new user-keyed table is erased without editing this service (v2 audit SOLID-1). These run
+        // before the user row (they reference it) and enlist in the ambient transaction.
+        foreach (var contributor in userDataContributors)
+            await contributor.WipeAsync(userId, cancellationToken);
+
+        // Identity-core PII. LoginTokens are email-keyed; the rest are user-keyed. Children before the
         // user row. Set-based deletes enlist in the ambient transaction.
         await refreshTokens.Query().Where(r => r.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await logins.Query().Where(l => l.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await loginTokens.Query().Where(l => l.Email == user.Email).ExecuteDeleteAsync(cancellationToken);
-        await mfaRecoveryCodes.Query().Where(c => c.UserId == userId).ExecuteDeleteAsync(cancellationToken);
-        await userMfa.Query().Where(m => m.UserId == userId).ExecuteDeleteAsync(cancellationToken);
-        await notifications.Query().Where(n => n.UserId == userId).ExecuteDeleteAsync(cancellationToken);
-        await notificationPreferences.Query().Where(p => p.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await users.Query().Where(u => u.Id == userId).ExecuteDeleteAsync(cancellationToken);
 
         await scope.CommitAsync(cancellationToken);

@@ -35,6 +35,8 @@ public static class ApiKeyEndpoints
                 return Results.Unauthorized();
 
             var created = await keys.CreateAsync(userId.Value, request.Name ?? "", request.Scopes, request.ExpiresAt, ct);
+            if (created is null)
+                return Results.BadRequest(new { error = "invalid_scopes", message = "None of the requested scopes are recognized." });
             // The raw key is returned ONCE here and never again.
             return Results.Created($"/api/apikeys/{created.Key.Id}", ApiKeyResponse.FromCreated(created));
         });

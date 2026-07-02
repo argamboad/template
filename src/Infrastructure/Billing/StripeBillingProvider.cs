@@ -88,7 +88,8 @@ public sealed class StripeBillingProvider(IOptions<StripeSettings> options) : IB
             Status: MapStatus(subscription.Status),
             StripeCustomerId: subscription.CustomerId,
             StripeSubscriptionId: subscription.Id,
-            CurrentPeriodEnd: item?.CurrentPeriodEnd is { } end ? new DateTimeOffset(end, TimeSpan.Zero) : null);
+            CurrentPeriodEnd: item?.CurrentPeriodEnd is { } end ? new DateTimeOffset(end, TimeSpan.Zero) : null,
+            OccurredAt: new DateTimeOffset(stripeEvent.Created, TimeSpan.Zero)); // provider emission time — recency guard
     }
 
     public async Task CancelSubscriptionAsync(string stripeSubscriptionId, CancellationToken cancellationToken = default)
