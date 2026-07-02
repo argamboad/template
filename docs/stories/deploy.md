@@ -186,7 +186,8 @@ merged; ADR-017 referenced.
 **Status: ✅ Implemented** (`feat/deploy-3-pipeline`). Deploy jobs live in `.github/workflows/ci.yml`
 (not a separate `deploy.yml` — same-workflow `needs` is the reliable way to gate deploy on the test/build
 jobs). **`deploy-staging`**: on a push to `develop`, after every test gate is green, POSTs the Render
-deploy hook (`RENDER_DEPLOY_HOOK_STAGING`), then polls `STAGING_BASE_URL/health/ready` and smoke-tests
+deploy hook (`RENDER_DEPLOY_HOOK_STAGING`), then waits for the new build to be live (`GET /api/version` reports the pushed commit — the old instance
+serves during Render's build) and smoke-tests
 (liveness, readiness, SPA shell + deep-link, `/api/*` → 404 not the shell, `/api/auth/providers`); a red
 smoke fails the run. **`deploy-prod`**: on a push to `main`, behind the `production` GitHub Environment
 (add a required reviewer → manual approval; `main` stays deploy-only). Both **skip cleanly** (log a notice,
