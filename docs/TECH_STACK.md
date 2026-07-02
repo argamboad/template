@@ -14,7 +14,7 @@
 | Database | PostgreSQL | Committed |
 | ORM | Entity Framework Core (Npgsql) | Committed |
 | Auth | Custom JWT + rotating refresh tokens (no ASP.NET Core Identity) | Committed (ADR-002) |
-| Non-web clients (mobile + desktop) | .NET MAUI **Blazor Hybrid**, reusing the RCL | Implemented (auth wired); feature parity web-first |
+| Non-web clients (mobile + desktop) | .NET MAUI **Blazor Hybrid**, reusing the RCL | Committed (ADR-018); auth wired, full-parity build = epic `NATIVE` |
 | Hosting | **Render free** (one container: API serving the WASM bundle, single-origin) + **Neon** Postgres + **Brevo** SMTP — free-tier-first | Decided (ADR-017); build = epic `DEPLOY` |
 
 ## Target versions
@@ -82,8 +82,9 @@ differ) but captures the majority of the UI. Cheap now, expensive to retrofit �
 - **Custom JWT + rotating refresh tokens** (not ASP.NET Core Identity) — a hardened auth stack the
   template ships: passwordless (magic link + email OTP) and OAuth account-linking on custom
   `User`/`UserLogin`/`LoginToken`/`RefreshToken` entities. Tenant scoping layers on top. See ADR-002.
-- **MAUI Blazor Hybrid (deferred)** — reuses the C# Blazor UI (via RCL) across mobile + Win/macOS
-  desktop, not just the API. Deferred until non-web work begins; re-check MAUI maturity then.
+- **MAUI Blazor Hybrid (committed — ADR-018)** — reuses the C# Blazor UI (via RCL) across mobile +
+  Win/macOS desktop, not just the API. Auth is wired; **full feature parity** (verify + CI + signed
+  distribution across Android/Windows/iOS/macOS) is epic `NATIVE` (`docs/stories/native.md`).
   Alternatives if MAUI disappoints: Uno Platform, Avalonia, or a JS frontend against the same API.
 
 ## Deferred sub-decisions (revisit when relevant)
