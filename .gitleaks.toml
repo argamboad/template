@@ -12,10 +12,12 @@ description = "Documented example values + test-only secrets — never real cred
 paths = [
   '''\.env\.example''',          # documented config surface (placeholders/commented examples)
   '''\.gitleaks\.toml''',        # this file (contains the sample patterns below)
+  '''\.github/workflows/''',     # CI uses throwaway signing secrets for the ephemeral e2e stack
   '''tests/''',                  # test fixtures use fake secrets (e.g. the integration-test JWT key)
 ]
 regexes = [
   '''integration-test-jwt-secret-key''',        # IntegrationTestFactory
   '''test-secret-key-at-least-32-chars''',       # ServiceHarness TestJwtSettings
+  '''ci-e2e-jwt-signing-secret''',               # the e2e CI job's throwaway JWT secret (ci.yml)
   '''sk_test_''', '''whsec_''', '''price_''',    # Stripe example placeholders in .env.example
 ]
