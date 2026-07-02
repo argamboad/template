@@ -30,5 +30,33 @@ services:
       retries: 5
       start_period: 5s
 
+  # Production image, single-origin API+WASM (DEPLOY-2). Behind the "app" profile so the normal dev flow
+  # (`docker compose up -d`) still starts ONLY db + mail — this only runs with `--profile app`. It's the
+  # local parity check: "does the container that ships to Render actually boot + migrate + serve?".
+  # Loads your .env for the app secrets, then overrides the connection string + SMTP to reach the
+  # sibling containers by service name. Copy .env.example -> .env first.
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${DB_NAME:-dev_db};Username=${DB_USER:-dev};Password=${DB_PASSWORD:-devpassword}"
+      Email__Smtp__Host: mail
+      Email__Smtp__Port: "1025"
+      Email__Smtp__Username: ""
+      Email__Smtp__Password: ""
+      PORT: "8080"
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+
 volumes:
   db_data:

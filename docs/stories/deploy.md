@@ -115,6 +115,18 @@ ADR-017 referenced.
 
 ### DEPLOY-2 — Containerize + bring up the staging environment (Render + Neon + Brevo)
 
+**Status: 🚧 Local half done** (`feat/deploy-2-container`) — cloud bring-up pending operator accounts.
+Multi-stage `Dockerfile` (repo root) + `.dockerignore`: publishes Web + Api, folds the WASM bundle into
+the API's `wwwroot`, runs non-root, binds `$PORT` (default 8080), `HEALTHCHECK` → `/health`. A compose
+`app` service (behind the `app` **profile**, so `docker compose up -d` still starts only db+mail) gives
+local parity. `render.yaml` blueprint (free plan, health `/health/ready`, secrets `sync:false`) +
+`docs/DEPLOYMENT.md` runbook (Neon session pooler, Brevo, **required Stripe test key** — the Production
+fail-closed billing guard, GAP-1). **Verified locally in Production mode against the compose Postgres:**
+boots + migrates, `/health` + `/health/ready` 200, SPA shell + deep-link fallback, fingerprinted WASM
+assets served (`application/wasm`), `/api/*` unknown → 404 (not shadowed), protected `/api` → 401.
+**Remaining (operator):** create Neon + Brevo + Stripe-test accounts, apply the blueprint, set secrets,
+first deploy, register OAuth/Stripe-webhook URIs — then confirm an OTP sign-in on the live URL.
+
 **As an** operator
 **I want** a production Docker image and a documented, reproducible staging environment on the free tier
 **So that** the app runs on a real URL with a managed DB and real SMTP, and QA can test where deployment bugs actually live
@@ -226,9 +238,10 @@ Ordered, each a mergeable vertical slice that leaves the app working. TDD throug
    fallback, `/api` excluded), `ApiBaseUrl` defaults to same-origin, config-gated `UseForwardedHeaders`.
    Both config-gated **off** by default (additive — local dev unchanged). Proven by integration tests
    in the existing harness (`SingleOriginHostingTests`) + a focused middleware test (`ProxyForwardingTests`).
-2. 📝 **Container + staging bring-up (DEPLOY-2).** Multi-stage Dockerfile + compose parity, then the
-   real thing: Neon (session pooler) + Render (render.yaml) + Brevo, `docs/DEPLOYMENT.md` runbook,
-   `.env.example` staging section. Ends with a live staging URL and a manual OTP sign-in on it.
+2. 🚧 **Container + staging bring-up (DEPLOY-2).** — Local half DONE: multi-stage Dockerfile +
+   `.dockerignore` + compose `app`-profile parity + `render.yaml` + `docs/DEPLOYMENT.md`, verified in
+   Production mode against compose Postgres. Cloud half (Neon + Render + Brevo + Stripe-test accounts →
+   live URL + manual OTP sign-in) is the operator's step per the runbook.
 3. 📝 **Pipeline + smoke + QA (DEPLOY-3).** `deploy.yml` (develop → staging auto + smoke;
    main → prod behind environment approval), QA plan "Environment B: staging" (+ PDF regen).
 
