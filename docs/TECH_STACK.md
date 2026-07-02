@@ -143,4 +143,10 @@ Production reads the same keys from real environment variables, never a committe
   Console exporters) — traces + metrics (OBS-2 / ADR-008). Npgsql DB spans via its built-in `"Npgsql"`
   `ActivitySource` (not the beta EF Core instrumentation). Exporter config-gated: OTLP when
   `OpenTelemetry:Otlp:Endpoint` is set, else nothing (or console via `OpenTelemetry:ConsoleExporter`).
+- **`Otp.NET` 1.4.1** — authenticator-app TOTP (MFA-1 / ADR-012); the standard RFC-6238 math behind the
+  encrypted per-user secret and step-up verification.
+- **`AWSSDK.S3` 4.0.100** — the S3-compatible `IFileStorage` implementation (FILES-3 / ADR-010; works
+  with AWS S3, MinIO, R2, DO Spaces). Selected only when `Storage:S3:*` is configured; else local disk.
+- **`Swashbuckle.AspNetCore` 7.2.0** — the leak-free public OpenAPI document at
+  `GET /api/public/openapi.json` (PUBAPI-2 / ADR-015), emitted only when `PublicApi:Enabled`.
 - _TODO_

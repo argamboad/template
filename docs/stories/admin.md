@@ -2,7 +2,8 @@
 
 > One file per epic. A **platform-staff** surface (outside the tenant model) to inspect any tenant and
 > "sign in as" a user for support — the **highest-blast-radius** feature, built entirely on existing
-> guardrails (the audited `QueryAllTenants()` escape hatch, ADR-003; the audit log, ADR-008). Design +
+> guardrails (`ITenantContext.EnterTenant` for scoped in-tenant reads/writes, ADR-003; the audit log,
+> ADR-008 — the global filter is never disabled). Design +
 > constraints in **ADR-014**. Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — ADMIN-1
 > (staff gate + cross-tenant inspection) + ADMIN-2 (short-lived audited impersonation). **UI shipped**
 > (`feat/ui-4-admin`): a staff-only `/admin` console (`AdminConsole`) — tenant list/detail + **Sign in as**
@@ -17,9 +18,10 @@
 - Reuses: audit (ADR-008 ✅), the audited escape hatch (ADR-003 ✅), JWT issuance, RBAC (ADR-009 ✅).
   No new packages.
 
-**Guardrails (ADR-014):** the global tenant filter is **never loosened** (cross-tenant reads use the
-audited hatch, scoped to the target); staff is **config-only** (never a tenant role / app toggle);
-impersonation is **short-lived + non-refreshable + audited**; admin is **read-only** over tenant data.
+**Guardrails (ADR-014):** the global tenant filter is **never loosened** (scoped in-tenant reads/writes
+enter the target via `EnterTenant`, keeping the filter engaged); staff is **config-only** (never a tenant
+role / app toggle); impersonation is **short-lived + non-refreshable + audited**; admin is **read-only**
+over tenant data.
 
 ---
 
@@ -42,9 +44,11 @@ list-with-counts, detail+in-tenant-audit, unknown→404).
 **Context / notes:** `PlatformAdminSettings` (`StaffEmails`) + `IPlatformStaffService.IsStaffAsync(userId)`
 (resolves the caller's email, checks the allowlist, case-insensitive) + an **`AdminOnly`** gate that 403s
 non-staff. `AdminController` (staff-gated): `GET /api/admin/tenants` (list — id, name, member count,
-created) and `GET /api/admin/tenants/{id}` (detail — members + roles, subscription status, counts), using
-the audited `QueryAllTenants()` hatch (ADR-003) for tenant-scoped data. **Every access audited**
-(`admin.tenant.viewed`). Read-only.
+created) and `GET /api/admin/tenants/{id}` (detail — members + roles, subscription status, counts). The
+list reads non-scoped tables directly (`ListAllAsync`, no hatch); the detail **enters the target tenant**
+via `ITenantContext.EnterTenant` (ADR-003 amendment) so scoped reads go through the normal filter engaged,
+never a disabled filter. **Every access audited** (`admin.tenant.viewed`, in the target's tenant).
+Read-only.
 
 **Acceptance criteria**
 
@@ -52,7 +56,7 @@ the audited `QueryAllTenants()` hatch (ADR-003) for tenant-scoped data. **Every 
 Scenario: Staff can list tenants
   Given I am on the platform-staff allowlist
   When I GET /api/admin/tenants
-  Then I see every tenant (id, name, member count) — across the global filter, via the audited hatch
+  Then I see every tenant (id, name, member count) — from the non-scoped tenant tables
 
 Scenario: Non-staff are refused
   Given I am a normal user (not on the allowlist)
@@ -68,7 +72,7 @@ Scenario: Admin reads are audited
   Then an AuditEvent records the staff actor and the tenant viewed
 
 Scenario: The global filter is never loosened
-  Then admin cross-tenant reads use QueryAllTenants() (audited hatch), not a disabled filter
+  Then admin tenant-detail reads enter the target tenant via EnterTenant (filter engaged), not a disabled filter
 ```
 
 **Out of scope:** cross-tenant **writes** (admin is read-only; changes go through impersonation, ADMIN-2);
@@ -143,6 +147,6 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    `POST /api/admin/impersonate/{userId}` → 15-min, non-refreshable, `impersonated_by`-tagged access
    token; audited (`admin.impersonation.started`) in the target's tenant. Unknown target → 404.
 
-**Known sharp edges (from ADR-014):** the global filter is **inviolable** (audited hatch only); staff is
+**Known sharp edges (from ADR-014):** the global filter is **inviolable** (`EnterTenant` keeps it engaged; never disabled); staff is
 **config-only** (never a role/app toggle); impersonation is **short-lived + non-refreshable + audited**;
 admin is **read-only** over tenant data; **no secrets/PII** in responses or audit metadata.

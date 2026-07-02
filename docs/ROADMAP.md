@@ -35,15 +35,15 @@ sequenced below by value, not by dependency.
 | Item | Epic | Size | Why | Deps |
 |------|------|------|-----|------|
 | **Account & data lifecycle (GDPR)** — export + erasure — ✅ *COMPLETE* (GDPR-1/2; ADR-011, `stories/gdpr.md`) | `GDPR` | M–L | Legal exposure; reuses dissolve (add `ExportAsync` beside `WipeAsync` on contributors) | audit ✅, File storage (W1) ✅ |
-| **MFA / TOTP 2FA** — ✅ *COMPLETE* (MFA-1/2; redirect-path step-up = UI follow-up) (ADR-012, `stories/mfa.md`) | `MFA` | M | Security baseline; closes the ADR-C15 "TOTP promised, never built" gap | ready |
+| **MFA / TOTP 2FA** — ✅ *COMPLETE* (MFA-1..4 — JSON + redirect + native step-up all shipped, enforced on every sign-in path) (ADR-012, `stories/mfa.md`) | `MFA` | M | Security baseline; closes the ADR-C15 "TOTP promised, never built" gap | ready |
 
 ## Wave 3 — Extensibility & ops (open the platform up)
 
 | Item | Epic | Size | Why | Deps |
 |------|------|------|-----|------|
-| **Public API + API keys** — ✅ *PUBAPI-1 DONE* (config-gated off; ADR-015, `stories/pubapi.md`) | `PUBAPI` | M | Programmatic access distinct from the user session | RBAC (W1) |
+| **Public API + API keys** — ✅ *COMPLETE* (PUBAPI-1/2, config-gated off; ADR-015, `stories/pubapi.md`) | `PUBAPI` | M | Programmatic access distinct from the user session | RBAC (W1) |
 | **In-app notifications** — ✅ *COMPLETE* (NOTIFY-1/2; ADR-013, `stories/notify.md`) | `NOTIFY` | M | Follow-on to email; fan-out via the outbox | outbox ✅ |
-| **Outbound webhooks** — ✅ *HOOKS-1 DONE* (config-gated off; ADR-016, `stories/hooks.md`) | `HOOKS` | M | Integration story for *your* customers | outbox ✅ |
+| **Outbound webhooks** — ✅ *COMPLETE* (HOOKS-1/2 — subscriptions + delivery log/replay; config-gated off; ADR-016, `stories/hooks.md`) | `HOOKS` | M | Integration story for *your* customers | outbox ✅ |
 | **Admin back-office + impersonation** — ✅ *COMPLETE* (ADMIN-1/2; ADR-014, `stories/admin.md`) | `ADMIN` | M–L | Support tooling — all deps ready (audit ✅ + `EnterTenant` ✅); highest blast radius, do deliberately | RBAC, audit ✅, EnterTenant ✅ |
 
 ## Finish-the-epic (optional — when a real paid plan exists)
@@ -59,8 +59,9 @@ sequenced below by value, not by dependency.
 
 - **E2E** (Playwright) for the platform features built unit/integration-first (billing flows, health, …).
 - **stripe-mock** integration test (deferred in BILLING-2 over Testcontainers 4.12 friction).
-- **Build-time ban on `IgnoreQueryFilters` in `src/Api/Features/**`** (audit task B9-1) — a one-test
-  guardrail making the escape hatch unreachable from slice code.
+- **Build-time ban on `IgnoreQueryFilters` in `src/Api/Features/**`** (audit task B9-1) — ✅ **DONE**
+  (`tests/Api.Tests/ArchitectureTests.cs`): a one-test guardrail making the escape hatch unreachable
+  from slice code.
 - *(optional)* Declarative auto-audit SaveChanges interceptor (deferred from OBS-4; explicit
   `IAuditLog.Record` covers semantic events today).
 
@@ -75,8 +76,9 @@ sequenced below by value, not by dependency.
 
 ## Recommended next
 
-**The planned platform is COMPLETE.** Foundation (JOBS/BILLING/OBS) + Wave 1 (RBAC, FILES) + Wave 2
-(GDPR, MFA) + Wave 3 (NOTIFY, ADMIN) — nine epics, ADRs 006–014, all merged. **Parked by choice:** PUBAPI
-+ HOOKS (public/customer-facing API). **Deferred:** CACHE (until multi-node). **Remaining work is
-UI-only** — the API-first surfaces (MFA enroll/step-up, GDPR export/erasure, notification bell menu, admin
-console) need Blazor pages when wanted.
+**All 11 planned epics + their UI are COMPLETE.** Foundation (JOBS/BILLING/OBS) + Wave 1 (RBAC, FILES) +
+Wave 2 (GDPR, MFA) + Wave 3 (NOTIFY, ADMIN, PUBAPI, HOOKS) — ADRs 006–016, all merged. PUBAPI + HOOKS
+were un-parked and shipped on 2026-07-01 (config-gated **default-off**). The API-first surfaces (MFA
+enroll/step-up, GDPR export/erasure, notification bell menu, admin console) all have their Blazor UI now.
+**Open items:** HOOKS-3 (a Blazor webhook/API-key management UI) and API-key rotation. **Deferred:**
+CACHE (Redis — until multi-node).

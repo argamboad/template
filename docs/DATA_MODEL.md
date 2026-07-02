@@ -10,8 +10,11 @@
 - Timestamps (`created_at`, `updated_at`) assumed on all entities; omitted below for brevity.
 - **Tenant scoping:** every app entity that holds tenant data implements `ITenantScoped`
   (a `TenantId`) and is filtered automatically by a global EF query filter (see ADR-003) — you
-  can't forget to scope a read. Cross-tenant/pre-auth lookups opt out explicitly with
-  `IgnoreQueryFilters()`. Never leak across tenants.
+  can't forget to scope a read. Genuinely cross-tenant/pre-auth reads use the sanctioned escape
+  hatch **`IRepository<T>.QueryAllTenants()`** (audited; used by dissolve contributors), and a
+  signature-/system-authenticated tenant-scoped write enters its tenant via
+  **`ITenantContext.EnterTenant(tenantId)`** — `IgnoreQueryFilters()` is **banned in
+  `src/Api/Features/**`** (a build-time test enforces it). Never leak across tenants.
 - "Tenant" is the code term for the household/org/team. The reference implementation labels it
   **Household**; rename per app.
 
@@ -64,6 +67,9 @@ A user's TOTP second-factor state (one per user). User-scoped identity data (wip
 - `encrypted_secret` — the TOTP secret **encrypted at rest** (Data Protection); never plaintext, never
   returned after enrollment
 - `enabled` (true only after a valid code confirms possession), `enrolled_at`
+- `last_verified_time_step` (nullable) — the TOTP time-step accepted by the most recent successful
+  **login** step-up; a code whose step is ≤ this is rejected as a replay (RFC-6238 anti-replay; v2
+  audit LOGIC-S1). Null until the first login step-up; enrollment-confirm deliberately does not set it.
 
 ### MfaRecoveryCode *(MFA — ADR-012)*
 Single-use recovery codes, stored **only as hashes** (SHA-256); the raw codes are shown once at
@@ -112,17 +118,51 @@ _TODO_
 <!-- The domain logic specific to this app. TenantInvitation rules are defined above. -->
 _TODO_
 
-## Pinned model extensions (future, not built)
-- SMS/phone field on User — needed when phone-based OTP is implemented.
-- App/domain tables — implement `ITenantScoped` so the global tenant filter covers them, and wire
-  them into `ITenantRepository.HasDataAsync`/`WipeDataAsync` (the dissolve hook) once they exist.
-- **`Subscription`** *(ADR-006 / `docs/stories/billing.md`)* — ✅ **BUILT (BILLING-1)**:
+## Platform entities (built — ADRs 006–016)
+
+> These are the tenant-/platform-scoped tables the platform epics added. All have EF Core migrations.
+> New app/domain tables you add should implement `ITenantScoped` (so the global tenant filter covers
+> them) and register an **`ITenantDataContributor`** (with `ExportKey` + `ExportAsync` **and**
+> `HasDataAsync`/`WipeAsync`) so they participate in tenant export + dissolve — there is **no** central
+> `HasDataAsync`/`WipeDataAsync` method to edit (adding a feature never means touching central code).
+
+- **`Subscription`** *(ADR-006 / `docs/stories/billing.md`)* — ✅ **BUILT (BILLING-1..7)**:
   `src/Core/Entities/Subscription.cs`, migration `AddSubscription`. `ITenantScoped`, **unique per
-  tenant**; `plan_key`, `status`, `stripe_customer_id`/`stripe_subscription_id` (nullable until
-  BILLING-2), `current_period_end`. A **projection** of Stripe state (Stripe is the source of truth for
-  money); absent ⇒ Free tier (fail-closed), as is any non-active/lapsed status. Plan catalog is
-  code (`src/Core/Billing/PlanCatalog.cs`), not a table. Will participate in dissolve (cancel + wipe)
-  once BILLING-2 adds the provider.
+  tenant**; `plan_key`, `status`, `stripe_customer_id`/`stripe_subscription_id`, `current_period_end`,
+  `lapse_notified_at` (nullable — set by the BILLING-6 lapse sweep so it nudges once per lapse),
+  `last_event_at` (nullable — the timestamp of the most recently *applied* webhook event; the handler
+  applies an incoming event only if strictly newer, so a redelivered/out-of-order older event can't
+  clobber newer state — v2 audit LOGIC-B1). A **projection** of Stripe state (Stripe is the source of
+  truth for money); absent ⇒ Free tier (fail-closed), as is any non-active/lapsed status. Plan catalog
+  is code (`src/Core/Billing/PlanCatalog.cs`), not a table. Participates in dissolve via
+  `BillingDataContributor` (cancels the provider sub + wipes the projection).
+- **`UsageCounter`** *(ADR-006 / `docs/stories/billing.md`)* — ✅ **BUILT (BILLING-5)**:
+  `src/Core/Entities/UsageCounter.cs`. `ITenantScoped`. A per-tenant, per-period metered-usage counter:
+  `key` (the metered action, e.g. "export"), `period` (a calendar month `yyyy-MM`, UTC), `count`,
+  `updated_at`. One row per (tenant, key, period) — the month-keyed period makes it **self-resetting
+  with no reset job**. `IQuotaService.TryConsumeAsync` increments it and denies once the plan's monthly
+  limit is reached.
+- **`ApiKey`** *(ADR-015 / `docs/stories/pubapi.md`)* — ✅ **BUILT (PUBAPI-1)**:
+  `src/Core/Entities/ApiKey.cs`. `ITenantScoped`. A tenant-scoped API key for programmatic access — only
+  the **hash** is stored: `name`, `key_hash` (deterministic hash for O(1) lookup), `prefix` (short
+  non-secret display prefix), `scopes` (comma-separated), `created_by_user_id`, `created_at`,
+  `last_used_at`, `expires_at` (nullable), `revoked_at` (nullable). The raw key is shown once at
+  creation. A presented key authenticates as its tenant (mints a `tenant_id`-claim principal).
+- **`WebhookSubscription`** *(ADR-016 / `docs/stories/hooks.md`)* — ✅ **BUILT (HOOKS-1)**:
+  `src/Core/Entities/WebhookSubscription.cs`. `ITenantScoped`. A tenant's outbound webhook subscription:
+  `url`, `event_types` (comma-separated), `encrypted_secret` (the HMAC signing secret **encrypted** at
+  rest via Data Protection — needed in plaintext to sign, so it can't be hashed; revealed once),
+  `created_by_user_id`, `created_at`, `disabled_at` (nullable). Delivery goes through the outbox
+  (ADR-007), so it's durable + retried.
+- **`WebhookDelivery`** *(ADR-016 / `docs/stories/hooks.md`)* — ✅ **BUILT (HOOKS-2)**:
+  `src/Core/Entities/WebhookDelivery.cs`. **NOT `ITenantScoped`** — like `OutboxMessage` it's written
+  from the tenant-less outbox dispatcher, so `tenant_id` is a **plain filter column** the read side
+  filters on, not a global-filter scoping key. A per-attempt delivery record (retries add rows):
+  `subscription_id`, `event_type`, `event_id`, `body` (the exact JSON sent — retained so a delivery can
+  be **replayed**), `success`, `status_code` (nullable), `error` (nullable), `created_at`.
+- **`OutboxMessage`**, **`InboxMessage`**, **`AuditEvent`** — see below.
+
+## Platform infra entities (built — not `ITenantScoped`)
 - **`OutboxMessage`** *(ADR-007 / `docs/stories/async-jobs.md`)* — ✅ **BUILT (JOBS-1)**:
   `src/Core/Entities/OutboxMessage.cs`, migration `AddOutbox`. **NOT** `ITenantScoped` (platform infra;
   carries an optional `TenantId` for context). `type`, `payload` (text/JSON), `status`,
@@ -141,6 +181,9 @@ _TODO_
   `AuditAppendOnlyInterceptor` (throws on tracked update/delete). `AuditDataContributor` purges on
   dissolve (set-based delete bypasses the guard). No secrets/PII in `metadata`. Dissolve vs retention:
   export-then-wipe if legal-hold is required (GDPR backlog).
-- Further future entities (RBAC roles, `ApiKey`, `Notification`, webhook subscriptions) are scoped in
-  `docs/PLATFORM_BACKLOG.md`.
+## Pinned model extensions (future, not built)
+- SMS/phone field on User — needed when phone-based OTP is implemented.
+- New app/domain tables — implement `ITenantScoped` so the global tenant filter covers them, and
+  register an `ITenantDataContributor` (`ExportKey` + `ExportAsync` + `HasDataAsync`/`WipeAsync`) so
+  they participate in tenant export + dissolve (there is no central wipe method to edit).
 - _TODO_
