@@ -1,7 +1,10 @@
+using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Template.Api.Controllers;
 using Template.Api.Tests.Infrastructure;
+using Template.Core.Abstractions;
 using Template.Core.Entities;
 using Template.Infrastructure.Persistence;
 
@@ -190,6 +193,112 @@ public class ArchitectureTests
 
         Assert.True(offenders.Count == 0,
             $"Platform tests must use the harness TestWidget fixture, not the DELETE-ME Notes sample: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void TenantDataContributors_HaveUniqueExportKeys()
+    {
+        // R13/TR-9: the export bundle is keyed by ITenantDataContributor.ExportKey, and dissolve fans out
+        // over the same set — two contributors sharing a key would silently overwrite each other's export
+        // slice (and confuse dissolve). Reflect every concrete contributor across the platform assemblies
+        // and assert the keys are distinct + non-blank. Uninitialized instances are enough: ExportKey
+        // getters return constants, so no constructor/DI is needed.
+        var assemblies = new[] { typeof(TenantApiControllerBase).Assembly, typeof(AppDbContext).Assembly };
+        var keys = assemblies
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(ITenantDataContributor).IsAssignableFrom(t))
+            .Select(t => ((ITenantDataContributor)RuntimeHelpers.GetUninitializedObject(t)).ExportKey)
+            .ToList();
+
+        Assert.All(keys, k => Assert.False(string.IsNullOrWhiteSpace(k), "ExportKey must be non-blank."));
+        var dupes = keys.GroupBy(k => k, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+        Assert.True(dupes.Count == 0, $"ITenantDataContributor.ExportKey values must be unique: {string.Join(", ", dupes)}");
+    }
+
+    [Fact]
+    public void TenantScopedEntities_MapToDistinctTables()
+    {
+        // R35 (table half)/ADV-4: two parallel slices must not silently map to the same table. Assert every
+        // mapped entity resolves to a distinct (schema, table) pair.
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql("Host=localhost;Database=arch-check") // model-only; never connects
+            .Options;
+        using var ctx = new AppDbContext(options, new TestCurrentTenant());
+
+        var dupes = ctx.Model.GetEntityTypes()
+            .Where(e => e.GetTableName() is not null)
+            .GroupBy(e => $"{e.GetSchema()}.{e.GetTableName()}", StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => $"{g.Key} <- {string.Join(" & ", g.Select(e => e.ClrType.Name))}")
+            .ToList();
+
+        Assert.True(dupes.Count == 0, $"Entities must map to distinct tables: {string.Join("; ", dupes)}");
+    }
+
+    [Fact]
+    public void RouteGroupPrefixes_AreUnique()
+    {
+        // R35 (route half)/ADV-4: no two slices claim the same /api/<x> prefix. Collect controller [Route]
+        // templates and minimal-API MapGroup("…") literals; assert the full route strings are distinct.
+        var controllersDir = Path.Combine(RepoRoot(), "src", "Api", "Controllers");
+        var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
+
+        var controllerRoutes = SourceFiles(controllersDir)
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\[Route\(""([^""]+)""\)\]").Select(m => m.Groups[1].Value));
+        var groupRoutes = SourceFiles(featuresDir)
+            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"MapGroup\(""([^""]+)""\)").Select(m => m.Groups[1].Value));
+
+        var all = controllerRoutes.Concat(groupRoutes)
+            .Select(r => "/" + r.Trim('/').ToLowerInvariant()) // normalize leading slash + case
+            .ToList();
+
+        var dupes = all.GroupBy(r => r, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+        Assert.True(dupes.Count == 0, $"Route prefixes must be unique across controllers and feature groups: {string.Join(", ", dupes)}");
+    }
+
+    [Fact]
+    public void FeatureFolders_DoNotReferenceEachOthersNamespaces()
+    {
+        // R7/TR-9: a vertical slice under Features/<X>/ must stay self-contained — it may not reference
+        // another slice's Features.<Y> namespace. Keeps slices independently deletable.
+        var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
+        var slices = Directory.Exists(featuresDir)
+            ? Directory.GetDirectories(featuresDir).Select(Path.GetFileName).ToList()
+            : [];
+
+        var offenders = new List<string>();
+        foreach (var slice in slices)
+        {
+            var others = slices.Where(s => !string.Equals(s, slice, StringComparison.Ordinal));
+            foreach (var file in SourceFiles(Path.Combine(featuresDir, slice!)))
+            {
+                var text = File.ReadAllText(file);
+                if (others.Any(o => text.Contains($"Template.Api.Features.{o}", StringComparison.Ordinal)))
+                    offenders.Add(Path.GetFileName(file)!);
+            }
+        }
+
+        Assert.True(offenders.Count == 0,
+            $"Feature slices must not reference another slice's namespace: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void OnlyProgram_ReferencesFeatureNamespaces_FromOutsideFeatures()
+    {
+        // R8: the clean state is that composition happens in one place — only Program.cs wires the feature
+        // endpoints. Nothing else outside src/Api/Features/ may reach into Template.Api.Features.*.
+        var apiDir = Path.Combine(RepoRoot(), "src", "Api");
+        var featuresPath = $"{Path.DirectorySeparatorChar}Features{Path.DirectorySeparatorChar}";
+
+        var offenders = SourceFiles(apiDir)
+            .Where(f => !f.Contains(featuresPath))                     // scope: outside the Features tree
+            .Where(f => Path.GetFileName(f) != "Program.cs")           // Program.cs is the sanctioned composer
+            .Where(f => File.ReadAllText(f).Contains("Template.Api.Features", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Only Program.cs may reference Template.Api.Features.* from outside Features/: {string.Join(", ", offenders)}");
     }
 
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>
