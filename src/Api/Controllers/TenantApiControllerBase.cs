@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Template.Api.Authentication;
 using Template.Api.Configuration;
 using Template.Api.Services;
 using Template.Core.Authorization;
@@ -27,8 +27,7 @@ public abstract class TenantApiControllerBase(
     protected ITenantRepository Tenants { get; } = tenants;
 
     /// <summary>The authenticated caller's user id, or null when the token lacks/can't parse it.</summary>
-    protected Guid? CurrentUserId =>
-        Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
+    protected Guid? CurrentUserId => User.GetUserId();
 
     /// <summary>The caller's single tenant membership (tenant + role), or null.</summary>
     protected Task<TenantMembership?> GetMembershipAsync(CancellationToken cancellationToken = default) =>

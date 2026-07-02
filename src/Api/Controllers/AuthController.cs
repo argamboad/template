@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
+using Template.Api.Authentication;
 using Template.Api.Configuration;
 using Template.Api.Models;
 using Template.Api.Services;
@@ -239,8 +240,7 @@ public class AuthController(
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(userIdValue, out var userId))
+        if (User.GetUserId() is not { } userId)
             return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
 
         var user = await userService.GetUserByIdAsync(userId, cancellationToken);
@@ -654,8 +654,12 @@ public class AuthController(
         return $"{url}{separator}{key}={Uri.EscapeDataString(value)}";
     }
 
-    private bool TryGetUserId(out Guid userId) =>
-        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
+    private bool TryGetUserId(out Guid userId)
+    {
+        var id = User.GetUserId();
+        userId = id ?? default;
+        return id is not null;
+    }
 
     private static bool IsLikelyEmail(string? email) =>
         !string.IsNullOrWhiteSpace(email) && System.Net.Mail.MailAddress.TryCreate(email.Trim(), out _);

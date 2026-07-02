@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Template.Api.Authentication;
 using Template.Api.Models;
 using Template.Api.Services;
 
@@ -18,8 +19,7 @@ namespace Template.Api.Controllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class NotificationsController(INotificationService notifications, IErrorResponseFactory errorFactory) : ControllerBase
 {
-    private Guid? CurrentUserId =>
-        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+    private Guid? CurrentUserId => User.GetUserId();
 
     /// <summary>The caller's notifications, newest first. Cursor with <c>before</c>; <c>limit</c> ≤ 100.</summary>
     [HttpGet]
