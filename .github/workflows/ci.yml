@@ -16,22 +16,36 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      # Supply-chain (B11-6): restore in LOCKED mode against the committed packages.lock.json
+      # files. --locked-mode fails if the resolved graph differs from the lockfile, so a
+      # dependency change can't slip in without updating the (reviewed) lockfile. The MAUI
+      # shells are excluded (not built in CI, no committed lockfile).
+      - name: Restore (locked mode)
+        run: |
+          dotnet restore src/Api/Template.Api.csproj --locked-mode
+          dotnet restore src/Web/Template.Web.csproj --locked-mode
+          dotnet restore tests/E2E.Tests/Template.E2E.Tests.csproj --locked-mode
+          dotnet restore tests/Core.Tests/Template.Core.Tests.csproj --locked-mode
+          dotnet restore tests/Api.Tests/Template.Api.Tests.csproj --locked-mode
+
       # Build the Linux-buildable graph with warnings-as-errors (Directory.Build.props).
       # The MAUI shells target net10.0-windows / -android and are excluded here; they're
       # deferred and not part of the gate. Building Web covers Shared.Ui (the RCL).
+      # --no-restore: reuse the locked-mode restore above (don't let the build re-restore loosely).
       - name: Build (warnings-as-errors)
         run: |
-          dotnet build src/Api/Template.Api.csproj -c Release
-          dotnet build src/Web/Template.Web.csproj -c Release
-          dotnet build tests/E2E.Tests/Template.E2E.Tests.csproj -c Release
+          dotnet build src/Api/Template.Api.csproj -c Release --no-restore
+          dotnet build src/Web/Template.Web.csproj -c Release --no-restore
+          dotnet build tests/E2E.Tests/Template.E2E.Tests.csproj -c Release --no-restore
 
       # Unit + integration tests. Api.Tests includes the architecture invariants (B9-1) and the
       # migration-drift guard (B6-2); both spin up Postgres via Testcontainers (Docker is
       # available on ubuntu-latest). E2E.Tests need the full running stack and aren't run here.
+      # --no-restore: the locked-mode restore already ran.
       - name: Test (Core + Api)
         run: |
-          dotnet test tests/Core.Tests/Template.Core.Tests.csproj -c Release
-          dotnet test tests/Api.Tests/Template.Api.Tests.csproj -c Release
+          dotnet test tests/Core.Tests/Template.Core.Tests.csproj -c Release --no-restore
+          dotnet test tests/Api.Tests/Template.Api.Tests.csproj -c Release --no-restore
 
       # Fail the build if the EF model has drifted from the latest migration/snapshot.
       - name: No pending EF model changes
@@ -63,3 +77,34 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | tar -xz gitleaks
           ./gitleaks detect --no-banner --redact --config .gitleaks.toml
+
+  # Dependency license scan (v2 audit B11-6, R26). Inventories every NuGet license in the main app's
+  # graph (direct + transitive) and FAILS only on clearly-incompatible copyleft licenses
+  # (GPL/AGPL/LGPL/SSPL) — a prohibited-list, not an allow-list, so Microsoft/permissive-OSS
+  # licenses (MIT, Apache-2.0, BSD, PostgreSQL, ...) never trip a false positive. Kept a separate
+  # job so a license failure is distinguishable from a build/test failure.
+  license-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: dotnet-project-licenses (fail on copyleft)
+        # Restore first so project.assets.json exists for the transitive walk (the app uses Central
+        # Package Management, so versions resolve from Directory.Packages.props). The tool targets an
+        # older runtime, so roll forward to the installed .NET. It prints the full license table and
+        # exits non-zero if any license in .github/forbidden-licenses.json (GPL/AGPL/LGPL/SSPL) appears.
+        env:
+          DOTNET_ROLL_FORWARD: LatestMajor
+        run: |
+          dotnet restore src/Api/Template.Api.csproj
+          dotnet tool install --global dotnet-project-licenses
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet-project-licenses \
+            --input src/Api/Template.Api.csproj \
+            --include-transitive \
+            --use-project-assets-json \
+            --forbidden-license-types .github/forbidden-licenses.json
