@@ -45,6 +45,8 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Owner promotes and demotes a member | QA-HH-09, QA-HH-10 |
 | Roster is permission-aware (member + admin views) | QA-HH-02, QA-HH-11, QA-HH-12 |
 | Owner removes a member (confirm dialog) | QA-HH-03 |
+| Inviting past the free-plan seat limit shows the upgrade prompt | QA-HH-14 |
+| Revoking a pending invitation frees the seat | QA-INV-08 |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that
