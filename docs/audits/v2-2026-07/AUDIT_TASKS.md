@@ -183,7 +183,7 @@ Add each machine rule as an arch test / analyzer / CI step (backlog `AUDIT_RECON
 - [x] **B11-4 · R13 ExportKey uniqueness test** — `TenantDataContributors_HaveUniqueExportKeys`.
 - [ ] **B11-5 · CI doc-sync (R23) + config-key⇄.env (R20) + secret scan (gitleaks) + MailKit-outside-Email ban** — ⬜ **scoped** (CI-infra).
 - [ ] **B11-6 · Supply chain:** R25 (CPM + lockfile + `--locked-mode`), R26 (license scan), R27 — ⬜ **scoped** (CI-infra).
-- [ ] **B11-7 · MA0048 file-name analyzer (R24 naming half)** — ⬜ **scoped**.
+- [x] **B11-7 · MA0048 file-name analyzer (R24 naming half)** — `SourceFile_DeclaresATypeMatchingItsName` arch test (a file declares a type matching its name; `*Models` DTO aggregations + `SettingsProvider`/`WebhookService` exempt). Realized as a source-scan gate rather than the Meziantou MA0048 analyzer, which would enable ~150 unrelated rules under warnings-as-error (unbounded churn) — same guarantee, bounded.
 - [ ] **B11-8 · QA: move guide-PDF generation into CI (deterministic); assert run-log append-only; assert QA plan + PDFs change together** — ⬜ **scoped** (CI-infra).
 - [x] **B11-9 · Definition of Solid + Standing Instruction:** `CONTRIBUTING.md` updated with the new invariants; `FOUNDATION_RULES.md`-binding standing instruction added to `CLAUDE.md` (per the suite's STANDING INSTRUCTION block). E2E-in-CI decision (B8-5) deferred with the harness.
   - **Exit check (V2-B11):** every machine rule in `FOUNDATION_RULES.md` v1.0 is a green gate; a generated clone inherits them; the doc-only floor (TR-9) is now CI-enforced.
