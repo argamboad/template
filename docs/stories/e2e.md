@@ -5,7 +5,7 @@
 > the **notification center/preferences**. Deliberately selective — headless machinery (webhooks,
 > outbox, health checks, Stripe money paths) stays at the integration layer where it's already
 > covered; `/health` liveness belongs to the DEPLOY-3 smoke step, not a browser test. Stories use
-> Gherkin acceptance criteria. **Status: 📝 planned.**
+> Gherkin acceptance criteria. **Status: 🚧 — E2E-1 ✅; E2E-2/3 📝.**
 
 **Epic key:** `E2E`
 
@@ -42,6 +42,14 @@
 
 ### E2E-1 — RBAC roster journey
 
+**Status: ✅ Implemented** (`test/e2e-1-roster-journey`). `RosterJourneyTests` (4 tests) +
+`Pages/HouseholdPage.cs`/`Pages/JoinPage.cs`; `data-testid` hooks added to `Household.razor` +
+`Join.razor` (role assertions use a `data-role` attribute, not localized badge text). Two fixes the
+failing tests drove out: the Mailpit OTP poll now matches on the OTP subject (a late outbox-delivered
+invitation email to the same address could satisfy the 6-digit regex), and the README documents the
+`Auth:RateLimit:PasswordlessPermitLimit` override for local runs (multi-user journeys trip the
+5/min/IP production default; CI already set it). Maps to QA-INV-01/02, QA-HH-02/03/09/10/11/12.
+
 **As a** household owner
 **I want** the roster UI (invite → join → promote/demote → remove) verified in a real browser
 **So that** permission-sensitive UI regressions are caught before they ship
@@ -72,7 +80,9 @@ Scenario: Owner promotes and demotes a member
 Scenario: The roster is permission-aware for a non-owner
   Given the member (role: member) opens the Household page in their own context
   Then no rename field, invite form, promote/demote, or remove controls are visible
-  And after promotion to admin (by the owner), a reload shows invite + remove but NOT promote/demote
+  And after promotion to admin (by the owner), a reload shows rename + invite but NOT promote/demote
+  # (No remove buttons appear either: with a two-person roster the only other row is the owner's,
+  #  and actions never target the owner or self.)
 
 Scenario: Owner removes a member
   Given a household with an owner and a member
@@ -171,9 +181,9 @@ scenarios green; README + QA plan mapping updated; merged, app working.
 Ordered, each a mergeable vertical slice. TDD throughout — the failing Playwright test drives the
 `data-testid` additions (the only production-code changes this epic should need).
 
-1. 📝 **RBAC roster journey (E2E-1).** Page objects `HouseholdPage`/`JoinPage`, testid hooks on
-   `Household.razor`, multi-context invite→join→promote→remove journey. Biggest value: the most
-   permission-sensitive UI in the template.
+1. ✅ **RBAC roster journey (E2E-1).** — DONE. Page objects `HouseholdPage`/`JoinPage`, testid hooks
+   on `Household.razor`/`Join.razor`, multi-context invite→join→promote→remove journey; Mailpit OTP
+   poll hardened (subject match) + rate-limit override documented.
 2. 📝 **Seat-quota journey (E2E-2).** Reuses `HouseholdPage`; free-plan limit (3) hit via pending
    invites; asserts the 402 upgrade prompt without touching Stripe.
 3. 📝 **Notification journey (E2E-3).** Bell empty state + prefs persistence, per-user isolation.

@@ -14,9 +14,13 @@ smoke path that doesn't need an external OAuth provider.
    leaves `.env` untouched):
    ```sh
    dotnet run --project src/Api --launch-profile https -- \
-     --Email:Smtp:Host=localhost --Email:Smtp:Port=1025 --Email:Smtp:Username= --Email:Smtp:Password=
+     --Email:Smtp:Host=localhost --Email:Smtp:Port=1025 --Email:Smtp:Username= --Email:Smtp:Password= \
+     --Auth:RateLimit:PasswordlessPermitLimit=1000
    ```
-   If your `.env` doesn't override email, just `dotnet run --project src/Api --launch-profile https`.
+   If your `.env` doesn't override email, you can drop the `--Email:*` args — but keep the
+   **rate-limit override**: the journey tests sign in several users per run from one IP, which
+   trips the production default (5 OTP requests/min/IP → 429 → flaky "no OTP email" timeouts).
+   CI sets the same override for its E2E job.
 3. **Web** — `dotnet run --project src/Web --launch-profile https` (serves <https://localhost:7008>).
 4. **Browser (once)** — `pwsh tests/E2E.Tests/bin/Debug/net10.0/playwright.ps1 install chromium`.
 
@@ -37,6 +41,10 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Email OTP sign-in → lands in the app shell | QA-SMK-01 |
 | Sign out → back to login | QA-SMK-03 |
 | Invalid email rejected before the code step | QA-AUTH-09 |
+| Owner invites; member joins via token (two contexts) | QA-INV-01, QA-INV-02 |
+| Owner promotes and demotes a member | QA-HH-09, QA-HH-10 |
+| Roster is permission-aware (member + admin views) | QA-HH-02, QA-HH-11, QA-HH-12 |
+| Owner removes a member (confirm dialog) | QA-HH-03 |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that

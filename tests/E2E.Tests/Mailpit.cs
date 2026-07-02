@@ -36,8 +36,12 @@ public static class Mailpit
     private static async Task<string?> TryGetLatestCodeAsync(string toEmail)
     {
         var list = await Http.GetFromJsonAsync<MessageList>("/api/v1/messages?limit=50");
+        // Match on the OTP subject too — other emails to the same address (e.g. an invitation,
+        // delivered late by the outbox) could otherwise satisfy the 6-digit regex.
         var summary = list?.Messages?
-            .FirstOrDefault(m => m.To.Any(a => string.Equals(a.Address, toEmail, StringComparison.OrdinalIgnoreCase)));
+            .FirstOrDefault(m =>
+                m.To.Any(a => string.Equals(a.Address, toEmail, StringComparison.OrdinalIgnoreCase))
+                && (m.Subject?.Contains("verification code", StringComparison.OrdinalIgnoreCase) ?? false));
         if (summary is null) return null;
 
         var detail = await Http.GetFromJsonAsync<MessageDetail>($"/api/v1/message/{summary.ID}");
@@ -47,7 +51,7 @@ public static class Mailpit
     }
 
     private sealed record MessageList(List<MessageSummary>? Messages);
-    private sealed record MessageSummary(string ID, List<EmailAddress> To);
+    private sealed record MessageSummary(string ID, List<EmailAddress> To, string? Subject);
     private sealed record EmailAddress(string Address);
     private sealed record MessageDetail(string? Text, string? HTML);
 }
