@@ -329,6 +329,37 @@ public class ArchitectureTests
             $"Feature slices must register routes via MapTenantFeatureGroup, not a raw MapGroup: {string.Join(", ", offenders)}");
     }
 
+    [Fact]
+    public void SourceFile_DeclaresATypeMatchingItsName()
+    {
+        // R24 (naming half, ~MA0048): a source file declares a type that matches its file name, so a
+        // reader can find `Foo` in `Foo.cs`. Intentional DTO/settings aggregation files (which hold many
+        // small records named for the feature, not the file) are the sanctioned exception: any
+        // `*Models.cs`, plus the two named aggregations. Enforced as a source scan rather than the
+        // Meziantou MA0048 analyzer, which would enable ~150 unrelated rules under warnings-as-error.
+        var allow = new HashSet<string>(StringComparer.Ordinal) { "SettingsProvider", "WebhookService" };
+        var typeDecl = new Regex(
+            @"\b(?:public|internal)\s+(?:sealed\s+|abstract\s+|static\s+|partial\s+|readonly\s+|ref\s+)*(?:class|record|interface|enum|struct)\s+([A-Za-z_][A-Za-z0-9_]*)",
+            RegexOptions.Compiled);
+
+        var offenders = new List<string>();
+        foreach (var file in SourceFiles(Path.Combine(RepoRoot(), "src")))
+        {
+            if (file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")) continue;
+            var name = Path.GetFileNameWithoutExtension(file);           // Foo.cs → Foo
+            if (name.EndsWith(".xaml", StringComparison.Ordinal)) name = name[..^5]; // App.xaml.cs → App
+            if (name.EndsWith("Models", StringComparison.Ordinal) || allow.Contains(name)) continue;
+
+            var types = typeDecl.Matches(File.ReadAllText(file))
+                .Select(m => Regex.Replace(m.Groups[1].Value, "<.*", "")).ToHashSet(StringComparer.Ordinal);
+            if (types.Count > 0 && !types.Contains(name))               // files with no top-level type are fine
+                offenders.Add(Path.GetFileName(file)!);
+        }
+
+        Assert.True(offenders.Count == 0,
+            $"Each source file must declare a type matching its name (or be a *Models aggregation): {string.Join(", ", offenders)}");
+    }
+
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>
         !Directory.Exists(dir)
             ? []
