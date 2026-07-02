@@ -70,8 +70,7 @@ public static class ApiKeyEndpoints
         return app;
     }
 
-    private static Guid? CurrentUserId(HttpContext http) =>
-        Guid.TryParse(http.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+    private static Guid? CurrentUserId(HttpContext http) => http.User.GetUserId();
 }
 
 /// <summary>Gates a public endpoint on an API-key scope; a key lacking it gets 403 <c>insufficient_scope</c>.</summary>

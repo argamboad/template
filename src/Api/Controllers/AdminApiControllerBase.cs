@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Template.Api.Authentication;
 using Template.Api.Services;
 
 namespace Template.Api.Controllers;
@@ -18,8 +18,7 @@ public abstract class AdminApiControllerBase(IPlatformStaffService staff, IError
 {
     protected IErrorResponseFactory ErrorFactory { get; } = errorFactory;
 
-    protected Guid? CurrentUserId =>
-        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+    protected Guid? CurrentUserId => User.GetUserId();
 
     /// <summary>
     /// Non-gating staff check: true when the current caller is platform staff. Unlike
