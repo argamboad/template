@@ -32,7 +32,7 @@ services:
       - key: Email__Smtp__Host
         value: smtp-relay.brevo.com
       - key: Email__Smtp__Port
-        value: "587"
+        value: "2525"               # Render free BLOCKS outbound 25/465/587 — Brevo also listens on 2525 (STARTTLS)
       - key: Email__Smtp__Username
         sync: false                 # Brevo SMTP login
       - key: Email__Smtp__Password

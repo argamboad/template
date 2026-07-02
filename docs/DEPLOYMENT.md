@@ -77,13 +77,18 @@ Tear down with `docker compose --profile app down`.
 1. Sign up at <https://brevo.com>, create an **SMTP key** (Senders & API → SMTP).
 2. **Verify a sender** (Senders, Domains & Dedicated IPs → **Senders** → add + verify your email).
    Brevo refuses to relay from an unverified sender, so this is required before any mail flows.
-3. Set: `Email__Smtp__Host=smtp-relay.brevo.com`, `Email__Smtp__Port=587`,
+3. Set: `Email__Smtp__Host=smtp-relay.brevo.com`, **`Email__Smtp__Port=2525`**,
    `Email__Smtp__Username=<your Brevo login>`, `Email__Smtp__Password=<the SMTP key>`, and
    **`Email__Smtp__FromAddress=<the verified sender>`** (optionally `Email__Smtp__FromName`). Without a
    valid, verified `FromAddress` the send is **rejected by Brevo** — and because mail is async via the
    outbox, the request still returns success while the email never arrives (it retries/dead-letters in
    `OutboxMessages`). If a code doesn't turn up, check that first.
 4. For real deliverability later, verify a sender **domain** (SPF/DKIM) — optional for staging QA.
+
+> **Render blocks outbound SMTP on ports 25/465/587 on free instances** (a `TimeoutException` on
+> `ConnectAsync` is the symptom). Brevo also listens on **2525** (STARTTLS, not blocked), which is why
+> the blueprint uses it. If you move to a host without that block, 587 is equally fine (the sender uses
+> `SecureSocketOptions.Auto`). A paid Render instance lifts the block too.
 
 ## 3. Stripe (test mode) — REQUIRED
 
@@ -109,12 +114,28 @@ later wire real billing, add `Billing__Stripe__WebhookSecret` and point a Stripe
 > background outbox/scheduler pause while asleep (queued email/webhooks flush on wake). Fine for staging;
 > a paid always-on plan (~$7/mo) is the floor for real users. The same image; no code change.
 
-## 5. OAuth redirect URIs (if using Google/Microsoft)
+## 5. OAuth — Google / Microsoft (optional)
 
-In each provider console add the live callback: `https://<host>/signin-google` and
-`…/signin-microsoft`, and set `Authentication__Google__ClientId/Secret` (+ Microsoft) in Render. Because
-`Proxy__Enabled=true`, the app sees the real `https` scheme behind Render's proxy, so generated redirect
-URIs are correct.
+OAuth is **config-gated**: a provider is only registered when its `ClientId` is set. Until then the
+sign-in buttons still render but `GET /api/auth/login/{provider}` returns **500** (challenging an
+unregistered scheme). Magic link + OTP work without any of this — set up OAuth only if you want it.
+
+Per provider:
+
+1. Register an app — **Google**: Cloud Console → APIs & Services → Credentials → OAuth client ID (Web).
+   **Microsoft**: Azure Portal → App registrations → New registration.
+2. Set the **redirect URI** to the app's default OAuth callback path (no `CallbackPath` override in this
+   template):
+   - Google: `https://<host>/signin-google`
+   - Microsoft: `https://<host>/signin-microsoft`
+3. Copy the client id + secret into Render: `Authentication__Google__ClientId` / `__ClientSecret` (and/or
+   `Authentication__Microsoft__ClientId` / `__ClientSecret`).
+4. Microsoft only: the tenant authority defaults to **`consumers`** (personal accounts). For work/school
+   or both, set `Authentication__Microsoft__Tenant` to `organizations`, `common`, or a tenant GUID — and
+   register the app for the matching account types.
+
+Because `Proxy__Enabled=true`, the app sees the real `https` scheme behind Render's proxy, so the
+generated redirect URIs match what you register. Render redeploys on the env change; the buttons then work.
 
 ---
 
