@@ -23,7 +23,6 @@ public class NativeAuthController(
     ILinkTokenService linkTokenService,
     IApplicationSettings appSettings,
     IMfaLoginService mfaLogin,
-    IErrorResponseFactory errorFactory,
     ILogger<NativeAuthController> logger) : AuthControllerBase
 {
     /// <summary>
@@ -37,7 +36,7 @@ public class NativeAuthController(
     {
         provider = provider.ToLowerInvariant();
         if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
-            return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
+            return BadRequest(new ErrorResponse("invalid_request", "Unsupported provider or redirect target."));
 
         var callback = $"/api/auth/native/callback/{provider}?redirect={Uri.EscapeDataString(redirect)}";
         if (!string.IsNullOrEmpty(linkToken))
@@ -46,7 +45,7 @@ public class NativeAuthController(
 
         var scheme = AuthProviders.SchemeFor(provider);
         return scheme is null
-            ? BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider."))
+            ? BadRequest(new ErrorResponse("invalid_request", "Unsupported provider."))
             : Challenge(properties, scheme);
     }
 
@@ -64,7 +63,7 @@ public class NativeAuthController(
         try
         {
             if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
-                return BadRequest(errorFactory.CreateError("invalid_request", "Unsupported provider or redirect target."));
+                return BadRequest(new ErrorResponse("invalid_request", "Unsupported provider or redirect target."));
 
             var (providerUserId, email) = claimsExtractor.ExtractClaims(User);
             await HttpContext.SignOutAsync(ServiceCollectionExtensions.ExternalScheme);
@@ -113,11 +112,11 @@ public class NativeAuthController(
     {
         var grant = nativeAuthCodeService.Redeem(req.Code);
         if (grant is null)
-            return Unauthorized(errorFactory.CreateError("invalid_code", "The code is invalid or has expired."));
+            return Unauthorized(new ErrorResponse("invalid_code", "The code is invalid or has expired."));
 
         var user = await userService.GetUserByIdAsync(grant.Value.UserId, cancellationToken);
         if (user is null)
-            return Unauthorized(errorFactory.CreateError("user_not_found", "User not found"));
+            return Unauthorized(new ErrorResponse("user_not_found", "User not found"));
 
         // Native exchange always returns the refresh token in the body.
         var (session, challenge) = await mfaLogin.CompleteOrChallengeAsync(

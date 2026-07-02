@@ -173,7 +173,7 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
 
         var staff = new PlatformStaffService(new UserRepository(db), Options.Create(new PlatformAdminSettings { StaffEmails = [StaffEmail] }));
         var controller = new AdminController(
-            staff, new ErrorResponseFactory(), new TenantRepository(db), ctx,
+            staff, new TenantRepository(db), ctx,
             new AuditLog(new EfRepository<AuditEvent>(db), TimeProvider.System),
             new EfRepository<Subscription>(db), new EfRepository<AuditEvent>(db),
             new UserRepository(db),

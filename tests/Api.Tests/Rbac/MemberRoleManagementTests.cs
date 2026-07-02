@@ -148,8 +148,9 @@ public class MemberRoleManagementTests(PostgresFixture fixture) : PostgresTestBa
         var memberId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
 
         await using var db = Fixture.CreateContext(tenantId);
-        var result = await NewController(db, adminId)
-            .ChangeMemberRole(memberId, new ChangeMemberRoleRequest { Role = TenantRoles.Admin }, default);
+        // ManageRoles gate moved to [RequireTenantPermission] (B9-5); run it as the pipeline would.
+        var result = await TenantPermissionGate.RunAsync(
+            typeof(HouseholdController), nameof(HouseholdController.ChangeMemberRole), new TenantRepository(db), adminId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
@@ -162,11 +163,11 @@ public class MemberRoleManagementTests(PostgresFixture fixture) : PostgresTestBa
         var tenantId = Guid.CreateVersion7();
         await SeedMembershipAsync(tenantId, TenantRoles.Owner);
         var memberId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
-        var otherId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
 
         await using var db = Fixture.CreateContext(tenantId);
-        var result = await NewController(db, memberId)
-            .ChangeMemberRole(otherId, new ChangeMemberRoleRequest { Role = TenantRoles.Admin }, default);
+        // ManageRoles gate moved to [RequireTenantPermission] (B9-5); run it as the pipeline would.
+        var result = await TenantPermissionGate.RunAsync(
+            typeof(HouseholdController), nameof(HouseholdController.ChangeMemberRole), new TenantRepository(db), memberId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
@@ -211,7 +212,7 @@ public class MemberRoleManagementTests(PostgresFixture fixture) : PostgresTestBa
         var service = new TenantService(tenants, new EfUnitOfWork(db), [], TimeProvider.System,
             NullLogger<TenantService>.Instance, audit);
 
-        var controller = new HouseholdController(service, tenants, new ErrorResponseFactory(), new StubExportService());
+        var controller = new HouseholdController(service, tenants, new StubExportService());
         var user = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, currentUserId.ToString())], authenticationType: "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };

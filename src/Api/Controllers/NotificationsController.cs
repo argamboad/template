@@ -17,7 +17,7 @@ namespace Template.Api.Controllers;
 [ApiController]
 [Route("api/notifications")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-public class NotificationsController(INotificationService notifications, IErrorResponseFactory errorFactory) : ControllerBase
+public class NotificationsController(INotificationService notifications) : ControllerBase
 {
     private Guid? CurrentUserId => User.GetUserId();
 
@@ -26,7 +26,7 @@ public class NotificationsController(INotificationService notifications, IErrorR
     public async Task<IActionResult> List([FromQuery] DateTimeOffset? before, [FromQuery] int limit = 20, CancellationToken cancellationToken = default)
     {
         if (CurrentUserId is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         var items = await notifications.ListAsync(userId, before, limit, cancellationToken);
         return Ok((IReadOnlyList<NotificationResponse>)items.Select(NotificationResponse.From).ToList());
@@ -36,7 +36,7 @@ public class NotificationsController(INotificationService notifications, IErrorR
     public async Task<IActionResult> UnreadCount(CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         return Ok(new UnreadCountResponse { Count = await notifications.UnreadCountAsync(userId, cancellationToken) });
     }
@@ -45,18 +45,18 @@ public class NotificationsController(INotificationService notifications, IErrorR
     public async Task<IActionResult> MarkRead(Guid id, CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         return await notifications.MarkReadAsync(userId, id, cancellationToken)
             ? NoContent()
-            : NotFound(errorFactory.CreateError("notification_not_found", "Notification not found"));
+            : NotFound(new ErrorResponse("notification_not_found", "Notification not found"));
     }
 
     [HttpPost("read-all")]
     public async Task<IActionResult> MarkAllRead(CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         await notifications.MarkAllReadAsync(userId, cancellationToken);
         return NoContent();
@@ -67,7 +67,7 @@ public class NotificationsController(INotificationService notifications, IErrorR
     public async Task<IActionResult> GetPreferences(CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         var prefs = await notifications.GetPreferencesAsync(userId, cancellationToken);
         return Ok(new NotificationPreferencesResponse { InApp = prefs.InApp, Email = prefs.Email });
@@ -78,7 +78,7 @@ public class NotificationsController(INotificationService notifications, IErrorR
     public async Task<IActionResult> UpdatePreferences([FromBody] UpdatePreferencesRequest req, CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
 
         await notifications.SetPreferencesAsync(userId, req.InApp, req.Email, cancellationToken);
         return Ok(new NotificationPreferencesResponse { InApp = req.InApp, Email = req.Email });

@@ -17,8 +17,7 @@ namespace Template.Api.Controllers;
 public class MfaController(
     IMfaService mfa,
     IMfaLoginService mfaLogin,
-    ICookieService cookieService,
-    IErrorResponseFactory errorFactory) : AuthControllerBase
+    ICookieService cookieService) : AuthControllerBase
 {
     // ── MFA: authenticator-app TOTP (MFA-1, ADR-012) ─────────────────────────
 
@@ -39,7 +38,7 @@ public class MfaController(
         if (!TryGetUserId(out var userId)) return Unauthorized();
         var enrollment = await mfa.BeginEnrollmentAsync(userId, cancellationToken);
         return enrollment is null
-            ? Unauthorized(errorFactory.CreateError("user_not_found", "User not found"))
+            ? Unauthorized(new ErrorResponse("user_not_found", "User not found"))
             : Ok(new MfaEnrollResponse { ProvisioningUri = enrollment.ProvisioningUri, Secret = enrollment.Secret });
     }
 
@@ -53,8 +52,8 @@ public class MfaController(
         return result switch
         {
             MfaConfirmResult.Enabled => Ok(new MfaRecoveryCodesResponse { RecoveryCodes = recoveryCodes }),
-            MfaConfirmResult.NotEnrolled => BadRequest(errorFactory.CreateError("not_enrolled", "Start enrollment first")),
-            _ => BadRequest(errorFactory.CreateError("invalid_code", "That code is not valid")),
+            MfaConfirmResult.NotEnrolled => BadRequest(new ErrorResponse("not_enrolled", "Start enrollment first")),
+            _ => BadRequest(new ErrorResponse("invalid_code", "That code is not valid")),
         };
     }
 
@@ -68,8 +67,8 @@ public class MfaController(
         return result switch
         {
             MfaDisableResult.Disabled => NoContent(),
-            MfaDisableResult.NotEnabled => BadRequest(errorFactory.CreateError("mfa_not_enabled", "MFA is not enabled")),
-            _ => BadRequest(errorFactory.CreateError("invalid_code", "That code is not valid")),
+            MfaDisableResult.NotEnabled => BadRequest(new ErrorResponse("mfa_not_enabled", "MFA is not enabled")),
+            _ => BadRequest(new ErrorResponse("invalid_code", "That code is not valid")),
         };
     }
 
@@ -84,7 +83,7 @@ public class MfaController(
     {
         var outcome = await mfaLogin.VerifyChallengeAsync(req.Challenge ?? "", req.Code ?? "", ClientIp, cancellationToken);
         if (outcome is null)
-            return Unauthorized(errorFactory.CreateError("mfa_failed", "Invalid or expired challenge or code."));
+            return Unauthorized(new ErrorResponse("mfa_failed", "Invalid or expired challenge or code."));
 
         if (!outcome.Native)
             cookieService.SetRefreshTokenCookie(Response, outcome.Session.RefreshToken, Request);
