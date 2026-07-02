@@ -127,6 +127,18 @@ jobs:
             --use-project-assets-json \
             --forbidden-license-types .github/forbidden-licenses.json
 
+  # Production image build gate (DEPLOY-2, ADR-017). The multi-stage Dockerfile (publishes Web + Api and
+  # serves the WASM single-origin) must keep building. Build-only — no push, and no run here: the
+  # compose-parity smoke (boot + migrate + serve) needs a database and is a local/manual step per
+  # docs/DEPLOYMENT.md. This just stops the Dockerfile silently rotting.
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the production image
+        run: docker build -t template-app:ci .
+
   # End-to-end tests (v2 audit B8-5). Boots the REAL stack — Postgres + Mailpit (service containers) +
   # the API + the Blazor WASM Web app — and drives a headless Chromium through the QA smoke journeys,
   # reading OTP codes from Mailpit (the same trick a manual tester uses). Everything runs on plain HTTP
