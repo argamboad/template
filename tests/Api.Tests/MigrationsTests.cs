@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Template.Api.Tests.Infrastructure;
 using Template.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -36,5 +38,18 @@ public sealed class MigrationsTests : IAsyncLifetime
 
         Assert.Empty(await db.Database.GetPendingMigrationsAsync()); // all applied
         Assert.False(db.Database.HasPendingModelChanges());          // model == last snapshot (no drift)
+    }
+
+    [Fact]
+    public async Task Migrations_Down_RevertCleanly_ToEmptySchema()
+    {
+        // v2 audit B8: exercise every Down — a broken rollback (e.g. dropping a renamed column) is
+        // otherwise invisible until a production rollback. Migrate up, then all the way back to empty.
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+
+        await db.GetService<IMigrator>().MigrateAsync(Migration.InitialDatabase); // runs every Down; throws if broken
+
+        Assert.Empty(await db.Database.GetAppliedMigrationsAsync()); // schema fully reverted
     }
 }

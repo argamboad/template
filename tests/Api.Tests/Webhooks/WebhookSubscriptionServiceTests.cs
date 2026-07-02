@@ -102,6 +102,23 @@ public class WebhookSubscriptionServiceTests(PostgresFixture fixture) : Postgres
         Assert.Empty(await read.Set<WebhookSubscription>().ToListAsync());
     }
 
+    [Fact]
+    public async Task Delete_CannotDeleteAnotherTenantsSubscription()
+    {
+        // v2 audit B8: write-side tenancy negative — a caller cannot delete a subscription owned by another tenant.
+        var tenantB = Guid.CreateVersion7();
+        Guid bSubId;
+        await using (var db = Fixture.CreateContext(tenantB))
+            bSubId = (await Build(db).CreateAsync(Creator, "https://b.test/h", ["ping"], default))!.Subscription.Id;
+
+        var tenantA = Guid.CreateVersion7();
+        await using (var db = Fixture.CreateContext(tenantA))
+            Assert.False(await Build(db).DeleteAsync(bSubId, default)); // not found under tenant A → no-op
+
+        await using var read = Fixture.CreateContext(tenantB);
+        Assert.Single(await read.Set<WebhookSubscription>().ToListAsync()); // B's subscription survives
+    }
+
     private static WebhookSecretProtector NewProtector() => new(new EphemeralDataProtectionProvider());
 
     private static WebhookSubscriptionService Build(Template.Infrastructure.Persistence.AppDbContext db, WebhookSecretProtector? protector = null) =>
