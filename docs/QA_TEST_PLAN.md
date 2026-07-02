@@ -118,10 +118,11 @@ Neon Postgres and Brevo email. Point the browser at the staging URL (e.g.
 - **Billing** uses Stripe **test mode** — exercise webhooks with `stripe trigger …` against the staging
   `/api/billing/webhook`.
 
-**Auto-deploy + smoke gate.** A merge to `develop` that passes CI auto-deploys staging and runs an
-automated post-deploy smoke (liveness/readiness, SPA shell + deep-link, `/api` returns an API-shaped 404,
-`/api/auth/providers`). A red smoke blocks — so a broken deploy is caught before manual QA starts. Manual
-QA on staging complements it (the human-only paths: real email, OAuth, billing, visual checks).
+**Auto-deploy + smoke gate.** A merge to `develop` that passes CI auto-deploys staging, waits for the new
+build to be live (`/api/version` reports the pushed commit), and runs an automated post-deploy smoke
+(liveness/readiness, SPA shell + deep-link, `/api` returns an API-shaped 404, `/api/auth/providers`). A red
+smoke blocks — so a broken deploy is caught before manual QA starts. Manual QA on staging complements it
+(the human-only paths: real email, OAuth, billing, visual checks).
 
 ---
 

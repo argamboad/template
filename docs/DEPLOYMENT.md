@@ -147,9 +147,11 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 2. Repo → **Settings → Secrets and variables → Actions**:
    - Secret **`RENDER_DEPLOY_HOOK_STAGING`** = the deploy hook URL.
    - Variable **`STAGING_BASE_URL`** = `https://<app>-staging.onrender.com`.
-3. Now a push to `develop` that passes every CI gate triggers the deploy and smoke-tests the live URL
-   (liveness/readiness, SPA shell + deep-link, `/api/*` → 404, `/api/auth/providers`). A red smoke fails
-   the run. Until the secret + variable exist, the `deploy-staging` job logs a notice and passes.
+3. Now a push to `develop` that passes every CI gate triggers the deploy, **waits for the new build to
+   actually be live** (polls `/api/version` until it reports the pushed commit — the old instance keeps
+   serving during Render's build), then smoke-tests the live URL (liveness/readiness, SPA shell +
+   deep-link, `/api/*` → 404, `/api/auth/providers`). A red smoke fails the run. Until the secret +
+   variable exist, the `deploy-staging` job logs a notice and passes.
 4. **Prod** (when you have a prod service): create a **`production`** GitHub Environment (repo Settings →
    Environments) with a **required reviewer**, and add secret **`RENDER_DEPLOY_HOOK_PROD`**. A push to
    `main` then waits for your approval before deploying — keeping `main` deploy-only and deliberate.

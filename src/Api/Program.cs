@@ -236,6 +236,17 @@ app.MapControllers();
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
+// Deployed build identity (DEPLOY-3). Anonymous; returns the commit this instance is running, from the
+// platform's env (Render sets RENDER_GIT_COMMIT) or an explicit APP_BUILD_COMMIT, else "unknown". The
+// post-deploy smoke polls this to wait for the NEW build to actually be live before asserting — the old
+// instance keeps serving during a build, so health alone can't tell old from new.
+app.MapGet("/api/version", () => Results.Ok(new
+{
+    commit = Environment.GetEnvironmentVariable("APP_BUILD_COMMIT")
+             ?? Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT")
+             ?? "unknown",
+})).AllowAnonymous().WithTags("Platform");
+
 // 🗑️ DELETE-ME: sample feature slice endpoints (remove with Features/Notes).
 app.MapNotes();
 // Billing is a platform controller (BillingController) — auto-mapped by MapControllers above.

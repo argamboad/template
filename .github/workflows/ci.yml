@@ -243,20 +243,25 @@ jobs:
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}
           BASE: ${{ vars.STAGING_BASE_URL }}
+          EXPECT: ${{ github.sha }}
         run: |
           if [ -z "$HOOK" ] || [ -z "$BASE" ]; then
             echo "::notice::Deploy hook or STAGING_BASE_URL not set — skipping post-deploy smoke."
             exit 0
           fi
-          echo "Waiting for $BASE to report healthy (Render free: build + cold boot can take minutes)…"
+          # Wait for the NEW build to actually be live — the old instance keeps serving during Render's
+          # build, so poll /api/version until it reports this commit AND readiness is 200. (Free-tier
+          # build + cold boot can take several minutes.)
+          echo "Waiting for $BASE to report commit $EXPECT …"
           ready=0
-          for i in $(seq 1 40); do
+          for i in $(seq 1 50); do
+            got=$(curl -s -m 20 "$BASE/api/version" | jq -r '.commit // empty' 2>/dev/null || echo "")
             code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$BASE/health/ready" || echo 000)
-            if [ "$code" = "200" ]; then ready=1; echo "  ready after ~$((i*10))s"; break; fi
-            echo "  [$i] /health/ready → $code; retry in 10s"
-            sleep 10
+            if [ "$got" = "$EXPECT" ] && [ "$code" = "200" ]; then ready=1; echo "  new build live after ~$((i*15))s"; break; fi
+            echo "  [$i] version=${got:-none} ready=$code; retry in 15s"
+            sleep 15
           done
-          [ "$ready" = "1" ] || { echo "::error::staging did not become ready in time"; exit 1; }
+          [ "$ready" = "1" ] || { echo "::error::the new build did not go live in time (version never matched $EXPECT)"; exit 1; }
 
           fail=0
           assert() { # label expected url
@@ -266,6 +271,7 @@ jobs:
           }
           assert liveness         200 "$BASE/health"
           assert readiness        200 "$BASE/health/ready"
+          assert build-version    200 "$BASE/api/version"
           assert spa-shell        200 "$BASE/"
           assert spa-deeplink     200 "$BASE/settings"
           assert api-not-shadowed 404 "$BASE/api/does-not-exist"
