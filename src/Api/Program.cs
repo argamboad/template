@@ -5,7 +5,7 @@ using Microsoft.OpenApi.Extensions;
 using Microsoft.OpenApi.Models;
 using Template.Api.Authentication;
 using Template.Api.Configuration;
-using Template.Api.Features;
+using Template.Api.Endpoints;
 using Template.Api.Features.Notes;
 using Template.Api.Observability;
 using Template.Api.Services;

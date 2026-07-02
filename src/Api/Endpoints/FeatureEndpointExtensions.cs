@@ -1,6 +1,6 @@
 using Template.Api.Configuration;
 
-namespace Template.Api.Features;
+namespace Template.Api.Endpoints;
 
 /// <summary>
 /// Shared scaffolding for vertical-slice feature endpoints. <see cref="MapTenantFeatureGroup"/> is

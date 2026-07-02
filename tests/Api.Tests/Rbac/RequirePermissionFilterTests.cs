@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Template.Api.Features;
+using Template.Api.Endpoints;
 using Template.Core.Abstractions;
 using Template.Core.Authorization;
 

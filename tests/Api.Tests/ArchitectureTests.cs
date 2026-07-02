@@ -310,6 +310,25 @@ public class ArchitectureTests
             $"Only Program.cs may reference Template.Api.Features.* from outside Features/: {string.Join(", ", offenders)}");
     }
 
+    [Fact]
+    public void FeatureFiles_RegisterRoutesViaMapTenantFeatureGroup_NotRawMapGroup()
+    {
+        // R6/D7: a vertical slice under Features/ registers its routes through the shared
+        // MapTenantFeatureGroup helper (which applies the tenant-API auth policy), never a raw
+        // app.MapGroup(...). Config-gated PLATFORM surfaces (PUBAPI/HOOKS) that legitimately need a
+        // raw MapGroup live under src/Api/Endpoints/, not Features/ (amended ADR-004) — so this scan
+        // stays clean. It fails the moment a future slice reaches for a raw MapGroup.
+        var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
+
+        var offenders = SourceFiles(featuresDir)
+            .Where(f => File.ReadAllText(f).Contains(".MapGroup(", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Feature slices must register routes via MapTenantFeatureGroup, not a raw MapGroup: {string.Join(", ", offenders)}");
+    }
+
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>
         !Directory.Exists(dir)
             ? []

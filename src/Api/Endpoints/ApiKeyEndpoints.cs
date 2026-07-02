@@ -7,7 +7,7 @@ using Template.Api.Services;
 using Template.Core.Authorization;
 using Template.Core.Entities;
 
-namespace Template.Api.Features;
+namespace Template.Api.Endpoints;
 
 /// <summary>
 /// The public API surface (PUBAPI, ADR-015), split in two: <b>management</b> (owner, JWT) to mint/list/
