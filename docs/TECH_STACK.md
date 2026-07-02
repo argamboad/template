@@ -15,7 +15,7 @@
 | ORM | Entity Framework Core (Npgsql) | Committed |
 | Auth | Custom JWT + rotating refresh tokens (no ASP.NET Core Identity) | Committed (ADR-002) |
 | Non-web clients (mobile + desktop) | .NET MAUI **Blazor Hybrid**, reusing the RCL | Implemented (auth wired); feature parity web-first |
-| Hosting | TBD (cheap .NET API + static WASM + Postgres) | Deferred |
+| Hosting | **Render free** (one container: API serving the WASM bundle, single-origin) + **Neon** Postgres + **Brevo** SMTP — free-tier-first | Decided (ADR-017); build = epic `DEPLOY` |
 
 ## Target versions
 
@@ -88,7 +88,9 @@ differ) but captures the majority of the UI. Cheap now, expensive to retrofit �
 
 ## Deferred sub-decisions (revisit when relevant)
 
-- Hosting specifics (pick near deploy; undemanding profile).
+- ~~Hosting specifics (pick near deploy; undemanding profile).~~ **Decided 2026-07-02 (ADR-017):**
+  Render free (single-origin container) + Neon Postgres + Brevo; built by epic `DEPLOY`
+  (`docs/stories/deploy.md`).
 - SMS OTP provider (Twilio etc.) — deferred until phone-based OTP is needed.
 
 ## Local dev environment (constant)
