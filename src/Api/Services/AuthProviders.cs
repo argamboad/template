@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
 
@@ -26,4 +27,21 @@ public static class AuthProviders
         Microsoft => MicrosoftAccountDefaults.AuthenticationScheme,
         _ => null,
     };
+
+    /// <summary>
+    /// The supported providers whose OAuth scheme is actually registered — i.e. those the deployment
+    /// configured (a provider is only added when its ClientId is present, see ServiceCollectionExtensions).
+    /// The login/link UIs read this so an unconfigured provider shows no (dead, 500-ing) button.
+    /// </summary>
+    public static async Task<IReadOnlyList<string>> EnabledAsync(IAuthenticationSchemeProvider schemeProvider)
+    {
+        var enabled = new List<string>();
+        foreach (var provider in Supported)
+        {
+            var scheme = SchemeFor(provider);
+            if (scheme is not null && await schemeProvider.GetSchemeAsync(scheme) is not null)
+                enabled.Add(provider);
+        }
+        return enabled;
+    }
 }

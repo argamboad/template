@@ -26,32 +26,48 @@
                 <div class="alert alert-danger mb-4">@ErrorMessage</div>
             }
 
-            <!-- OAuth providers. Web full-navigates to the API; native runs the system-
-                 browser flow via AuthService and stays in the app. -->
-            <div class="d-grid gap-2">
-                @if (Auth.IsNative)
-                {
-                    <button type="button" class="btn btn-oauth btn-google"
-                            @onclick='() => SignInWithOAuth("Google")' disabled="@_oauthBusy">
-                        @GoogleIcon @Localizer["Login_ContinueWith", "Google"]
-                    </button>
-                    <button type="button" class="btn btn-oauth btn-microsoft"
-                            @onclick='() => SignInWithOAuth("Microsoft")' disabled="@_oauthBusy">
-                        @MicrosoftIcon @Localizer["Login_ContinueWith", "Microsoft"]
-                    </button>
-                }
-                else
-                {
-                    <a href="@($"{ApiBase}/api/auth/login/Google")" class="btn btn-oauth btn-google">
-                        @GoogleIcon @Localizer["Login_ContinueWith", "Google"]
-                    </a>
-                    <a href="@($"{ApiBase}/api/auth/login/Microsoft")" class="btn btn-oauth btn-microsoft">
-                        @MicrosoftIcon @Localizer["Login_ContinueWith", "Microsoft"]
-                    </a>
-                }
-            </div>
+            <!-- OAuth providers. Only those the server has configured are shown (else the button would
+                 500 on challenge). Web full-navigates to the API; native runs the system-browser flow
+                 via AuthService and stays in the app. -->
+            @if (_providers.Contains("google") || _providers.Contains("microsoft"))
+            {
+                <div class="d-grid gap-2">
+                    @if (_providers.Contains("google"))
+                    {
+                        @if (Auth.IsNative)
+                        {
+                            <button type="button" class="btn btn-oauth btn-google"
+                                    @onclick='() => SignInWithOAuth("Google")' disabled="@_oauthBusy">
+                                @GoogleIcon @Localizer["Login_ContinueWith", "Google"]
+                            </button>
+                        }
+                        else
+                        {
+                            <a href="@($"{ApiBase}/api/auth/login/Google")" class="btn btn-oauth btn-google">
+                                @GoogleIcon @Localizer["Login_ContinueWith", "Google"]
+                            </a>
+                        }
+                    }
+                    @if (_providers.Contains("microsoft"))
+                    {
+                        @if (Auth.IsNative)
+                        {
+                            <button type="button" class="btn btn-oauth btn-microsoft"
+                                    @onclick='() => SignInWithOAuth("Microsoft")' disabled="@_oauthBusy">
+                                @MicrosoftIcon @Localizer["Login_ContinueWith", "Microsoft"]
+                            </button>
+                        }
+                        else
+                        {
+                            <a href="@($"{ApiBase}/api/auth/login/Microsoft")" class="btn btn-oauth btn-microsoft">
+                                @MicrosoftIcon @Localizer["Login_ContinueWith", "Microsoft"]
+                            </a>
+                        }
+                    }
+                </div>
 
-            <div class="divider-text my-4"><span>@Localizer["Login_OrWithEmail"]</span></div>
+                <div class="divider-text my-4"><span>@Localizer["Login_OrWithEmail"]</span></div>
+            }
 
             @if (_mode == Mode.Idle)
             {
@@ -196,6 +212,10 @@
     private bool _otpError;
     private string? _error;
 
+    // The OAuth providers the server actually configured — only these get a button (an unconfigured
+    // provider would 500 on challenge). Empty until fetched / when none configured.
+    private HashSet<string> _providers = new(StringComparer.OrdinalIgnoreCase);
+
     protected override void OnInitialized()
     {
         // A redirect login (OAuth / magic link) that needs a second factor lands here with ?mfa=<challenge>.
@@ -210,6 +230,9 @@
         if (Auth.IsAuthenticated)
             Nav.NavigateTo("/");
     }
+
+    protected override async Task OnInitializedAsync() =>
+        _providers = new HashSet<string>(await Auth.GetEnabledProvidersAsync(), StringComparer.OrdinalIgnoreCase);
 
     private bool ValidateEmail()
     {
