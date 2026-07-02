@@ -8,6 +8,11 @@
 _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 
 ## Read before you act
+- **Writing or modifying ANY code → `docs/audits/v2-2026-07/FOUNDATION_RULES.md` (v1.0, R1–R35) is
+  binding.** It encodes the post-audit invariants (tenancy, second-factor/event replay, SSRF,
+  fail-closed normalization, atomic quotas, per-user erasure, injected clocks, slice boundaries) as
+  machine-enforced arch tests + CI gates. Comply; if a task seems to require violating a rule, stop and
+  surface it. The frozen quality bar lives in `CONTRIBUTING.md`.
 - Touching the schema or entities → read **`docs/DATA_MODEL.md`** first.
 - Implementing a screen or flow → read **`docs/FEATURES.md`** first.
 - Starting a build slice → read **`docs/WAYS_OF_WORKING.md`** (slices, story format, PR/commit
