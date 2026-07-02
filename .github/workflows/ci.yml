@@ -45,3 +45,21 @@ jobs:
           dotnet ef migrations has-pending-model-changes \
             --project src/Infrastructure/Template.Infrastructure.csproj \
             --startup-project src/Api/Template.Api.csproj
+
+  # Secret scan (v2 audit B11-5). Runs the gitleaks OSS binary directly (no marketplace action, so no
+  # org-license requirement) over the full history + working tree. Config + allowlist in .gitleaks.toml;
+  # real secrets live only in the gitignored .env, which is never committed.
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history so the scan covers every commit, not just the tip
+
+      - name: gitleaks
+        env:
+          GITLEAKS_VERSION: "8.21.2"
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks detect --no-banner --redact --config .gitleaks.toml
