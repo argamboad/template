@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Template.Api.Configuration;
@@ -21,7 +22,9 @@ public static class RateLimiting
     /// <summary>Per-API-key throttle for the public API (PUBAPI-2) — partitions by the key id.</summary>
     public const string PublicApiPolicy = "public-api";
 
-    /// <summary>Requests allowed per IP per <see cref="Window"/> before the limiter returns 429.</summary>
+    /// <summary>Default requests allowed per IP per <see cref="Window"/> before the limiter returns 429.
+    /// Overridable via <c>Auth:RateLimit:PasswordlessPermitLimit</c> (e.g. raised for the E2E stack,
+    /// where the whole browser suite shares one source IP); production keeps this default.</summary>
     public const int PermitLimit = 5;
     public static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
 
@@ -29,8 +32,10 @@ public static class RateLimiting
     public const int PublicApiPermitLimit = 60;
     public static readonly TimeSpan PublicApiWindow = TimeSpan.FromMinutes(1);
 
-    public static IServiceCollection AddApiRateLimiters(this IServiceCollection services) =>
-        services.AddRateLimiter(options =>
+    public static IServiceCollection AddApiRateLimiters(this IServiceCollection services, IConfiguration? configuration = null)
+    {
+        var passwordlessLimit = configuration?.GetValue("Auth:RateLimit:PasswordlessPermitLimit", PermitLimit) ?? PermitLimit;
+        return services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
@@ -40,7 +45,7 @@ public static class RateLimiting
                 var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = PermitLimit,
+                    PermitLimit = passwordlessLimit,
                     Window = Window,
                     QueueLimit = 0,
                 });
@@ -61,4 +66,5 @@ public static class RateLimiting
                 });
             });
         });
+    }
 }

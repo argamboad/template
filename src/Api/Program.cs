@@ -151,7 +151,7 @@ builder.Services.AddScoped<IWebhookPublisher, WebhookPublisher>();
 builder.Services.AddTenantApiAuthorization();
 
 // Throttle the unauthenticated passwordless endpoints (email-bomb / brute-force surface) — CONF-5.
-builder.Services.AddApiRateLimiters();
+builder.Services.AddApiRateLimiters(builder.Configuration);
 
 // CORS — allow the Blazor WASM client to send credentialed requests (cookies).
 var allowedOrigins = builder.Configuration

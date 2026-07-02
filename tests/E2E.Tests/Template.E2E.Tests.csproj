@@ -12,6 +12,8 @@
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Playwright.NUnit" />
+    <!-- Compute TOTP codes from the enrollment secret for the MFA enroll+step-up journey. -->
+    <PackageReference Include="Otp.NET" />
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit.Analyzers" />
     <PackageReference Include="NUnit3TestAdapter" />
