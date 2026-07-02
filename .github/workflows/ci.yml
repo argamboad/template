@@ -182,6 +182,9 @@ jobs:
           ASPNETCORE_ENVIRONMENT: Development
           ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=e2e;Username=e2e;Password=e2e"
           Jwt__Secret: "ci-e2e-jwt-signing-secret-0123456789ab"
+          # The whole browser suite shares one source IP, so raise the per-IP passwordless limit well
+          # above the prod default of 5 (the limiter itself is unit-tested at the default in Api.Tests).
+          Auth__RateLimit__PasswordlessPermitLimit: "1000"
         run: |
           set -e
           dotnet run --project src/Api/Template.Api.csproj -c Debug --no-build --urls http://localhost:5238 > api.log 2>&1 &
