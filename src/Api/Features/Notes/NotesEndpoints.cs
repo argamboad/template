@@ -1,3 +1,5 @@
+using Template.Api.Endpoints;
+
 namespace Template.Api.Features.Notes;
 
 /// <summary>

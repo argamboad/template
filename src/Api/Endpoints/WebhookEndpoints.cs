@@ -7,7 +7,7 @@ using Template.Core.Authorization;
 using Template.Core.Entities;
 using Template.Infrastructure.Webhooks;
 
-namespace Template.Api.Features;
+namespace Template.Api.Endpoints;
 
 /// <summary>
 /// Outbound webhook management (HOOKS, ADR-016): owner-only routes to register/list/remove subscriptions

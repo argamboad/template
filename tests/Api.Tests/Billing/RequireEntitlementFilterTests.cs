@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Template.Api.Configuration;
-using Template.Api.Features;
+using Template.Api.Endpoints;
 using Template.Api.Tests.Infrastructure;
 using Template.Core.Abstractions;
 using Template.Core.Billing;

@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Template.Core.Abstractions;
 using Template.Core.Authorization;
 
-namespace Template.Api.Features;
+namespace Template.Api.Endpoints;
 
 /// <summary>
 /// Gates an endpoint (or a feature group) behind a tenant <see cref="Permission"/> (ADR-009). A feature

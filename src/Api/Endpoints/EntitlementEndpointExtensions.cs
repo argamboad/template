@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Template.Api.Configuration;
 using Template.Core.Abstractions;
 
-namespace Template.Api.Features;
+namespace Template.Api.Endpoints;
 
 /// <summary>
 /// Gates an endpoint (or a feature group) behind a plan entitlement (ADR-006). A feature slice adds

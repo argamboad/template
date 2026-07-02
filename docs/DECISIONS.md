@@ -207,6 +207,24 @@ to reconcile this ADR with what shipped:
    The point stands — you never edit a central *wipe/has-data/export* method or author a repository pair
    — but it's ~5 mechanical touchpoints, not none.
 
+*Amendment (v2 audit B9-6 / DEBT-6, 2026-07-02, per v2 decision D7) — the config-gated platform surfaces
+now live in a distinct namespace/folder, separated from vertical-slice features.* The prior amendment
+established that PUBAPI/HOOKS are **platform** (not app features); this refines *where* they live so the
+distinction is structural, not just narrative:
+1. **Config-gated minimal-API PLATFORM surfaces live under `src/Api/Endpoints/`** (namespace
+   `Template.Api.Endpoints`), NOT `src/Api/Features/`. `ApiKeyEndpoints` (PUBAPI) and `WebhookEndpoints`
+   (HOOKS) moved there. They may use a raw `MapGroup(...)` because they are platform surfaces, not slices.
+2. **The shared endpoint-extension helpers are platform infra and live with Endpoints.**
+   `MapTenantFeatureGroup` (`FeatureEndpointExtensions`), `RequirePermission` (`PermissionEndpointExtensions`),
+   and `RequireEntitlement` (`EntitlementEndpointExtensions`) moved from `Template.Api.Features` to
+   `Template.Api.Endpoints`. This is what lets the R8 gate hold: nothing outside `src/Api/Features/` (except
+   `Program.cs`, which composes the Notes sample) references `Template.Api.Features.*`.
+3. **Vertical-slice features stay under `src/Api/Features/<X>/`** and register their routes via
+   `MapTenantFeatureGroup` — never a raw `MapGroup`. A new build gate (R6,
+   `FeatureFiles_RegisterRoutesViaMapTenantFeatureGroup_NotRawMapGroup`) scans `src/Api/Features/**` and
+   fails on any raw `.MapGroup(` there, so a future slice can't quietly bypass the shared tenant-API auth.
+   This is a pure move + namespace change — no route, behavior, or signature changed.
+
 **ADR-005 — Apple Sign In fits the agnostic provider model; implementation DEFERRED, web-first. (2026-06-24)**
 A third OAuth provider (Apple) was assessed against the provider-agnostic auth stack (ADR-002). The
 verdict: the **backend absorbs it with small, mechanical additions** — `.AddApple(...)` in
