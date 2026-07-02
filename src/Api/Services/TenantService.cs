@@ -82,7 +82,7 @@ public interface ITenantService
 public class TenantService(
     ITenantRepository tenants,
     IUnitOfWork unitOfWork,
-    IEnumerable<ITenantDataContributor> dataContributors,
+    ITenantDissolutionService dissolution,
     TimeProvider clock,
     ILogger<TenantService> logger,
     IAuditLog audit) : ITenantService
@@ -204,12 +204,11 @@ public class TenantService(
         {
             if (!confirmDissolve) return LeaveOutcome.ConfirmationRequired;
 
-            // Wipe + re-home atomically — a partial wipe is impossible. Each feature's
-            // domain data goes first (its contributor), then the platform's core teardown.
+            // Wipe + re-home atomically — a partial wipe is impossible. The shared dissolve sequence
+            // (DEBT-7) wipes each feature's domain data first, then the platform's core teardown; it
+            // runs inside this transaction alongside the re-home.
             await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
-            foreach (var contributor in dataContributors)
-                await contributor.WipeAsync(tenantId, cancellationToken);
-            await tenants.WipeDataAsync(tenantId, cancellationToken);
+            await dissolution.DissolveAsync(tenantId, cancellationToken);
             await ReHomeAsync(userId, cancellationToken);
             await scope.CommitAsync(cancellationToken);
 

@@ -46,7 +46,8 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null, 
         new(LoginTokens, UserService(), TokenGen, Hasher, settings ?? new TestPasswordlessSettings(), Clock);
 
     public TenantService TenantService() =>
-        new(Tenants, UnitOfWork, [], Clock, NullLogger<TenantService>.Instance, Audit);
+        new(Tenants, UnitOfWork, new TenantDissolutionService([], Tenants), Clock,
+            NullLogger<TenantService>.Instance, Audit);
 
     public JwtTokenService JwtTokenService() =>
         new(new TestJwtSettings(), Clock, NullLogger<JwtTokenService>.Instance);

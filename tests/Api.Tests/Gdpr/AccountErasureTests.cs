@@ -101,14 +101,19 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
 
     // --- construction ---
 
-    private static AccountErasureService NewService(AppDbContext db) =>
-        new(new TenantRepository(db),
-            new EfUnitOfWork(db),
+    private static AccountErasureService NewService(AppDbContext db)
+    {
+        var tenants = new TenantRepository(db);
+        var dissolution = new TenantDissolutionService(
             new ITenantDataContributor[]
             {
                 new TestWidgetDataContributor(new EfRepository<TestWidget>(db)),
                 new AuditDataContributor(new EfRepository<AuditEvent>(db)),
             },
+            tenants);
+        return new(tenants,
+            new EfUnitOfWork(db),
+            dissolution,
             new IUserDataContributor[]
             {
                 new MfaUserDataContributor(new EfRepository<UserMfa>(db), new EfRepository<MfaRecoveryCode>(db)),
@@ -119,6 +124,7 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
             new EfRepository<UserLogin>(db),
             new EfRepository<RefreshToken>(db),
             new EfRepository<LoginToken>(db));
+    }
 
     // --- seeding ---
 

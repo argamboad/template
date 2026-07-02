@@ -44,6 +44,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpCurrentTenant>());
         services.AddScoped<ITenantService, TenantService>();
         services.AddScoped<ITenantInvitationService, TenantInvitationService>();
+        // Shared tenant-dissolve sequence (DEBT-7): contributors first, then core WipeDataAsync. Used by
+        // both sole-owner leave and solo-owner erasure so the order is defined once (no own transaction).
+        services.AddScoped<ITenantDissolutionService, TenantDissolutionService>();
 
         // Tenant data export (GDPR-1, ADR-011). Assembles core + each contributor's section into a JSON
         // bundle stored via IFileStorage, returned as a signed URL. Owner-gated at the endpoint.
