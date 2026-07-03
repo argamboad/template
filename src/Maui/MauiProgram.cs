@@ -15,7 +15,11 @@ public static class MauiProgram
 	//    OAuth work: Google/Microsoft accept localhost as a redirect host but reject raw IPs,
 	//    so the provider redirect_uri http://localhost:5238/signin-google is valid (and is
 	//    the same one already registered for the desktop/web flow). See docs/MOBILE_TESTING.md.
+	//  - TEMPLATE_API_BASE_URL overrides both (dev builds): the CI native smoke (NATIVE-7)
+	//    points the app at its plain-HTTP stack, and a physical device can target a LAN API
+	//    without recompiling.
 	private static string ApiBaseUrl =>
+		Environment.GetEnvironmentVariable("TEMPLATE_API_BASE_URL") is { Length: > 0 } o ? o :
 #if ANDROID
 		"http://localhost:5238";
 #else
