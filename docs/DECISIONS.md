@@ -971,3 +971,12 @@ broader safety net. **The honest counterweight:** automated native E2E + store d
 partly per-app; committing the template to them (vs deferring) is a deliberate choice to make native a
 first-class, shippable channel rather than an experiment.
 Stories + slice plan: `docs/stories/native.md` (epic `NATIVE`).
+
+*Amendment (NATIVE-1, 2026-07-03) — Apple CI cadence + Maui lockfile.* The build gate shipped with two
+free-tier-conscious refinements: (1) the **iOS/macCatalyst CI legs run on develop pushes only**, not per
+PR — macOS runners bill at 10× on a private repo, so per-PR Apple builds would drain the 2 000-min/month
+quota for little added signal (breakage still surfaces within one merge); Android + Windows legs run on
+every trigger. (2) The Maui project sets `RestorePackagesWithLockFile=false` (a documented exception to
+the B11-6 lockfile rule): its TFM list is host-OS-conditional, so the resolved graph differs per OS and a
+single committed lockfile can never satisfy locked-mode on all three runners — CPM alone pins its
+versions.

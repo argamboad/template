@@ -139,6 +139,73 @@ jobs:
       - name: Build the production image
         run: docker build -t template-app:ci .
 
+  # Native (MAUI) build gate — NATIVE-1 (ADR-018). Compile-only (no emulator, no signing): a change that
+  # breaks the native build fails the PR instead of rotting until a manual run. Android + Windows run on
+  # every trigger (cheap runners); the Apple targets live in native-build-apple below (macOS = 10× billed
+  # minutes on a private repo, so they run on develop pushes only — still catches rot within one merge).
+  # The Maui project is outside the locked-mode restore path by design (host-conditional TFMs — see the
+  # csproj note); CPM pins its package versions.
+  native-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tfm: net10.0-android
+            os: ubuntu-latest
+            workload: maui-android
+          - tfm: net10.0-windows10.0.19041.0
+            os: windows-latest
+            workload: maui-windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      # The Android target compiles against the JDK; runners preinstall the Android SDK (ANDROID_HOME).
+      - uses: actions/setup-java@v4
+        if: contains(matrix.tfm, 'android')
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install the MAUI workload
+        run: dotnet workload install ${{ matrix.workload }}
+
+      - name: Build (compile-only gate)
+        run: dotnet build src/Maui/Template.Maui.csproj -f ${{ matrix.tfm }} -c Debug -p:AcceptAndroidSDKLicenses=true
+
+  # Apple half of the native build gate (NATIVE-1). Runs on pushes to develop only: macOS runners bill
+  # at 10× on a private repo, so per-PR Apple builds would burn the free-tier minutes for little extra
+  # signal. iOS/MacCatalyst TFMs only exist on macOS hosts (see the csproj condition).
+  native-build-apple:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tfm: net10.0-ios
+            workload: maui-ios
+          - tfm: net10.0-maccatalyst
+            workload: maui-maccatalyst
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install the MAUI workload
+        run: dotnet workload install ${{ matrix.workload }}
+
+      - name: Build (compile-only gate)
+        run: dotnet build src/Maui/Template.Maui.csproj -f ${{ matrix.tfm }} -c Debug
+
   # End-to-end tests (v2 audit B8-5). Boots the REAL stack — Postgres + Mailpit (service containers) +
   # the API + the Blazor WASM Web app — and drives a headless Chromium through the QA smoke journeys,
   # reading OTP codes from Mailpit (the same trick a manual tester uses). Everything runs on plain HTTP

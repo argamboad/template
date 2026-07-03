@@ -1,12 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
-        <!-- Targeting Android + Windows for now. iOS/MacCatalyst are intentionally dropped
-             (Mac not being targeted yet). To re-add them later, append to the android line below:
-               ;net10.0-ios;net10.0-maccatalyst
-             (typically guarded with Condition="!$([MSBuild]::IsOSPlatform('linux'))"). -->
+        <!-- All four target platforms (NATIVE-1, ADR-018). Each TFM is added only on a host OS that
+             can actually build it, so `dotnet build src/Maui` (no -f) never tries a target the host
+             can't produce: Android anywhere; Windows on Windows; iOS/MacCatalyst on macOS (they need
+             Xcode — a Windows box without a paired Mac can't build them). CI builds each TFM on its
+             matching runner (the native-build jobs in ci.yml). -->
         <TargetFrameworks>net10.0-android</TargetFrameworks>
         <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">$(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+
+        <!-- No packages.lock.json for this project (overrides the solution-wide opt-in): the TFM list
+             above is host-OS-conditional, so the resolved graph differs per OS and a single committed
+             lockfile can never satisfy locked-mode on all three runners. MAUI is deliberately outside
+             the locked-mode CI path (build-test restores Api/Web/tests only); supply-chain pinning for
+             it comes from CPM (Directory.Packages.props) alone. Also stops the recurring untracked
+             src/Maui/packages.lock.json that full-solution builds kept regenerating. -->
+        <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
 
         <!-- Note for MacCatalyst:
             The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
