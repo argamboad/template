@@ -192,7 +192,7 @@
                 {
                     <h2 class="h6 fw-bold mb-3">@Localizer["Household_TransferOwnership"]</h2>
                     <div class="d-flex gap-2 flex-wrap">
-                        <select class="form-select" style="max-width:320px" @bind="_transferTargetId">
+                        <select class="form-select" style="max-width:320px" data-testid="transfer-select" @bind="_transferTargetId">
                             <option value="">@Localizer["Household_ChooseMember"]</option>
                             @foreach (var m in OtherMembers)
                             {
@@ -200,7 +200,7 @@
                             }
                         </select>
                         <button class="btn btn-outline-primary" disabled="@(_busy || string.IsNullOrEmpty(_transferTargetId))"
-                                @onclick="TransferOwnership">@Localizer["Household_Transfer"]</button>
+                                data-testid="transfer-submit" @onclick="TransferOwnership">@Localizer["Household_Transfer"]</button>
                     </div>
                     <p class="small text-muted mt-2 mb-0">@Localizer["Household_MustTransfer"]</p>
                 }
@@ -208,13 +208,13 @@
                 {
                     <h2 class="h6 fw-bold mb-2 text-danger">@Localizer["Household_LeaveDissolve"]</h2>
                     <p class="small text-muted">@Localizer["Household_DissolveWarning"]</p>
-                    <button class="btn btn-danger" disabled="@_busy" @onclick="DissolveAndLeave">@Localizer["Household_LeaveAndDelete"]</button>
+                    <button class="btn btn-danger" disabled="@_busy" data-testid="leave-dissolve" @onclick="DissolveAndLeave">@Localizer["Household_LeaveAndDelete"]</button>
                 }
                 else
                 {
                     <h2 class="h6 fw-bold mb-2">@Localizer["Household_LeaveTitle"]</h2>
                     <p class="small text-muted">@Localizer["Household_LeaveAsMemberNote"]</p>
-                    <button class="btn btn-outline-danger" disabled="@_busy" @onclick="LeaveAsMember">@Localizer["Household_Leave"]</button>
+                    <button class="btn btn-outline-danger" disabled="@_busy" data-testid="leave-household" @onclick="LeaveAsMember">@Localizer["Household_Leave"]</button>
                 }
             </div>
         </div>

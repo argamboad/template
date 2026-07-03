@@ -75,7 +75,7 @@
         <div class="card-body">
             <h2 class="h6 fw-bold text-danger mb-2">@Localizer["Settings_DangerZone"]</h2>
             <p class="small text-muted mb-3">@Localizer["Settings_DeleteAccountWarning"]</p>
-            <button class="btn btn-outline-danger" disabled="@_busy" @onclick="DeleteAccount">
+            <button class="btn btn-outline-danger" disabled="@_busy" data-testid="delete-account" @onclick="DeleteAccount">
                 @Localizer["Settings_DeleteAccount"]
             </button>
         </div>
