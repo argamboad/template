@@ -5,7 +5,8 @@
 > the **notification center/preferences**. Deliberately selective — headless machinery (webhooks,
 > outbox, health checks, Stripe money paths) stays at the integration layer where it's already
 > covered; `/health` liveness belongs to the DEPLOY-3 smoke step, not a browser test. Stories use
-> Gherkin acceptance criteria. **Status: ✅ COMPLETE — E2E-1/2/3.**
+> Gherkin acceptance criteria. **Status: 🚧 — E2E-1/2/3/4 ✅; E2E-5 📝** (4 and 5 added after
+> review showed magic-link + destructive flows were automatable after all).
 
 **Epic key:** `E2E`
 
@@ -188,6 +189,88 @@ scenarios green; README + QA plan mapping updated; merged, app working.
 
 ---
 
+### E2E-4 — Magic-link sign-in journey
+
+**Status: ✅ Implemented** (`test/e2e-4-magic-link-journey`). `MagicLinkJourneyTests` (2 tests);
+`Mailpit.WaitForMagicLinkAsync` (subject-matched, extracts the verify URL from the HTML) +
+`LoginPage.RequestMagicLinkAsync`; testids `login-send-magic-link` + `login-error` added to
+`Login.razor`. Maps to QA-AUTH-01, QA-AUTH-05.
+
+**As a** user
+**I want** magic-link sign-in verified in a real browser
+**So that** the redirect sign-in path (the kind MFA-3 found a bypass in) can't silently regress
+
+**Context / notes:** Added after the epic first closed — reviewing the exclusions showed this was
+very automatable: Mailpit already captures the email; the test parses the
+`/api/auth/magic-link/verify` URL and opens it (API sets the refresh cookie → `/auth-callback` →
+app shell). The unhappy path exercises single-use enforcement in a second, session-less context.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: Magic-link sign-in lands in the app
+  Given a user requests a magic link on the login page
+  When they open the link from the email
+  Then they land signed-in (app shell with sign-out + tenant badge)
+
+Scenario: A used magic link is rejected
+  Given a magic link that was already used to sign in
+  When a fresh browser context opens the same link
+  Then it bounces to /login?error=invalid_link with the error banner and no session
+```
+
+**Out of scope:** expiry (clock-dependent — integration-tested), MFA step-up via magic link
+(covered by `MfaJourneyTests`' redirect step-up), native (magic link is web-only by design).
+**Definition of done:** tests written first; scenarios green; README + QA mapping updated; merged.
+
+---
+
+### E2E-5 — Membership lifecycle (destructive flows) journey
+
+**Status: 📝 planned.** Added with E2E-4: "destructive" was a weak exclusion — every test creates
+fresh throwaway users, so these flows are safely automatable. Transfer ownership, member leave,
+solo-owner dissolve, and account deletion, all through the real UI with confirm dialogs.
+
+**As a** household owner (or member)
+**I want** the membership lifecycle verified in a real browser
+**So that** the highest-consequence flows in the app can't silently regress
+
+**Context / notes:** Drives the lifecycle card on `Household.razor` (transfer select + button,
+leave/dissolve buttons, `window.confirm` dialogs) and the delete-account flow in Settings (GDPR-2
+UI). Assertions stay UI-observable: badges swap after transfer, the leaver lands signed-out or in
+a fresh household state, deleted accounts can't sign back into the old household.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: Owner transfers ownership
+  Given a household with an owner and a member
+  When the owner transfers ownership to the member
+  Then the member's badge shows Owner and the ex-owner sees member-level controls
+
+Scenario: Member leaves the household
+  Given a member of a two-person household
+  When they leave (confirming the dialog)
+  Then they are out — and the owner's reloaded roster no longer lists them
+
+Scenario: Solo owner dissolves the household
+  Given a sole owner
+  When they leave-and-delete (confirming the dialog)
+  Then the household is gone and the UI lands in a coherent signed-in-or-out state
+
+Scenario: User deletes their account
+  Given a member with no ownership
+  When they delete their account from Settings (confirming)
+  Then they are signed out and the owner's roster no longer lists them
+```
+
+**Out of scope:** dissolve-with-billing (provider cancellation is BILLING-7, integration-tested);
+export-before-erasure flows (QA covers).
+**Definition of done:** tests written first; testids on the lifecycle card + delete-account
+controls; scenarios green; README + QA mapping updated; merged, app working.
+
+---
+
 ## Slice plan (implementation map)
 
 Ordered, each a mergeable vertical slice. TDD throughout — the failing Playwright test drives the
@@ -201,6 +284,10 @@ Ordered, each a mergeable vertical slice. TDD throughout — the failing Playwri
    promoted to `E2ETestBase`.
 3. ✅ **Notification journey (E2E-3).** — DONE. Bell empty state + prefs persistence, per-user
    isolation; testids on the bell empty state + prefs toggles.
+4. ✅ **Magic-link journey (E2E-4).** — DONE. Happy path + single-use rejection;
+   `Mailpit.WaitForMagicLinkAsync`; testids on the send button + login error banner.
+5. 📝 **Membership lifecycle journey (E2E-5).** Transfer, leave, dissolve, delete account — all
+   with fresh throwaway users; testids on the lifecycle card + Settings delete-account controls.
 
 **Known sharp edges:**
 - **Selectors are `data-testid`-only** — the touched components don't have hooks yet; adding them

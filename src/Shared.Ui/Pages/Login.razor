@@ -23,7 +23,7 @@
 
             @if (!string.IsNullOrEmpty(Error))
             {
-                <div class="alert alert-danger mb-4">@ErrorMessage</div>
+                <div class="alert alert-danger mb-4" data-testid="login-error">@ErrorMessage</div>
             }
 
             <!-- OAuth providers. Only those the server has configured are shown (else the button would
@@ -89,7 +89,8 @@
                        hand the session back to a native app. Native uses the OTP code. *@
                     @if (!Auth.IsNative)
                     {
-                        <button class="btn btn-primary" @onclick="SendMagicLink" disabled="@_busy">
+                        <button class="btn btn-primary" data-testid="login-send-magic-link"
+                                @onclick="SendMagicLink" disabled="@_busy">
                             @if (_busy && _pending == Mode.MagicLinkSent)
                             {
                                 <span class="spinner-border spinner-border-sm me-2"></span>

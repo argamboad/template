@@ -33,6 +33,36 @@ public static class Mailpit
         throw new TimeoutException($"No OTP email for {toEmail} within {timeout.TotalSeconds:0}s.");
     }
 
+    /// <summary>
+    /// Polls until a magic-link email addressed to <paramref name="toEmail"/> arrives and returns
+    /// the sign-in URL it contains. Throws on timeout.
+    /// </summary>
+    public static async Task<string> WaitForMagicLinkAsync(string toEmail, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var link = await TryGetLatestMagicLinkAsync(toEmail);
+            if (link is not null) return link;
+            await Task.Delay(500);
+        }
+        throw new TimeoutException($"No magic-link email for {toEmail} within {timeout.TotalSeconds:0}s.");
+    }
+
+    private static async Task<string?> TryGetLatestMagicLinkAsync(string toEmail)
+    {
+        var list = await Http.GetFromJsonAsync<MessageList>("/api/v1/messages?limit=50");
+        var summary = list?.Messages?
+            .FirstOrDefault(m =>
+                m.To.Any(a => string.Equals(a.Address, toEmail, StringComparison.OrdinalIgnoreCase))
+                && (m.Subject?.Contains("sign-in link", StringComparison.OrdinalIgnoreCase) ?? false));
+        if (summary is null) return null;
+
+        var detail = await Http.GetFromJsonAsync<MessageDetail>($"/api/v1/message/{summary.ID}");
+        var match = Regex.Match(detail?.HTML ?? "", @"https?://[^""'\s]*magic-link/verify[^""'\s]*");
+        return match.Success ? System.Net.WebUtility.HtmlDecode(match.Value) : null;
+    }
+
     private static async Task<string?> TryGetLatestCodeAsync(string toEmail)
     {
         var list = await Http.GetFromJsonAsync<MessageList>("/api/v1/messages?limit=50");
