@@ -28,10 +28,21 @@
         <p class="text-muted">@Localizer["Join_SuccessBody"]</p>
         <button class="btn btn-primary" data-testid="join-go-household" @onclick="@(() => Nav.NavigateTo("/household", forceLoad: true))">@Localizer["Join_GoToHousehold"]</button>
     }
-    else if (_state == State.MissingToken)
+    else if (_state == State.EnterCode)
     {
-        <h1 class="h5 fw-bold mb-2">@Localizer["Join_InvalidTitle"]</h1>
-        <p class="text-muted">@Localizer["Join_MissingToken"]</p>
+        <h1 class="h5 fw-bold mb-2" data-testid="join-enter-code">@Localizer["Join_EnterCodeTitle"]</h1>
+        <p class="text-muted">@Localizer["Join_EnterCodeBody"]</p>
+        @if (_codeError)
+        {
+            <p class="text-danger small" data-testid="join-code-error">@Localizer["Join_DefaultError"]</p>
+        }
+        <div class="d-flex justify-content-center gap-2">
+            <input class="form-control" style="max-width:320px" placeholder="@Localizer["Join_CodePlaceholder"]"
+                   data-testid="join-code-input" @bind="_code" @bind:event="oninput" />
+            <button class="btn btn-primary" data-testid="join-code-submit"
+                    disabled="@string.IsNullOrWhiteSpace(_code)"
+                    @onclick="SubmitCode">@Localizer["Join_SubmitCode"]</button>
+        </div>
     }
     else if (_state == State.Error)
     {
@@ -44,17 +55,13 @@
 @code {
     [SupplyParameterFromQuery] public string? Token { get; set; }
 
-    private enum State { Working, NeedsSignIn, Success, MissingToken, Error }
+    private enum State { Working, NeedsSignIn, EnterCode, Success, Error }
     private State _state = State.Working;
+    private string _code = "";
+    private bool _codeError;
 
     protected override async Task OnInitializedAsync()
     {
-        if (string.IsNullOrWhiteSpace(Token))
-        {
-            _state = State.MissingToken;
-            return;
-        }
-
         if (!Auth.IsAuthenticated)
         {
             // Remember where to return after sign-in. localStorage is shared across
@@ -66,23 +73,40 @@
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            // No token in the URL — native apps have no address bar for the emailed
+            // /join?token=… link (parity gap G5), and some email clients mangle links,
+            // so offer manual entry of the invite code shown in the email instead.
+            _state = State.EnterCode;
+            return;
+        }
+
+        await AcceptAsync(Token, failure: State.Error);
+    }
+
+    private Task SubmitCode() => AcceptAsync(_code.Trim(), failure: State.EnterCode, inlineError: true);
+
+    private async Task AcceptAsync(string token, State failure, bool inlineError = false)
+    {
+        _state = State.Working;
+        _codeError = false;
         try
         {
-            var resp = await Http.PostAsJsonAsync("/api/household/invitations/accept", new { token = Token });
-            // The tenant_name claim changed — refresh so the new household shows.
+            var resp = await Http.PostAsJsonAsync("/api/household/invitations/accept", new { token });
             if (resp.IsSuccessStatusCode)
             {
+                // The tenant_name claim changed — refresh so the new household shows.
                 await Auth.TryRefreshAsync();
                 _state = State.Success;
-            }
-            else
-            {
-                _state = State.Error;
+                return;
             }
         }
         catch
         {
-            _state = State.Error;
+            // fall through to the failure state
         }
+        _codeError = inlineError;
+        _state = failure;
     }
 }

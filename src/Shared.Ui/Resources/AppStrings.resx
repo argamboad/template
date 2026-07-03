@@ -170,8 +170,10 @@
   <data name="Join_SuccessTitle" xml:space="preserve"><value>You're in!</value></data>
   <data name="Join_SuccessBody" xml:space="preserve"><value>You've joined the household.</value></data>
   <data name="Join_GoToHousehold" xml:space="preserve"><value>Go to household</value></data>
-  <data name="Join_InvalidTitle" xml:space="preserve"><value>Invalid link</value></data>
-  <data name="Join_MissingToken" xml:space="preserve"><value>This invite link is missing its token.</value></data>
+  <data name="Join_EnterCodeTitle" xml:space="preserve"><value>Join with an invite code</value></data>
+  <data name="Join_EnterCodeBody" xml:space="preserve"><value>Paste the code from your invitation email.</value></data>
+  <data name="Join_CodePlaceholder" xml:space="preserve"><value>Invite code</value></data>
+  <data name="Join_SubmitCode" xml:space="preserve"><value>Join</value></data>
   <data name="Join_ErrorTitle" xml:space="preserve"><value>Couldn't join</value></data>
   <data name="Join_BackToHousehold" xml:space="preserve"><value>Back to household</value></data>
   <data name="Join_DefaultError" xml:space="preserve"><value>The invitation is invalid or has expired.</value></data>
