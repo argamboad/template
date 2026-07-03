@@ -190,7 +190,11 @@ jobs:
         include:
           - tfm: net10.0-ios
           - tfm: net10.0-maccatalyst
-    runs-on: macos-latest
+    # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode —
+    # 26.5 as of SDK 10.0.301 — and macos-26 is the GA image whose default Xcode is 26.5. The
+    # macos-latest label still resolves to an older image (Xcode 16.4) on some rollouts, which fails
+    # with "requires Xcode 26.5". Revisit the pin when bumping the .NET SDK.
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
