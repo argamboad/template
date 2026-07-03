@@ -15,8 +15,11 @@ smoke path that doesn't need an external OAuth provider.
    ```sh
    dotnet run --project src/Api --launch-profile https -- \
      --Email:Smtp:Host=localhost --Email:Smtp:Port=1025 --Email:Smtp:Username= --Email:Smtp:Password= \
-     --Auth:RateLimit:PasswordlessPermitLimit=1000
+     --Auth:RateLimit:PasswordlessPermitLimit=1000 \
+     --Admin:StaffEmails:0=e2e-staff@example.com
    ```
+   The `Admin:StaffEmails` entry enables the admin-console journey (ADMIN-3); it must match
+   `AnnouncementJourneyTests.StaffEmail`. CI sets the same overrides.
    If your `.env` doesn't override email, you can drop the `--Email:*` args — but keep the
    **rate-limit override**: the journey tests sign in several users per run from one IP, which
    trips the production default (5 OTP requests/min/IP → 429 → flaky "no OTP email" timeouts).
@@ -55,6 +58,8 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Member leaves → re-homed to a fresh tenant-of-one | QA-HH-08 |
 | Sole owner dissolves → re-homed, old household gone | QA-HH-07 |
 | Member deletes their account → signed out, off the roster | QA-SET-07 |
+| Staff announcement → member's bell badge + item; mark-read clears | QA-ADMIN-04, QA-NOTIF-01, QA-NOTIF-02 |
+| Non-staff gets the admin-console forbidden state | QA-ADMIN-01 (partial) |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that

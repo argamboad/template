@@ -757,6 +757,15 @@ hatch, ADR-003; the audit log, ADR-008) rather than loosening any of them.
    expiry, an `impersonated_by` claim, and a loud audit record in the target's tenant.
 4. **Admin is read-only over tenant data** — inspection + impersonation, not direct cross-tenant writes
    (a staff member who needs to change tenant data does it *through* impersonation, which is audited).
+
+**Addendum (2026-07-02, ADMIN-3):** the admin surface gains **staff announcements** —
+`POST /api/admin/tenants/{id}/announce` notifies every member of a tenant through the normal NOTIFY
+fan-out (ADR-013; per-user prefs decide in-app vs outbox email) and records `admin.announcement.sent`
+in the target tenant. This is the one sanctioned admin write: it creates **per-user notification rows
+only** — tenant data stays read-only, the filter stays engaged (`EnterTenant`), and the action is as
+loudly audited as inspection/impersonation. Also fixed en route: the web client's staff probe
+(`AuthService.IsStaffAsync`) ran on the Bearer-less auth HttpClient, making `/admin` unreachable on
+web; it now attaches the in-memory access token explicitly.
 5. **No secrets/PII in admin responses or audit metadata** beyond identifiers — same rule as elsewhere.
 *Rationale:* support tooling is necessary but dangerous; the safe way to build it is to reuse the audited
 escape hatch and the audit log instead of adding new privileged paths, and to keep the staff grant in

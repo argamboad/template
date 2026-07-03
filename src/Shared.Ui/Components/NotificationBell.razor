@@ -50,7 +50,7 @@
                         @foreach (var n in _items)
                         {
                             <li class="list-group-item notif-item @(n.ReadAt is null ? "notif-unread" : "")"
-                                role="button" @onclick="() => OnItemClick(n)">
+                                data-testid="notif-item" role="button" @onclick="() => OnItemClick(n)">
                                 <div class="d-flex align-items-start gap-2">
                                     @if (n.ReadAt is null)
                                     {
