@@ -283,6 +283,21 @@ Scenario: Full native regression exists
 
 ### NATIVE-7 — Automated native UI tests in CI
 
+**Status: 🚧 Windows half ✅ Implemented** (`feat/native-7-windows-smoke`). No Appium: the smoke
+drives the REAL MAUI app's WebView over the **Chrome DevTools Protocol** (the recipe proven during
+Wave 2) — the app launches with remote debugging enabled and Playwright attaches with
+`ConnectOverCDPAsync`, reusing the E2E project's page test-ids and Mailpit helper.
+`NativeSmokeTests` (`[Explicit]` + `Category=NativeSmoke`, so the browser e2e job never runs it):
+CDP connect w/ retry → login renders (a G7-style boot crash dies here) → OTP sign-in end-to-end →
+Household loads over the native Bearer path. New CI job **`native-smoke-windows`** (develop pushes
+only — Windows bills 2×, ~10 min; NOT in deploy-staging needs so native flake can't block web
+deploys): preinstalled-Postgres + downloaded Mailpit + API on plain HTTP + the built exe, pointed at
+the stack via the new **`TEMPLATE_API_BASE_URL`** override in `MauiProgram` (also useful for
+physical-device testing against a LAN API). Verified locally with the exact CI shape (smoke green in
+5 s against the live app). **Remaining:** Android-emulator leg (same CDP idea via
+`adb forward … webview_devtools_remote`; own slice) and the iOS-simulator leg (parked with the
+Apple pin).
+
 **As a** maintainer
 **I want** the native critical paths driven automatically against a real emulator/simulator
 **So that** native regressions are caught without a manual pass
@@ -360,8 +375,9 @@ upload. Store review + accounts are external; the template ships the upload plum
    (share sheet, hardware back, real focus transitions) queue for the NATIVE-6 device pass.
 3. 🚧 **NATIVE-6** manual native QA pass — plan authored (117 cases incl. iOS/macCatalyst first-run
    smoke + §13c release checklist; G7 Apple-boot fix shipped alongside); **execution needs the
-   maintainer's devices**. Then **NATIVE-7** automated native smoke (the WebView2-CDP recipe from
-   Wave 2 is the Windows half).
+   maintainer's devices** (Apple column explicitly PINNED by the maintainer until Apple hardware is
+   available — 2026-07-03). **NATIVE-7** Windows smoke ✅ in CI (WebView2-CDP `native-smoke-windows`,
+   develop pushes); Android-emulator leg 📝 next; iOS-simulator leg parked with the Apple pin.
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:

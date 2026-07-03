@@ -211,6 +211,91 @@ jobs:
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Template.Maui.csproj -f ${{ matrix.tfm }} -c Debug
 
+  # Native smoke — Windows (NATIVE-7, ADR-018). Runs the REAL MAUI Windows app against a real API +
+  # Postgres + Mailpit, and drives its WebView2 over the Chrome DevTools Protocol (Playwright
+  # ConnectOverCDP — no Appium): boot → OTP sign-in → an authorized page loads. Develop pushes only,
+  # like the Apple legs: Windows runners bill 2× on a private repo and the job takes ~10 min, so
+  # per-PR runs would burn minutes for little signal (a native-runtime regression is still caught
+  # within one merge). Deliberately NOT in the deploy-staging needs — a flaky native run must not
+  # block web deploys (accepted-risk note in ADR-018: native UI automation is flakier than browser
+  # E2E; this stays a tiny canary).
+  native-smoke-windows:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install the MAUI workloads (host-aware)
+        run: dotnet workload restore src/Maui/Template.Maui.csproj
+
+      - name: Build the app + API + smoke tests
+        run: |
+          dotnet restore src/Api/Template.Api.csproj --locked-mode
+          dotnet restore tests/E2E.Tests/Template.E2E.Tests.csproj --locked-mode
+          dotnet build src/Api/Template.Api.csproj -c Debug --no-restore
+          dotnet build tests/E2E.Tests/Template.E2E.Tests.csproj -c Debug --no-restore
+          dotnet build src/Maui/Template.Maui.csproj -f net10.0-windows10.0.19041.0 -c Debug
+
+      - name: Start Postgres (preinstalled) + Mailpit
+        # The Windows runner image ships PostgreSQL with its service disabled (creds
+        # postgres/root via PGUSER/PGPASSWORD). Mailpit is a single Go binary.
+        run: |
+          $svc = Get-Service postgresql* | Select-Object -First 1
+          if (-not $svc) { Write-Error "no preinstalled PostgreSQL service on this image"; exit 1 }
+          Set-Service $svc.Name -StartupType Manual
+          Start-Service $svc.Name
+          $env:PGPASSWORD = "root"
+          & "$env:PGBIN\psql" -U postgres -c "CREATE DATABASE smoke;"
+          Invoke-WebRequest -Uri "https://github.com/axllent/mailpit/releases/latest/download/mailpit-windows-amd64.zip" -OutFile mailpit.zip
+          Expand-Archive mailpit.zip -DestinationPath mailpit-bin
+          Start-Process -FilePath "mailpit-bin\mailpit.exe" -WindowStyle Hidden
+
+      - name: Boot API + app, run the native smoke
+        # Everything process-bound lives in ONE step (the runner tears down a step's process tree).
+        # The app is pointed at the plain-HTTP API via TEMPLATE_API_BASE_URL (no dev-cert hoops) and
+        # launched with WebView2 remote debugging for the CDP connection.
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=smoke;Username=postgres;Password=root"
+          Jwt__Secret: "ci-native-smoke-jwt-signing-key-0123"
+          TEMPLATE_API_BASE_URL: "http://localhost:5238"
+          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=9223"
+          NATIVE_SMOKE_CDP: "http://localhost:9223"
+          MAILPIT_BASE_URL: "http://localhost:8025"
+        run: |
+          $api = Start-Process dotnet -ArgumentList "run --project src/Api/Template.Api.csproj -c Debug --no-build --urls http://localhost:5238" -PassThru -RedirectStandardOutput api.log -RedirectStandardError api.err.log
+
+          Write-Host "Waiting for the API..."
+          $ready = $false
+          foreach ($i in 1..60) {
+            try { if ((Invoke-WebRequest -Uri "http://localhost:5238/health/ready" -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) { $ready = $true; break } } catch {}
+            Start-Sleep -Seconds 3
+          }
+          if (-not $ready) { Write-Host "::error::API did not become ready"; Get-Content api.log -Tail 60; exit 1 }
+
+          $exe = "src/Maui/bin/Debug/net10.0-windows10.0.19041.0/win-x64/Template.Maui.exe"
+          if (-not (Test-Path $exe)) { $exe = Get-ChildItem -Recurse -Path src/Maui/bin -Filter Template.Maui.exe | Select-Object -First 1 -ExpandProperty FullName }
+          Start-Process -FilePath $exe
+
+          Write-Host "Waiting for the WebView2 CDP endpoint..."
+          $cdp = $false
+          foreach ($i in 1..40) {
+            try { if ((Invoke-WebRequest -Uri "http://localhost:9223/json/version" -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) { $cdp = $true; break } } catch {}
+            Start-Sleep -Seconds 3
+          }
+          if (-not $cdp) { Write-Host "::error::CDP endpoint never came up (WebView2 runtime missing, or the app crashed at boot)"; Get-Content api.log -Tail 40; exit 1 }
+
+          dotnet test tests/E2E.Tests/Template.E2E.Tests.csproj -c Debug --no-build --filter "Category=NativeSmoke"
+
+      - name: API log (on failure)
+        if: failure()
+        run: if (Test-Path api.log) { Get-Content api.log -Tail 100 }
+
   # End-to-end tests (v2 audit B8-5). Boots the REAL stack — Postgres + Mailpit (service containers) +
   # the API + the Blazor WASM Web app — and drives a headless Chromium through the QA smoke journeys,
   # reading OTP codes from Mailpit (the same trick a manual tester uses). Everything runs on plain HTTP
