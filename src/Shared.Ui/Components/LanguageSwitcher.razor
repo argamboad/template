@@ -1,7 +1,7 @@
 @using System.Globalization
 @using System.Net.Http.Json
 @using Template.Shared.Ui.Auth
-@inject IJSRuntime JS
+@inject ICulturePersistence CulturePersistence
 @inject NavigationManager Nav
 @inject HttpClient Http
 @inject AuthService Auth
@@ -33,9 +33,10 @@
         var code = e.Value?.ToString() ?? "en";
         if (code == _current) return;
 
-        // Device-local store (survives the web reload), plus the in-process culture so the
-        // MAUI webview reload picks it up (MauiProgram doesn't re-run on reload).
-        await JS.InvokeVoidAsync("localStorage.setItem", "app_culture", code);
+        // Device-local store (read back by the host's next cold start: web pre-render,
+        // MauiProgram on native), plus the in-process culture so the MAUI webview reload
+        // picks it up (MauiProgram doesn't re-run on reload).
+        await CulturePersistence.PersistAsync(code);
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(code);
 
         // Signed in: persist server-side so the choice follows the user across devices.

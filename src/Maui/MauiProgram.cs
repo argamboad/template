@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Template.Maui.Auth;
+using Template.Shared.Ui;
 using Template.Shared.Ui.Auth;
 
 namespace Template.Maui;
@@ -37,8 +39,23 @@ public static class MauiProgram
 		builder.Services.AddMauiBlazorWebView();
 
 		// Localization — IStringLocalizer<AppStrings> resolves the RCL's .resx resources.
-		// Uses the OS culture for now; device-local switching is wired in a later slice.
+		// Apply the device-local saved culture before the first render (NATIVE-5, parity with
+		// Web/Program.cs's localStorage bootstrap): the LanguageSwitcher persists the choice to
+		// OS Preferences on native, the only store readable this early — the WebView (and its
+		// localStorage) doesn't exist yet. No saved value → OS culture, the documented default
+		// (docs/LOCALIZATION.md). Signed-in users are further reconciled to their server-side
+		// locale by MainLayout.
+		var savedCulture = Preferences.Default.Get<string?>(PreferencesCulturePersistence.PreferenceKey, null);
+		if (!string.IsNullOrWhiteSpace(savedCulture))
+		{
+			try
+			{
+				CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(savedCulture);
+			}
+			catch (CultureNotFoundException) { /* corrupt stored value — keep the OS culture */ }
+		}
 		builder.Services.AddLocalization();
+		builder.Services.AddSingleton<ICulturePersistence, PreferencesCulturePersistence>();
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();

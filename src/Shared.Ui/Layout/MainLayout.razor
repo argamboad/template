@@ -3,7 +3,7 @@
 @using Template.Shared.Ui.Auth
 @inject AuthService Auth
 @inject NavigationManager Nav
-@inject IJSRuntime JS
+@inject ICulturePersistence CulturePersistence
 @inject IStringLocalizer<AppStrings> Localizer
 
 @if (!_initialized)
@@ -61,7 +61,7 @@ else
                 var culture = new CultureInfo(Auth.Locale);
                 CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = culture;
                 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = culture;
-                await JS.InvokeVoidAsync("localStorage.setItem", "app_culture", Auth.Locale);
+                await CulturePersistence.PersistAsync(Auth.Locale);
             }
             catch (CultureNotFoundException) { /* unknown locale — keep the current culture */ }
         }

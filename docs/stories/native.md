@@ -186,6 +186,21 @@ Scenario: Web keeps working
 
 ### NATIVE-5 — Localization + theming/layout polish per platform
 
+**Status: ✅ Implemented** (`feat/native-5-culture-bootstrap`). The audit's G6 wording was corrected
+during the build: the runtime switch already worked on native (the switcher sets the in-process culture
+before the WebView reload) and signed-in users were already reconciled to their server locale by
+`MainLayout` — the real gap was **cold-start persistence for anonymous users** (the choice lived in
+WebView localStorage, unreadable from C# at native startup). Fix: `ICulturePersistence` seam in the RCL
+(web impl → the same localStorage key, behavior unchanged; MAUI impl → OS `Preferences`) and a
+`MauiProgram` bootstrap that applies the saved culture before first render (OS-culture fallback, per
+`docs/LOCALIZATION.md`). The web bootstrap also gained a `CultureNotFoundException` guard.
+**Verified on real native Windows** by driving the app's WebView2 over CDP
+(`--remote-debugging-port`): EN → switch ES (renders Spanish) → kill → cold start → **still Spanish**
+on `/login` (anonymous page, OS culture en-US — only the new bootstrap explains it), then switched back
+to EN. Desktop window sizing 🔍 resolved for Windows (usable ~1140×571 default). Web regression: full
+E2E 28/28 + Core/Api suites green. Android/RTL/safe-area cells stay with NATIVE-6 (RTL has no shipped
+language; safe-areas need a device).
+
 **As a** native user
 **I want** device culture (incl. RTL) and correct safe-areas / status bar / window sizing
 **So that** the app looks and reads right on each platform, matching web
@@ -294,8 +309,9 @@ upload. Store review + accounts are external; the template ships the upload plum
 1. ✅ **NATIVE-1** build gate — DONE (all four TFMs; Apple legs on develop pushes, see the free-tier
    amendment above) + ✅ **NATIVE-2** audit — DONE (`docs/NATIVE_PARITY.md`, incl. the post-plan
    BILLING-8/ADMIN-3 screens): six gaps G1–G6 registered, each mapped to a slice below.
-2. ✅ **NATIVE-4b** (G5 join-by-code — audit discovery) — DONE; 📝 **NATIVE-5** (G6 culture bootstrap +
-   🔍 layout checks) / **NATIVE-3** (G1 downloads) / **NATIVE-4** (G2 external nav, G3 back button).
+2. ✅ **NATIVE-4b** (G5 join-by-code — audit discovery) + ✅ **NATIVE-5** (G6 culture bootstrap;
+   Windows window-sizing 🔍 resolved) — DONE; 📝 **NATIVE-3** (G1 downloads) / **NATIVE-4**
+   (G2 external nav, G3 back button).
 3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 

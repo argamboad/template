@@ -19,8 +19,11 @@ Any key missing from a culture file falls back to the neutral (English) file.
 - **Signed-in users:** a per-user `User.Locale` (saved via `PUT /api/auth/locale`, carried in
   the JWT `locale` claim) — it follows the user across devices. `MainLayout` reconciles to it
   on load.
-- **Anonymous / pre-login:** device-local `localStorage["app_culture"]` (web) / OS culture
-  (MAUI), with the in-app `LanguageSwitcher` (header + login card).
+- **Anonymous / pre-login:** a device-local store read at startup, written by the in-app
+  `LanguageSwitcher` (header + login card) through the `ICulturePersistence` seam:
+  `localStorage["app_culture"]` on web (read pre-render in `Web/Program.cs`) and OS
+  `Preferences["app_culture"]` on MAUI (read in `MauiProgram` — NATIVE-5), falling back to
+  English (web) / the OS culture (MAUI).
 - **Emails:** OTP / magic-link use the requester's current UI culture (the Login page sends
   it); invitations use the **inviter's** saved locale.
 

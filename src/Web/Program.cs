@@ -40,6 +40,7 @@ builder.Services.AddScoped(sp =>
 
 // Localization — IStringLocalizer<AppStrings> resolves the RCL's .resx resources.
 builder.Services.AddLocalization();
+builder.Services.AddSingleton<ICulturePersistence, LocalStorageCulturePersistence>();
 
 // Web session store: the browser owns the HttpOnly refresh cookie, so this is a no-op.
 builder.Services.AddSingleton<ISessionStore, CookieSessionStore>();
@@ -55,11 +56,15 @@ builder.Services.AddSingleton(sp => new AuthService(
 
 var host = builder.Build();
 
-// Apply the user's saved UI culture (device-local for now; per-user server preference is
-// layered on later) before the app renders, falling back to English.
+// Apply the user's saved UI culture before the app renders, falling back to English.
+// Signed-in users are further reconciled to their server-side locale by MainLayout.
 var js = host.Services.GetRequiredService<IJSRuntime>();
-var stored = await js.InvokeAsync<string?>("localStorage.getItem", "app_culture");
-var culture = string.IsNullOrWhiteSpace(stored) ? "en" : stored;
-CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(culture);
+var stored = await js.InvokeAsync<string?>("localStorage.getItem", LocalStorageCulturePersistence.StorageKey);
+try
+{
+    var culture = string.IsNullOrWhiteSpace(stored) ? "en" : stored;
+    CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(culture);
+}
+catch (CultureNotFoundException) { /* corrupt stored value — keep the default culture */ }
 
 await host.RunAsync();
