@@ -269,7 +269,14 @@ public class AuthService(
         if (!IsAuthenticated || IsImpersonating) return (_isStaff = false).Value;
         try
         {
-            var res = await httpClient.GetFromJsonAsync<StaffStatus>("/api/admin/me");
+            // This service's HttpClient deliberately has NO Bearer handler (it would be a DI cycle —
+            // see Program.cs), so attach the in-memory token explicitly for this authenticated probe.
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/admin/me");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+            using var response = await httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                return false; // don't cache transient failures
+            var res = await response.Content.ReadFromJsonAsync<StaffStatus>();
             return (_isStaff = res?.IsStaff ?? false).Value;
         }
         catch

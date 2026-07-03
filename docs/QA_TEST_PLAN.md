@@ -970,6 +970,23 @@ And "Stop impersonating" returns me to my own staff identity
 4. The impersonation token is **short-lived (15 min) and non-refreshable** — a full page reload also
    returns you to your own identity. Impersonation is **audited** in the target's tenant.
 
+### QA-ADMIN-04 — Staff announcement reaches a tenant's members 🟢 (Web) ⚙️ Automated in CI
+**Gherkin**
+```gherkin
+Given I am staff on a tenant's detail in /admin
+When I send an announcement (title + body) and confirm
+Then every member of that tenant is notified through their preferred channels
+And each member's bell shows the announcement; reading it clears the badge
+And an admin.announcement.sent audit event is recorded in that tenant
+```
+**Walkthrough**
+1. As staff, open a tenant's detail in `/admin` → fill **Send announcement** (title + message) →
+   **Send to all members** → confirm. **Expected:** "Announcement sent to N member(s)."
+2. Sign in as a member of that tenant. **Expected:** the bell badge shows the unread announcement;
+   opening it shows title + message; clicking it marks it read and the badge clears. Members with
+   email delivery on also get the email (Mailpit).
+3. The send is audited **in that tenant** (`admin.announcement.sent`, with the member count).
+
 ---
 
 ## 11. Emails (Mailpit) — branding & content 🟠

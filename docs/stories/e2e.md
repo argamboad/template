@@ -155,12 +155,12 @@ producer, per the constraint below.
 **So that** the NOTIFY UI (bell, prefs card) can't silently break
 
 **Context / notes:** Covers `NotificationBell.razor` (header) and `NotificationPrefsCard.razor`
-(Settings). **Constraint:** the only production caller of `NotifyAsync` is `BillingNotifier`
-(trial/dunning), which is not browser-triggerable — so "a notification appears and can be marked
-read" stays at the integration layer (`Notify/*` tests), and the E2E asserts the UI shell +
-preferences round-trip. If a future feature emits user-triggerable notifications, extend this
-journey then. New test file `tests/E2E.Tests/NotificationJourneyTests.cs` + prefs section on
-`Pages/SettingsPage.cs`.
+(Settings). **Constraint (since resolved):** at the time, the only production caller of `NotifyAsync`
+was `BillingNotifier` (not browser-triggerable), so "a notification appears and can be marked read"
+stayed at the integration layer. **ADMIN-3 later added staff announcements** — a browser-triggerable
+producer — and `AnnouncementJourneyTests` now covers the bell list + mark-read end-to-end
+(QA-NOTIF-01 full + QA-NOTIF-02). New test file `tests/E2E.Tests/NotificationJourneyTests.cs` +
+prefs section on `Pages/SettingsPage.cs`.
 
 **Acceptance criteria**
 

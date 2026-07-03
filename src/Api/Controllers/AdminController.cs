@@ -24,10 +24,15 @@ public class AdminController(
     IRepository<Subscription> subscriptions,
     IRepository<AuditEvent> auditEvents,
     IUserRepository users,
-    IJwtTokenService jwt) : AdminApiControllerBase(staff)
+    IJwtTokenService jwt,
+    INotificationService notifications,
+    IUnitOfWork unitOfWork) : AdminApiControllerBase(staff)
 {
     // Impersonation tokens are deliberately short-lived and non-refreshable (ADR-014).
     private static readonly TimeSpan ImpersonationLifetime = TimeSpan.FromMinutes(15);
+
+    private const int AnnounceTitleMaxLength = 200;
+    private const int AnnounceBodyMaxLength = 2000;
 
     /// <summary>
     /// Whether the authenticated caller is platform staff. Unlike the other actions this never 403s —
@@ -86,6 +91,47 @@ public class AdminController(
                 SubscriptionStatus = subscription?.Status ?? "none",
                 AuditEventCount = auditCount,
             });
+        }
+    }
+
+    /// <summary>
+    /// Sends an announcement to every member of a tenant (staff only; ADMIN-3). Delivery goes through
+    /// the normal notification fan-out — in-app row and/or outbox email per each user's preferences —
+    /// and the send is loudly audited in the target tenant. Everything commits atomically.
+    /// </summary>
+    [HttpPost("tenants/{id:guid}/announce")]
+    public async Task<IActionResult> Announce(Guid id, [FromBody] AdminAnnounceRequest request, CancellationToken cancellationToken)
+    {
+        var (staffUserId, denied) = await RequireStaffAsync(cancellationToken);
+        if (denied is not null)
+            return denied;
+
+        var title = request.Title?.Trim();
+        var body = request.Body?.Trim();
+        if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(body)
+            || title.Length > AnnounceTitleMaxLength || body.Length > AnnounceBodyMaxLength)
+            return BadRequest(new ErrorResponse("invalid_request",
+                $"Title (max {AnnounceTitleMaxLength} chars) and body (max {AnnounceBodyMaxLength} chars) are required."));
+
+        // Notifications, outbox emails, and the in-tenant audit all commit together.
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        using (tenantContext.EnterTenant(id))
+        {
+            var tenant = await tenants.GetByIdAsync(id, cancellationToken);
+            if (tenant is null)
+                return NotFound(new ErrorResponse("tenant_not_found", "Tenant not found"));
+
+            var members = await tenants.GetMembersAsync(id, cancellationToken);
+            foreach (var member in members)
+                await notifications.NotifyAsync(member.UserId, "announcement", title, body,
+                    metadata: null, cancellationToken);
+
+            await audit.RecordAsync("admin.announcement.sent", staffUserId, nameof(Tenant), id.ToString(),
+                new { member_count = members.Count }, cancellationToken);
+            await auditEvents.SaveChangesAsync(cancellationToken);
+            await scope.CommitAsync(cancellationToken);
+
+            return Ok(new AdminAnnounceResponse { NotifiedCount = members.Count });
         }
     }
 

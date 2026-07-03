@@ -9,6 +9,7 @@ using Template.Api.Controllers;
 using Template.Api.Models;
 using Template.Api.Services;
 using Template.Api.Tests.Infrastructure;
+using Template.Api.Tests.Notify;
 using Template.Core.Billing;
 using Template.Core.Entities;
 using Template.Infrastructure.Audit;
@@ -163,6 +164,86 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
             Assert.IsType<NotFoundObjectResult>(await controller.Impersonate(Guid.CreateVersion7(), default));
     }
 
+    // --- ADMIN-3: announcements ---
+
+    [Fact]
+    public async Task NonStaff_Announce_Returns403()
+    {
+        var callerId = await SeedUserAsync("normal@corp.com");
+        var tenantId = await SeedTenantAsync("Delta", members: 1);
+        var (controller, db) = BuildController(callerId);
+        await using (db)
+        {
+            var obj = Assert.IsType<ObjectResult>(
+                await controller.Announce(tenantId, new AdminAnnounceRequest { Title = "t", Body = "b" }, default));
+            Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Staff_Announce_NotifiesAllMembers_AndAuditsInTenant()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Epsilon", members: 2);
+        var title = $"Maintenance {Guid.NewGuid():N}";
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.Announce(
+                tenantId, new AdminAnnounceRequest { Title = title, Body = "Scheduled downtime tonight." }, default));
+            Assert.Equal(2, Assert.IsType<AdminAnnounceResponse>(ok.Value).NotifiedCount);
+        }
+
+        // One in-app notification per member (notifications are per-user, not tenant-scoped)...
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.Equal(2, await read.Set<Notification>().CountAsync(n => n.Title == title && n.Kind == "announcement"));
+
+        // ...and the announcement is audited in the target tenant.
+        Assert.True(await read.Set<AuditEvent>().AnyAsync(
+            e => e.Action == "admin.announcement.sent" && e.ActorUserId == staffId));
+    }
+
+    [Fact]
+    public async Task Staff_Announce_UnknownTenant_Returns404()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<NotFoundObjectResult>(await controller.Announce(
+                Guid.CreateVersion7(), new AdminAnnounceRequest { Title = "t", Body = "b" }, default));
+    }
+
+    [Theory]
+    [InlineData(null, "b")]
+    [InlineData("  ", "b")]
+    [InlineData("t", null)]
+    [InlineData("t", "")]
+    public async Task Staff_Announce_MissingTitleOrBody_Returns400(string? title, string? body)
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Zeta", members: 1);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<BadRequestObjectResult>(await controller.Announce(
+                tenantId, new AdminAnnounceRequest { Title = title, Body = body }, default));
+    }
+
+    [Fact]
+    public async Task Staff_Announce_OverlongTitleOrBody_Returns400()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Eta", members: 1);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            Assert.IsType<BadRequestObjectResult>(await controller.Announce(
+                tenantId, new AdminAnnounceRequest { Title = new string('x', 201), Body = "b" }, default));
+            Assert.IsType<BadRequestObjectResult>(await controller.Announce(
+                tenantId, new AdminAnnounceRequest { Title = "t", Body = new string('x', 2001) }, default));
+        }
+    }
+
     // --- construction (shared tenant context between controller + DbContext) ---
 
     private (AdminController controller, AppDbContext db) BuildController(Guid callerId)
@@ -172,12 +253,16 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         var db = new AppDbContext(options, ctx);
 
         var staff = new PlatformStaffService(new UserRepository(db), Options.Create(new PlatformAdminSettings { StaffEmails = [StaffEmail] }));
+        var notifications = new NotificationService(
+            new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db),
+            new UserRepository(db), new CapturingEmailSender(), TimeProvider.System);
         var controller = new AdminController(
             staff, new TenantRepository(db), ctx,
             new AuditLog(new EfRepository<AuditEvent>(db), TimeProvider.System),
             new EfRepository<Subscription>(db), new EfRepository<AuditEvent>(db),
             new UserRepository(db),
-            new JwtTokenService(new TestJwtSettings(), TimeProvider.System, NullLogger<JwtTokenService>.Instance));
+            new JwtTokenService(new TestJwtSettings(), TimeProvider.System, NullLogger<JwtTokenService>.Instance),
+            notifications, new EfUnitOfWork(db));
 
         var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, callerId.ToString())], "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };

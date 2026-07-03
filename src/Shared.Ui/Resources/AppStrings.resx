@@ -129,6 +129,13 @@
   <data name="Admin_ErrLoad" xml:space="preserve"><value>Couldn't load tenants.</value></data>
   <data name="Admin_ErrDetail" xml:space="preserve"><value>Couldn't load tenant details.</value></data>
   <data name="Admin_ErrImpersonate" xml:space="preserve"><value>Couldn't start impersonation.</value></data>
+  <data name="Admin_AnnounceTitle" xml:space="preserve"><value>Send announcement</value></data>
+  <data name="Admin_AnnounceTitlePlaceholder" xml:space="preserve"><value>Title</value></data>
+  <data name="Admin_AnnounceBodyPlaceholder" xml:space="preserve"><value>Message</value></data>
+  <data name="Admin_AnnounceSend" xml:space="preserve"><value>Send to all members</value></data>
+  <data name="Admin_ConfirmAnnounce" xml:space="preserve"><value>Send this announcement to all members of "{0}"?</value></data>
+  <data name="Admin_AnnounceSent" xml:space="preserve"><value>Announcement sent to {0} member(s).</value></data>
+  <data name="Admin_ErrAnnounce" xml:space="preserve"><value>Couldn't send the announcement.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Household</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>

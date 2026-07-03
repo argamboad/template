@@ -30,6 +30,18 @@ public record AdminStatusResponse
     [JsonPropertyName("is_staff")] public required bool IsStaff { get; init; }
 }
 
+/// <summary>Staff announcement to every member of a tenant (ADMIN-3).</summary>
+public record AdminAnnounceRequest
+{
+    [JsonPropertyName("title")] public string? Title { get; init; }
+    [JsonPropertyName("body")] public string? Body { get; init; }
+}
+
+public record AdminAnnounceResponse
+{
+    [JsonPropertyName("notified_count")] public required int NotifiedCount { get; init; }
+}
+
 public record ImpersonationResponse
 {
     /// <summary>Short-lived access token for the impersonated user. No refresh token is issued.</summary>

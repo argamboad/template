@@ -22,7 +22,7 @@
     }
     else if (_state == State.Forbidden)
     {
-        <div class="alert alert-danger">
+        <div class="alert alert-danger" data-testid="admin-forbidden">
             @Localizer["Admin_Forbidden"]
             <a href="/" class="alert-link ms-1">@Localizer["Admin_BackHome"]</a>
         </div>
@@ -45,7 +45,7 @@
                         @foreach (var t in _tenants)
                         {
                             <button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(t.Id == _selectedId ? "active" : "")"
-                                    @onclick="() => SelectTenant(t.Id)">
+                                    data-testid="admin-tenant-row" @onclick="() => SelectTenant(t.Id)">
                                 <span class="text-truncate">@t.Name</span>
                                 <span class="badge bg-secondary-subtle text-secondary-emphasis ms-2">@t.MemberCount</span>
                             </button>
@@ -118,6 +118,24 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            @* ── Announcement to all members (ADMIN-3) ── *@
+                            <h3 class="h6 fw-semibold mt-4 mb-2">@Localizer["Admin_AnnounceTitle"]</h3>
+                            @if (!string.IsNullOrEmpty(_announceStatus))
+                            {
+                                <div class="alert alert-success py-2" data-testid="admin-status">@_announceStatus</div>
+                            }
+                            <div class="mb-2">
+                                <input class="form-control" maxlength="200" data-testid="admin-announce-title"
+                                       placeholder="@Localizer["Admin_AnnounceTitlePlaceholder"]" @bind="_announceTitle" />
+                            </div>
+                            <div class="mb-2">
+                                <textarea class="form-control" rows="3" maxlength="2000" data-testid="admin-announce-body"
+                                          placeholder="@Localizer["Admin_AnnounceBodyPlaceholder"]" @bind="_announceBody"></textarea>
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm" data-testid="admin-announce-send"
+                                    disabled="@(_busy || string.IsNullOrWhiteSpace(_announceTitle) || string.IsNullOrWhiteSpace(_announceBody))"
+                                    @onclick="SendAnnouncement">@Localizer["Admin_AnnounceSend"]</button>
                         </div>
                     </div>
                 }
@@ -164,6 +182,7 @@
         _detail = null;
         _detailLoading = true;
         _error = null;
+        _announceStatus = null;
         try
         {
             _detail = await Http.GetFromJsonAsync<TenantDetailDto>($"/api/admin/tenants/{id}");
@@ -197,6 +216,38 @@
         }
         catch { _error = Localizer["Admin_ErrImpersonate"]; }
         finally { _busy = false; }
+    }
+
+    private string _announceTitle = "";
+    private string _announceBody = "";
+    private string? _announceStatus;
+
+    private async Task SendAnnouncement()
+    {
+        if (_detail is null) return;
+        if (!await JS.ConfirmAsync(Localizer["Admin_ConfirmAnnounce", _detail.Name])) return;
+
+        _busy = true; _announceStatus = null; _error = null;
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"/api/admin/tenants/{_detail.Id}/announce",
+                new { title = _announceTitle.Trim(), body = _announceBody.Trim() });
+            if (res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadFromJsonAsync<AnnounceResultDto>();
+                _announceStatus = Localizer["Admin_AnnounceSent", body?.NotifiedCount ?? 0];
+                _announceTitle = "";
+                _announceBody = "";
+            }
+            else { _error = Localizer["Admin_ErrAnnounce"]; }
+        }
+        catch { _error = Localizer["Admin_ErrAnnounce"]; }
+        finally { _busy = false; }
+    }
+
+    private sealed record AnnounceResultDto
+    {
+        [JsonPropertyName("notified_count")] public int NotifiedCount { get; init; }
     }
 
     private sealed record TenantSummaryDto

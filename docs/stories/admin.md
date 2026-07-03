@@ -5,10 +5,11 @@
 > guardrails (`ITenantContext.EnterTenant` for scoped in-tenant reads/writes, ADR-003; the audit log,
 > ADR-008 — the global filter is never disabled). Design +
 > constraints in **ADR-014**. Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — ADMIN-1
-> (staff gate + cross-tenant inspection) + ADMIN-2 (short-lived audited impersonation). **UI shipped**
+> (staff gate + cross-tenant inspection) + ADMIN-2 (short-lived audited impersonation) + ADMIN-3
+> (staff announcements → notification fan-out). **UI shipped**
 > (`feat/ui-4-admin`): a staff-only `/admin` console (`AdminConsole`) — tenant list/detail + **Sign in as**
 > with an impersonation banner + **Stop** — gated by a new non-gating probe `GET /api/admin/me`
-> (`{is_staff}`; allowlist stays config-only). EN/ES; QA-ADMIN-01..03.
+> (`{is_staff}`; allowlist stays config-only). EN/ES; QA-ADMIN-01..04.
 
 **Epic key:** `ADMIN`
 
@@ -21,7 +22,8 @@
 **Guardrails (ADR-014):** the global tenant filter is **never loosened** (scoped in-tenant reads/writes
 enter the target via `EnterTenant`, keeping the filter engaged); staff is **config-only** (never a tenant
 role / app toggle); impersonation is **short-lived + non-refreshable + audited**; admin is **read-only**
-over tenant data.
+over tenant data (the ADMIN-3 announcement is the one sanctioned write: it creates **per-user
+notifications** through the normal fan-out, never mutates tenant data, and is audited in-tenant).
 
 ---
 
@@ -135,6 +137,58 @@ ADR-014 referenced.
 
 ---
 
+### ADMIN-3 — Staff announcement to a tenant's members
+
+**Status: ✅ Implemented** (`feat/admin-3-announcements`). `POST /api/admin/tenants/{id}/announce`
+(`AdminAnnounceRequest` title ≤200 / body ≤2000 → 400; staff-gated → 403; unknown tenant → 404);
+inside one transaction + `EnterTenant`: `NotifyAsync(userId, "announcement", …)` per member (in-app
+row and/or outbox email per each user's prefs) + `admin.announcement.sent` audited in-tenant with
+`member_count`; returns `{notified_count}`. Console UI: send-announcement card in the tenant detail
+(confirm dialog, EN/ES). E2E `AnnouncementJourneyTests` (staff sends → target's bell badge + item →
+mark-read clears; non-staff forbidden) — the suite's first browser-triggerable notification producer,
+closing QA-NOTIF-01/02 automation. **Found & fixed en route:** `AuthService.IsStaffAsync` called
+`/api/admin/me` on the Bearer-less auth client, so the web admin console was unreachable (401 → always
+"forbidden"); it now attaches the in-memory token explicitly. Maps to QA-ADMIN-04.
+
+**As a** platform staff member
+**I want** to send an announcement to all members of a tenant
+**So that** I can notify affected users (maintenance, incidents) through the app's normal channels
+
+**Context / notes:** A real support capability that doubles as the browser-triggerable notification
+producer the E2E suite lacked. Delivery is the existing NOTIFY fan-out (ADR-013) — per-user prefs
+decide in-app vs email; nothing is hard-coded. The write is per-user notification rows only; tenant
+data is untouched (guardrail above). Audited in the target tenant like every admin action.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: Staff announcement reaches every member
+  Given a tenant with N members
+  When staff sends an announcement (title + body)
+  Then each member gets a notification through their preferred channels
+  And the response reports N notified
+
+Scenario: The announcement is audited in the target tenant
+  When staff sends an announcement
+  Then an admin.announcement.sent AuditEvent (with member_count) lands in that tenant
+
+Scenario: Non-staff cannot announce
+  Given a normal user
+  When they call the announce endpoint
+  Then they get 403 Forbidden
+
+Scenario: Validation
+  When title/body are missing or exceed 200/2000 chars
+  Then the request is rejected with 400
+```
+
+**Out of scope:** targeting a single member (announcements are tenant-wide; impersonation covers 1:1
+support); scheduling/drafts; cross-tenant broadcast to ALL tenants (loop in the console if ever needed).
+**Definition of done:** tests first; fan-out + audit + gating + validation covered; console UI with
+confirm; E2E journey green; merged, app working; ADR-014 addendum recorded.
+
+---
+
 ## Slice plan (implementation map)
 
 Ordered, each a mergeable vertical slice. TDD throughout.
@@ -146,6 +200,9 @@ Ordered, each a mergeable vertical slice. TDD throughout.
 2. ✅ **Impersonation (ADMIN-2).** — DONE. `IJwtTokenService.IssueImpersonationToken` +
    `POST /api/admin/impersonate/{userId}` → 15-min, non-refreshable, `impersonated_by`-tagged access
    token; audited (`admin.impersonation.started`) in the target's tenant. Unknown target → 404.
+3. ✅ **Announcements (ADMIN-3).** — DONE. Staff announcement → NOTIFY fan-out to all members +
+   in-tenant audit, console form, E2E journey (the suite's notification producer); fixed the
+   Bearer-less `IsStaffAsync` probe that made the web console unreachable.
 
 **Known sharp edges (from ADR-014):** the global filter is **inviolable** (`EnterTenant` keeps it engaged; never disabled); staff is
 **config-only** (never a role/app toggle); impersonation is **short-lived + non-refreshable + audited**;
