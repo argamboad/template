@@ -1,0 +1,74 @@
+# Native parity audit (NATIVE-2, ADR-018)
+
+> The scoping artifact for the NATIVE epic's Wave 2/3: every place **WebView-hosted Blazor (MAUI
+> Hybrid)** differs from **browser Blazor (WASM)**, audited concern-by-concern and screen-by-screen.
+> Verdicts: ✅ works (verified in code) · ⚠️ gap (mapped to a slice) · 🔍 likely-OK, **verify on
+> device** (NATIVE-6) · **N-A** not applicable.
+>
+> Method: source inspection at `develop@198319d` (grep + code-path tracing of `src/Shared.Ui`,
+> `src/Maui`, the API's link-building services, and both `index.html` hosts). Static analysis can't
+> prove rendering/OS behavior — those cells are 🔍 and become checklist items in the NATIVE-6 QA
+> pass. Platforms: **Android**, **Windows**; iOS/macCatalyst compile in CI (NATIVE-1) but have never
+> been run — every cell is implicitly 🔍 there until NATIVE-6 gets Apple hardware.
+
+## 1. Cross-cutting concerns
+
+| Concern | Verdict | Evidence / note |
+|---|---|---|
+| **File download** (GDPR export signed URL) | ⚠️ **G1** | `Household.razor:181` renders `<a href={signedUrl} target="_blank">`. In a WebView, `target=_blank` is a new-window request: Windows WebView2 may hand it to the system browser; Android WebView **drops it silently** (no `onCreateWindow` handler). Even when the URL opens, "download a JSON file" needs a native save/share affordance. → **NATIVE-3** |
+| **File upload** | N-A (today) | No UI consumer of `IFileStorage` upload exists yet (FILES is API-only). Becomes NATIVE-3's second half the day a feature adds an uploader. |
+| **External navigation** (billing checkout/portal) | ⚠️ **G2** | `Billing.razor:126,147` does `Nav.NavigateTo(providerUrl, forceLoad: true)` to the Stripe-hosted page. BlazorWebView's default `UrlLoading` policy opens **external hosts in the system browser** (app keeps running) — but the provider's post-checkout redirect returns to **`Auth:AppBaseUrl` (the web app)**, not the native app; the native `/billing` page only refreshes on next visit. Flow completes, return-trip UX is web. → **NATIVE-4** (verify default-external-open on device; document/handle the return) |
+| **`mailto:` / other `target=_blank`** | ✅ | Grep: the export link is the **only** `_blank` and there are no `mailto:` links in the RCL. Nothing else to route. |
+| **Android hardware back** | ⚠️ **G3** | No `OnBackPressed`/`OnBackInvoked` handling anywhere in `src/Maui`. MAUI default: the back button backgrounds/exits the Activity instead of navigating Blazor history — every mis-tap dumps the user out. → **NATIVE-4** |
+| **Deep links into the app** | ⚠️ **G4** (by omission) | The only registered scheme is the OAuth callback (`perezosoft://`, `WebAuthenticatorCallbackActivity`). **Emailed links (invite `/join?token=…`, magic link) always open the web app** — there is no https App Link/Universal Link. Magic link is web-only **by design** (documented); the invite link is not — see G5. |
+| **Join-by-invitation on native** | ⚠️ **G5 — feature gap** | `Join.razor` reads the token **only from the query string** (`[SupplyParameterFromQuery]`); there is **no manual token-entry UI**, and a native app has no address bar. Invite emails link to `{ClientUrl}/join?token=…` (web) with a raw-token fallback in the body — which a native user **has nowhere to paste**. A native-only member cannot join a household. → **new Wave-2 slice (NATIVE-4b)**: an "enter invite code" input on `/join` (works on web too), and/or https deep links. |
+| **Culture / i18n** | ⚠️ **G6** | Web's `Program.cs` reads `localStorage.app_culture` and sets `CultureInfo.DefaultThreadCurrent(UI)Culture` **before first render**; `src/Maui` has **no equivalent** (grep: zero `Culture` references). `LanguageSwitcher` writes localStorage then `forceLoad`-reloads — on native, nothing re-applies the culture, so **switching language does nothing** (stays at device/default culture) and the saved preference is never honored. → **NATIVE-5** |
+| **RTL** | 🔍 | No RTL language is shipped (EN/ES); revisit when one is. |
+| **Safe areas / status bar / edge-to-edge** | 🔍 | `MainPage.xaml` is a bare `BlazorWebView` (no `SafeArea`/padding). Android 15 (API 35) enforces edge-to-edge — content may draw under the status bar. Prior QA (AND-05) passed, so likely acceptable; **verify on a modern device** → NATIVE-5 if it fails. |
+| **Desktop window sizing** | 🔍 | No explicit window size; WinUI default. Verify it opens usably (NATIVE-6); NATIVE-5 if not. |
+| **Session across restart** | ✅ | `SecureStorageSessionStore` (OS secure store) + body-transport refresh (`AuthService.RunRefreshAsync` native branch). QA-DSK-03/AND-03 cover it. |
+| **Auth: OTP / OAuth / MFA step-up** | ✅ | All native-wired and previously verified: OTP + OAuth via system browser (`LoopbackOAuthInitiator` desktop, custom scheme Android), MFA-4 native step-up, provider discovery (`GET /api/auth/providers`) works over the native client (anonymous endpoint). Magic link N-A by design. |
+| **Impersonation (admin)** | ✅ | In-memory token swap (`BeginImpersonation`); **Stop** calls `TryRefreshAsync`, whose native branch refreshes from SecureStorage — the staff identity restores without a cookie. Banner reads the `impersonated_by` claim (shared UI). 🔍 spot-check on device (NATIVE-6). |
+| **JS interop / vendored scripts** | ✅ | `src/Maui/wwwroot/index.html` includes the same `_content/Template.Shared.Ui/js/qrcode-generator.min.js` + `mfa-qr.js` as web — the MFA QR renders natively. (Keep the two `index.html` files in sync — noted as a maintainer rule below.) |
+| **Clipboard** | N-A | No copy-to-clipboard buttons exist (MFA manual key is selectable text; WebView selection works). |
+| **Polling (bell)** | ✅ | `NotificationBell` uses a C# `PeriodicTimer` (60 s) — no browser API dependency. |
+| **Dev networking** | ✅ (documented) | Android dev needs `adb reverse` (auto-run by the csproj target on deploy); prod points at the real URL. `docs/MOBILE_TESTING.md`. |
+
+## 2. Per-feature screens (all shared-RCL — render everywhere; deltas only)
+
+| Screen | Android | Windows | Delta notes |
+|---|---|---|---|
+| Login (OTP, OAuth, MFA step-up) | ✅ | ✅ | Fully native-wired; QA-AND/DSK cover. The magic-link button is already hidden on native (`@if (!Auth.IsNative)` in `Login.razor`) — correct by construction. |
+| Home / AppHeader / bell | ✅ | ✅ | Polling is C#; mark-read etc. are plain fetches. |
+| Household (roster, roles, invite) | ✅ | ✅ | Invite **send** works; the invited member's **join** is G5. |
+| Household → Data export | ⚠️ G1 | ⚠️ G1 | The download anchor. |
+| Join | ⚠️ G5 | ⚠️ G5 | Query-string-only token; unreachable natively. |
+| Settings (linked accounts, prefs, MFA card, danger zone) | ✅ | ✅ | Link-provider has a native branch (`LinkProviderAsync`); MFA QR scripts included; delete-account is a plain API call. 🔍 device pass in NATIVE-6. |
+| Billing (BILLING-8) | ⚠️ G2 | ⚠️ G2 | Summary renders; Upgrade/Manage leave for the system browser; return-trip lands on web. |
+| Admin console + impersonation (ADMIN-1..3) | ✅ | ✅ | Staff probe + announce form are plain fetches; impersonation verified by code path. 🔍 device spot-check. |
+| Language switcher | ⚠️ G6 | ⚠️ G6 | Persists the pref but never applies it natively. |
+
+## 3. Gap register → Wave-2 backlog (drives the epic)
+
+| Gap | What breaks | Fix slice | Sketch |
+|---|---|---|---|
+| **G1** | GDPR export (any future signed-URL download) dead/awkward in WebView | **NATIVE-3** | Intercept/route download URLs to a native save/share bridge (per-platform: Android `Share`/MediaStore, Windows save dialog); or open externally as a stopgap. |
+| **G2** | Billing checkout/portal round-trip returns to web, not the app | **NATIVE-4** | Confirm default external-open on each platform; on return, poll/refresh the billing summary when the app foregrounds; document the web-return as accepted if so decided. |
+| **G3** | Android back button exits instead of navigating | **NATIVE-4** | Handle back → `blazorWebView` JS `history.back()` when the WebView can go back, else default. |
+| **G5** | Native member cannot join a household | **NATIVE-4b (new)** | Token-entry input on `/join` (benefits web too — email clients that mangle links); optionally https App Links later. |
+| **G6** | Language switching inert on native; saved culture ignored | **NATIVE-5** | Bootstrap culture in `MauiProgram`/`MainPage` from the same store the switcher writes (localStorage via WebView, or move the pref to `Preferences` behind an abstraction), apply before root component renders, and re-apply on switch. |
+| 🔍 edge-to-edge / window sizing | Cosmetic risk | **NATIVE-5** (only if device check fails) | SafeArea padding / default window size. |
+
+**Explicitly N-A / deferred:** magic link on native (web-only by design); file upload (no UI consumer yet);
+RTL (no RTL language shipped); clipboard (no copy affordances exist).
+
+## 4. Maintainer rules surfaced by this audit
+
+- **The two `index.html` hosts must stay in sync** (`src/Web/wwwroot/index.html` ↔
+  `src/Maui/wwwroot/index.html`): any script/CSS the RCL depends on (e.g. the MFA QR vendor script)
+  must be added to **both**, or the feature silently breaks on one host.
+- **Every emailed link lands on `Auth:AppBaseUrl` (the web app)** — when adding an email that links
+  into the product, either the flow must also be reachable in-app without a URL (like G5's token
+  input) or it is web-only and should say so.
+- **`Nav.NavigateTo(external, forceLoad: true)` means "leave the app" on native** — any new external
+  round-trip (payment, OAuth-like flows) needs a return-trip story on native, not just a redirect URL.

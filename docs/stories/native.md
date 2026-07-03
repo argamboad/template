@@ -72,6 +72,20 @@ lockfile handled deterministically; ADR-018 referenced.
 
 ### NATIVE-2 — Native-concerns audit → `docs/NATIVE_PARITY.md`
 
+**Status: ✅ Implemented** (`docs/native-2-parity-audit`). Source-inspection audit at `develop@198319d`
+covering every concern below + all shared-RCL screens (incl. the post-plan BILLING-8 billing page and
+ADMIN-3 announcements). **Six gaps registered (G1–G6), each mapped to a Wave-2 slice**; uncertain cells
+marked 🔍 for the NATIVE-6 device pass (all iOS/macCatalyst cells implicitly 🔍 — never run yet).
+Highlights: G1 GDPR-export `target=_blank` download dead-ends the WebView (→ NATIVE-3); G3 Android
+hardware back exits the app (→ NATIVE-4); **G5 (discovered): a native member cannot join a household** —
+`Join.razor` reads the token from the query string only, no manual entry, and invite emails link to the
+web origin (→ **new slice NATIVE-4b**: token-entry input on `/join`, benefits web too); G6 language
+switching is inert on native (no culture bootstrap in `src/Maui`; → NATIVE-5). Confirmed-working: MFA QR
+scripts included in both `index.html` hosts, native refresh/impersonation-stop, OAuth callback scheme,
+bell polling (C# `PeriodicTimer`), secure-storage sessions; magic link correctly hidden on native.
+Also produced three **maintainer rules** (keep the two `index.html` hosts in sync; emailed links land on
+web — flows need an in-app path; `forceLoad` external nav = leaving the app).
+
 **As a** developer
 **I want** a written matrix of every place WebView-hosted Blazor differs from browser Blazor
 **So that** Wave 2 fixes real, enumerated gaps instead of guessing
@@ -132,6 +146,32 @@ Scenario: Android hardware back
 ```
 
 **DoD:** link routing + hardware-back verified on Android; ADR-018.
+
+### NATIVE-4b — Join a household by invite code (audit gap G5)
+
+**As a** native user invited to a household
+**I want** to enter the invite code from the email directly in the app
+**So that** I can join at all — the emailed `/join?token=…` link opens the web app, and a native app has
+no address bar to reach it
+
+**Context / notes:** discovered by the NATIVE-2 audit: `Join.razor` reads the token **only** from the
+query string and invite emails link to `Auth:AppBaseUrl` (web); the email's raw-token fallback has
+nowhere to be pasted. Add a token-entry input on `/join` (reachable from the app, e.g. via Household or
+the nav) — this benefits **web** too (email clients that mangle links). Optional later: https App
+Links/Universal Links.
+
+```gherkin
+Scenario: Join with a pasted invite code
+  Given I received an invitation email
+  When I open the app's Join screen and paste the invite code
+  Then I join the household exactly as the emailed link would have
+
+Scenario: Web keeps working
+  When I open the emailed /join?token=… link in a browser
+  Then the flow is unchanged
+```
+
+**DoD:** token entry verified on Android + web regression (E2E roster journey still green); ADR-018.
 
 ### NATIVE-5 — Localization + theming/layout polish per platform
 
@@ -241,10 +281,10 @@ upload. Store review + accounts are external; the template ships the upload plum
 ## Slice plan (sequenced — guardrails first, distribution last)
 
 1. ✅ **NATIVE-1** build gate — DONE (all four TFMs; Apple legs on develop pushes, see the free-tier
-   amendment above) + 📝 **NATIVE-2** audit — next; it scopes everything after it. Note the audit must
-   also cover the screens shipped since this plan was written (billing page BILLING-8, staff
-   announcements ADMIN-3) — they're shared-RCL, so they render natively and belong in the matrix.
-2. 📝 **NATIVE-3/4/5** — fix the WebView gaps the audit confirms (skip any that already work).
+   amendment above) + ✅ **NATIVE-2** audit — DONE (`docs/NATIVE_PARITY.md`, incl. the post-plan
+   BILLING-8/ADMIN-3 screens): six gaps G1–G6 registered, each mapped to a slice below.
+2. 📝 **NATIVE-3** (G1 downloads) / **NATIVE-4** (G2 external nav, G3 back button) / **NATIVE-4b**
+   (G5 join-by-code — audit discovery) / **NATIVE-5** (G6 culture bootstrap + 🔍 layout checks).
 3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 
