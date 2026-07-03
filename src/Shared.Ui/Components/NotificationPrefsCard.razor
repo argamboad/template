@@ -22,13 +22,13 @@
         {
             <div class="form-check form-switch mb-2">
                 <input class="form-check-input" type="checkbox" id="notif-inapp"
-                       checked="@_inApp" disabled="@_busy"
+                       data-testid="notif-prefs-inapp" checked="@_inApp" disabled="@_busy"
                        @onchange="e => Save(inApp: (bool)e.Value!, email: _email)" />
                 <label class="form-check-label" for="notif-inapp">@Localizer["NotifPrefs_InApp"]</label>
             </div>
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="notif-email"
-                       checked="@_email" disabled="@_busy"
+                       data-testid="notif-prefs-email" checked="@_email" disabled="@_busy"
                        @onchange="e => Save(inApp: _inApp, email: (bool)e.Value!)" />
                 <label class="form-check-label" for="notif-email">@Localizer["NotifPrefs_Email"]</label>
             </div>

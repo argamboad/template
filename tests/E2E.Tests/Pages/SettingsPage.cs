@@ -7,6 +7,9 @@ public class SettingsPage(IPage page) : BasePage(page)
 {
     public override string Path => "/settings";
 
+    public ILocator NotifPrefInApp => Page.GetByTestId("notif-prefs-inapp");
+    public ILocator NotifPrefEmail => Page.GetByTestId("notif-prefs-email");
+
     public ILocator MfaEnable => Page.GetByTestId("mfa-enable");
     public ILocator MfaSecret => Page.GetByTestId("mfa-secret");
     public ILocator MfaConfirmCode => Page.GetByTestId("mfa-confirm-code");
