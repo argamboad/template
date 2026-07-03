@@ -17,6 +17,8 @@ public class HouseholdPage(IPage page) : BasePage(page)
     public ILocator InviteSend => Page.GetByTestId("invite-send");
     public ILocator RevealedToken => Page.GetByTestId("invite-token");
     public ILocator Status => Page.GetByTestId("household-status");
+    public ILocator ExportData => Page.GetByTestId("export-data");
+    public ILocator ExportDownload => Page.GetByTestId("export-download");
     public ILocator MemberRows => Page.GetByTestId("member-row");
     public ILocator PendingRows => Page.GetByTestId("pending-invite-row");
 

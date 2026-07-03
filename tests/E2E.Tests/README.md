@@ -69,6 +69,7 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Billing page is owner-only (member sees the pointer state) | QA-BILL-01 |
 | Member joins by pasting the invite code on /join (NATIVE-4b) | QA-INV-02 (code-entry variant) |
 | Invalid pasted code → inline error, form stays usable | — |
+| Owner requests the GDPR export → real browser download (.json) | QA-HH export case |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that

@@ -39,6 +39,24 @@ public sealed class FilesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidToken_SetsAttachmentFilenameFromKeyBasename()
+    {
+        var (storage, ctx, tokenizer) = Build();
+        var tenant = Guid.NewGuid();
+        using (ctx.EnterTenant(tenant))
+            await storage.PutAsync("exports/2026-bundle.json", Bytes("{}"), "application/json");
+        var token = tokenizer.Mint(tenant, "exports/2026-bundle.json", TimeSpan.FromMinutes(5));
+
+        var result = await new FilesController(storage, ctx, tokenizer).Download(token, default);
+
+        // Content-Disposition: attachment — a browser downloads instead of rendering the JSON
+        // inline, and a same-tab navigation to the URL never replaces the page (NATIVE-3).
+        var file = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("2026-bundle.json", file.FileDownloadName);
+        await using var _ = file.FileStream;
+    }
+
+    [Fact]
     public async Task ExpiredToken_Returns404()
     {
         var (storage, ctx, tokenizer) = Build();
