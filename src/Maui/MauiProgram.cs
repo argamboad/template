@@ -73,13 +73,16 @@ public static class MauiProgram
 #endif
 
 		// Refresh token lives in the OS secure store (the native equivalent of the web's
-		// HttpOnly cookie). OAuth is platform-specific: desktop captures the callback via a
-		// loopback HTTP listener; Android via a custom-scheme WebAuthenticator. Both sit
-		// behind IOAuthInitiator so AuthService and the Login page stay platform-agnostic.
+		// HttpOnly cookie). OAuth is platform-specific: Windows captures the callback via a
+		// loopback HTTP listener; Android/iOS/macCatalyst via a custom-scheme WebAuthenticator.
+		// Both sit behind IOAuthInitiator so AuthService and the Login page stay
+		// platform-agnostic. EVERY target platform must register one — the AuthService factory
+		// below resolves it with GetRequiredService, so a missing branch here crashes the app at
+		// first resolve (exactly how iOS/macCatalyst were dead-on-arrival before G7).
 		builder.Services.AddSingleton<ISessionStore, SecureStorageSessionStore>();
-#if ANDROID
+#if ANDROID || IOS || MACCATALYST
 		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
-			new AndroidOAuthInitiator(ApiBaseUrl, CallbackScheme, sp.GetRequiredService<ILogger<AndroidOAuthInitiator>>()));
+			new WebAuthenticatorOAuthInitiator(ApiBaseUrl, CallbackScheme, sp.GetRequiredService<ILogger<WebAuthenticatorOAuthInitiator>>()));
 #elif WINDOWS
 		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
 			new LoopbackOAuthInitiator(ApiBaseUrl, sp.GetRequiredService<ILogger<LoopbackOAuthInitiator>>()));
