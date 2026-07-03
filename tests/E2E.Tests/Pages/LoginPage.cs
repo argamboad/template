@@ -9,10 +9,20 @@ public class LoginPage(IPage page) : BasePage(page)
 
     public ILocator Email => Page.GetByTestId("login-email");
     public ILocator SendOtp => Page.GetByTestId("login-send-otp");
+    public ILocator SendMagicLink => Page.GetByTestId("login-send-magic-link");
+    public ILocator ErrorAlert => Page.GetByTestId("login-error");
     public ILocator OtpCode => Page.GetByTestId("login-otp-code");
     public ILocator VerifyOtp => Page.GetByTestId("login-verify-otp");
     public ILocator MfaCode => Page.GetByTestId("login-mfa-code");
     public ILocator VerifyMfa => Page.GetByTestId("login-verify-mfa");
+
+    /// <summary>Requests a magic link and returns the sign-in URL read from Mailpit.</summary>
+    public async Task<string> RequestMagicLinkAsync(string email)
+    {
+        await Email.FillAsync(email);
+        await SendMagicLink.ClickAsync();
+        return await Mailpit.WaitForMagicLinkAsync(email, TimeSpan.FromSeconds(20));
+    }
 
     /// <summary>Requests an OTP, reads it from Mailpit, enters it, and submits.</summary>
     public async Task SignInWithOtpAsync(string email)

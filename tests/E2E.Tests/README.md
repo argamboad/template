@@ -49,6 +49,8 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Revoking a pending invitation frees the seat | QA-INV-08 |
 | Notification bell shows the empty state for a fresh user | QA-NOTIF-01 (empty state) |
 | Delivery preferences round-trip + per-user isolation | QA-NOTIF-03 |
+| Magic-link sign-in → lands in the app shell | QA-AUTH-01 |
+| Used magic link rejected (single-use) | QA-AUTH-05 |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that
