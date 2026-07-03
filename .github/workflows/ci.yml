@@ -152,10 +152,8 @@ jobs:
         include:
           - tfm: net10.0-android
             os: ubuntu-latest
-            workload: maui-android
           - tfm: net10.0-windows10.0.19041.0
             os: windows-latest
-            workload: maui-windows
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -172,8 +170,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install the MAUI workload
-        run: dotnet workload install ${{ matrix.workload }}
+      # workload RESTORE (not install <id>): a multi-TFM project restores EVERY host-visible TFM even
+      # when building just one (-f), so each runner needs the workloads for all TFMs its OS exposes —
+      # e.g. macOS needs android too (NETSDK1147 otherwise). restore resolves that per-host, forever.
+      - name: Install the MAUI workloads (host-aware)
+        run: dotnet workload restore src/Maui/Template.Maui.csproj
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Template.Maui.csproj -f ${{ matrix.tfm }} -c Debug -p:AcceptAndroidSDKLicenses=true
@@ -188,9 +189,7 @@ jobs:
       matrix:
         include:
           - tfm: net10.0-ios
-            workload: maui-ios
           - tfm: net10.0-maccatalyst
-            workload: maui-maccatalyst
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -200,8 +199,10 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Install the MAUI workload
-        run: dotnet workload install ${{ matrix.workload }}
+      # See the native-build note: restore installs ALL workloads this host's TFM list needs (on macOS
+      # that's ios + maccatalyst + android — the android TFM restores here too, even building -f ios).
+      - name: Install the MAUI workloads (host-aware)
+        run: dotnet workload restore src/Maui/Template.Maui.csproj
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Template.Maui.csproj -f ${{ matrix.tfm }} -c Debug
