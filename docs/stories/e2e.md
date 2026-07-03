@@ -5,7 +5,7 @@
 > the **notification center/preferences**. Deliberately selective — headless machinery (webhooks,
 > outbox, health checks, Stripe money paths) stays at the integration layer where it's already
 > covered; `/health` liveness belongs to the DEPLOY-3 smoke step, not a browser test. Stories use
-> Gherkin acceptance criteria. **Status: 🚧 — E2E-1 ✅; E2E-2/3 📝.**
+> Gherkin acceptance criteria. **Status: 🚧 — E2E-1/2 ✅; E2E-3 📝.**
 
 **Epic key:** `E2E`
 
@@ -100,6 +100,12 @@ updated; merged, app working.
 
 ### E2E-2 — Billing seat-quota journey
 
+**Status: ✅ Implemented** (`test/e2e-2-seat-quota-journey`). `SeatQuotaJourneyTests` (2 tests) reusing
+`HouseholdPage`; no production changes needed — E2E-1's testid hooks already covered the invite flow.
+The shared sign-in helpers (`SignInAsync`/`SignInToHouseholdAsync`/`UniqueEmail`) moved from
+`RosterJourneyTests` into `E2ETestBase` for reuse. The seat limit is a named constant in the test file
+(`FreePlanSeatLimit = 3`) per the sharp edge below. Maps to QA-HH-14, QA-INV-08.
+
 **As a** household owner on the free plan
 **I want** the seat-limit experience verified in a real browser
 **So that** the quota → 402 → upgrade-prompt UX (BILLING-5) can't silently regress
@@ -184,8 +190,9 @@ Ordered, each a mergeable vertical slice. TDD throughout — the failing Playwri
 1. ✅ **RBAC roster journey (E2E-1).** — DONE. Page objects `HouseholdPage`/`JoinPage`, testid hooks
    on `Household.razor`/`Join.razor`, multi-context invite→join→promote→remove journey; Mailpit OTP
    poll hardened (subject match) + rate-limit override documented.
-2. 📝 **Seat-quota journey (E2E-2).** Reuses `HouseholdPage`; free-plan limit (3) hit via pending
-   invites; asserts the 402 upgrade prompt without touching Stripe.
+2. ✅ **Seat-quota journey (E2E-2).** — DONE. Reuses `HouseholdPage`; free-plan limit (3) hit via
+   pending invites; asserts the 402 upgrade prompt without touching Stripe; sign-in helpers
+   promoted to `E2ETestBase`.
 3. 📝 **Notification journey (E2E-3).** Bell empty state + prefs persistence, per-user isolation.
 
 **Known sharp edges:**

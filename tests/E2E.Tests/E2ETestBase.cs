@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using Microsoft.Playwright.NUnit;
 using NUnit.Framework;
+using Template.E2E.Tests.Pages;
 
 namespace Template.E2E.Tests;
 
@@ -28,4 +29,26 @@ public abstract class E2ETestBase : PageTest
         BaseURL = BaseUrl,
         IgnoreHTTPSErrors = true,
     };
+
+    /// <summary>OTP sign-in on the given page/context and wait for the app shell.</summary>
+    protected static async Task SignInAsync(IPage page, string email)
+    {
+        var login = new LoginPage(page);
+        await login.GotoAsync();
+        await Assertions.Expect(login.Email).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        await login.SignInWithOtpAsync(email);
+        await Assertions.Expect(page.GetByTestId("sign-out")).ToBeVisibleAsync(new() { Timeout = 30_000 });
+    }
+
+    /// <summary>Clears Mailpit, signs the user in, and lands on the Household page.</summary>
+    protected static async Task<HouseholdPage> SignInToHouseholdAsync(IPage page, string email)
+    {
+        await Mailpit.ClearAsync();
+        await SignInAsync(page, email);
+        var household = new HouseholdPage(page);
+        await household.GotoAsync();
+        return household;
+    }
+
+    protected static string UniqueEmail(string role) => $"e2e-{role}-{Guid.NewGuid():N}@example.com";
 }

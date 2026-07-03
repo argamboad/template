@@ -120,26 +120,6 @@ public class RosterJourneyTests : E2ETestBase
         await Expect(household.MemberRow(ownerEmail)).ToBeVisibleAsync();
     }
 
-    /// <summary>OTP sign-in on the given page/context and wait for the app shell.</summary>
-    private static async Task SignInAsync(IPage page, string email)
-    {
-        var login = new LoginPage(page);
-        await login.GotoAsync();
-        await Assertions.Expect(login.Email).ToBeVisibleAsync(new() { Timeout = 30_000 });
-        await login.SignInWithOtpAsync(email);
-        await Assertions.Expect(page.GetByTestId("sign-out")).ToBeVisibleAsync(new() { Timeout = 30_000 });
-    }
-
-    /// <summary>Signs the owner in and lands on the Household page.</summary>
-    private static async Task<HouseholdPage> SignInToHouseholdAsync(IPage page, string email)
-    {
-        await Mailpit.ClearAsync();
-        await SignInAsync(page, email);
-        var household = new HouseholdPage(page);
-        await household.GotoAsync();
-        return household;
-    }
-
     /// <summary>
     /// Owner invites <paramref name="memberEmail"/>; the member signs in on
     /// <paramref name="memberPage"/> and accepts via the revealed token.
@@ -156,6 +136,4 @@ public class RosterJourneyTests : E2ETestBase
         await join.GotoWithTokenAsync(token);
         await Assertions.Expect(join.Success).ToBeVisibleAsync(new() { Timeout = 30_000 });
     }
-
-    private static string UniqueEmail(string role) => $"e2e-{role}-{Guid.NewGuid():N}@example.com";
 }
