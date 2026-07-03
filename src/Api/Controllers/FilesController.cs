@@ -35,6 +35,9 @@ public class FilesController(
 
         // The framework streams and disposes file.Content; the entered-tenant scope is already closed
         // (the open handle is self-contained, so streaming doesn't need the tenant context).
-        return File(file.Content, file.ContentType);
+        // The filename overload sets Content-Disposition: attachment (named by the key's basename,
+        // server-controlled) — browsers download instead of rendering inline, a same-tab navigation
+        // never replaces the page, and native clients read the filename from the header (NATIVE-3).
+        return File(file.Content, file.ContentType, Path.GetFileName(key));
     }
 }

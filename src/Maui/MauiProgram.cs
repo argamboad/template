@@ -57,6 +57,12 @@ public static class MauiProgram
 		builder.Services.AddLocalization();
 		builder.Services.AddSingleton<ICulturePersistence, PreferencesCulturePersistence>();
 
+		// Signed-URL downloads can't ride a WebView navigation — fetch + OS share sheet instead
+		// (NATIVE-3). Uses the default (Bearer) client registered below: the signed URL itself
+		// needs no auth, but absolute URLs bypass BaseAddress so the same client serves both.
+		builder.Services.AddSingleton<IFileDownloadLauncher>(sp =>
+			new ShareFileDownloadLauncher(sp.GetRequiredService<HttpClient>()));
+
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();

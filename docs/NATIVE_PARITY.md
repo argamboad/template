@@ -15,7 +15,7 @@
 
 | Concern | Verdict | Evidence / note |
 |---|---|---|
-| **File download** (GDPR export signed URL) | ⚠️ **G1** | `Household.razor:181` renders `<a href={signedUrl} target="_blank">`. In a WebView, `target=_blank` is a new-window request: Windows WebView2 may hand it to the system browser; Android WebView **drops it silently** (no `onCreateWindow` handler). Even when the URL opens, "download a JSON file" needs a native save/share affordance. → **NATIVE-3** |
+| **File download** (GDPR export signed URL) | ✅ **G1 — fixed (NATIVE-3)** | Was: the export anchor used `target=_blank`, which Android WebView drops silently, and the signed URL was served **inline** (no Content-Disposition) so even a browser showed raw JSON in a tab. **Fixed end-to-end:** `FilesController` now serves signed files as `Content-Disposition: attachment` (named by the key basename), and the anchor became an `IFileDownloadLauncher` seam — web navigates same-tab (real download, page stays, no popup risk), MAUI fetches the bytes and opens the **OS share sheet** (`ShareFileDownloadLauncher`, all four targets; filename from the header, sanitized). E2E: `Owner_Downloads_The_Data_Export` asserts a real browser download. Share-sheet UX device-checked in NATIVE-6. |
 | **File upload** | N-A (today) | No UI consumer of `IFileStorage` upload exists yet (FILES is API-only). Becomes NATIVE-3's second half the day a feature adds an uploader. |
 | **External navigation** (billing checkout/portal) | ⚠️ **G2** | `Billing.razor:126,147` does `Nav.NavigateTo(providerUrl, forceLoad: true)` to the Stripe-hosted page. BlazorWebView's default `UrlLoading` policy opens **external hosts in the system browser** (app keeps running) — but the provider's post-checkout redirect returns to **`Auth:AppBaseUrl` (the web app)**, not the native app; the native `/billing` page only refreshes on next visit. Flow completes, return-trip UX is web. → **NATIVE-4** (verify default-external-open on device; document/handle the return) |
 | **`mailto:` / other `target=_blank`** | ✅ | Grep: the export link is the **only** `_blank` and there are no `mailto:` links in the RCL. Nothing else to route. |
@@ -41,7 +41,7 @@
 | Login (OTP, OAuth, MFA step-up) | ✅ | ✅ | Fully native-wired; QA-AND/DSK cover. The magic-link button is already hidden on native (`@if (!Auth.IsNative)` in `Login.razor`) — correct by construction. |
 | Home / AppHeader / bell | ✅ | ✅ | Polling is C#; mark-read etc. are plain fetches. |
 | Household (roster, roles, invite) | ✅ | ✅ | Invite **send** works; the invited member's **join** was G5 — fixed (NATIVE-4b). |
-| Household → Data export | ⚠️ G1 | ⚠️ G1 | The download anchor. |
+| Household → Data export | ✅ | ✅ | Was ⚠️ G1 — fixed by NATIVE-3 (attachment disposition + download-launcher seam; native = share sheet). 🔍 share-sheet device pass in NATIVE-6. |
 | Join | ✅ | ✅ | Was ⚠️ G5 (query-string-only token) — fixed by NATIVE-4b's invite-code entry form. 🔍 device pass in NATIVE-6. |
 | Settings (linked accounts, prefs, MFA card, danger zone) | ✅ | ✅ | Link-provider has a native branch (`LinkProviderAsync`); MFA QR scripts included; delete-account is a plain API call. 🔍 device pass in NATIVE-6. |
 | Billing (BILLING-8) | ⚠️ G2 | ⚠️ G2 | Summary renders; Upgrade/Manage leave for the system browser; return-trip lands on web. |
@@ -52,7 +52,7 @@
 
 | Gap | What breaks | Fix slice | Sketch |
 |---|---|---|---|
-| **G1** | GDPR export (any future signed-URL download) dead/awkward in WebView | **NATIVE-3** | Intercept/route download URLs to a native save/share bridge (per-platform: Android `Share`/MediaStore, Windows save dialog); or open externally as a stopgap. |
+| **G1** ✅ | GDPR export (any future signed-URL download) dead/awkward in WebView | **NATIVE-3 — shipped** | Intercept/route download URLs to a native save/share bridge (per-platform: Android `Share`/MediaStore, Windows save dialog); or open externally as a stopgap. |
 | **G2** | Billing checkout/portal round-trip returns to web, not the app | **NATIVE-4** | Confirm default external-open on each platform; on return, poll/refresh the billing summary when the app foregrounds; document the web-return as accepted if so decided. |
 | **G3** | Android back button exits instead of navigating | **NATIVE-4** | Handle back → `blazorWebView` JS `history.back()` when the WebView can go back, else default. |
 | **G5** ✅ | Native member cannot join a household | **NATIVE-4b — shipped** | Token-entry input on `/join` (benefits web too — email clients that mangle links); optionally https App Links later. |

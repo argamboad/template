@@ -5,6 +5,7 @@
 @inject HttpClient Http
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject IFileDownloadLauncher DownloadLauncher
 @inject IStringLocalizer<AppStrings> Localizer
 
 <PageTitle>@Localizer["Nav_Household"]</PageTitle>
@@ -167,7 +168,7 @@
                 <div class="card-body">
                     <h2 class="h6 fw-bold mb-2">@Localizer["Household_DataTitle"]</h2>
                     <p class="small text-muted mb-2">@Localizer["Household_DataSubtitle"]</p>
-                    <button class="btn btn-outline-secondary" disabled="@_busy" @onclick="ExportData">
+                    <button class="btn btn-outline-secondary" disabled="@_busy" data-testid="export-data" @onclick="ExportData">
                         @if (_busy && _exporting)
                         {
                             <span class="spinner-border spinner-border-sm me-2"></span>
@@ -178,7 +179,8 @@
                     {
                         <div class="alert alert-success py-2 mt-3 mb-0 d-flex align-items-center gap-2">
                             <span>@Localizer["Household_ExportReady"]</span>
-                            <a href="@_exportUrl" target="_blank" rel="noopener">@Localizer["Household_ExportDownload"]</a>
+                            <button class="btn btn-link p-0 align-baseline" data-testid="export-download"
+                                    @onclick="DownloadExport">@Localizer["Household_ExportDownload"]</button>
                         </div>
                     }
                 </div>
@@ -421,6 +423,15 @@
         }
         catch { SetStatus(Localizer["Household_ErrExport"], false); }
         finally { _busy = false; _exporting = false; }
+    }
+
+    // Browser: same-tab navigation → attachment download. Native: fetch + OS share sheet.
+    // The server names the file (Content-Disposition); the fallback only covers a bare response.
+    private async Task DownloadExport()
+    {
+        if (_exportUrl is null) return;
+        try { await DownloadLauncher.LaunchAsync(_exportUrl, "household-export.json"); }
+        catch { SetStatus(Localizer["Household_ErrExport"], false); }
     }
 
     private async Task TransferOwnership()

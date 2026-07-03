@@ -41,6 +41,7 @@ builder.Services.AddScoped(sp =>
 // Localization — IStringLocalizer<AppStrings> resolves the RCL's .resx resources.
 builder.Services.AddLocalization();
 builder.Services.AddSingleton<ICulturePersistence, LocalStorageCulturePersistence>();
+builder.Services.AddSingleton<IFileDownloadLauncher, BrowserFileDownloadLauncher>();
 
 // Web session store: the browser owns the HttpOnly refresh cookie, so this is a no-op.
 builder.Services.AddSingleton<ISessionStore, CookieSessionStore>();

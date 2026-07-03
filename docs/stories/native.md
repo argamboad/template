@@ -112,6 +112,20 @@ Scenario: Every WebView-vs-browser delta is enumerated
 
 ### NATIVE-3 — File download / upload / share in the WebView
 
+**Status: ✅ Implemented (download half)** (`feat/native-3-download-bridge`). Two-part fix, and it
+improved **web** too: the audit found the signed URL was served **inline** (no Content-Disposition), so
+even the browser flow showed raw JSON in a `_blank` tab rather than downloading. (1) `FilesController`
+now serves signed files with `Content-Disposition: attachment`, named by the storage key's basename
+(server-controlled). (2) The export anchor became a reusable **`IFileDownloadLauncher`** seam:
+`BrowserFileDownloadLauncher` (web) navigates same-tab — a real download, the page stays, no
+popup-blocker exposure; `ShareFileDownloadLauncher` (MAUI) fetches the bytes to the app cache and opens
+the **OS share sheet** (core MAUI `Share`, all four targets; filename from the header, sanitized to a
+basename). TDD: red-first `FilesControllerTests.ValidToken_SetsAttachmentFilenameFromKeyBasename` +
+new E2E `Owner_Downloads_The_Data_Export` (asserts a real browser download lands as `.json` and the
+page is not navigated away); suite 28→29, all green. **Upload half stays N-A** per the audit — no UI
+consumer of `IFileStorage` upload exists yet; build it with the first feature that needs an uploader.
+Share-sheet UX gets its device pass in NATIVE-6.
+
 **As a** native user
 **I want** downloads (GDPR export, future attachments/avatars) and uploads to work
 **So that** file features aren't silently broken on native (a browser download won't "just happen" in a WebView)
@@ -310,8 +324,9 @@ upload. Store review + accounts are external; the template ships the upload plum
    amendment above) + ✅ **NATIVE-2** audit — DONE (`docs/NATIVE_PARITY.md`, incl. the post-plan
    BILLING-8/ADMIN-3 screens): six gaps G1–G6 registered, each mapped to a slice below.
 2. ✅ **NATIVE-4b** (G5 join-by-code — audit discovery) + ✅ **NATIVE-5** (G6 culture bootstrap;
-   Windows window-sizing 🔍 resolved) — DONE; 📝 **NATIVE-3** (G1 downloads) / **NATIVE-4**
-   (G2 external nav, G3 back button).
+   Windows window-sizing 🔍 resolved) + ✅ **NATIVE-3** (G1 downloads — attachment disposition +
+   `IFileDownloadLauncher`; upload half N-A, no consumer yet) — DONE; 📝 **NATIVE-4**
+   (G2 external nav, G3 back button) closes Wave 2.
 3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 
