@@ -23,6 +23,20 @@ public abstract class E2ETestBase : PageTest
         ?? Environment.GetEnvironmentVariable("PLAYWRIGHT_BASE_URL")
         ?? "https://localhost:7008";
 
+    // The API's own origin, for tests that simulate an external caller (e.g. the billing-provider
+    // webhook). Defaults to the API's https launch profile; CI overrides to its single-origin base.
+    protected static string ApiBaseUrl =>
+        TestContext.Parameters.Get("E2E_API_BASE_URL")
+        ?? Environment.GetEnvironmentVariable("E2E_API_BASE_URL")
+        ?? "https://localhost:7160";
+
+    /// <summary>HttpClient for API calls made by tests themselves (accepts the dev self-signed cert).</summary>
+    protected static HttpClient NewApiClient() => new(new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
+    })
+    { BaseAddress = new Uri(ApiBaseUrl) };
+
     // Dev runs on a self-signed cert, so ignore HTTPS errors for the test browser.
     public override BrowserNewContextOptions ContextOptions() => new()
     {

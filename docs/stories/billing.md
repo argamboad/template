@@ -2,7 +2,7 @@
 
 > One file per epic. Adds monetization to the template: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
-> flags keyed to plan) and **quotas** (countable limits). **Status: ✅ COMPLETE** — **BILLING-1–7
+> flags keyed to plan) and **quotas** (countable limits). **Status: ✅ COMPLETE** — **BILLING-1–8
 > shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal; seat +
 > metered-usage quotas; trial/dunning lifecycle; **dissolve cleanup** — cancel the provider sub + wipe
 > the projection when a tenant is dissolved). The core loop is closed and self-serve manage/cancel
@@ -386,6 +386,16 @@ must land first** (ADR-007) — billing webhooks depend on the inbox.
    projection on tenant dissolve and **cancels the provider subscription** (via a `"billing.cancel"`
    outbox message → `IBillingProvider.CancelSubscriptionAsync`), so a deleted tenant stops being billed.
    `HasDataAsync` = false (billing isn't abandonable content); export gains a `billing` section.
+8. ✅ **Billing page (BILLING-8, 2026-07-03, `feat/billing-8-billing-page`).** — DONE. The owner-facing
+   UI billing lacked (dunning notifications already deep-linked to `/billing`): `GET /api/billing`
+   summary (owner-only `ManageBilling`; plan fail-closed via `EntitlementService.ResolvePlanKey`, raw
+   status, `CurrentPeriodEnd`, seats via `IQuotaService.GetSeatUsageAsync`, `has_subscription` gating
+   the portal button) + `Billing.razor` at `/billing` (plan card, seats, Upgrade→checkout redirect,
+   Manage→portal redirect, member-facing owner-only notice) + `Nav_Billing` header link; EN/ES.
+   E2E `BillingJourneyTests`: the full upgrade loop with **no Stripe** — FakeBillingProvider checkout
+   URL stubbed via Playwright routing (tenant id parsed from it), provider webhook POSTed exactly as
+   Stripe would (PascalCase body, `Stripe-Signature: valid`) through the real verify → inbox dedup →
+   `EnterTenant` → projection path, page lands on pro/10-seats/portal. QA-BILL-01/02; ADR-006 addendum.
 
 **Known sharp edges (from ADR-006):** webhooks are at-least-once and out-of-order (idempotency is
 mandatory — needs JOBS-2); never grant access on the Checkout redirect, only on the webhook; the DB

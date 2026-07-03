@@ -16,10 +16,15 @@ smoke path that doesn't need an external OAuth provider.
    dotnet run --project src/Api --launch-profile https -- \
      --Email:Smtp:Host=localhost --Email:Smtp:Port=1025 --Email:Smtp:Username= --Email:Smtp:Password= \
      --Auth:RateLimit:PasswordlessPermitLimit=1000 \
-     --Admin:StaffEmails:0=e2e-staff@example.com
+     --Admin:StaffEmails:0=e2e-staff@example.com \
+     --Billing:Stripe:SecretKey=
    ```
    The `Admin:StaffEmails` entry enables the admin-console journey (ADMIN-3); it must match
-   `AnnouncementJourneyTests.StaffEmail`. CI sets the same overrides.
+   `AnnouncementJourneyTests.StaffEmail`. The empty `Billing:Stripe:SecretKey` forces the
+   **FakeBillingProvider** even if your `.env` has Stripe test keys — the billing journey
+   (BILLING-8) depends on the fake's deterministic checkout URLs and `valid` webhook signature.
+   CI sets the same overrides. Tests that call the API directly (the billing webhook) use
+   `E2E_API_BASE_URL` (default `https://localhost:7160`; CI overrides).
    If your `.env` doesn't override email, you can drop the `--Email:*` args — but keep the
    **rate-limit override**: the journey tests sign in several users per run from one IP, which
    trips the production default (5 OTP requests/min/IP → 429 → flaky "no OTP email" timeouts).
@@ -60,6 +65,8 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Member deletes their account → signed out, off the roster | QA-SET-07 |
 | Staff announcement → member's bell badge + item; mark-read clears | QA-ADMIN-04, QA-NOTIF-01, QA-NOTIF-02 |
 | Non-staff gets the admin-console forbidden state | QA-ADMIN-01 (partial) |
+| Billing page: free → upgrade → webhook → pro (fake provider) | QA-BILL-02 |
+| Billing page is owner-only (member sees the pointer state) | QA-BILL-01 |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that

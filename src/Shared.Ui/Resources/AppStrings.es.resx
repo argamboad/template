@@ -139,6 +139,19 @@
   <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>
+  <data name="Nav_Billing" xml:space="preserve"><value>Facturación</value></data>
+  <data name="Billing_Title" xml:space="preserve"><value>Facturación</value></data>
+  <data name="Billing_Subtitle" xml:space="preserve"><value>Tu plan, uso y suscripción.</value></data>
+  <data name="Billing_CurrentPlan" xml:space="preserve"><value>Plan actual</value></data>
+  <data name="Billing_RenewsOn" xml:space="preserve"><value>Se renueva o finaliza el {0}.</value></data>
+  <data name="Billing_Seats" xml:space="preserve"><value>Asientos</value></data>
+  <data name="Billing_SeatsUsage" xml:space="preserve"><value>{0} de {1} usados</value></data>
+  <data name="Billing_Upgrade" xml:space="preserve"><value>Mejorar a Pro</value></data>
+  <data name="Billing_Manage" xml:space="preserve"><value>Gestionar suscripción</value></data>
+  <data name="Billing_OwnerOnly" xml:space="preserve"><value>Solo el propietario del hogar puede gestionar la facturación. Pídeselo si necesitas un cambio de plan.</value></data>
+  <data name="Billing_ErrLoad" xml:space="preserve"><value>No se pudo cargar la facturación.</value></data>
+  <data name="Billing_ErrCheckout" xml:space="preserve"><value>No se pudo iniciar el pago.</value></data>
+  <data name="Billing_ErrPortal" xml:space="preserve"><value>No se pudo abrir el portal de facturación.</value></data>
   <data name="Nav_SignOut" xml:space="preserve"><value>Cerrar sesión</value></data>
   <data name="Home_WelcomeBack" xml:space="preserve"><value>¡Bienvenido de nuevo, {0}!</value></data>
   <data name="Home_SignedInTo" xml:space="preserve"><value>Has iniciado sesión en el hogar {0}.</value></data>
