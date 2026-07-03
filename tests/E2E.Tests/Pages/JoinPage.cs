@@ -2,7 +2,7 @@ using Microsoft.Playwright;
 
 namespace Template.E2E.Tests.Pages;
 
-/// <summary>Page object for the invitation-accept page (/join?token=…).</summary>
+/// <summary>Page object for the invitation-accept page (/join?token=… or manual code entry).</summary>
 public class JoinPage(IPage page) : BasePage(page)
 {
     public override string Path => "/join";
@@ -12,6 +12,18 @@ public class JoinPage(IPage page) : BasePage(page)
     public ILocator NeedsSignIn => Page.GetByTestId("join-needs-signin");
     public ILocator Error => Page.GetByTestId("join-error");
 
+    public ILocator CodeInput => Page.GetByTestId("join-code-input");
+    public ILocator CodeSubmit => Page.GetByTestId("join-code-submit");
+    public ILocator CodeError => Page.GetByTestId("join-code-error");
+
     public Task GotoWithTokenAsync(string token) =>
         Page.GotoAsync($"{Path}?token={Uri.EscapeDataString(token)}");
+
+    /// <summary>The native path (parity gap G5): open bare /join and paste the emailed code.</summary>
+    public async Task JoinWithCodeAsync(string token)
+    {
+        await GotoAsync();
+        await CodeInput.FillAsync(token);
+        await CodeSubmit.ClickAsync();
+    }
 }

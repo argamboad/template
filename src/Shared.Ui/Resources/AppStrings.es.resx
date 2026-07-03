@@ -170,8 +170,10 @@
   <data name="Join_SuccessTitle" xml:space="preserve"><value>¡Ya estás dentro!</value></data>
   <data name="Join_SuccessBody" xml:space="preserve"><value>Te has unido al hogar.</value></data>
   <data name="Join_GoToHousehold" xml:space="preserve"><value>Ir al hogar</value></data>
-  <data name="Join_InvalidTitle" xml:space="preserve"><value>Enlace no válido</value></data>
-  <data name="Join_MissingToken" xml:space="preserve"><value>A este enlace de invitación le falta el token.</value></data>
+  <data name="Join_EnterCodeTitle" xml:space="preserve"><value>Únete con un código de invitación</value></data>
+  <data name="Join_EnterCodeBody" xml:space="preserve"><value>Pega el código de tu correo de invitación.</value></data>
+  <data name="Join_CodePlaceholder" xml:space="preserve"><value>Código de invitación</value></data>
+  <data name="Join_SubmitCode" xml:space="preserve"><value>Unirse</value></data>
   <data name="Join_ErrorTitle" xml:space="preserve"><value>No se pudo unir</value></data>
   <data name="Join_BackToHousehold" xml:space="preserve"><value>Volver al hogar</value></data>
   <data name="Join_DefaultError" xml:space="preserve"><value>La invitación no es válida o ha caducado.</value></data>

@@ -149,6 +149,17 @@ Scenario: Android hardware back
 
 ### NATIVE-4b — Join a household by invite code (audit gap G5)
 
+**Status: ✅ Implemented** (`feat/native-4b-join-by-code`). Bare `/join` (no `?token=`) now renders an
+invite-code entry form instead of the old "invalid link" dead-end — the entry point already existed (the
+Household page's "Have an invite?" button links to `/join`), so the whole fix is in `Join.razor`: the
+accept call is shared between the URL-token path (unchanged) and the pasted-code path; failures on the
+form are inline + retryable (the URL path keeps its terminal error state). Unauthenticated visitors get
+the existing sign-in-first redirect for both paths. No API change — the email already carries the raw
+token as a copy fallback. EN+ES strings added (`Join_EnterCode*`); the now-unreachable
+`Join_MissingToken`/`Join_InvalidTitle` strings removed. TDD: two new Playwright journeys
+(`Member_Joins_By_Pasting_The_Invite_Code`, `Pasting_An_Invalid_Code_Shows_An_Inline_Error`) written
+red-first; suite 26→28, full local run green. Android device verification lands in NATIVE-6.
+
 **As a** native user invited to a household
 **I want** to enter the invite code from the email directly in the app
 **So that** I can join at all — the emailed `/join?token=…` link opens the web app, and a native app has
@@ -283,8 +294,8 @@ upload. Store review + accounts are external; the template ships the upload plum
 1. ✅ **NATIVE-1** build gate — DONE (all four TFMs; Apple legs on develop pushes, see the free-tier
    amendment above) + ✅ **NATIVE-2** audit — DONE (`docs/NATIVE_PARITY.md`, incl. the post-plan
    BILLING-8/ADMIN-3 screens): six gaps G1–G6 registered, each mapped to a slice below.
-2. 📝 **NATIVE-3** (G1 downloads) / **NATIVE-4** (G2 external nav, G3 back button) / **NATIVE-4b**
-   (G5 join-by-code — audit discovery) / **NATIVE-5** (G6 culture bootstrap + 🔍 layout checks).
+2. ✅ **NATIVE-4b** (G5 join-by-code — audit discovery) — DONE; 📝 **NATIVE-5** (G6 culture bootstrap +
+   🔍 layout checks) / **NATIVE-3** (G1 downloads) / **NATIVE-4** (G2 external nav, G3 back button).
 3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 

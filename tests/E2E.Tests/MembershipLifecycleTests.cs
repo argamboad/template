@@ -96,6 +96,43 @@ public class MembershipLifecycleTests : E2ETestBase
     }
 
     [Test]
+    public async Task Member_Joins_By_Pasting_The_Invite_Code()
+    {
+        var (ownerEmail, memberEmail) = (UniqueEmail("owner"), UniqueEmail("member"));
+        var household = await SignInToHouseholdAsync(Page, ownerEmail);
+        var token = await household.InviteAsync(memberEmail);
+
+        await Mailpit.ClearAsync();
+        await using var memberCtx = await Browser.NewContextAsync(ContextOptions());
+        var memberPage = await memberCtx.NewPageAsync();
+        await SignInAsync(memberPage, memberEmail);
+
+        // NATIVE-4b (parity gap G5): a native app has no address bar for the emailed
+        // /join?token=… link, so the member opens Join from the app and pastes the code.
+        var join = new JoinPage(memberPage);
+        await join.JoinWithCodeAsync(token);
+        await Expect(join.Success).ToBeVisibleAsync(Slow);
+
+        var memberView = new HouseholdPage(memberPage);
+        await memberView.GotoAsync();
+        await Expect(memberView.MemberRow(ownerEmail)).ToBeVisibleAsync(Slow);
+        await Expect(memberView.MemberRow(memberEmail)).ToBeVisibleAsync();
+    }
+
+    [Test]
+    public async Task Pasting_An_Invalid_Code_Shows_An_Inline_Error()
+    {
+        await SignInToHouseholdAsync(Page, UniqueEmail("badcode"));
+
+        var join = new JoinPage(Page);
+        await join.JoinWithCodeAsync("not-a-real-invite-code");
+
+        // The error is inline and the form stays usable for a retry.
+        await Expect(join.CodeError).ToBeVisibleAsync(Slow);
+        await Expect(join.CodeInput).ToBeVisibleAsync();
+    }
+
+    [Test]
     public async Task Member_Deletes_Their_Account()
     {
         var (ownerEmail, memberEmail) = (UniqueEmail("owner"), UniqueEmail("member"));

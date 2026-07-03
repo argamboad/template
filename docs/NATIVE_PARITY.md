@@ -21,7 +21,7 @@
 | **`mailto:` / other `target=_blank`** | ✅ | Grep: the export link is the **only** `_blank` and there are no `mailto:` links in the RCL. Nothing else to route. |
 | **Android hardware back** | ⚠️ **G3** | No `OnBackPressed`/`OnBackInvoked` handling anywhere in `src/Maui`. MAUI default: the back button backgrounds/exits the Activity instead of navigating Blazor history — every mis-tap dumps the user out. → **NATIVE-4** |
 | **Deep links into the app** | ⚠️ **G4** (by omission) | The only registered scheme is the OAuth callback (`perezosoft://`, `WebAuthenticatorCallbackActivity`). **Emailed links (invite `/join?token=…`, magic link) always open the web app** — there is no https App Link/Universal Link. Magic link is web-only **by design** (documented); the invite link is not — see G5. |
-| **Join-by-invitation on native** | ⚠️ **G5 — feature gap** | `Join.razor` reads the token **only from the query string** (`[SupplyParameterFromQuery]`); there is **no manual token-entry UI**, and a native app has no address bar. Invite emails link to `{ClientUrl}/join?token=…` (web) with a raw-token fallback in the body — which a native user **has nowhere to paste**. A native-only member cannot join a household. → **new Wave-2 slice (NATIVE-4b)**: an "enter invite code" input on `/join` (works on web too), and/or https deep links. |
+| **Join-by-invitation on native** | ✅ **G5 — fixed (NATIVE-4b)** | Was: `Join.razor` read the token **only from the query string**, no manual entry, and a native app has no address bar — a native-only member could not join. **Fixed:** bare `/join` (reachable via the Household page's "Have an invite?" button) now shows an invite-code entry form that accepts the raw token from the email; failures are inline + retryable. Works on web too (mangled-link fallback). E2E: `Member_Joins_By_Pasting_The_Invite_Code` + invalid-code case. https deep links remain optional-later (G4). |
 | **Culture / i18n** | ⚠️ **G6** | Web's `Program.cs` reads `localStorage.app_culture` and sets `CultureInfo.DefaultThreadCurrent(UI)Culture` **before first render**; `src/Maui` has **no equivalent** (grep: zero `Culture` references). `LanguageSwitcher` writes localStorage then `forceLoad`-reloads — on native, nothing re-applies the culture, so **switching language does nothing** (stays at device/default culture) and the saved preference is never honored. → **NATIVE-5** |
 | **RTL** | 🔍 | No RTL language is shipped (EN/ES); revisit when one is. |
 | **Safe areas / status bar / edge-to-edge** | 🔍 | `MainPage.xaml` is a bare `BlazorWebView` (no `SafeArea`/padding). Android 15 (API 35) enforces edge-to-edge — content may draw under the status bar. Prior QA (AND-05) passed, so likely acceptable; **verify on a modern device** → NATIVE-5 if it fails. |
@@ -40,9 +40,9 @@
 |---|---|---|---|
 | Login (OTP, OAuth, MFA step-up) | ✅ | ✅ | Fully native-wired; QA-AND/DSK cover. The magic-link button is already hidden on native (`@if (!Auth.IsNative)` in `Login.razor`) — correct by construction. |
 | Home / AppHeader / bell | ✅ | ✅ | Polling is C#; mark-read etc. are plain fetches. |
-| Household (roster, roles, invite) | ✅ | ✅ | Invite **send** works; the invited member's **join** is G5. |
+| Household (roster, roles, invite) | ✅ | ✅ | Invite **send** works; the invited member's **join** was G5 — fixed (NATIVE-4b). |
 | Household → Data export | ⚠️ G1 | ⚠️ G1 | The download anchor. |
-| Join | ⚠️ G5 | ⚠️ G5 | Query-string-only token; unreachable natively. |
+| Join | ✅ | ✅ | Was ⚠️ G5 (query-string-only token) — fixed by NATIVE-4b's invite-code entry form. 🔍 device pass in NATIVE-6. |
 | Settings (linked accounts, prefs, MFA card, danger zone) | ✅ | ✅ | Link-provider has a native branch (`LinkProviderAsync`); MFA QR scripts included; delete-account is a plain API call. 🔍 device pass in NATIVE-6. |
 | Billing (BILLING-8) | ⚠️ G2 | ⚠️ G2 | Summary renders; Upgrade/Manage leave for the system browser; return-trip lands on web. |
 | Admin console + impersonation (ADMIN-1..3) | ✅ | ✅ | Staff probe + announce form are plain fetches; impersonation verified by code path. 🔍 device spot-check. |
@@ -55,7 +55,7 @@
 | **G1** | GDPR export (any future signed-URL download) dead/awkward in WebView | **NATIVE-3** | Intercept/route download URLs to a native save/share bridge (per-platform: Android `Share`/MediaStore, Windows save dialog); or open externally as a stopgap. |
 | **G2** | Billing checkout/portal round-trip returns to web, not the app | **NATIVE-4** | Confirm default external-open on each platform; on return, poll/refresh the billing summary when the app foregrounds; document the web-return as accepted if so decided. |
 | **G3** | Android back button exits instead of navigating | **NATIVE-4** | Handle back → `blazorWebView` JS `history.back()` when the WebView can go back, else default. |
-| **G5** | Native member cannot join a household | **NATIVE-4b (new)** | Token-entry input on `/join` (benefits web too — email clients that mangle links); optionally https App Links later. |
+| **G5** ✅ | Native member cannot join a household | **NATIVE-4b — shipped** | Token-entry input on `/join` (benefits web too — email clients that mangle links); optionally https App Links later. |
 | **G6** | Language switching inert on native; saved culture ignored | **NATIVE-5** | Bootstrap culture in `MauiProgram`/`MainPage` from the same store the switcher writes (localStorage via WebView, or move the pref to `Preferences` behind an abstraction), apply before root component renders, and re-apply on switch. |
 | 🔍 edge-to-edge / window sizing | Cosmetic risk | **NATIVE-5** (only if device check fails) | SafeArea padding / default window size. |
 
