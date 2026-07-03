@@ -5,7 +5,7 @@
 > the **notification center/preferences**. Deliberately selective — headless machinery (webhooks,
 > outbox, health checks, Stripe money paths) stays at the integration layer where it's already
 > covered; `/health` liveness belongs to the DEPLOY-3 smoke step, not a browser test. Stories use
-> Gherkin acceptance criteria. **Status: 🚧 — E2E-1/2 ✅; E2E-3 📝.**
+> Gherkin acceptance criteria. **Status: ✅ COMPLETE — E2E-1/2/3.**
 
 **Epic key:** `E2E`
 
@@ -143,6 +143,12 @@ and status alert; scenarios green; README + QA plan mapping updated; merged, app
 
 ### E2E-3 — Notification center & preferences journey
 
+**Status: ✅ Implemented** (`test/e2e-3-notification-journey`). `NotificationJourneyTests` (3 tests) +
+prefs locators on `SettingsPage`. The bell already had `notif-bell`/`notif-count`/`notif-panel`
+hooks; added `notif-empty` (bell) and `notif-prefs-inapp`/`notif-prefs-email` (prefs card). Maps to
+QA-NOTIF-01 (empty state) + QA-NOTIF-03; QA-NOTIF-02 (mark read) stays manual — no browser-triggerable
+producer, per the constraint below.
+
 **As a** user
 **I want** the notification bell and delivery preferences verified in a real browser
 **So that** the NOTIFY UI (bell, prefs card) can't silently break
@@ -193,7 +199,8 @@ Ordered, each a mergeable vertical slice. TDD throughout — the failing Playwri
 2. ✅ **Seat-quota journey (E2E-2).** — DONE. Reuses `HouseholdPage`; free-plan limit (3) hit via
    pending invites; asserts the 402 upgrade prompt without touching Stripe; sign-in helpers
    promoted to `E2ETestBase`.
-3. 📝 **Notification journey (E2E-3).** Bell empty state + prefs persistence, per-user isolation.
+3. ✅ **Notification journey (E2E-3).** — DONE. Bell empty state + prefs persistence, per-user
+   isolation; testids on the bell empty state + prefs toggles.
 
 **Known sharp edges:**
 - **Selectors are `data-testid`-only** — the touched components don't have hooks yet; adding them

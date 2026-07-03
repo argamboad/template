@@ -47,6 +47,8 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Owner removes a member (confirm dialog) | QA-HH-03 |
 | Inviting past the free-plan seat limit shows the upgrade prompt | QA-HH-14 |
 | Revoking a pending invitation frees the seat | QA-INV-08 |
+| Notification bell shows the empty state for a fresh user | QA-NOTIF-01 (empty state) |
+| Delivery preferences round-trip + per-user isolation | QA-NOTIF-03 |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that
