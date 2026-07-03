@@ -1,4 +1,4 @@
-#if ANDROID
+#if ANDROID || IOS || MACCATALYST
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Authentication;
 using Template.Shared.Ui.Auth;
@@ -6,17 +6,19 @@ using Template.Shared.Ui.Auth;
 namespace Template.Maui.Auth;
 
 /// <summary>
-/// Android OAuth via a custom-scheme <see cref="WebAuthenticator"/> flow. A loopback
-/// HTTP listener (the desktop approach) can't work on Android — 127.0.0.1 is the phone
-/// itself — so the API instead redirects to <c>{scheme}://auth?…</c>, which the OS routes
-/// back to the app through the registered intent filter
-/// (<c>WebAuthenticatorCallbackActivity</c>). <see cref="WebAuthenticator"/> opens a
-/// Custom Tab, follows the provider round-trip, and surfaces the callback query.
+/// OAuth via a custom-scheme <see cref="WebAuthenticator"/> flow — Android, iOS, and macCatalyst.
+/// A loopback HTTP listener (the Windows approach) can't work on Android — 127.0.0.1 is the phone
+/// itself — so the API instead redirects to <c>{scheme}://auth?…</c>, which the OS routes back to
+/// the app: on Android through the registered intent filter
+/// (<c>WebAuthenticatorCallbackActivity</c>), on iOS/macCatalyst through the
+/// <c>CFBundleURLTypes</c> scheme in Info.plist (WebAuthenticator drives
+/// ASWebAuthenticationSession there). <see cref="WebAuthenticator"/> opens the platform browser
+/// session, follows the provider round-trip, and surfaces the callback query.
 /// </summary>
-public sealed class AndroidOAuthInitiator(
+public sealed class WebAuthenticatorOAuthInitiator(
     string apiBaseUrl,
     string callbackScheme,
-    ILogger<AndroidOAuthInitiator> logger) : IOAuthInitiator
+    ILogger<WebAuthenticatorOAuthInitiator> logger) : IOAuthInitiator
 {
     public async Task<IReadOnlyDictionary<string, string>?> RunBrowserFlowAsync(string provider, string? linkToken = null)
     {
@@ -35,12 +37,12 @@ public sealed class AndroidOAuthInitiator(
         }
         catch (TaskCanceledException)
         {
-            // User dismissed the Custom Tab.
+            // User dismissed the browser session.
             return null;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Android WebAuthenticator flow failed for {Provider}", provider);
+            logger.LogError(ex, "WebAuthenticator flow failed for {Provider}", provider);
             return null;
         }
     }

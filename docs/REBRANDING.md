@@ -54,6 +54,7 @@ Marketing (not shipped in the app):
 These must all match each other **and** your OAuth provider registration:
 - `src/Maui/MauiProgram.cs` — `CallbackScheme`
 - `src/Maui/Platforms/Android/WebAuthenticatorCallbackActivity.cs` — `CallbackScheme` const + intent-filter `DataScheme`
+- `src/Maui/Platforms/iOS/Info.plist` + `src/Maui/Platforms/MacCatalyst/Info.plist` — `CFBundleURLSchemes` entry
 - `src/Api/appsettings.json` — `Auth:Native:CallbackScheme`
 - `src/Maui/Template.Maui.csproj` — `ApplicationId` (`com.companyname.…`)
 - Provider consoles — register `{scheme}://auth` and your `signin-*` redirect URIs
