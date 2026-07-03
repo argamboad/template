@@ -42,6 +42,9 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddLocalization();
 builder.Services.AddSingleton<ICulturePersistence, LocalStorageCulturePersistence>();
 builder.Services.AddSingleton<IFileDownloadLauncher, BrowserFileDownloadLauncher>();
+// Never notified on web — external flows return via a full redirect (fresh page load); the
+// registration only satisfies the shared pages' injection (see AppResumeNotifier).
+builder.Services.AddSingleton<AppResumeNotifier>();
 
 // Web session store: the browser owns the HttpOnly refresh cookie, so this is a no-op.
 builder.Services.AddSingleton<ISessionStore, CookieSessionStore>();

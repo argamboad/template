@@ -145,6 +145,22 @@ Scenario: Upload a file on native
 
 ### NATIVE-4 — External links, mailto, and back-navigation
 
+**Status: ✅ Implemented** (`feat/native-4-back-and-return`). **G3 (Android back):**
+`MainPage.OnBackButtonPressed` walks the WebView history (which contains Blazor's pushState route
+changes) via `CanGoBack()`/`GoBack()`, falling through to the default exit only at the history root.
+**G2 (external return-trip):** external opens were already correct (BlazorWebView's default
+`UrlLoading` hands external hosts to the system browser; the provider's redirect landing on web is
+accepted by design until https App Links — G4). The stale-page half is fixed with a small
+`AppResumeNotifier` seam in the RCL: MAUI fires it from the window's `Resumed` **and** `Activated`
+lifecycle events (Android returns from the browser via onStop→Resumed; desktop only loses focus, so
+the return is Activated), and `/billing` subscribes to refetch its summary on return — web registers
+the notifier but never fires it (its return path is a full redirect). **Windows verification** (CDP +
+API request log): launch-Activated→Notify proven from the lifecycle log; Notify→billing-refetch proven
+live (timer-fired Notify produced matching `GET /api/billing` requests); a genuine focus transition
+can't be synthesized from a background shell (Windows foreground-lock), so the human-click case +
+Android land in NATIVE-6. Web regression: full E2E 29/29 green. `mailto:` cells were already ✅ (none
+exist in the RCL).
+
 **As a** native user
 **I want** external links to open in the system browser and the Android back button to behave
 **So that** the app doesn't trap me in the WebView or dead-end on a `target=_blank`
@@ -323,10 +339,11 @@ upload. Store review + accounts are external; the template ships the upload plum
 1. ✅ **NATIVE-1** build gate — DONE (all four TFMs; Apple legs on develop pushes, see the free-tier
    amendment above) + ✅ **NATIVE-2** audit — DONE (`docs/NATIVE_PARITY.md`, incl. the post-plan
    BILLING-8/ADMIN-3 screens): six gaps G1–G6 registered, each mapped to a slice below.
-2. ✅ **NATIVE-4b** (G5 join-by-code — audit discovery) + ✅ **NATIVE-5** (G6 culture bootstrap;
-   Windows window-sizing 🔍 resolved) + ✅ **NATIVE-3** (G1 downloads — attachment disposition +
-   `IFileDownloadLauncher`; upload half N-A, no consumer yet) — DONE; 📝 **NATIVE-4**
-   (G2 external nav, G3 back button) closes Wave 2.
+2. ✅ **Wave 2 COMPLETE** — NATIVE-4b (G5 join-by-code), NATIVE-5 (G6 culture bootstrap; Windows
+   window-sizing 🔍 resolved), NATIVE-3 (G1 downloads — attachment disposition +
+   `IFileDownloadLauncher`; upload half N-A, no consumer yet), NATIVE-4 (G2 refresh-on-resume via
+   `AppResumeNotifier` + G3 Android back handler). All six audit gaps closed; OS-chrome behaviors
+   (share sheet, hardware back, real focus transitions) queue for the NATIVE-6 device pass.
 3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 

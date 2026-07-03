@@ -1,9 +1,11 @@
 @page "/billing"
 @using System.Net.Http.Json
 @using System.Text.Json.Serialization
+@implements IDisposable
 @inject AuthService Auth
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject AppResumeNotifier Resume
 @inject IStringLocalizer<AppStrings> Localizer
 
 <PageTitle>@Localizer["Billing_Title"]</PageTitle>
@@ -90,8 +92,20 @@
             Nav.NavigateTo("/login");
             return;
         }
+        // On native, checkout/portal open the system browser and the provider's redirect lands on
+        // web — this page is still what the user returns to. Refresh on resume so the new plan
+        // shows without a manual re-navigation (NATIVE-4, G2). Never fires on web.
+        Resume.Resumed += OnAppResumed;
         await LoadAsync();
     }
+
+    private void OnAppResumed() => _ = InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Resume.Resumed -= OnAppResumed;
 
     private async Task LoadAsync()
     {
