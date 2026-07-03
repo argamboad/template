@@ -50,5 +50,22 @@ public abstract class E2ETestBase : PageTest
         return household;
     }
 
+    /// <summary>
+    /// Owner invites <paramref name="memberEmail"/>; the member signs in on
+    /// <paramref name="memberPage"/> and accepts via the revealed token.
+    /// </summary>
+    protected static async Task InviteAndJoinAsync(HouseholdPage owner, IPage memberPage, string memberEmail)
+    {
+        var token = await owner.InviteAsync(memberEmail);
+
+        // Drop the invitation email so the member's OTP poll can't misread it.
+        await Mailpit.ClearAsync();
+        await SignInAsync(memberPage, memberEmail);
+
+        var join = new JoinPage(memberPage);
+        await join.GotoWithTokenAsync(token);
+        await Assertions.Expect(join.Success).ToBeVisibleAsync(new() { Timeout = 30_000 });
+    }
+
     protected static string UniqueEmail(string role) => $"e2e-{role}-{Guid.NewGuid():N}@example.com";
 }

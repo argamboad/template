@@ -120,20 +120,4 @@ public class RosterJourneyTests : E2ETestBase
         await Expect(household.MemberRow(ownerEmail)).ToBeVisibleAsync();
     }
 
-    /// <summary>
-    /// Owner invites <paramref name="memberEmail"/>; the member signs in on
-    /// <paramref name="memberPage"/> and accepts via the revealed token.
-    /// </summary>
-    private static async Task InviteAndJoinAsync(HouseholdPage owner, IPage memberPage, string memberEmail)
-    {
-        var token = await owner.InviteAsync(memberEmail);
-
-        // Drop the invitation email so the member's OTP poll can't misread it.
-        await Mailpit.ClearAsync();
-        await SignInAsync(memberPage, memberEmail);
-
-        var join = new JoinPage(memberPage);
-        await join.GotoWithTokenAsync(token);
-        await Assertions.Expect(join.Success).ToBeVisibleAsync(new() { Timeout = 30_000 });
-    }
 }

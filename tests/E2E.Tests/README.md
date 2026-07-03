@@ -51,6 +51,10 @@ dev self-signed cert is accepted (`IgnoreHTTPSErrors`).
 | Delivery preferences round-trip + per-user isolation | QA-NOTIF-03 |
 | Magic-link sign-in → lands in the app shell | QA-AUTH-01 |
 | Used magic link rejected (single-use) | QA-AUTH-05 |
+| Owner transfers ownership (badges swap, controls follow) | QA-HH-05 |
+| Member leaves → re-homed to a fresh tenant-of-one | QA-HH-08 |
+| Sole owner dissolves → re-homed, old household gone | QA-HH-07 |
+| Member deletes their account → signed out, off the roster | QA-SET-07 |
 
 OAuth (Google/Microsoft), desktop, and Android are intentionally **not** automated here —
 they need external provider accounts / native runners. See `docs/QA_TEST_PLAN.md` for that

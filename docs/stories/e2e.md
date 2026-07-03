@@ -5,8 +5,8 @@
 > the **notification center/preferences**. Deliberately selective — headless machinery (webhooks,
 > outbox, health checks, Stripe money paths) stays at the integration layer where it's already
 > covered; `/health` liveness belongs to the DEPLOY-3 smoke step, not a browser test. Stories use
-> Gherkin acceptance criteria. **Status: 🚧 — E2E-1/2/3/4 ✅; E2E-5 📝** (4 and 5 added after
-> review showed magic-link + destructive flows were automatable after all).
+> Gherkin acceptance criteria. **Status: ✅ COMPLETE — E2E-1..5** (4 and 5 added after review
+> showed magic-link + destructive flows were automatable after all).
 
 **Epic key:** `E2E`
 
@@ -227,7 +227,14 @@ Scenario: A used magic link is rejected
 
 ### E2E-5 — Membership lifecycle (destructive flows) journey
 
-**Status: 📝 planned.** Added with E2E-4: "destructive" was a weak exclusion — every test creates
+**Status: ✅ Implemented** (`test/e2e-5-membership-lifecycle`). `MembershipLifecycleTests` (4 tests);
+testids on the lifecycle card (`transfer-select`/`transfer-submit`/`leave-dissolve`/
+`leave-household`) + Settings `delete-account`; `InviteAndJoinAsync` promoted to `E2ETestBase`.
+The re-home invariant ("every non-refused leave lands the user in a fresh tenant-of-one",
+`TenantService`) is what the assertions pin — the dissolve test renames the doomed household first
+to prove the re-homed one is new. Maps to QA-HH-05/07/08, QA-SET-07.
+
+Added with E2E-4: "destructive" was a weak exclusion — every test creates
 fresh throwaway users, so these flows are safely automatable. Transfer ownership, member leave,
 solo-owner dissolve, and account deletion, all through the real UI with confirm dialogs.
 
@@ -286,8 +293,9 @@ Ordered, each a mergeable vertical slice. TDD throughout — the failing Playwri
    isolation; testids on the bell empty state + prefs toggles.
 4. ✅ **Magic-link journey (E2E-4).** — DONE. Happy path + single-use rejection;
    `Mailpit.WaitForMagicLinkAsync`; testids on the send button + login error banner.
-5. 📝 **Membership lifecycle journey (E2E-5).** Transfer, leave, dissolve, delete account — all
-   with fresh throwaway users; testids on the lifecycle card + Settings delete-account controls.
+5. ✅ **Membership lifecycle journey (E2E-5).** — DONE. Transfer, leave, dissolve, delete account —
+   all with fresh throwaway users; testids on the lifecycle card + Settings delete-account button;
+   assertions pin the re-home-to-fresh-tenant invariant.
 
 **Known sharp edges:**
 - **Selectors are `data-testid`-only** — the touched components don't have hooks yet; adding them

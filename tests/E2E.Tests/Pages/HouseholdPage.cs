@@ -8,6 +8,11 @@ public class HouseholdPage(IPage page) : BasePage(page)
     public override string Path => "/household";
 
     public ILocator RenameInput => Page.GetByTestId("household-rename-input");
+    public ILocator RenameSave => Page.GetByTestId("household-rename-save");
+    public ILocator TransferSelect => Page.GetByTestId("transfer-select");
+    public ILocator TransferSubmit => Page.GetByTestId("transfer-submit");
+    public ILocator LeaveDissolve => Page.GetByTestId("leave-dissolve");
+    public ILocator LeaveHousehold => Page.GetByTestId("leave-household");
     public ILocator InviteEmail => Page.GetByTestId("invite-email");
     public ILocator InviteSend => Page.GetByTestId("invite-send");
     public ILocator RevealedToken => Page.GetByTestId("invite-token");
@@ -22,6 +27,15 @@ public class HouseholdPage(IPage page) : BasePage(page)
     public ILocator Remove(string email) => MemberRow(email).GetByTestId("member-remove");
     public ILocator PendingRow(string email) => PendingRows.Filter(new() { HasText = email });
     public ILocator Revoke(string email) => PendingRow(email).GetByTestId("invite-revoke");
+
+    /// <summary>Renames the household through the UI.</summary>
+    public async Task RenameAsync(string name)
+    {
+        await RenameInput.FillAsync(name);
+        // Blazor's @bind updates on the change event — blur so the save button enables.
+        await RenameInput.BlurAsync();
+        await RenameSave.ClickAsync();
+    }
 
     /// <summary>Sends an invitation and returns the one-time token the UI reveals.</summary>
     public async Task<string> InviteAsync(string email)
