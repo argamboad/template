@@ -30,6 +30,21 @@ auth-focused desktop/Android cases (`QA-DSK-01..07`, `QA-AND-01..06`). See `docs
 
 ### NATIVE-1 — Build MAUI in CI, all target platforms
 
+**Status: ✅ Implemented** (`feat/native-1-ci-build-gate`). `net10.0-ios` + `net10.0-maccatalyst` TFMs
+restored, **host-conditional** (iOS/MacCatalyst only on macOS hosts, mirroring the Windows pattern — a
+Windows box without a paired Mac can't build them, and `dotnet build src/Maui` with no `-f` must never
+try a target the host can't produce; the `Platforms/iOS` + `Platforms/MacCatalyst` scaffolds were already
+in git). Two ci.yml jobs: **`native-build`** (matrix: Android on `ubuntu-latest` + JDK 17, Windows on
+`windows-latest`; `dotnet workload install maui-<platform>` → compile-only `dotnet build -f <tfm>`) runs
+on every trigger; **`native-build-apple`** (iOS + MacCatalyst on `macos-latest`) runs on **develop pushes
+only** — a free-tier amendment: macOS runners bill **10×** minutes on a private repo, so per-PR Apple
+builds would burn the quota for little added signal (rot is still caught within one merge). **Lockfile
+resolved by documented exclusion:** `RestorePackagesWithLockFile=false` for the Maui project — the
+host-conditional TFM list makes the resolved graph differ per OS, so one committed lockfile can never
+satisfy locked-mode on all three runners; CPM alone pins its versions. (Side-benefit: kills the
+recurring untracked `src/Maui/packages.lock.json`.) Android + Windows verified locally; Apple legs
+verified on the post-merge develop run.
+
 **As a** maintainer
 **I want** the MAUI app compiled in CI on every PR, for every target platform
 **So that** a change that breaks the native build fails the PR instead of rotting silently until a manual run
@@ -225,7 +240,10 @@ upload. Store review + accounts are external; the template ships the upload plum
 
 ## Slice plan (sequenced — guardrails first, distribution last)
 
-1. 📝 **NATIVE-1** build gate + **NATIVE-2** audit — cheap, and NATIVE-2 scopes everything after it.
+1. ✅ **NATIVE-1** build gate — DONE (all four TFMs; Apple legs on develop pushes, see the free-tier
+   amendment above) + 📝 **NATIVE-2** audit — next; it scopes everything after it. Note the audit must
+   also cover the screens shipped since this plan was written (billing page BILLING-8, staff
+   announcements ADMIN-3) — they're shared-RCL, so they render natively and belong in the matrix.
 2. 📝 **NATIVE-3/4/5** — fix the WebView gaps the audit confirms (skip any that already work).
 3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
