@@ -252,6 +252,20 @@ Scenario: Platform chrome is correct
 
 ### NATIVE-6 — Native QA pass: expand the QA plan to the full feature surface
 
+**Status: ✅ Authored** (`docs/native-6-qa-plan`) — **execution pending a device pass** (needs the
+maintainer's hardware; Apple cases need a Mac). `docs/QA_TEST_PLAN.md` grew 96→117 cases:
+**QA-DSK-08..14** (desktop per-feature parity: join-by-code, culture persistence, export share,
+billing return-refresh, MFA native step-up, bell/prefs, admin console), **QA-AND-07..13** (the same
+plus the Android-only hardware back 🔴 and share sheet, and the Android-15 edge-to-edge check that
+resolves the audit's 🔍 safe-area cell), the first-ever **iOS/macCatalyst smoke** (§13b,
+QA-IOS-01..04 + QA-MAC-01..03 — G7 boot, OTP, core-flow spot, first OAuth run), and a per-release
+**native release checklist** (§13c). Traceability matrix + per-client coverage + release gate updated;
+both QA PDFs regenerated (B11-8 gate green). **Authoring found G7** — iOS/macCatalyst crashed at boot
+(no `IOAuthInitiator` registered; `GetRequiredService` throws) — fixed separately
+(`fix/native-6a-apple-boot`): the WebAuthenticator initiator generalized to
+Android+iOS+macCatalyst + the callback scheme registered in both Apple Info.plists. The slice
+completes when the pass is **run**: results go in the §16 sign-off (run log).
+
 **As a** QA tester
 **I want** per-feature native cases (not just the 13 auth-focused ones)
 **So that** "works on native" is deliberately verified, not merely inherited from the shared RCL
@@ -344,7 +358,10 @@ upload. Store review + accounts are external; the template ships the upload plum
    `IFileDownloadLauncher`; upload half N-A, no consumer yet), NATIVE-4 (G2 refresh-on-resume via
    `AppResumeNotifier` + G3 Android back handler). All six audit gaps closed; OS-chrome behaviors
    (share sheet, hardware back, real focus transitions) queue for the NATIVE-6 device pass.
-3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
+3. 🚧 **NATIVE-6** manual native QA pass — plan authored (117 cases incl. iOS/macCatalyst first-run
+   smoke + §13c release checklist; G7 Apple-boot fix shipped alongside); **execution needs the
+   maintainer's devices**. Then **NATIVE-7** automated native smoke (the WebView2-CDP recipe from
+   Wave 2 is the Windows half).
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:

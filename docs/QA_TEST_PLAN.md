@@ -130,7 +130,10 @@ smoke blocks — so a broken deploy is caught before manual QA starts. Manual QA
 
 **In scope:** authentication (all methods, all clients), new-user onboarding, household/tenant
 management, invitations & joining, account settings (linked providers), localization (EN/ES),
-transactional emails, and cross-cutting security (tenant isolation, auth guards, token lifecycle).
+transactional emails, cross-cutting security (tenant isolation, auth guards, token lifecycle), and
+**native (MAUI) feature parity** — the shared-RCL feature surface exercised per platform on
+Windows + Android (§12–13) with a first-run iOS/macCatalyst smoke (§13b) and a per-release native
+checklist (§13c).
 
 **Out of scope (per `docs/PROJECT_BRIEF.md` OUT list & current state):** SMS OTP, OAuth providers
 beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — see
@@ -1123,6 +1126,93 @@ auto-sign-in (secure storage cleared).
 **Walkthrough:** spot-check rename, invite (token revealed), and leave on desktop. **Expected:** same
 behavior as web (§7–8) — the UI is shared.
 
+> **NATIVE Wave 2 (ADR-018, `docs/NATIVE_PARITY.md`):** the cases below verify the parity fixes
+> per-feature on desktop — join-by-code (G5), culture persistence (G6), export share (G1), and the
+> billing return-trip (G2) — plus the feature areas the old plan never exercised natively.
+
+### QA-DSK-08 — Join a household by pasted invite code 🟠 (Desktop)
+**Gherkin**
+```gherkin
+Given a member account signed in on desktop and an invite code from the owner
+When I open Household → "Have an invite?" and paste the code
+Then I join the owner's household exactly as the emailed link would
+```
+**Walkthrough**
+1. As the **owner** (web is fine): Household → invite the member's email → copy the revealed token.
+2. On **desktop** as the member: **Household** → **Have an invite?** → paste the code → **Join**.
+   **Expected:** success state → **Go to household** → roster lists both members.
+3. Negative: paste a garbage code. **Expected:** inline error, the form stays for a retry.
+
+### QA-DSK-09 — Language choice survives an app restart 🟠 (Desktop)
+**Gherkin**
+```gherkin
+Given the desktop app on the login screen (signed out)
+When I switch the language to Español and fully restart the app
+Then it launches in Spanish
+```
+**Walkthrough**
+1. Signed out, on the login screen: switch the language selector to **Español**. **Expected:** the UI
+   re-renders in Spanish (no restart needed).
+2. Fully close the app; relaunch. **Expected:** still Spanish — the choice is read from OS
+   Preferences before first render (NATIVE-5). Switch back to English; same persistence.
+3. Note: after sign-in, a **server-saved** locale wins (the account preference follows you across
+   devices) — that's by design.
+
+### QA-DSK-10 — Data export downloads via the OS 🟠 (Desktop)
+**Gherkin**
+```gherkin
+Given I am the owner, signed in on desktop
+When I request the data export and click Download
+Then the file is offered through the platform share/save UI, not a dead WebView navigation
+```
+**Walkthrough**
+1. **Household** → **Data** → **Export my data** → wait for the ready alert → **Download**.
+2. **Expected:** the **Windows share flyout** opens with the JSON bundle staged (server-named
+   `…-<id>.json`); the app page is not navigated away. Save it and open — valid JSON, no secrets
+   (spot-check: no token hashes).
+
+### QA-DSK-11 — Billing: checkout leaves, summary refreshes on return 🟠 (Desktop)
+**Gherkin**
+```gherkin
+Given I am the owner on the desktop Billing page (Stripe test mode configured)
+When I click Upgrade, complete checkout in the system browser, and return to the app
+Then the plan summary refreshes by itself — no re-navigation needed
+```
+**Walkthrough**
+1. **Billing** → **Upgrade**. **Expected:** the **system browser** opens the hosted checkout; the
+   app stays on Billing (it does not navigate away).
+2. Complete checkout with a test card. **Expected:** the browser lands on the **web** app's billing
+   page (by design — emailed/redirect links are web; `docs/NATIVE_PARITY.md` G2).
+3. Click back into the desktop app. **Expected:** the summary **refetches on focus** — the plan
+   flips to **pro** without touching navigation. (Without Stripe keys the fake provider's checkout
+   URL is a stub — then verify only: browser opened, app stayed, and refocusing refetches.)
+
+### QA-DSK-12 — MFA: enroll and native step-up 🟠 (Desktop)
+**Gherkin**
+```gherkin
+Given I am signed in on desktop without MFA
+When I enable the authenticator in Settings, sign out, and sign in again
+Then the app itself prompts for the 6-digit code before completing sign-in
+```
+**Walkthrough**
+1. **Settings** → **Two-factor** → **Enable**. **Expected:** the QR renders inside the app (the
+   vendored QR script ships in the native host too); manual key shown; confirm with a code;
+   **recovery codes** displayed once.
+2. Sign out → OTP sign-in. **Expected:** after the OTP, the app shows the **in-app MFA prompt**
+   (native step-up, MFA-4) — enter the authenticator code → signed in. A recovery code also works
+   (single-use).
+
+### QA-DSK-13 — Notification bell & preferences 🟢 (Desktop)
+**Walkthrough:** header **bell** → **Expected:** opens with the empty state (or your items), badge
+matches unread count. **Settings** → notification preferences → toggle one off → reload the page →
+**Expected:** the switch state persisted. (For a real item end-to-end, a staff announcement — see
+QA-ADMIN-04 — lands in the native bell too; spot-check when staff is configured.)
+
+### QA-DSK-14 — Admin console on desktop (staff only) 🟢 (Desktop)
+**Walkthrough:** with your email in `Admin:StaffEmails`, sign in on desktop. **Expected:** **Admin**
+appears in the nav; the console lists tenants; opening a detail works. Impersonate a user →
+**Expected:** banner appears; **Stop** restores your staff session in-app (native refresh path).
+
 ---
 
 ## 13. Android — MAUI 🟠
@@ -1178,6 +1268,126 @@ below the status bar (safe-area padding) and every item is tappable.
 ### QA-AND-06 — Core flows on Android 🟢 (Android)
 **Walkthrough:** spot-check language switch, invite (token revealed), and leave. **Expected:** parity
 with web.
+
+> **NATIVE Wave 2 (ADR-018, `docs/NATIVE_PARITY.md`):** the cases below verify the parity fixes on
+> Android — including the two that only exist on this platform (hardware back, share sheet).
+
+### QA-AND-07 — Hardware back navigates in-app history 🔴 (Android)
+**Gherkin**
+```gherkin
+Given I am signed in on Android and have navigated Home → Household → Settings
+When I press the hardware/gesture back button repeatedly
+Then it walks back through the app's pages and only leaves the app at the root
+```
+**Walkthrough**
+1. Navigate **Home → Household → Settings** (three distinct pages).
+2. Press **back**. **Expected:** Settings → Household. Again: → Home.
+3. Press **back at Home (root)**. **Expected:** the app backgrounds/exits — the default, but only
+   at the root. *(Before NATIVE-4, any back press exited the app.)*
+4. Note: a full WebView reload (e.g. the language switch) restarts the in-page history — back
+   exiting right after one is acceptable.
+
+### QA-AND-08 — Join a household by pasted invite code 🟠 (Android)
+**Walkthrough:** as QA-DSK-08, on Android: owner invites (web) → member on Android: **Household** →
+**Have an invite?** → paste → **Join** → roster shows both. Garbage code → inline error, retryable.
+*(This was parity gap G5 — a native member previously had no way to join at all.)*
+
+### QA-AND-09 — Language choice survives an app restart 🟠 (Android)
+**Walkthrough:** as QA-DSK-09: signed out, switch to **Español** (re-renders) → **swipe-close** the
+app → relaunch. **Expected:** still Spanish (OS Preferences bootstrap, NATIVE-5). Signed-in accounts
+reconcile to their server-saved locale — by design.
+
+### QA-AND-10 — Data export via the share sheet 🟠 (Android)
+**Walkthrough:** owner → **Household** → **Data** → **Export my data** → **Download**. **Expected:**
+the **Android share sheet** opens with the JSON bundle (server-named); share to Files/Drive and open —
+valid JSON. The app page is not navigated away. *(Before NATIVE-3 this click did nothing — the
+WebView silently dropped it.)*
+
+### QA-AND-11 — Billing: checkout leaves, summary refreshes on return 🟠 (Android)
+**Walkthrough:** as QA-DSK-11: **Billing** → **Upgrade** → **Expected:** the system browser/Custom
+Tab opens; complete checkout (test mode); switch back to the app (app switcher or back).
+**Expected:** the summary **refetches on resume** — plan shows **pro** without re-navigation
+(NATIVE-4; Android's return path is the Activity resume).
+
+### QA-AND-12 — MFA: enroll and native step-up 🟠 (Android)
+**Walkthrough:** as QA-DSK-12 on Android — QR renders in-app (scan it with a second device or use
+the manual key), recovery codes shown once; after sign-out, OTP sign-in prompts the **in-app** MFA
+step-up (MFA-4).
+
+### QA-AND-13 — Edge-to-edge / status bar on Android 15 🟢 (Android)
+**Gherkin**
+```gherkin
+Given a device or emulator on Android 15 (API 35, edge-to-edge enforced)
+When I use the app in portrait and landscape
+Then no control is hidden under the status bar or gesture areas
+```
+**Walkthrough:** check the header/hamburger (extends QA-AND-05), the bell dropdown, and a page with
+bottom-of-screen buttons (Settings danger zone) in both orientations. **Expected:** nothing sits
+under the status bar or the gesture-nav pill; everything tappable. *(Flagged 🔍 by the parity audit —
+if this fails, it becomes a small safe-area fix slice.)*
+
+---
+
+## 13b. iOS + macCatalyst — first-run smoke 🟠
+
+> **These platforms compile in CI but had never been RUN before this pass.** Prereqs: a Mac with
+> **Xcode 26.5** (the CI pin), the repo, and the API + Postgres + Mailpit running on that Mac (the
+> iOS **simulator** shares the host network, so `https://localhost:7160` works; a **physical device**
+> needs the API bound to a LAN address + the dev cert trusted). Launch:
+> `dotnet build src/Maui -t:Run -f net10.0-ios` (simulator) / `-f net10.0-maccatalyst`.
+> The **G7 fix is required** (PR #109) — before it, both platforms crashed at first resolve (no
+> `IOAuthInitiator` registered). OAuth is wired via `ASWebAuthenticationSession` + the `perezosoft`
+> scheme in Info.plist but has **never been exercised** — treat QA-IOS-04 as its first real test.
+
+### QA-IOS-01 — App boots to the login screen 🔴 (iOS)
+**Walkthrough:** launch on the simulator. **Expected:** the app opens (no startup crash — this *was*
+parity gap G7), the login screen renders: email + **Email me a 6-digit code**, provider buttons,
+**no magic-link button**, nothing under the notch/safe areas.
+
+### QA-IOS-02 — OTP sign-in 🔴 (iOS)
+**Walkthrough:** request a code → read it from Mailpit (on the Mac) → enter it. **Expected:** signed
+in, app shell + household load (the native Bearer/body-token path works on iOS).
+
+### QA-IOS-03 — Core flows spot-check 🟠 (iOS)
+**Walkthrough:** spot-check on the simulator: **Household** roster + invite (token revealed) +
+**join-by-code**, **Settings** (providers list, MFA card renders its QR), **language switch** →
+re-render + relaunch persistence, **bell** empty state, **export** → iOS share sheet. **Expected:**
+parity with Android (§13) — same shared RCL.
+
+### QA-IOS-04 — OAuth via ASWebAuthenticationSession 🟠 (iOS)
+**Walkthrough:** **Continue with Google**. **Expected:** the system auth session sheet opens to
+Google consent; approving returns to the app via the `perezosoft://auth` scheme, signed in. Also
+verify session-across-restart (Keychain-backed secure storage).
+
+### QA-MAC-01 — App launches at a usable window 🔴 (macCatalyst)
+**Walkthrough:** launch the macCatalyst build. **Expected:** no startup crash (G7); the window opens
+at a sensible default size and is resizable; login renders. *(The audit's 🔍 desktop-window-sizing
+cell for macOS.)*
+
+### QA-MAC-02 — OTP sign-in 🔴 (macCatalyst)
+**Walkthrough:** as QA-IOS-02. **Expected:** signed in; Household + Settings load.
+
+### QA-MAC-03 — Core flows + OAuth spot-check 🟠 (macCatalyst)
+**Walkthrough:** as QA-IOS-03 (share = macOS share menu) + one OAuth round-trip (QA-IOS-04 flow) +
+restart persistence. **Expected:** parity.
+
+---
+
+## 13c. Native release checklist
+
+Per release that ships a native client, run the platform's 🔴 cases plus **one** 🟠 feature
+spot-check, and record results in §16:
+
+| Platform | Always (🔴) | Plus one of (🟠) |
+|---|---|---|
+| Windows desktop | DSK-01, DSK-03, DSK-06 | DSK-08..12 |
+| Android | AND-01, AND-03, AND-07 | AND-08..12 |
+| iOS | IOS-01, IOS-02 | IOS-03, IOS-04 |
+| macCatalyst | MAC-01, MAC-02 | MAC-03 |
+
+Full per-feature native regression (every case in §12–13b) is for releases that changed native glue
+(`src/Maui/**`, the RCL seams: `ICulturePersistence` / `IFileDownloadLauncher` / `AppResumeNotifier`)
+or bumped the .NET/MAUI toolchain.
 
 ---
 
@@ -1345,14 +1555,14 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | Household view/rename | HH-01/02 | `GET /api/household`, `PUT /api/household` |
 | Members (remove/leave/transfer/dissolve) | HH-03..08 | `DELETE /api/household/members/{id}`, `POST /api/household/leave`, `POST /api/household/transfer-ownership` |
 | Invitations | INV-01/06/07/08, MAIL-03 | `POST /api/household/invitations`, `GET /api/household/invitations`, `POST …/{id}/regenerate`, `DELETE …/{id}` |
-| Join / accept | INV-02/03/04/05 | `POST /api/household/invitations/accept` |
+| Join / accept | INV-02/03/04/05, **DSK-08 / AND-08** (paste invite code — NATIVE-4b; web variant ⚙️ E2E) | `POST /api/household/invitations/accept` |
 | Linked accounts | SET-01..06, DSK-05 | `GET /api/auth/logins`, `POST /api/auth/link/{provider}`, `DELETE /api/auth/logins/{provider}` |
-| Localization | I18N-01..04 | `PUT /api/auth/locale` (+ resx) |
+| Localization | I18N-01..04, **DSK-09 / AND-09** (native restart persistence — NATIVE-5) | `PUT /api/auth/locale` (+ resx) |
 | Emails / branding | MAIL-01..04, I18N-04 | (SMTP via Mailpit) |
 | Tenant isolation / auth guards | SEC-01..05 | (all `[Authorize]` endpoints; write-stamping + reuse detection are automated) |
 | Platform health / readiness | SMK-07 | `GET /health`, `GET /health/ready` |
 | Transactional email delivery | (all email cases) | async via the outbox dispatcher (`OutboxMessages`) |
-| Billing — checkout/portal/webhook (API-only) | covered by `Api.Tests` (Billing*/Entitlement* tests); E2E pending | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
+| Billing — checkout/portal/webhook + billing page | **BILL-01/02** (§10c, ⚙️ E2E `BillingJourneyTests`) + **DSK-11 / AND-11** (native refresh-on-return — NATIVE-4) + `Api.Tests` (Billing*/Entitlement* tests) | `POST /api/billing/checkout`, `…/portal`, `…/webhook` |
 | Billing — quotas (BILLING-5) | **HH-14** (seat limit blocks invite → 402 upgrade message) + `Api.Tests` (`QuotaServiceTests`) | seats (members + pending invites vs `Plan.SeatLimit`) enforced on `POST /api/household/invitations` → 402 `seat_limit_reached`; metered usage via `IQuotaService.TryConsumeAsync` (monthly `UsageCounter`). Limits in `PlanCatalog` (null = unlimited). |
 | Billing — trial/dunning (BILLING-6) | covered by `Api.Tests` (`BillingWebhookHandlerTests`, `SubscriptionLapseSweepJobTests`); manual via Stripe test triggers | webhook transition into `past_due`/`canceled` → owner **notification** (in-app bell + outbox email, NOTIFY) once; `SubscriptionLapseSweepJob` (6h) nudges the owner once when a paid period lapses without a webhook (`LapseNotifiedAt`). Verify with `stripe trigger invoice.payment_failed` (test mode) → owner sees a billing notification in the bell. |
 | Billing — dissolve cleanup (BILLING-7) | covered by `Api.Tests` (`BillingDissolveTests`) | on tenant dissolve, `BillingDataContributor` wipes the `Subscription` projection **and** enqueues a `"billing.cancel"` outbox message → `IBillingProvider.CancelSubscriptionAsync` (a deleted tenant stops being billed). `HasDataAsync`=false (billing never blocks leaving); export gains a `billing` section (plan/status/period, no Stripe ids). Manual (Stripe test mode): subscribe a throwaway tenant, delete the account, confirm the Stripe subscription is canceled. |
@@ -1361,14 +1571,16 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | Audit log (API-only) | covered by `Api.Tests` (`AuditLogTests`) | append-only `IAuditLog` + interceptor |
 | RBAC roles (admin tier) | HH-09/10/11/12 (web roster promote/demote + admin capability/limits); `Api.Tests` (`RolePermissionsTests`, `PermissionServiceTests`, `MemberRoleManagementTests`) | `PUT /api/household/members/{id}/role` (owner-only; admin↔member, owner via transfer only); permission seam gates tenant writes |
 | File storage (API-only) | covered by `Api.Tests` (`LocalDiskFileStorageTests`, `FileDownloadTokenizerTests`, `FilesControllerTests`, `S3FileStorageMinioTests` [real MinIO], `FileStorageRegistrationTests`) | `IFileStorage` (tenant-scoped keys; local disk / S3-compatible — AWS/MinIO/R2/B2, config-gated); local signed `GET /api/files/{token}` (expiring, single-key, tenant-checked → 404 on any failure); S3 native presigned URLs |
-| GDPR data export | **HH-13** (owner Household → Data → download) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
+| GDPR data export | **HH-13** (owner Household → Data → download, ⚙️ E2E `GdprExportJourneyTests`) + **DSK-10 / AND-10** (native share — NATIVE-3) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
-| MFA / TOTP | **MFA-01..05** (Settings enroll/QR/confirm/recovery + disable; step-up on OTP, OAuth/magic-link, **and** native logins) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). **Every sign-in path enforces it** (web + native): OTP returns the challenge as JSON; OAuth callback + magic-link redirect to `/login?mfa=<challenge>`; native OTP/OAuth-exchange return the challenge in the body and the MAUI client steps up in-app. |
-| In-app notifications | **NOTIF-01..03** (header bell: list/unread-count/mark-read; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
-| Admin back-office | **ADMIN-01..03** (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}`) inspection, `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
+| MFA / TOTP | **MFA-01..05**, **DSK-12 / AND-12** (native) (Settings enroll/QR/confirm/recovery + disable; step-up on OTP, OAuth/magic-link, **and** native logins) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). **Every sign-in path enforces it** (web + native): OTP returns the challenge as JSON; OAuth callback + magic-link redirect to `/login?mfa=<challenge>`; native OTP/OAuth-exchange return the challenge in the body and the MAUI client steps up in-app. |
+| In-app notifications | **NOTIF-01..03**, **DSK-13** (header bell: list/unread-count/mark-read; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
+| Admin back-office | **ADMIN-01..03**, **DSK-14** (native spot) (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}`) inspection, `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
-**Per-client coverage:** Web = full (all suites). Desktop = DSK-01..07 + shared-UI spot checks.
-Android = AND-01..06 + shared-UI spot checks. Magic link is **web-only** by design.
+**Per-client coverage:** Web = full (all suites). Desktop = DSK-01..14 (auth + per-feature parity).
+Android = AND-01..13 (auth + per-feature parity incl. hardware back + share sheet). iOS = IOS-01..04
+and macCatalyst = MAC-01..03 (first-run smoke — never run before; needs a Mac). Magic link is
+**web-only** by design; the §13c checklist is the per-release native subset.
 
 **Automated (E2E CI ⚙️):** the following manual cases have an equivalent Playwright/NUnit journey in
 `tests/E2E.Tests`, run on every push by the `e2e` job (`.github/workflows/ci.yml`) against a booted
@@ -1398,8 +1610,9 @@ Record one row per executed case. Build = API/web commit SHA (`git rev-parse --s
 | QA-SMK-02 | Web | | | | | |
 | … | | | | | | |
 
-**Release gate (suggested):** all 🔴 Smoke + all 🟠 Core cases Pass on Web; 🔴 Smoke Pass on Desktop
-and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
+**Release gate (suggested):** all 🔴 Smoke + all 🟠 Core cases Pass on Web; the §13c native
+checklist Pass on every platform being shipped (iOS/macCatalyst once those ship); no open
+Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
 
 ---
 
@@ -1597,3 +1810,12 @@ and Android; no open Critical/High defects. 🟢 Edge cases triaged (Pass or acc
   These stay in the manual plan for **Desktop/Android** (CI runs Web only) and area-change re-runs; human
   QA can spot-check them on Web rather than run them in full each cycle. `data-testid` hooks were added to
   `MfaCard` and `LanguageSwitcher` to keep the selectors stable.
+- **Updated 2026-07-03** for NATIVE Wave 2 (ADR-018, `docs/NATIVE_PARITY.md`): the parity audit's six
+  gaps were fixed (join-by-code, culture persistence, export download/share, billing return-refresh,
+  Android hardware back — plus **G7**, iOS/macCatalyst crashing at boot, found while writing this
+  expansion) and this plan grew the per-feature native coverage that verifies them on hardware:
+  **QA-DSK-08..14**, **QA-AND-07..13**, the first-ever **iOS/macCatalyst smoke** (§13b, QA-IOS-01..04 +
+  QA-MAC-01..03), and the **per-release native checklist** (§13c). The web halves of the fixes are
+  already ⚙️-automated (`Member_Joins_By_Pasting_The_Invite_Code`, `Owner_Downloads_The_Data_Export`);
+  the OS-chrome halves (share sheets, hardware back, real focus-return, safe areas) are exactly what
+  these manual cases exist for.
