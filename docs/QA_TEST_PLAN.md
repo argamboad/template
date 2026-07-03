@@ -255,7 +255,7 @@ And /health/ready returns 200 when the database is reachable, 503 when it is not
 
 ## 5. Web — Authentication 🟠
 
-### QA-AUTH-01 — Magic-link sign-in happy path 🟠 (Web)
+### QA-AUTH-01 — Magic-link sign-in happy path 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am an anonymous user on /login
@@ -346,7 +346,7 @@ Then further requests are rejected with HTTP 429 until the window resets
 > Protects against email-bombing and OTP brute-forcing. Expected behavior, not a defect — see the
 > §1.1 pacing note.
 
-### QA-AUTH-05 — Magic link is single-use 🟢 (Web)
+### QA-AUTH-05 — Magic link is single-use 🟢 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I signed in by clicking a magic link
@@ -435,12 +435,12 @@ Then the new name is saved and reflected in the header tenant badge
 2. **Expected:** success banner; the header tenant badge updates to the new name (a silent refresh
    updates the claim).
 
-### QA-HH-02 — Member sees read-only household, no owner controls 🟠 (Web)
+### QA-HH-02 — Member sees read-only household, no owner controls 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** signed in as a *member* (use QA-INV flow to create one).
 **Walkthrough:** open **Household**. **Expected:** household name shown as read-only heading; no
 rename/invite/transfer controls; a **Leave** button is present.
 
-### QA-HH-03 — Owner removes a member 🟠 (Web)
+### QA-HH-03 — Owner removes a member 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am the owner and another member exists
@@ -457,7 +457,7 @@ Then they are removed from the household member list
 **Walkthrough:** as owner, confirm there is **no Remove button on your own row**. (Owner departs via
 transfer or dissolve, not removal.)
 
-### QA-HH-05 — Transfer ownership 🟠 (Web)
+### QA-HH-05 — Transfer ownership 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am the owner and at least one other member exists
@@ -475,7 +475,7 @@ Then they become owner and I become a regular member
 **Transfer ownership** control (with "you must transfer before leaving" note) — **not** a
 leave/dissolve button. The single-owner invariant is enforced in the UI.
 
-### QA-HH-07 — Sole owner dissolves the household 🟠 (Web)
+### QA-HH-07 — Sole owner dissolves the household 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am the only member and owner of my household
@@ -487,7 +487,7 @@ Then the household is dissolved and I am re-homed to a fresh solo household
 2. **Expected:** a confirm dialog warning the household will be deleted; on confirm, the app reloads
    and you land signed in with a **new empty household you own** (you're never left tenant-less).
 
-### QA-HH-08 — Member leaves the household 🟠 (Web)
+### QA-HH-08 — Member leaves the household 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am a non-owner member
@@ -499,7 +499,7 @@ Then I leave the household and am re-homed to a fresh solo household I own
 2. **Expected:** app reloads; you now own a brand-new empty household. The household you left still
    exists for its remaining members (verify as the owner: the leaver is gone from the member list).
 
-### QA-HH-09 — Owner promotes a member to admin 🟠 (Web)
+### QA-HH-09 — Owner promotes a member to admin 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** signed in as the owner with at least one **member** present (use the QA-INV flow).
 **Gherkin**
 ```gherkin
@@ -512,7 +512,7 @@ Then their badge changes to Admin
 2. **Expected:** success banner ("Role updated."); the member's badge flips from **Member** to
    **Admin**, and the button becomes **Make member**. (Verify as that user — see QA-HH-11.)
 
-### QA-HH-10 — Owner demotes an admin to member 🟠 (Web)
+### QA-HH-10 — Owner demotes an admin to member 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am the owner and an admin exists
@@ -523,7 +523,7 @@ Then their badge changes back to Member
 1. On **Household**, on an **Admin** row → click **Make member**.
 2. **Expected:** success banner; the badge returns to **Member** and the button becomes **Make admin**.
 
-### QA-HH-11 — Admin sees management controls but not role/ownership controls 🟠 (Web)
+### QA-HH-11 — Admin sees management controls but not role/ownership controls 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** signed in **as the admin** promoted in QA-HH-09.
 **Gherkin**
 ```gherkin
@@ -539,7 +539,7 @@ But I see no promote/demote (role) controls and no transfer/dissolve — only Le
    bottom card shows **Leave** (no Transfer ownership / Leave & delete). The owner's row shows **no**
    action buttons.
 
-### QA-HH-12 — Member sees no management controls 🟢 (Web)
+### QA-HH-12 — Member sees no management controls 🟢 (Web) ⚙️ Automated in CI
 **Walkthrough:** signed in as a plain **member**, open **Household**. **Expected:** read-only name, no
 Invitations card, no per-row action buttons (no Remove/role controls), only a **Leave** button —
 unchanged from QA-HH-02 (a member is never shown management controls regardless of the admin tier).
@@ -557,7 +557,7 @@ Then I get a link to a JSON export of the household's data
    the tenant, members and invitations (and each feature's data). Members/admins don't see the Data card
    (owner-only). No secrets (invitation token hashes) appear in the file.
 
-### QA-HH-14 — Seat quota blocks inviting past the plan limit 🟠 (Web)
+### QA-HH-14 — Seat quota blocks inviting past the plan limit 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** the template ships example seat caps (Free = 3 seats, counting members + pending invites;
 `PlanCatalog`). A Free household at its cap (e.g. 3 members, or 2 members + 1 pending invite).
 **Gherkin**
@@ -580,7 +580,7 @@ And raising the limit (Pro plan / editing PlanCatalog) lets the invite through
 
 ## 8. Web — Invitations & joining 🟠
 
-### QA-INV-01 — Owner invites by email; token revealed + email sent 🔴 (Web)
+### QA-INV-01 — Owner invites by email; token revealed + email sent 🔴 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am the household owner
@@ -595,7 +595,7 @@ And an invitation email with a /join link is delivered to Mailpit
    emailed; the address shows under **Pending** with an expiry date.
 3. Check Mailpit: an invitation email addressed to that user, containing a `/join?token=…` link.
 
-### QA-INV-02 — Invitee accepts and joins (two-user flow) 🔴 (Web)
+### QA-INV-02 — Invitee accepts and joins (two-user flow) 🔴 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given an invitation exists for a second user
@@ -655,7 +655,7 @@ Then a new token is issued (revealed) and the old token no longer works
 2. **Expected:** a new token is revealed. The **previous** token's `/join` link now fails
    (QA-INV-05), the new one works.
 
-### QA-INV-08 — Revoke a pending invitation 🟠 (Web)
+### QA-INV-08 — Revoke a pending invitation 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given a pending invitation exists
@@ -736,7 +736,7 @@ available by design, so provider removal can't lock you out.)
 ### QA-SET-06 — Settings requires auth 🟢 (Web)
 **Walkthrough:** signed out, navigate to `/settings`. **Expected:** redirect to `/login`.
 
-### QA-SET-07 — Delete my account 🟠 (Web)
+### QA-SET-07 — Delete my account 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** use a **throwaway** account (this is destructive). Easiest: a member of another
 owner's household (so no dissolve).
 **Gherkin**
@@ -834,7 +834,7 @@ And a valid code (or recovery code) finishes sign-in
 4. **Wrong/expired code:** inline error; you remain on the prompt (no session). Tokens arrive in the
    response body (native transport), same as a normal native login.
 
-### QA-NOTIF-01 — Notification bell + list 🟠 (Web)
+### QA-NOTIF-01 — Notification bell + list 🟠 (Web) ⚙️ Automated in CI
 **Note:** the template has no built-in producer; to see items, a feature must call
 `INotificationService.NotifyAsync` (seed one in dev, or exercise a downstream feature that notifies).
 **Gherkin**
@@ -851,7 +851,7 @@ And the bell shows an unread count when I have unread notifications
    bold title; each shows a relative time ("just now", "5m", "3h", "2d").
 3. Click the backdrop (outside the panel) → it closes.
 
-### QA-NOTIF-02 — Mark read / mark all read 🟠 (Web)
+### QA-NOTIF-02 — Mark read / mark all read 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** at least one unread notification (see QA-NOTIF-01 note).
 **Gherkin**
 ```gherkin
@@ -865,7 +865,7 @@ And "Mark all read" zeroes the count
 2. Click **Mark all read**. **Expected:** the count badge disappears; all rows show as read.
 3. Reload the page → the counts/read state persist (server-side).
 
-### QA-NOTIF-03 — Delivery preferences 🟠 (Web)
+### QA-NOTIF-03 — Delivery preferences 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am signed in on /settings
@@ -927,7 +927,7 @@ Then the email arrives in Spanish
 **Precondition:** your account's email must be in the staff allowlist — set `Admin__StaffEmails__0` in the
 repo-root `.env` (see `.env.example`) and restart the API. Non-staff accounts must **not** see any of this.
 
-### QA-ADMIN-01 — Staff sees the console; non-staff don't 🟠 (Web)
+### QA-ADMIN-01 — Staff sees the console; non-staff don't 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am signed in as a platform-staff user
@@ -941,6 +941,9 @@ And a non-staff user sees no Admin link and is refused at /admin
    shows members (name/email + role), subscription status, created date, audit-event count.
 3. Sign in as a **non-staff** user: **no Admin link**; navigating directly to `/admin` shows
    "You don't have access to the admin console."
+
+> Automated: staff console + tenant list (announcement journey) and the non-staff `/admin` refusal.
+> The header **Admin-link visibility** checks (steps 1 and 3's "no Admin link") remain manual.
 
 ### QA-ADMIN-02 — View a tenant is audited in that tenant 🟠 (Web)
 **Gherkin**
