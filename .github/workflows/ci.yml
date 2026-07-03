@@ -200,6 +200,11 @@ jobs:
           # Staff allowlist for the admin-console E2E journey (ADMIN-3) — must match
           # AnnouncementJourneyTests.StaffEmail.
           Admin__StaffEmails__0: "e2e-staff@example.com"
+          # Where server-side redirects send the BROWSER (magic-link verify, OAuth callback → the client).
+          # Without this it falls back to the dev default https://localhost:7008, which is NOT running in
+          # this stack — so the magic-link journey (E2E-4) died with ERR_CONNECTION_REFUSED (Playwright
+          # attributes the refusal to the *requested* URL, which made it look like the API was down).
+          Auth__AppBaseUrl: "http://localhost:5169"
         run: |
           set -e
           dotnet run --project src/Api/Template.Api.csproj -c Debug --no-build --urls http://localhost:5238 > api.log 2>&1 &
@@ -220,7 +225,9 @@ jobs:
 
       - name: Server logs (on failure)
         if: failure()
-        run: tail -80 api.log web.log || true
+        # -n 80 (not -80): the numeric shorthand is invalid with multiple files in GNU tail, which made
+        # this diagnostic silently print nothing on every failure.
+        run: tail -n 80 api.log web.log || true
 
   # Deploy staging (DEPLOY-3, ADR-017). Runs ONLY on a push to develop, and only after every test/build
   # gate above is green — so staging always reflects a passing develop. Triggers the Render deploy via a
