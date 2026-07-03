@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Template.Api.Authentication;
 using Template.Api.Models;
 using Template.Api.Services;
+using Template.Core.Abstractions;
 using Template.Core.Authorization;
+using Template.Core.Entities;
 using Template.Core.Repositories;
 
 namespace Template.Api.Controllers;
@@ -16,8 +19,37 @@ namespace Template.Api.Controllers;
 [Route("api/billing")]
 public class BillingController(
     ITenantRepository tenants,
-    IBillingService billing) : TenantApiControllerBase(tenants)
+    IBillingService billing,
+    IRepository<Subscription> subscriptions,
+    IQuotaService quota,
+    TimeProvider clock) : TenantApiControllerBase(tenants)
 {
+    /// <summary>
+    /// The tenant's billing state for the billing page (owner only, BILLING-8): active plan
+    /// (fail-closed to Free, exactly like entitlements), raw subscription status, seat usage vs the
+    /// plan limit, and whether a provider customer exists (gates the portal button).
+    /// </summary>
+    [HttpGet]
+    [RequireTenantPermission(Permission.ManageBilling, "Only the household owner can manage billing")]
+    public async Task<IActionResult> Summary(CancellationToken cancellationToken)
+    {
+        var membership = await GetMembershipAsync(cancellationToken);
+        if (membership is null)
+            return InvalidToken();
+
+        var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken);
+        var seats = await quota.GetSeatUsageAsync(cancellationToken);
+
+        return Ok(new BillingSummaryResponse
+        {
+            PlanKey = EntitlementService.ResolvePlanKey(subscription, clock.GetUtcNow()),
+            Status = subscription?.Status ?? "none",
+            CurrentPeriodEnd = subscription?.CurrentPeriodEnd,
+            Seats = new BillingSeats { Used = seats.Used, Limit = seats.Limit },
+            HasSubscription = !string.IsNullOrEmpty(subscription?.StripeCustomerId),
+        });
+    }
+
     /// <summary>Starts a hosted checkout to subscribe the tenant to a paid plan (owner only).</summary>
     [HttpPost("checkout")]
     [RequireTenantPermission(Permission.ManageBilling, "Only the household owner can manage billing")]

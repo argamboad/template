@@ -989,6 +989,43 @@ And an admin.announcement.sent audit event is recorded in that tenant
 
 ---
 
+## 10c. Web — Billing page 🟠
+
+> With no Stripe keys configured (dev default) the **FakeBillingProvider** is active: checkout/portal
+> return `https://billing.test/...` URLs (a dead domain — expected), and the webhook accepts the
+> signature `valid`. With real Stripe test keys, use Stripe's hosted test checkout instead.
+
+### QA-BILL-01 — Billing page shows plan + seats; owner-only 🟢 (Web) ⚙️ Automated in CI
+**Gherkin**
+```gherkin
+Given I am the household owner on /billing
+Then I see my current plan, its status, and seat usage vs the plan limit
+And a member opening /billing sees only the "ask your owner" notice
+```
+**Walkthrough**
+1. As **owner**, open **Billing** in the header. **Expected:** current plan (e.g. `free`), status
+   badge, and seats (e.g. `1 of 3 used`); an **Upgrade to Pro** button on the free plan; **Manage
+   subscription** only when a subscription exists.
+2. As a **member**, open `/billing`. **Expected:** no plan/usage — just the owner-only notice.
+
+### QA-BILL-02 — Upgrade via checkout + provider webhook lands on Pro 🟠 (Web) ⚙️ Automated in CI
+**Gherkin**
+```gherkin
+Given the owner on the free plan clicks Upgrade to Pro
+When the checkout redirect fires and the provider webhook lands (subscription active)
+Then /billing shows plan pro, status active, the pro seat limit, and the portal button
+```
+**Walkthrough**
+1. Click **Upgrade to Pro**. **Expected:** redirect to the provider checkout (fake:
+   `billing.test/checkout/{tenantId}/pro` — the page won't load, which is fine).
+2. Simulate payment completion by POSTing the webhook (fake provider): `POST {api}/api/billing/webhook`
+   with header `Stripe-Signature: valid` and a PascalCase JSON body (`EventId`, `TenantId`, `PlanKey:
+   "pro"`, `Status: "active"`, `StripeCustomerId`, `OccurredAt`). **Expected:** 200.
+3. Reload `/billing`. **Expected:** plan `pro` / status `active`, seats `x of 10`, **Manage
+   subscription** now visible.
+
+---
+
 ## 11. Emails (Mailpit) — branding & content 🟠
 
 > **Delivery is asynchronous** (the outbox dispatcher) — emails land in Mailpit a few seconds after the

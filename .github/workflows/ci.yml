@@ -215,6 +215,7 @@ jobs:
           [ "$api" = "200" ] && [ "$web" = "200" ] || { echo "::error::stack did not become ready"; tail -40 api.log web.log; exit 1; }
 
           PLAYWRIGHT_BASE_URL=http://localhost:5169 MAILPIT_BASE_URL=http://localhost:8025 \
+            E2E_API_BASE_URL=http://localhost:5238 \
             dotnet test tests/E2E.Tests/Template.E2E.Tests.csproj -c Debug --no-build
 
       - name: Server logs (on failure)

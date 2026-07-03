@@ -344,6 +344,16 @@ out-of-band with retry by `BillingCancelOutboxHandler` → new idempotent `IBill
 the "would abandon data" guard; it's cleaned up automatically instead. Export (GDPR-1) gains a `billing`
 section (plan/status/period — never Stripe ids or card data). **This closes the BILLING epic (1–7).**
 
+*Addendum (BILLING-8, 2026-07-03) — the billing page.* The chassis finally gets its owner-facing UI
+(dunning notifications had deep-linked to `/billing` since BILLING-6): **`GET /api/billing`** (owner-only
+`ManageBilling`) returns the plan (resolved **fail-closed** exactly like entitlements), raw status,
+period end, seat usage vs the plan limit, and `has_subscription` (gates the portal button); a
+**`Billing.razor`** page renders it with Upgrade (checkout redirect) and Manage (portal redirect)
+actions, plus an owner-only notice for members. Nothing about the money rules changed: access is still
+granted only by the webhook, the page just *shows* the projection. The E2E journey proves the whole
+loop without Stripe via the `FakeBillingProvider` (stubbed checkout URL + a webhook POSTed exactly as
+Stripe would send it, through the real verify/inbox/EnterTenant/projection path).
+
 *Amendment (v2 audit GAP-1, 2026-07-01) — the fake provider is Development-only; production without a key fails fast.* The
 original wiring registered `FakeBillingProvider` whenever `Billing:Stripe:SecretKey` was absent — including in
 production. Because the fake **trusts a literal webhook signature** (`Stripe-Signature: valid`) and the webhook

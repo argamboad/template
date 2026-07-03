@@ -139,6 +139,19 @@
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Household</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="Nav_Billing" xml:space="preserve"><value>Billing</value></data>
+  <data name="Billing_Title" xml:space="preserve"><value>Billing</value></data>
+  <data name="Billing_Subtitle" xml:space="preserve"><value>Your plan, usage, and subscription.</value></data>
+  <data name="Billing_CurrentPlan" xml:space="preserve"><value>Current plan</value></data>
+  <data name="Billing_RenewsOn" xml:space="preserve"><value>Renews or ends on {0}.</value></data>
+  <data name="Billing_Seats" xml:space="preserve"><value>Seats</value></data>
+  <data name="Billing_SeatsUsage" xml:space="preserve"><value>{0} of {1} used</value></data>
+  <data name="Billing_Upgrade" xml:space="preserve"><value>Upgrade to Pro</value></data>
+  <data name="Billing_Manage" xml:space="preserve"><value>Manage subscription</value></data>
+  <data name="Billing_OwnerOnly" xml:space="preserve"><value>Only the household owner can manage billing. Ask them if you need a plan change.</value></data>
+  <data name="Billing_ErrLoad" xml:space="preserve"><value>Couldn't load billing.</value></data>
+  <data name="Billing_ErrCheckout" xml:space="preserve"><value>Couldn't start checkout.</value></data>
+  <data name="Billing_ErrPortal" xml:space="preserve"><value>Couldn't open the billing portal.</value></data>
   <data name="Nav_SignOut" xml:space="preserve"><value>Sign out</value></data>
   <data name="Home_WelcomeBack" xml:space="preserve"><value>Welcome back, {0}!</value></data>
   <data name="Home_SignedInTo" xml:space="preserve"><value>Signed in to the {0} household.</value></data>

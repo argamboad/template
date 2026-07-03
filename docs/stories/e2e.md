@@ -20,9 +20,11 @@
 
 **Scope guardrails (what this epic deliberately does NOT do):**
 - **No Stripe.** Checkout/Portal round-trips stay covered by
-  `tests/Api.Tests/Billing/*` (webhook handler, entitlements, dunning). There is **no billing UI
-  page** in the Web app today; the only billing-visible UI is the seat-limit message on the invite
-  flow — that is the billing E2E surface. Building a billing page is a separate (unscheduled) slice.
+  `tests/Api.Tests/Billing/*` (webhook handler, entitlements, dunning). At the time this epic ran
+  there was **no billing UI page** — the seat-limit message on the invite flow was the only billing
+  E2E surface (E2E-2). **BILLING-8 later built `/billing`** and added `BillingJourneyTests`: the full
+  upgrade loop with the FakeBillingProvider (stubbed checkout URL + a real webhook POST), still no
+  Stripe involved.
 - **No health/observability browser tests.** `/health` verification is the DEPLOY-3 deploy-smoke
   concern (ADR-017).
 - **No E2E for config-gated-off surfaces** (PUBAPI, HOOKS, ADMIN console) or destructive GDPR
