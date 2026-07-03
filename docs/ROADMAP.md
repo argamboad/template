@@ -95,3 +95,16 @@ bring-up + a `docs/DEPLOYMENT.md` runbook; **DEPLOY-3** the deploy pipeline (dev
 with a post-deploy smoke gate; main → prod behind environment approval) + a staging section in the QA
 plan. Free-tier trade-offs are recorded decisions, not surprises (instance sleep pauses the outbox —
 staging-acceptable, never prod; real SMTP means email QA cases stay manual on staging).
+**DEPLOY is now ✅ COMPLETE** (all three slices; staging live + auto-deploy with a version-gated smoke).
+
+## Next up: NATIVE — full MAUI parity (planned 2026-07-02)
+
+The MAUI Blazor-Hybrid shells reuse the shared RCL, so they already render every web screen and have
+native auth wired — but native isn't built in CI, the full feature surface is inherited-but-unverified,
+and there are no signed artifacts. Epic **`NATIVE`** (ADR-018, `stories/native.md`) commits to **full
+parity across Android/Windows/iOS/macOS**, in four waves: **guardrails** (CI build gate + a
+`docs/NATIVE_PARITY.md` audit), **gap-fixes** (WebView deltas — downloads, external links, back button,
+culture/theming), **verification** (a per-feature native QA pass + automated emulator/simulator smoke),
+and **distribution** (signed AAB / MSIX / IPA / pkg). Recorded costs (the user opted into everything): a
+**macOS CI runner** + **Apple Developer account** + signing material in secrets. Parity means "what web
+does" — OS push/biometrics are beyond scope; web-first still holds (this keeps native *caught up*).

@@ -918,3 +918,37 @@ risk, noted in the runbook as the self-host escape hatch. A **custom domain** (~
 deliberate first paid upgrade (pretty URLs + DKIM deliverability); nothing in the architecture
 depends on it.
 Stories + slice plan: `docs/stories/deploy.md` (epic `DEPLOY`).
+
+**ADR-018 — Native (MAUI) client: commit to full feature parity across Android/Windows/iOS/macOS, incl. automated native tests + signed distribution. (2026-07-02)**
+Resolves the deferred "non-web framework commitment" from `docs/TECH_STACK.md`. The template already ships
+**MAUI Blazor Hybrid** shells that reuse the shared RCL (`Shared.Ui`) and have native auth wired (OTP,
+OAuth via system browser, MFA step-up MFA-4, secure-storage tokens) — so the native clients already render
+every web screen. We commit to closing the remaining gap to **full parity**: verify every feature on
+native, fix WebView-vs-browser deltas, test the native build + UI in CI, and produce **signed, shippable
+artifacts** for all four platforms. Decided:
+
+1. **MAUI is the native stack** (not Uno/Avalonia/PWA). Rationale: it reuses the exact C# Blazor
+   components already built, so parity is verification + glue, not a second UI. Alternatives stay noted in
+   `TECH_STACK.md` as fallbacks if MAUI's maturity disappoints.
+2. **Parity means "what web does", not more.** OS push notifications, biometrics, and other native-only
+   capabilities are **beyond parity** and out of scope for this epic (future epics if wanted). The
+   in-app notification center (NOTIFY, polling) is the parity bar, not native push.
+3. **Web-first still holds** (golden rule 5): features land + prove on web first; this epic keeps native
+   *caught up*, it does not invert the order.
+4. **Full-platform scope accepts real, recorded costs** (the user opted into "everything"): a **macOS CI
+   runner** (to build/test/sign iOS + macCatalyst), an **Apple Developer account** ($99/yr), and
+   **signing material managed as repo secrets** (Android keystore, Windows cert, Apple cert+profile,
+   base64-encoded, never committed — same discipline as `.env`, ADR-001). Without the macOS runner +
+   Apple account, the Apple-platform slices can't run — so they're sequenced last, after the
+   Android/Windows path proves the machinery.
+5. **Sequenced in waves** (guardrails → gap-fixes → verification → distribution): a build gate + a
+   `docs/NATIVE_PARITY.md` audit first (scopes everything), then WebView-gap fixes, then a manual +
+   automated native QA pass, then per-platform signing/packaging. Don't automate or distribute before the
+   app is verified working.
+
+**Accepted trade-off:** native UI tests (Appium / .NET MAUI UITest on emulators/simulators) are slower and
+flakier than Playwright-web — kept to a small smoke suite with retries; the manual native QA pass is the
+broader safety net. **The honest counterweight:** automated native E2E + store distribution are large and
+partly per-app; committing the template to them (vs deferring) is a deliberate choice to make native a
+first-class, shippable channel rather than an experiment.
+Stories + slice plan: `docs/stories/native.md` (epic `NATIVE`).

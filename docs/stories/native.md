@@ -1,0 +1,246 @@
+# Stories — Native (MAUI) client feature parity (`NATIVE`)
+
+> One file per epic. Brings the **MAUI Blazor Hybrid** clients (Android, Windows, **iOS, macOS**) to
+> **full parity** with web: every feature verified working on native, WebView-specific gaps closed, the
+> native build + UI tested in CI, and **signed, shippable artifacts**. Design decision + accepted costs
+> in **ADR-018**. Stories use Gherkin acceptance criteria. **Status: 📝 PLANNED (full-parity scope).**
+
+**Epic key:** `NATIVE`
+
+**The nature of the work (read first).** MAUI here is **Blazor Hybrid** reusing the shared RCL
+(`Shared.Ui`), so the native shells already render *every* web screen inside a native WebView, and auth
+is already native (OTP, OAuth via system browser, MFA step-up MFA-4, secure-storage tokens). So this epic
+is **mostly verification + native-glue + CI/distribution plumbing, not rebuilding features.** The work is:
+(1) guard the native build, (2) close the handful of places a WebView differs from a browser, (3) verify
+the full feature surface on every platform, (4) test it automatically, (5) ship signed artifacts.
+
+**Prerequisites (external — these are the real cost of "everything", per ADR-018):**
+- A **macOS CI runner** (GitHub-hosted `macos-latest`) — required to build/test/sign **iOS + macCatalyst**.
+- An **Apple Developer account** ($99/yr) — iOS/macOS signing certs + provisioning profiles.
+- **Signing material as repo secrets** (never committed): Android keystore, Windows code-sign cert, Apple
+  cert + profile (base64-encoded). Loaded at build time, same discipline as `.env` (ADR-001).
+- Android SDK + the `.NET maui` workloads on the runners.
+
+**Current baseline:** targets `net10.0-android` + `net10.0-windows`; not built in CI; QA covers 13
+auth-focused desktop/Android cases (`QA-DSK-01..07`, `QA-AND-01..06`). See `docs/MOBILE_TESTING.md`.
+
+---
+
+## Wave 1 — Guardrails (build gate + audit)
+
+### NATIVE-1 — Build MAUI in CI, all target platforms
+
+**As a** maintainer
+**I want** the MAUI app compiled in CI on every PR, for every target platform
+**So that** a change that breaks the native build fails the PR instead of rotting silently until a manual run
+
+**Context / notes:** add `net10.0-ios` + `net10.0-maccatalyst` to the target frameworks. A CI matrix:
+Android on `ubuntu-latest`, Windows on `windows-latest`, iOS + macCatalyst on `macos-latest`
+(`dotnet workload install maui-*`, then `dotnet build src/Maui -f <tfm>`). Compile-only — no emulator, no
+signing (that's Wave 3/4). CPM lockfile: MAUI's `packages.lock.json` is currently **excluded** from CI
+(it regenerates on full-solution builds) — this slice brings it under control or documents the exclusion.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: The native build is a required check
+  Given a PR that breaks the MAUI build (any target platform)
+  When CI runs
+  Then the native-build job fails and blocks the merge
+
+Scenario: All four platforms compile
+  Then android, windows, ios, and maccatalyst each build in CI on their respective runners
+```
+
+**Out of scope:** running the app; signing; tests. **DoD:** matrix builds green on a clean PR; MAUI
+lockfile handled deterministically; ADR-018 referenced.
+
+### NATIVE-2 — Native-concerns audit → `docs/NATIVE_PARITY.md`
+
+**As a** developer
+**I want** a written matrix of every place WebView-hosted Blazor differs from browser Blazor
+**So that** Wave 2 fixes real, enumerated gaps instead of guessing
+
+**Context / notes:** produce `docs/NATIVE_PARITY.md` — a table over: file **download/upload/share**,
+external links / `mailto` / `target=_blank`, Android **hardware back**, deep links / OAuth callback,
+clipboard, **culture/RTL**, **safe areas / status bar / window sizing**, session-across-restart, cold
+networking (dev `adb reverse` vs prod URL), and per **feature** (household, invites, settings, notifications,
+MFA, admin, GDPR export, files). Each cell: ✅ works / ⚠️ gap / N-A, with a note. This is the scoping artifact.
+
+**Acceptance criteria**
+
+```gherkin
+Scenario: Every WebView-vs-browser delta is enumerated
+  Then docs/NATIVE_PARITY.md lists each concern × platform with a done/gap/N-A verdict
+  And each ⚠️ gap maps to a Wave-2 slice (or is explicitly deferred)
+```
+
+**Out of scope:** fixing the gaps (Wave 2). **DoD:** the matrix is complete and drives the Wave-2 backlog.
+
+---
+
+## Wave 2 — Close the WebView gaps (each built only if the audit confirms it)
+
+### NATIVE-3 — File download / upload / share in the WebView
+
+**As a** native user
+**I want** downloads (GDPR export, future attachments/avatars) and uploads to work
+**So that** file features aren't silently broken on native (a browser download won't "just happen" in a WebView)
+
+```gherkin
+Scenario: Download a signed-URL file on native
+  Given a signed download URL (e.g. the GDPR export)
+  When I trigger it in the native app
+  Then the file is saved/shared via the platform (not a dead WebView navigation)
+
+Scenario: Upload a file on native
+  When a feature needs a file picker
+  Then the native picker opens and the file uploads through the same API
+```
+
+**DoD:** download + upload verified on Android + one desktop target; a reusable native file bridge; ADR-018.
+
+### NATIVE-4 — External links, mailto, and back-navigation
+
+**As a** native user
+**I want** external links to open in the system browser and the Android back button to behave
+**So that** the app doesn't trap me in the WebView or dead-end on a `target=_blank`
+
+```gherkin
+Scenario: External link opens the system browser
+  When I tap a target=_blank or mailto link
+  Then it opens outside the WebView, and in-app navigation stays in the app
+
+Scenario: Android hardware back
+  When I press the device back button
+  Then it navigates the in-app history, and exits only at the root
+```
+
+**DoD:** link routing + hardware-back verified on Android; ADR-018.
+
+### NATIVE-5 — Localization + theming/layout polish per platform
+
+**As a** native user
+**I want** device culture (incl. RTL) and correct safe-areas / status bar / window sizing
+**So that** the app looks and reads right on each platform, matching web
+
+```gherkin
+Scenario: Device locale drives the UI
+  Given the device is set to Spanish
+  Then the app renders in Spanish (matching web i18n), RTL where applicable
+
+Scenario: Platform chrome is correct
+  Then mobile respects safe areas + status bar, and desktop opens at a sensible window size
+```
+
+**DoD:** verified on Android + Windows (+ iOS/macOS once runners exist); ADR-018.
+
+---
+
+## Wave 3 — Verification (manual + automated)
+
+### NATIVE-6 — Native QA pass: expand the QA plan to the full feature surface
+
+**As a** QA tester
+**I want** per-feature native cases (not just the 13 auth-focused ones)
+**So that** "works on native" is deliberately verified, not merely inherited from the shared RCL
+
+**Context / notes:** extend `docs/QA_TEST_PLAN.md` §11–13 with a native case per feature area (household,
+invites, settings, notifications, MFA, admin, GDPR, files) × {Android, Windows, iOS, macOS} smoke, and a
+native release checklist. Regenerate the QA PDFs (B11-8 gate).
+
+```gherkin
+Scenario: Full native regression exists
+  Then each web feature has a matching native case in §11–13 for each supported platform
+```
+
+**DoD:** QA plan expanded + PDFs regenerated; a native smoke suite a human can run per release.
+
+### NATIVE-7 — Automated native UI tests in CI
+
+**As a** maintainer
+**I want** the native critical paths driven automatically against a real emulator/simulator
+**So that** native regressions are caught without a manual pass
+
+**Context / notes:** stand up a native UI-test harness — **Appium** (or .NET MAUI UITest) driving the
+**Android emulator** on CI and a desktop target, covering the auth-critical journeys (OTP sign-in, OAuth,
+MFA step-up, a core feature flow). **Accepted risk (ADR-018):** native UI tests are slower + flakier than
+Playwright-web; budget retries + generous timeouts, and keep the suite small (smoke, not exhaustive). iOS
+simulator tests run on the macOS runner.
+
+```gherkin
+Scenario: Native smoke runs on every push
+  Given the Android emulator (and iOS simulator) in CI
+  When the native UI smoke runs
+  Then OTP sign-in + a core feature flow pass headlessly, with retries for flakiness
+```
+
+**DoD:** an Android emulator smoke green in CI; iOS simulator smoke on macOS runner; flakiness mitigations documented.
+
+---
+
+## Wave 4 — Distribution (signed, shippable artifacts)
+
+### NATIVE-8 — Android: signed AAB/APK in CI
+
+```gherkin
+Scenario: A signed Android artifact is produced
+  Given the release keystore (from repo secrets, never committed)
+  When the release workflow runs on a tag
+  Then a signed .aab is built and uploaded as an artifact
+```
+
+**DoD:** signed AAB from CI; keystore in secrets; ADR-018.
+
+### NATIVE-9 — Windows: MSIX package + code-signing
+
+```gherkin
+Scenario: A signed MSIX is produced
+  Then a code-signed MSIX is built in CI (cert from secrets) and uploaded
+```
+
+**DoD:** signed MSIX artifact; ADR-018.
+
+### NATIVE-10 — iOS + macOS: signed IPA / pkg (Apple)
+
+**Context / notes:** needs the Apple Developer account + certs/provisioning profiles (secrets, base64),
+built + signed on the macOS runner. iOS `.ipa` + macCatalyst `.pkg`.
+
+```gherkin
+Scenario: Signed Apple artifacts are produced
+  Given Apple signing material in secrets and the macOS runner
+  Then a signed .ipa (iOS) and .pkg (macCatalyst) are built and uploaded
+```
+
+**DoD:** signed Apple artifacts from CI; ADR-018.
+
+### NATIVE-11 — (optional) Store submission
+
+**Context / notes:** automate (or document the manual path for) Play Console / App Store Connect / MS Store
+upload. Store review + accounts are external; the template ships the upload plumbing behind flags/secrets.
+
+**DoD:** upload step wired (guarded/off by default) or the manual submission path documented per store.
+
+---
+
+## Slice plan (sequenced — guardrails first, distribution last)
+
+1. 📝 **NATIVE-1** build gate + **NATIVE-2** audit — cheap, and NATIVE-2 scopes everything after it.
+2. 📝 **NATIVE-3/4/5** — fix the WebView gaps the audit confirms (skip any that already work).
+3. 📝 **NATIVE-6** manual native QA pass, then **NATIVE-7** automated native smoke.
+4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
+
+Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:
+don't automate (7) or distribute (8–11) before the app is verified working (6).
+
+**Known sharp edges (from ADR-018):**
+- **iOS/macOS need a Mac** — no macOS runner ⇒ NATIVE-1/7/10 can't cover Apple platforms; sequence Apple
+  work once the runner + Apple account exist.
+- **Signing material is secret** — keystores/certs/profiles live in repo secrets (base64), never the repo;
+  gitleaks stays green.
+- **Native UI tests are flaky** — keep the automated suite to smoke, with retries; manual QA (NATIVE-6)
+  remains the broader safety net.
+- **Parity ≠ more** — this epic makes native do what **web** does. OS push notifications, biometrics, and
+  other native-only features are **beyond parity** and explicitly out of scope here (own future epics).
+- **Web-first still holds** — new features land + prove on web first (golden rule 5); this epic keeps
+  native *caught up*, it doesn't invert the order.
