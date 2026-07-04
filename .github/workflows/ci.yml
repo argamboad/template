@@ -395,8 +395,17 @@ jobs:
           timeout 900 "$SDK/cmdline-tools/latest/bin/sdkmanager" --install "system-images;android-34;google_apis;x86_64" "emulator" "platform-tools"
           echo "::endgroup::"
 
+          # avdmanager and the emulator resolve the AVD directory DIFFERENTLY unless it's pinned:
+          # run 3 failed with "Unknown AVD name [smoke]" — avdmanager wrote the AVD where the
+          # emulator doesn't look. One exported ANDROID_AVD_HOME makes both sides agree (it's also
+          # what the reactivecircus emulator action does), and -list-avds verifies before launch.
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+
           echo "creating AVD…"
           echo no | timeout 120 "$SDK/cmdline-tools/latest/bin/avdmanager" create avd -n smoke -k "system-images;android-34;google_apis;x86_64" --force
+          "$SDK/emulator/emulator" -list-avds | grep -qx smoke || {
+            echo "::error::the AVD is not visible to the emulator"; ls -la "$ANDROID_AVD_HOME" || true; exit 1; }
 
           echo "launching emulator…"
           nohup "$SDK/emulator/emulator" -avd smoke -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > emulator.log 2>&1 &
