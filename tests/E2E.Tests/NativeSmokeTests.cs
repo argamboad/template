@@ -60,7 +60,10 @@ public class NativeSmokeTests
         var code = await Mailpit.WaitForOtpAsync(email, TimeSpan.FromSeconds(60));
         await page.GetByTestId("login-otp-code").FillAsync(code);
         await page.GetByTestId("login-verify-otp").ClickAsync();
-        await page.GetByTestId("sign-out").First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
+        // Attached, not Visible: the CI runner opens the app window narrow enough that the
+        // responsive header collapses sign-out behind the hamburger. Its presence in the DOM
+        // proves the authenticated shell rendered; the household assertions below prove the rest.
+        await page.GetByTestId("sign-out").First.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 60_000 });
 
         // One authorized page: Household loads its data — proves the native Bearer path.
         await page.GotoAsync("https://0.0.0.1/household");
