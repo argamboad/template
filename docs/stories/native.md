@@ -294,9 +294,19 @@ only — Windows bills 2×, ~10 min; NOT in deploy-staging needs so native flake
 deploys): preinstalled-Postgres + downloaded Mailpit + API on plain HTTP + the built exe, pointed at
 the stack via the new **`TEMPLATE_API_BASE_URL`** override in `MauiProgram` (also useful for
 physical-device testing against a LAN API). Verified locally with the exact CI shape (smoke green in
-5 s against the live app). **Remaining:** Android-emulator leg (same CDP idea via
-`adb forward … webview_devtools_remote`; own slice) and the iOS-simulator leg (parked with the
-Apple pin).
+5 s against the live app). **Android leg ✅ Implemented**
+(`feat/native-7b-android-smoke`): Android WebView's CDP lacks the browser-context management
+`ConnectOverCDPAsync` needs, so this leg uses **playwright-core's Node-only `_android` module**
+(adb + WebView attach) — a tiny committed spec in `tests/native-smoke-android/` mirroring the
+Windows journey; CI job `native-smoke-android` hand-rolls the emulator from the runner's
+preinstalled SDK (no marketplace action). Two gotchas encoded: Debug APKs must build with
+`EmbedAssembliesIntoApk=true` (a fast-deployment APK silently fails to start from `adb install`),
+and the smoke waits for the app process before attaching. **Rehearsed green on a real local
+emulator** (boot + OTP + roster). The same PR adds the **`native-paths` cost gate** (docs-only
+develop pushes skip the Apple builds + both smokes — the 2026-07-03 sprint exhausted the month's
+free Actions minutes in a day) and **deploy-staging concurrency** (back-to-back merges cancel the
+older deploy's version-gated smoke instead of failing it). **Remaining:** the iOS-simulator leg
+(parked with the Apple pin).
 
 **As a** maintainer
 **I want** the native critical paths driven automatically against a real emulator/simulator

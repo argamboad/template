@@ -179,11 +179,43 @@ jobs:
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Template.Maui.csproj -f ${{ matrix.tfm }} -c Debug -p:AcceptAndroidSDKLicenses=true
 
-  # Apple half of the native build gate (NATIVE-1). Runs on pushes to develop only: macOS runners bill
-  # at 10× on a private repo, so per-PR Apple builds would burn the free-tier minutes for little extra
-  # signal. iOS/MacCatalyst TFMs only exist on macOS hosts (see the csproj condition).
-  native-build-apple:
+  # Relevance gate for the expensive native legs. Born as a free-tier cost guard (the 2026-07-03
+  # NATIVE sprint burned a month of private-repo minutes in one day: ~10 develop pushes × [2 macOS
+  # legs at 10× + Windows at 2×]); the repo is public now (2026-07-04) so standard-runner minutes
+  # are free, but the gate still pays for itself in wall-clock and runner-queue time — and keeps
+  # any future return to private billable-safe. This cheap job diffs each develop push; docs-only
+  # merges (stories, QA plan/PDFs, parity matrix, ...) skip the Apple builds and both native smokes.
+  # Anything that could affect a native binary or the smoke harness (src/**, the E2E project,
+  # package pins, this workflow) still runs them. A schedule can't replace this: scheduled
+  # workflows execute from the DEFAULT branch (main here, which is deploy-only and behind develop).
+  native-paths:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          # Unknown before-SHA (force push, branch creation) ⇒ fail open: run the legs.
+          if ! git cat-file -e ${{ github.event.before }} 2>/dev/null; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} \
+              | grep -qE '^(src/|tests/E2E\.Tests/|tests/native-smoke-android/|Directory\.Packages\.props|\.github/workflows/ci\.yml|global\.json)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::docs-only push — skipping the Apple builds and native smokes."
+          fi
+
+  # Apple half of the native build gate (NATIVE-1). Develop pushes only, and only when the push
+  # touched native-relevant paths (see native-paths): macOS runners bill at 10× on a private repo.
+  native-build-apple:
+    needs: native-paths
+    if: needs.native-paths.outputs.changed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -213,14 +245,13 @@ jobs:
 
   # Native smoke — Windows (NATIVE-7, ADR-018). Runs the REAL MAUI Windows app against a real API +
   # Postgres + Mailpit, and drives its WebView2 over the Chrome DevTools Protocol (Playwright
-  # ConnectOverCDP — no Appium): boot → OTP sign-in → an authorized page loads. Develop pushes only,
-  # like the Apple legs: Windows runners bill 2× on a private repo and the job takes ~10 min, so
-  # per-PR runs would burn minutes for little signal (a native-runtime regression is still caught
-  # within one merge). Deliberately NOT in the deploy-staging needs — a flaky native run must not
-  # block web deploys (accepted-risk note in ADR-018: native UI automation is flakier than browser
-  # E2E; this stays a tiny canary).
+  # ConnectOverCDP — no Appium): boot → OTP sign-in → an authorized page loads. Develop pushes with
+  # native-relevant changes only (see native-paths; Windows bills 2×, job ~10 min). Deliberately NOT
+  # in the deploy-staging needs — a flaky native run must not block web deploys (accepted-risk note
+  # in ADR-018: native UI automation is flakier than browser E2E; this stays a tiny canary).
   native-smoke-windows:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: native-paths
+    if: needs.native-paths.outputs.changed == 'true'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -295,6 +326,117 @@ jobs:
       - name: API log (on failure)
         if: failure()
         run: if (Test-Path api.log) { Get-Content api.log -Tail 100 }
+
+  # Native smoke — Android (NATIVE-7, ADR-018). Same canary as the Windows leg, on a real emulator.
+  # Android WebView's CDP lacks the browser-context management Playwright's ConnectOverCDP needs, so
+  # this leg uses playwright-core's Node-only _android module (adb + WebView attach) — the tiny spec
+  # lives in tests/native-smoke-android/. The emulator is hand-rolled from the runner's preinstalled
+  # SDK (no marketplace action, mirroring the gitleaks approach). Two hard-won gotchas encoded here:
+  # the app must be built with EmbedAssembliesIntoApk=true (a fast-deployment Debug APK silently
+  # fails to start from a plain `adb install`), and the WebView devtools socket only exists after
+  # the app process is up.
+  native-smoke-android:
+    needs: native-paths
+    if: needs.native-paths.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_DB: smoke
+          POSTGRES_USER: smoke
+          POSTGRES_PASSWORD: smoke
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U smoke -d smoke" --health-interval 5s --health-timeout 5s --health-retries 15
+      mail:
+        image: axllent/mailpit:latest
+        ports: ["1025:1025", "8025:8025"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install the MAUI workloads (host-aware)
+        run: dotnet workload restore src/Maui/Template.Maui.csproj
+
+      - name: Build the app (self-contained APK) + API + smoke deps
+        run: |
+          dotnet build src/Maui/Template.Maui.csproj -f net10.0-android -c Debug \
+            -p:AcceptAndroidSDKLicenses=true -p:EmbedAssembliesIntoApk=true
+          dotnet restore src/Api/Template.Api.csproj --locked-mode
+          dotnet build src/Api/Template.Api.csproj -c Debug --no-restore
+          npm ci --prefix tests/native-smoke-android
+
+      - name: Enable KVM (hardware-accelerated emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Create and boot the emulator
+        run: |
+          SDK="$ANDROID_HOME"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --install "system-images;android-34;google_apis;x86_64" "emulator" "platform-tools" > /dev/null
+          echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd -n smoke -k "system-images;android-34;google_apis;x86_64" --force
+          nohup "$SDK/emulator/emulator" -avd smoke -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > emulator.log 2>&1 &
+          "$SDK/platform-tools/adb" wait-for-device
+          for i in $(seq 1 60); do
+            boot=$("$SDK/platform-tools/adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            [ "$boot" = "1" ] && { echo "emulator booted after ~$((i*5))s"; break; }
+            sleep 5
+          done
+          [ "$boot" = "1" ] || { echo "::error::emulator did not boot"; tail -40 emulator.log; exit 1; }
+
+      - name: Boot API + app, run the Android smoke
+        # One step for everything process-bound (the runner tears down a step's process tree).
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=smoke;Username=smoke;Password=smoke"
+          Jwt__Secret: "ci-native-smoke-jwt-signing-key-0123"
+          MAILPIT_BASE_URL: "http://localhost:8025"
+        run: |
+          set -e
+          dotnet run --project src/Api/Template.Api.csproj -c Debug --no-build --urls http://localhost:5238 > api.log 2>&1 &
+
+          echo "Waiting for the API…"
+          for i in $(seq 1 60); do
+            api=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5238/health/ready || echo 000)
+            [ "$api" = "200" ] && { echo "ready"; break; }
+            sleep 3
+          done
+          [ "$api" = "200" ] || { echo "::error::API did not become ready"; tail -60 api.log; exit 1; }
+
+          adb install -r src/Maui/bin/Debug/net10.0-android/com.companyname.template.maui-Signed.apk
+          # The app's compiled Android base URL is http://localhost:5238 — adb reverse maps the
+          # emulator's localhost:5238 back to this runner (same trick as local dev).
+          adb reverse tcp:5238 tcp:5238
+          adb shell monkey -p com.companyname.template.maui -c android.intent.category.LAUNCHER 1
+
+          echo "Waiting for the app process…"
+          for i in $(seq 1 20); do
+            pid=$(adb shell pidof com.companyname.template.maui | tr -d '\r')
+            [ -n "$pid" ] && { echo "app pid $pid"; break; }
+            sleep 3
+          done
+          [ -n "$pid" ] || { echo "::error::the app never started (fast-deployment APK? startup crash?)"; adb logcat -d | grep -iE "companyname|FATAL" | tail -40; exit 1; }
+
+          node tests/native-smoke-android/smoke.js
+
+      - name: Logs (on failure)
+        if: failure()
+        run: |
+          tail -n 60 api.log || true
+          adb logcat -d 2>/dev/null | grep -iE "companyname|FATAL|blazor" | tail -n 60 || true
 
   # End-to-end tests (v2 audit B8-5). Boots the REAL stack — Postgres + Mailpit (service containers) +
   # the API + the Blazor WASM Web app — and drives a headless Chromium through the QA smoke journeys,
@@ -394,6 +536,12 @@ jobs:
   deploy-staging:
     needs: [build-test, secret-scan, qa-artifacts, license-scan, docker-build, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    # Back-to-back merges: Render supersedes the older build, so the older run's version-gated smoke
+    # can never see its own SHA go live and fails spuriously. Cancel the older in-flight deploy job
+    # instead — cancelled reads as neutral, and the newest push still gets its full smoke.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render deploy

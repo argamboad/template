@@ -16,3 +16,6 @@ obj/
 # OS
 .DS_Store
 Thumbs.db
+
+# Node (the Android native smoke in tests/native-smoke-android)
+node_modules/
