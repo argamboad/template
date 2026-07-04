@@ -1,14 +1,18 @@
 :root {
-    /* Perezosoft brand palette — harmonized with the logo (sage/forest greens). */
-    --bs-primary: #465d4d;          /* forest green — buttons, header, accents */
+    /* Brand palette — THE single place to re-theme the app (web + all native shells).
+       Single-sourced in the RCL; both hosts load it via _content/Template.Shared.Ui/css/app.css.
+       Rebranding: derive these from the new logo and see docs/REBRANDING.md §4
+       (the email templates in Infrastructure/Email/BrandedEmail.cs carry their own copies).
+       Current values: Perezosoft sage/forest greens, harmonized with the logo. */
+    --bs-primary: #465d4d;          /* primary — buttons, header, accents */
     --bs-primary-rgb: 70, 93, 77;
-    --brand-green: #6b8a72;         /* sage — logo body */
-    --brand-green-dark: #2f3d33;    /* darkest — hover / active */
-    --brand-sage: #9bb6a1;          /* light sage accent */
+    --brand-accent: #6b8a72;        /* accent — logo body, loading spinner */
+    --brand-dark: #2f3d33;          /* darkest shade — hover / active */
+    --brand-accent-light: #9bb6a1;  /* light accent */
     --bs-link-color: #4f6b58;
     --bs-link-hover-color: #2f3d33;
     --header-height: 60px;
-    --app-bg: #F5F7F4;              /* faint warm sage-gray surface */
+    --app-bg: #F5F7F4;              /* page background surface */
     --app-border: #DCE5DD;
 }
 
@@ -28,17 +32,17 @@ a, .btn-link {
 .btn-primary {
     color: #fff;
     background-color: var(--bs-primary);
-    border-color: var(--brand-green-dark);
+    border-color: var(--brand-dark);
 }
 
 .btn-primary:hover {
-    background-color: var(--brand-green-dark);
-    border-color: var(--brand-green-dark);
+    background-color: var(--brand-dark);
+    border-color: var(--brand-dark);
 }
 
 .btn-primary:focus, .btn-primary:active {
-    background-color: var(--brand-green-dark);
-    border-color: var(--brand-green-dark);
+    background-color: var(--brand-dark);
+    border-color: var(--brand-dark);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
@@ -116,7 +120,7 @@ a, .btn-link {
     }
 
         .loading-progress circle:last-child {
-            stroke: #6b8a72;
+            stroke: var(--brand-accent);
             stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
             transition: stroke-dasharray 0.05s ease-in-out;
         }

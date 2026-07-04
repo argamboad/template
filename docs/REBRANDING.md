@@ -45,10 +45,18 @@ Native launcher icon (MAUI):
 Marketing (not shipped in the app):
 - `docs/brand/{linkedin_banner_1128x191.png, linkedin_logo_300.png}`
 
-## 4. Colour palette — green → your brand colours
-- `src/Web/wwwroot/css/app.css` — `:root` vars (`--bs-primary`, `--brand-green`, `--brand-green-dark`, `--brand-sage`, `--bs-link-color`, `--app-bg`, `--app-border`) + the loading-spinner stroke
-- `src/Maui/wwwroot/css/app.css` — the same set (kept in sync with the Web copy)
-- **`src/Infrastructure/Email/BrandedEmail.cs`** — the colour constants at the top (`Green`, `GreenDark`, `Sage`, `SageLight`, `Surface`, `Border`, `Ink`, `Muted`). They're hard-coded because email HTML can't use CSS variables.
+## 4. Colour palette — derive from your logo
+The palette is semantic tokens, single-sourced for web **and** all native shells:
+- **`src/Shared.Ui/wwwroot/css/app.css`** — the `:root` vars (`--bs-primary`/`--bs-primary-rgb`,
+  `--brand-accent`, `--brand-dark`, `--brand-accent-light`, `--bs-link-color`/`--bs-link-hover-color`,
+  `--app-bg`, `--app-border`). One file; both hosts load it via
+  `_content/Template.Shared.Ui/css/app.css`. Typical derivation from a logo: primary = the logo's
+  dominant mid tone, dark = its darkest shade (hover/active), accent(-light) = supporting tones,
+  bg/border = a near-white and a soft border tinted toward the primary. Check WCAG contrast for
+  white text on `--bs-primary`.
+- **`src/Infrastructure/Email/BrandedEmail.cs`** — the colour constants at the top (`Green`,
+  `GreenDark`, `Sage`, `SageLight`, `Surface`, `Border`, `Ink`, `Muted`) — rename them to match
+  your palette while you're there. They're hard-coded because email HTML can't use CSS variables.
 
 ## 5. App identifier & OAuth callback scheme — "perezosoft" / app id
 These must all match each other **and** your OAuth provider registration:
