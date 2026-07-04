@@ -179,13 +179,15 @@ jobs:
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Template.Maui.csproj -f ${{ matrix.tfm }} -c Debug -p:AcceptAndroidSDKLicenses=true
 
-  # Cost gate for the expensive native legs (free-tier guard — the 2026-07-03 NATIVE sprint burned
-  # the month's included minutes in one day: ~10 develop pushes × [2 macOS legs at 10× + Windows at
-  # 2×]). This cheap 1× job diffs each develop push; docs-only merges (stories, QA plan/PDFs, parity
-  # matrix, ...) skip the Apple builds and both native smokes entirely. Anything that could affect a
-  # native binary or the smoke harness (src/**, the E2E project, package pins, this workflow) still
-  # runs them. A schedule can't replace this: scheduled workflows execute from the DEFAULT branch
-  # (main here, which is deploy-only and behind develop).
+  # Relevance gate for the expensive native legs. Born as a free-tier cost guard (the 2026-07-03
+  # NATIVE sprint burned a month of private-repo minutes in one day: ~10 develop pushes × [2 macOS
+  # legs at 10× + Windows at 2×]); the repo is public now (2026-07-04) so standard-runner minutes
+  # are free, but the gate still pays for itself in wall-clock and runner-queue time — and keeps
+  # any future return to private billable-safe. This cheap job diffs each develop push; docs-only
+  # merges (stories, QA plan/PDFs, parity matrix, ...) skip the Apple builds and both native smokes.
+  # Anything that could affect a native binary or the smoke harness (src/**, the E2E project,
+  # package pins, this workflow) still runs them. A schedule can't replace this: scheduled
+  # workflows execute from the DEFAULT branch (main here, which is deploy-only and behind develop).
   native-paths:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
