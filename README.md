@@ -17,7 +17,7 @@ docs/                   ← doc skeletons (constant parts filled, app-specific =
   TECH_STACK.md         ← almost entirely reusable; only re-verify versions
   DECISIONS.md          ← pre-seeded with constant ADRs (C1–C15); add app ADRs from 001
   stories/
-src/ , tests/           ← ready-to-scaffold solution layout (Claude Code fills these)
+src/ , tests/           ← the complete platform (auth, tenancy, billing, jobs, …) + Notes sample slice
 ```
 
 ## How to use it
@@ -31,10 +31,31 @@ fills in the doc skeletons. The stack is already decided, so the conversation is
 Once concept + features + data model + decisions are settled, clone this template tree as
 your new repo (it already has `CLAUDE.md` at root, `docs/`, and the `src/`+`tests/` layout).
 
-**Step 3 — Build (in Claude Code).**
-Point Claude Code at the repo. It re-verifies current stable versions, scaffolds the projects into
-`src/`, builds the EF Core models + first migration from `DATA_MODEL.md`, and proceeds slice by
-slice — writing per-epic user stories into `docs/stories/` as it goes.
+**Step 3 — Rebrand + build (in Claude Code).**
+Point Claude Code at the repo. The platform (auth, tenancy, billing, jobs, notifications, GDPR,
+admin, deploy pipeline, …) is already built — the first session rebrands it and fills in the
+app-specific docs; after that it's your feature slices, with per-epic user stories written into
+`docs/stories/` as they're built.
+
+**The expected first Claude Code prompt** (copy, fill the brackets, attach the logo):
+
+> We're starting a new app on this template, from the conceptualization docs already in `docs/`.
+> The app is **[AppName]**; the tenant's app-facing label is **[Team / Workspace / Household / …]**.
+> Here is the logo: **[file]**.
+>
+> 1. **Rebrand end to end per `docs/REBRANDING.md`** — every section: name/wordmark, tagline,
+>    logo assets (derive the resized icons/favicon/OG image from this logo), the **colour palette
+>    derived from the logo** (the `:root` tokens in `src/Shared.Ui/wwwroot/css/app.css` **and**
+>    the email colours in `src/Infrastructure/Email/BrandedEmail.cs` — don't skip the email
+>    templates), the OAuth callback scheme + `ApplicationId`, and the brand strings in every
+>    localization `.resx`.
+> 2. **Fill the app-specific placeholders** — `CLAUDE.md` TODOs (golden rules, conventions) and
+>    any remaining `docs/` placeholders — from the conceptualization docs.
+> 3. **Verify** per the checklist: `git grep -i perezosoft` returns nothing, the app builds and
+>    runs with the new brand, and a test OTP email arrives with the new logo/colours/name.
+>
+> Then propose the first feature epic from `docs/FEATURES.md` (the `Notes` sample slice gets
+> deleted when the first real feature lands).
 
 ## What's constant vs. per-project
 

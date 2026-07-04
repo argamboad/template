@@ -68,7 +68,10 @@ RTL (no RTL language shipped); clipboard (no copy affordances exist).
 
 - **The two `index.html` hosts must stay in sync** (`src/Web/wwwroot/index.html` ↔
   `src/Maui/wwwroot/index.html`): any script/CSS the RCL depends on (e.g. the MFA QR vendor script)
-  must be added to **both**, or the feature silently breaks on one host.
+  must be added to **both**, or the feature silently breaks on one host. *(Reduced surface since
+  the brand-tokens refactor: `app.css` is single-sourced from the RCL at
+  `_content/Template.Shared.Ui/css/app.css`; only the bootstrap vendored copies and the script
+  tags remain per-host.)*
 - **Every emailed link lands on `Auth:AppBaseUrl` (the web app)** — when adding an email that links
   into the product, either the flow must also be reachable in-app without a URL (like G5's token
   input) or it is web-only and should say so.

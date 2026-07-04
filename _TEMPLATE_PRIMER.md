@@ -97,4 +97,7 @@ rules, and domain logic are designed fresh. Only the items under "Frozen decisio
 
 Ask me to describe the app in a few sentences, then begin clarifying. Once concept + features +
 data model + decisions are settled, remind me it's time to create the repo (using the starter
-skeleton) and switch to Claude Code.
+skeleton) and switch to Claude Code — where the **first task is the rebrand** (name, logo,
+logo-derived colour palette, OAuth scheme). The repo's `README.md` contains the expected
+copy-paste first prompt for that session; make sure I leave the conceptualization with an app
+name, a tenant label, and a logo file in hand.
