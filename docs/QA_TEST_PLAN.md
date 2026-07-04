@@ -1068,7 +1068,7 @@ in spam — a domain/DKIM concern, not an app bug.)*
 > The desktop client reuses the same UI; only the **auth transport** (loopback browser flow, body
 > token, OS secure storage) differs. Magic link is intentionally **absent** on native.
 
-### QA-DSK-01 — OTP sign-in 🔴 (Desktop)
+### QA-DSK-01 — OTP sign-in 🔴 (Desktop) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given the desktop app is on the login screen
@@ -1220,7 +1220,7 @@ appears in the nav; the console lists tenants; opening a detail works. Impersona
 > Prereq every run: **`adb reverse tcp:5238 tcp:5238`** + API on the https profile. See
 > `docs/MOBILE_TESTING.md`.
 
-### QA-AND-01 — OTP sign-in 🔴 (Android)
+### QA-AND-01 — OTP sign-in 🔴 (Android) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given the Android app is on the login screen with adb reverse set
@@ -1594,9 +1594,13 @@ Postgres + Mailpit + API + Web stack — so they are continuously regression-gua
 | QA-MFA-01 (enable TOTP) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` (enroll leg) |
 | QA-MFA-02 (step-up enforced at sign-in) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` + `StepUp_WithWrongCode_DoesNotSignIn` |
 | QA-I18N-01 (switch language on login) | `I18nTests.Switching_Language_ReRendersTheUi` |
+| QA-DSK-01 (desktop OTP sign-in) | `NativeSmokeTests` — the `native-smoke-windows` job boots the REAL Windows exe and drives it over WebView2 CDP (OTP + household load) |
+| QA-AND-01 (Android OTP sign-in) | `tests/native-smoke-android/smoke.js` — the `native-smoke-android` job boots a real emulator and drives the app via playwright-core's `_android` module |
 
-These still need a manual pass on **Desktop/Android** (the CI job runs Web only) and whenever the area
-changes. All other cases remain manual-only or API-test-backed as noted per row.
+The two native smoke jobs run on develop pushes that touch native-relevant paths (see the
+`native-paths` gate in ci.yml) — they are boot-and-sign-in canaries, not the per-feature native
+regression, which stays manual (§12–13b). All other cases remain manual-only or API-test-backed as
+noted per row.
 
 ---
 

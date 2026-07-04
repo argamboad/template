@@ -283,7 +283,17 @@ Scenario: Full native regression exists
 
 ### NATIVE-7 — Automated native UI tests in CI
 
-**Status: 🚧 Windows half ✅ Implemented** (`feat/native-7-windows-smoke`). No Appium: the smoke
+**Status: ✅ COMPLETE for the non-Apple platforms — both smokes green in CI** (develop run
+after #116; Windows leg green 4× consecutively). Getting the Android leg green took five CI
+iterations, each fixing one runner-environment delta the local rehearsal couldn't expose — the
+sequence is instructive: (1) silent 45-min hang → hardened every phase with deadlines + narration +
+`if: always()` diagnostics (a timed-out job archives NO logs); (2) `Unknown AVD name` → avdmanager
+and the emulator resolve the AVD home differently on runners, pinned via `ANDROID_AVD_HOME`;
+(3) `adb: command not found` → sdkmanager-installed platform-tools isn't on the runner's PATH.
+The Windows leg needed one fix (assert `Attached`, not `Visible` — the runner's narrow window
+collapses the header). Originally implemented as:
+
+**Windows half** (`feat/native-7-windows-smoke`). No Appium: the smoke
 drives the REAL MAUI app's WebView over the **Chrome DevTools Protocol** (the recipe proven during
 Wave 2) — the app launches with remote debugging enabled and Playwright attaches with
 `ConnectOverCDPAsync`, reusing the E2E project's page test-ids and Mailpit helper.
