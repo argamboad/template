@@ -25,6 +25,27 @@ PRI_EMOJI = {"\U0001f534": ("Smoke", "#c0392b"),
              "\U0001f7e0": ("Core",  "#d35400"),
              "\U0001f7e2": ("Edge",  "#27ae60")}
 
+# The built-in Helvetica/Courier fonts only cover WinAnsi — every other glyph
+# prints as a hollow box (emoji + U+FE0F even print as TWO boxes). Swap them
+# for printable equivalents before rendering. Priority circles are handled
+# separately in inline().
+SYMBOLS = [
+    ("\ufe0f", ""),   # U+FE0F variation selector riding on emoji
+    ("⚙", ""),          # gear "automated" marker — its text is alongside
+    ("→", "->"),        # rightwards arrow
+    ("⇒", "=>"),        # rightwards double arrow
+    ("↔", "<->"),       # left right arrow
+    ("≥", ">="),        # greater-than or equal
+    ("⚠", "(!)"),       # warning sign
+    ("\U0001f50d", "[verify]"),  # magnifying glass (parity-audit flag)
+    ("☐", "[ ]"),       # ballot box
+]
+
+def sanitize(text):
+    for src, repl in SYMBOLS:
+        text = text.replace(src, repl)
+    return text
+
 styles = getSampleStyleSheet()
 H1   = ParagraphStyle("H1", parent=styles["Title"], fontSize=20, leading=24,
                       textColor=INK, spaceAfter=4)
@@ -53,6 +74,9 @@ def inline(text):
     # Split out `code` spans first; escape every segment BEFORE injecting any
     # reportlab markup so html.escape() can't clobber the tags we add.
     out = []
+    text = sanitize(text)
+    text = re.sub(r' {2,}', ' ', text)   # gaps left by dropped markers
+    text = re.sub(r' \)', ')', text)
     parts = re.split(r'(`[^`]+`)', text)
     for part in parts:
         if part.startswith("`") and part.endswith("`") and len(part) >= 2:
@@ -61,7 +85,7 @@ def inline(text):
             continue
         seg = html.escape(part)                       # escape raw text first
         for emo, (name, col) in PRI_EMOJI.items():    # emoji survive escaping
-            seg = seg.replace(emo, '<font color="%s">● %s</font>' % (col, name))
+            seg = seg.replace(emo, '<font color="%s">• %s</font>' % (col, name))
         seg = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', seg)          # bold
         seg = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<u>\1</u>', seg)  # md links
         seg = re.sub(r'&lt;(https?://[^&]+)&gt;', r'<u>\1</u>', seg) # <url>
@@ -79,7 +103,16 @@ def md_table(rows):
         r = r.strip().strip("|")
         return [c.strip() for c in r.split("|")]
     head = cells(rows[0])
-    body = [cells(r) for r in rows[2:]]
+    body = []
+    for r in rows[2:]:
+        cs = cells(r)
+        # A raw '|' inside a cell (e.g. `GET|POST` in a code span) splits into
+        # extra cells and makes the Table wider than the page — glue the
+        # overflow back onto the last column and pad short rows.
+        if len(cs) > len(head):
+            cs = cs[:len(head)-1] + ["|".join(cs[len(head)-1:])]
+        cs += [""] * (len(head) - len(cs))
+        body.append(cs)
     return head, body
 
 while i < N:
@@ -120,14 +153,23 @@ while i < N:
             buf.append(re.sub(r'^\s*>\s?', '', lines[i].rstrip()))
             i += 1
         blocks.append(("quote", buf)); continue
-    # ordered list item
+    # list items (ordered / unordered) — indented follow-up lines belong to
+    # the item; splitting them off restarts the numbering and orphans text.
+    def item_continuation(idx, parts):
+        while idx < N and lines[idx].strip() and lines[idx][:1] in (" ", "\t") \
+                and not re.match(r'^\s*(#{1,3}\s|```|>|[-*]\s|\d+\.\s|\|)', lines[idx]):
+            parts.append(lines[idx].strip()); idx += 1
+        return idx
     m = re.match(r'^(\d+)\.\s+(.*)$', s.strip())
     if m:
-        blocks.append(("ol", m.group(2).strip())); i += 1; continue
-    # unordered list item
+        parts = [m.group(2).strip()]
+        i = item_continuation(i + 1, parts)
+        blocks.append(("ol", " ".join(parts))); continue
     m = re.match(r'^[-*]\s+(.*)$', s.strip())
     if m:
-        blocks.append(("ul", m.group(1).strip())); i += 1; continue
+        parts = [m.group(1).strip()]
+        i = item_continuation(i + 1, parts)
+        blocks.append(("ul", " ".join(parts))); continue
     # plain paragraph (gather continuation lines)
     buf = [s.strip()]
     i += 1
@@ -147,9 +189,9 @@ story.append(Paragraph(
 story.append(HRFlowable(width="100%", thickness=1, color=INK, spaceBefore=6, spaceAfter=8))
 
 def code_block(lang, buf):
-    txt = "\n".join(buf) if buf else " "
+    buf = [sanitize(l) for l in (buf or [" "])]
     para = Paragraph("<br/>".join(html.escape(l) if l else "&nbsp;"
-                                  for l in (buf or [" "])), CODE)
+                                  for l in buf), CODE)
     bg = colors.HexColor("#eef4ec") if lang == "gherkin" else colors.HexColor("#f3f3f3")
     t = Table([[para]], colWidths=[doc_width])
     t.setStyle(TableStyle([
@@ -162,6 +204,38 @@ def code_block(lang, buf):
     return t
 
 doc_width = A4[0] - 28*mm  # set properly after doc is built; placeholder
+
+def make_table(data, head, body, width):
+    # Equal column widths starve text-heavy columns (§15's traceability matrix
+    # ends up with page-tall rows that spill off the page). Weight each column
+    # by its longest cell instead, with a floor so tiny columns stay legible,
+    # and let oversized rows split across pages when the engine supports it.
+    ncols = max(1, len(head))
+    weights = []
+    for ci in range(ncols):
+        cells = [head[ci]] + [r[ci] for r in body if ci < len(r)]
+        longest = max(8, min(max(len(c) for c in cells), 320))
+        weights.append(longest ** 0.5)  # sqrt keeps short columns readable
+    total = float(sum(weights))
+    raw = [width * w / total for w in weights]
+    floor = min(16*mm, width / ncols)
+    fixed = sum(floor for w in raw if w < floor)
+    flex = sum(w for w in raw if w >= floor) or 1.0
+    scale = (width - fixed) / flex
+    cw = [floor if w < floor else w * scale for w in raw]
+    try:
+        t = Table(data, colWidths=cw, repeatRows=1, splitInRow=1)
+    except TypeError:  # older reportlab without splitInRow
+        t = Table(data, colWidths=cw, repeatRows=1)
+    t.setStyle(TableStyle([
+        ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#bbbbbb")),
+        ("BACKGROUND", (0,0), (-1,0), INK),
+        ("VALIGN", (0,0), (-1,-1), "TOP"),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f6f8fa")]),
+        ("TOPPADDING", (0,0), (-1,-1), 3), ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ("LEFTPADDING", (0,0), (-1,-1), 4), ("RIGHTPADDING", (0,0), (-1,-1), 4),
+    ]))
+    return t
 
 # pending list grouping
 def flush_list(items, ordered, out):
@@ -219,19 +293,10 @@ def build(width):
             out.append(Spacer(1, 1*mm))
         elif kind == "table":
             head, body = md_table(payload)
-            cw = width / max(1, len(head))
             data = [[Paragraph(inline(c), CELLH) for c in head]]
             for row in body:
                 data.append([Paragraph(inline(c), CELL) for c in row])
-            t = Table(data, colWidths=[cw]*len(head), repeatRows=1)
-            t.setStyle(TableStyle([
-                ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#bbbbbb")),
-                ("BACKGROUND", (0,0), (-1,0), INK),
-                ("VALIGN", (0,0), (-1,-1), "TOP"),
-                ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f6f8fa")]),
-                ("TOPPADDING", (0,0), (-1,-1), 3), ("BOTTOMPADDING", (0,0), (-1,-1), 3),
-                ("LEFTPADDING", (0,0), (-1,-1), 4), ("RIGHTPADDING", (0,0), (-1,-1), 4),
-            ]))
+            t = make_table(data, head, body, width)
             out.append(t)
             out.append(Spacer(1, 2*mm))
         elif kind == "ol":

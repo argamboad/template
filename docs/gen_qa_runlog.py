@@ -15,26 +15,46 @@ OUT = "QA_RUN_LOG.pdf"
 PRI = {"\U0001f534": "Smoke", "\U0001f7e0": "Core", "\U0001f7e2": "Edge"}
 PRI_COLOR = {"Smoke": "#c0392b", "Core": "#d35400", "Edge": "#27ae60"}
 
-# --- suite section map: prefix -> (number, title) in document order ---
-SUITES = [
-    ("4",  "Smoke suite", ["QA-SMK"]),
-    ("5",  "Web — Authentication", ["QA-AUTH"]),
-    ("6",  "Web — Onboarding & new tenant", ["QA-ONB"]),
-    ("7",  "Web — Household management", ["QA-HH"]),
-    ("8",  "Web — Invitations & joining", ["QA-INV"]),
-    ("9",  "Web — Settings / linked accounts", ["QA-SET"]),
-    ("10", "Web — Localization (i18n)", ["QA-I18N"]),
-    ("11", "Emails (Mailpit)", ["QA-MAIL"]),
-    ("12", "Desktop — MAUI / Windows", ["QA-DSK"]),
-    ("13", "Android — MAUI", ["QA-AND"]),
-    ("14", "Cross-cutting security", ["QA-SEC"]),
+# Built-in Helvetica only covers WinAnsi — anything else prints as hollow
+# boxes (symbol + U+FE0F variation selector = two boxes). Same map as
+# gen_qa_guide.py; keep the two in sync.
+SYMBOLS = [
+    ("\ufe0f", ""),   # U+FE0F variation selector riding on emoji
+    ("⚙", ""),          # gear "automated" marker — its text is alongside
+    ("→", "->"),        # rightwards arrow
+    ("⇒", "=>"),        # rightwards double arrow
+    ("↔", "<->"),       # left right arrow
+    ("≥", ">="),        # greater-than or equal
+    ("⚠", "(!)"),       # warning sign
+    ("\U0001f50d", "[verify]"),  # magnifying glass (parity-audit flag)
 ]
 
+def sanitize(text):
+    for src, repl in SYMBOLS:
+        text = text.replace(src, repl)
+    return text
+
+# Helvetica has no U+2610 ballot box either — a plain bracket pair is the
+# only checkbox that renders the same in every PDF viewer.
+CHK = '[&nbsp;&nbsp;&nbsp;]'
+
 hdr_re = re.compile(r'^### (QA-[A-Z0-9]+-\d+) — (.+)$')
+sec_re = re.compile(r'^## (\d+[a-z]?)\.\s+(.+)$')
 
 def parse():
+    # Each case belongs to the "## N. Title" section it sits under — derived
+    # from the document so new suites never need a hand-maintained map.
     cases = []
+    sec = ("?", "Other")
     for line in open(PLAN, encoding="utf-8"):
+        s = sec_re.match(line.rstrip())
+        if s:
+            name = s.group(2)
+            for emo in PRI:
+                name = name.replace(emo, "")
+            name = re.sub(r'\s{2,}', ' ', sanitize(name)).strip(" —")
+            sec = (s.group(1), name)
+            continue
         m = hdr_re.match(line.rstrip())
         if not m:
             continue
@@ -55,15 +75,10 @@ def parse():
             title = title.replace(emo, "")
         title = re.sub(r'\s*— see QA-[A-Z0-9-]+\s*$', '', title)
         title = re.sub(r'\s*\([^()]*\)\s*$', '', title).strip()
-        cases.append(dict(id=cid, title=title, pri=pri, client=client))
+        title = re.sub(r'\s{2,}', ' ', sanitize(title)).strip()
+        client = re.sub(r'\s{2,}', ' ', sanitize(client)).strip()
+        cases.append(dict(id=cid, title=title, pri=pri, client=client, sec=sec))
     return cases
-
-def suite_for(cid):
-    for num, name, prefixes in SUITES:
-        for p in prefixes:
-            if cid.startswith(p + "-"):
-                return (num, name)
-    return ("?", "Other")
 
 cases = parse()
 
@@ -111,8 +126,10 @@ meta = [
      Paragraph("<b>Date</b>", CELL), Paragraph(today, CELL)],
     [Paragraph("<b>Build / commit SHA</b>", CELL), Paragraph("&nbsp;", CELL),
      Paragraph("<b>Branch</b>", CELL), Paragraph("&nbsp;", CELL)],
-    [Paragraph("<b>Client(s) under test</b>", CELL), Paragraph("Web ☐&nbsp;&nbsp; Desktop ☐&nbsp;&nbsp; Android ☐", CELL),
-     Paragraph("<b>Mail → Mailpit?</b>", CELL), Paragraph("Yes ☐&nbsp;&nbsp; No ☐", CELL)],
+    [Paragraph("<b>Client(s) under test</b>", CELL),
+     Paragraph("Web %s&nbsp;&nbsp; Desktop %s&nbsp;&nbsp; Android %s" % (CHK, CHK, CHK), CELL),
+     Paragraph("<b>Mail -&gt; Mailpit?</b>", CELL),
+     Paragraph("Yes %s&nbsp;&nbsp; No %s" % (CHK, CHK), CELL)],
 ]
 mt = Table(meta, colWidths=[34*mm, 60*mm, 30*mm, 58*mm])
 mt.setStyle(TableStyle([
@@ -132,21 +149,21 @@ sm = sum(1 for c in cases if c["pri"]=="Smoke")
 co = sum(1 for c in cases if c["pri"]=="Core")
 ed = sum(1 for c in cases if c["pri"]=="Edge")
 story.append(Paragraph(
-    "<b>%d cases</b> &nbsp;—&nbsp; <font color='#c0392b'>● %d Smoke</font> &nbsp; "
-    "<font color='#d35400'>● %d Core</font> &nbsp; <font color='#27ae60'>● %d Edge</font>"
+    "<b>%d cases</b> &nbsp;—&nbsp; <font color='#c0392b'>• %d Smoke</font> &nbsp; "
+    "<font color='#d35400'>• %d Core</font> &nbsp; <font color='#27ae60'>• %d Edge</font>"
     % (n, sm, co, ed), NOTE))
 story.append(Spacer(1, 3*mm))
 
 # --- per-suite tables ---
 RESULT_HDR = "Result (circle one)"
-col_widths = [20*mm, 56*mm, 13*mm, 17*mm, 34*mm, 42*mm]
+col_widths = [24*mm, 52*mm, 13*mm, 17*mm, 34*mm, 42*mm]  # Case ID fits QA-ADMIN-0x unwrapped
 
 def result_cell():
     return Paragraph("P&nbsp;&nbsp;/&nbsp;&nbsp;F&nbsp;&nbsp;/&nbsp;&nbsp;B&nbsp;&nbsp;/&nbsp;&nbsp;N-A", CELL)
 
 last_suite = None
 for c in cases:
-    num, name = suite_for(c["id"])
+    num, name = c["sec"]
     key = (num, name)
     if key != last_suite:
         last_suite = key
@@ -162,7 +179,7 @@ for c in cases:
         if isinstance(el, tuple) and el[0]=="__TABLE_MARK__":
             rows = el[1]
             break
-    pri_cell = Paragraph("<font color='%s'>●</font> %s" % (PRI_COLOR[c["pri"]], c["pri"]), SMALL)
+    pri_cell = Paragraph("<font color='%s'>•</font> %s" % (PRI_COLOR[c["pri"]], c["pri"]), SMALL)
     rows.append([
         Paragraph(c["id"], CELLB),
         Paragraph(c["title"], CELL),
@@ -195,12 +212,12 @@ for el in story:
 final.append(Spacer(1, 5*mm))
 final.append(Paragraph("Release gate", SEC))
 final.append(Paragraph(
-    "All ● <b>Smoke</b> + all ● <b>Core</b> cases Pass on Web; ● Smoke Pass on Desktop "
-    "and Android; no open Critical/High defects. ● Edge cases triaged (Pass or "
+    "All • <b>Smoke</b> + all • <b>Core</b> cases Pass on Web; • Smoke Pass on Desktop "
+    "and Android; no open Critical/High defects. • Edge cases triaged (Pass or "
     "accepted-known-issue).", NOTE))
 final.append(Spacer(1, 4*mm))
 gate = [[Paragraph("<b>Overall verdict</b>", CELL),
-         Paragraph("PASS ☐&nbsp;&nbsp;&nbsp; FAIL ☐&nbsp;&nbsp;&nbsp; CONDITIONAL ☐", CELL),
+         Paragraph("PASS %s&nbsp;&nbsp;&nbsp; FAIL %s&nbsp;&nbsp;&nbsp; CONDITIONAL %s" % (CHK, CHK, CHK), CELL),
          Paragraph("<b>Signed</b>", CELL), Paragraph("&nbsp;", CELL)]]
 gt = Table(gate, colWidths=[28*mm, 78*mm, 20*mm, 56*mm])
 gt.setStyle(TableStyle([
