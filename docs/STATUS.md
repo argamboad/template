@@ -67,11 +67,22 @@ df -h /        # want ~60 GB free (Xcode ≈ 15 GB + simulator runtime + .NET + 
 If the Mac can't run macOS 15.5+, stop and report back — we'd need to discuss pinning an older
 toolchain instead.
 
+> **Verdict for the target machine (2026-07-04):** the maintainer's Mac is a 2020 MacBook Air
+> M1, 8 GB RAM, 512 GB SSD, on the latest macOS with Xcode and VS Code already installed —
+> **viable**; Phase 0 passes and Phase 1 shrinks to steps 2–6. The only pinch point is the
+> **8 GB of RAM**; work in this order and it's comfortable:
+> 1. Cap Docker Desktop's memory at ~2 GB (Settings → Resources) — Postgres + Mailpit need far less.
+> 2. Close browsers and other heavy apps during the pass.
+> 3. Do the **macCatalyst cases first** (Phase 3, no simulator), then quit that app before Phase 4.
+> 4. Keep exactly **one** simulator booted; expect the first iOS build to take several minutes.
+
 ### Phase 1 — install the toolchain (~1–2 h, mostly downloads)
 
 1. **Xcode 26.5** — App Store (search "Xcode"), or the exact version from
    <https://developer.apple.com/download/applications/> (free Apple ID sign-in). 26.5 is the CI
-   pin; a newer 26.x from the App Store is normally fine.
+   pin; a newer 26.x from the App Store is normally fine. *(Already installed on the target
+   MacBook — just confirm `xcodebuild -version` reports 26.x, and still run step 2: the iOS
+   simulator runtime is a separate download that a stock Xcode install may not have.)*
 2. **First-launch setup** (Terminal):
    ```bash
    sudo xcode-select -s /Applications/Xcode.app
