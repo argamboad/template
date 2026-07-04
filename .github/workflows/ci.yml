@@ -432,6 +432,9 @@ jobs:
           MAILPIT_BASE_URL: "http://localhost:8025"
         run: |
           set -e
+          # platform-tools was installed by sdkmanager this job — it is NOT on the runner's PATH
+          # (run 4 died with `adb: command not found`); the Node smoke needs adb reachable too.
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           dotnet run --project src/Api/Template.Api.csproj -c Debug --no-build --urls http://localhost:5238 > api.log 2>&1 &
 
           echo "Waiting for the API…"
@@ -463,6 +466,7 @@ jobs:
         # don't satisfy failure() — the first hung run produced zero diagnostics because of this.
         if: always()
         run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           tail -n 40 emulator.log || true
           tail -n 60 api.log || true
           adb logcat -d 2>/dev/null | grep -iE "companyname|FATAL|blazor" | tail -n 60 || true
