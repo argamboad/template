@@ -36,7 +36,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o =>
 {
-    o.SwaggerDoc("v1", new OpenApiInfo { Title = "Template API", Version = "v1" });
+    o.SwaggerDoc("v1", new OpenApiInfo { Title = "Perezosoft API", Version = "v1" });
     // A curated "public" document with ONLY the /api/public routes (PUBAPI-2) — the customer-facing
     // contract, served leak-free at /api/public/openapi.json when PUBAPI is enabled (see below).
     o.SwaggerDoc("public", new OpenApiInfo
@@ -206,7 +206,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Template API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Perezosoft API v1");
         if (publicApiSettings.Enabled)
             c.SwaggerEndpoint("/swagger/public/swagger.json", "Public API"); // PUBAPI-2
         c.RoutePrefix = string.Empty; // serve the UI at the API root (/)

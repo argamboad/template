@@ -288,13 +288,13 @@ jobs:
 
       - name: Boot API + app, run the native smoke
         # Everything process-bound lives in ONE step (the runner tears down a step's process tree).
-        # The app is pointed at the plain-HTTP API via TEMPLATE_API_BASE_URL (no dev-cert hoops) and
+        # The app is pointed at the plain-HTTP API via PEREZOSOFT_API_BASE_URL (no dev-cert hoops) and
         # launched with WebView2 remote debugging for the CDP connection.
         env:
           ASPNETCORE_ENVIRONMENT: Development
           ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=smoke;Username=postgres;Password=root"
           Jwt__Secret: "ci-native-smoke-jwt-signing-key-0123"
-          TEMPLATE_API_BASE_URL: "http://localhost:5238"
+          PEREZOSOFT_API_BASE_URL: "http://localhost:5238"
           WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=9223"
           NATIVE_SMOKE_CDP: "http://localhost:9223"
           MAILPIT_BASE_URL: "http://localhost:8025"
@@ -445,15 +445,15 @@ jobs:
           done
           [ "$api" = "200" ] || { echo "::error::API did not become ready"; tail -60 api.log; exit 1; }
 
-          adb install -r src/Maui/bin/Debug/net10.0-android/com.companyname.template.maui-Signed.apk
+          adb install -r src/Maui/bin/Debug/net10.0-android/com.perezosoft.platform-Signed.apk
           # The app's compiled Android base URL is http://localhost:5238 — adb reverse maps the
           # emulator's localhost:5238 back to this runner (same trick as local dev).
           adb reverse tcp:5238 tcp:5238
-          adb shell monkey -p com.companyname.template.maui -c android.intent.category.LAUNCHER 1
+          adb shell monkey -p com.perezosoft.platform -c android.intent.category.LAUNCHER 1
 
           echo "Waiting for the app process…"
           for i in $(seq 1 20); do
-            pid=$(adb shell pidof com.companyname.template.maui | tr -d '\r')
+            pid=$(adb shell pidof com.perezosoft.platform | tr -d '\r')
             [ -n "$pid" ] && { echo "app pid $pid"; break; }
             sleep 3
           done

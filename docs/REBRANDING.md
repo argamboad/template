@@ -64,7 +64,7 @@ These must all match each other **and** your OAuth provider registration:
 - `src/Maui/Platforms/Android/WebAuthenticatorCallbackActivity.cs` — `CallbackScheme` const + intent-filter `DataScheme`
 - `src/Maui/Platforms/iOS/Info.plist` + `src/Maui/Platforms/MacCatalyst/Info.plist` — `CFBundleURLSchemes` entry
 - `src/Api/appsettings.json` — `Auth:Native:CallbackScheme`
-- `src/Maui/Perezosoft.Maui.csproj` — `ApplicationId` (`com.companyname.…`)
+- `src/Maui/Perezosoft.Maui.csproj` — `ApplicationId` (`com.perezosoft.…`)
 - Provider consoles — register `{scheme}://auth` and your `signin-*` redirect URIs
 
 ## Verify the rebrand

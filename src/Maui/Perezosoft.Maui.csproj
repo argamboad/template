@@ -42,10 +42,10 @@
         <MauiXamlInflator>SourceGen</MauiXamlInflator>
 
         <!-- Display name -->
-        <ApplicationTitle>Perezosoft.Maui</ApplicationTitle>
+        <ApplicationTitle>Perezosoft Platform</ApplicationTitle>
 
         <!-- App Identifier -->
-        <ApplicationId>com.companyname.template.maui</ApplicationId>
+        <ApplicationId>com.perezosoft.platform</ApplicationId>
 
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>

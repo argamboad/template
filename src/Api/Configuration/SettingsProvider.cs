@@ -16,7 +16,7 @@ public class JwtSettings : IJwtSettings
     {
         SecretKey = config["Jwt:Secret"]
             ?? throw new InvalidOperationException("Jwt:Secret not configured (set Jwt__Secret in .env for dev)");
-        Issuer = config["Jwt:Issuer"] ?? "Template";
+        Issuer = config["Jwt:Issuer"] ?? "Perezosoft";
         ExpiryMinutes = config.GetValue("Jwt:ExpiryMinutes", 60);
 
         const int MinSecretKeyLength = 32;

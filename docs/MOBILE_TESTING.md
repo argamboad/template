@@ -87,6 +87,6 @@ the Android Keystore and silently exchanged on startup).
   `Platforms/Android/Resources/xml/network_security_config.xml`. If you change the host,
   add it there.
 - **Physical device** → `adb reverse` works over USB too; no other change needed.
-- **Pointing the app somewhere else** → set `TEMPLATE_API_BASE_URL` before launching (any
+- **Pointing the app somewhere else** → set `PEREZOSOFT_API_BASE_URL` before launching (any
   platform): overrides the compiled per-platform API base — e.g. a LAN address for a device that
   can't use `adb reverse`, or plain HTTP for the CI native smoke (`native-smoke-windows`).
