@@ -1,4 +1,4 @@
-# Creating an App from this Template — the end-to-end guide
+# Creating an App from this Platform — the end-to-end guide
 
 > The spine document: every phase from "I have an idea" to "customers are using it in
 > production", in order, with links to the detailed doc for each step. The README gives the
@@ -37,7 +37,7 @@ No cloud accounts are needed until Phase 7.
 
 ## Phase 1 — Conceptualize (in Claude chat, not Code)
 
-Paste **`_TEMPLATE_PRIMER.md`** into a fresh Claude chat and describe your app. The primer makes
+Paste **`_PLATFORM_PRIMER.md`** into a fresh Claude chat and describe your app. The primer makes
 Claude run a structured session: clarifying questions, recommendations, scope discipline
 (an explicit OUT list), and ADRs for every settled decision. The stack is frozen, so the whole
 conversation is about *your product*.
@@ -48,8 +48,8 @@ app-facing label** (Team? Workspace? Household?), and a **logo file** (SVG or la
 
 ## Phase 2 — Create the repo
 
-1. Copy the template tree into a new repository (don't fork — a new app is not a branch of the
-   template): `git clone`, remove `.git`, `git init`, point at your new GitHub remote.
+1. Copy the platform tree into a new repository (don't fork — a new app is not a branch of the
+   platform): `git clone`, remove `.git`, `git init`, point at your new GitHub remote.
 2. Drop the Phase-1 docs into `docs/`.
 3. Create the two branches and protect them: **`main` is deploy-only** (protect it; nothing lands
    there except release merges), **`develop` is the working branch** — one branch + PR per slice.

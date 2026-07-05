@@ -1,6 +1,6 @@
 # Deployment runbook
 
-> How to run this template on a real environment. The target stack is **free-tier-first** (ADR-017):
+> How to run this platform on a real environment. The target stack is **free-tier-first** (ADR-017):
 > **Render** (one container serving the API **and** the Blazor WASM client, single-origin) + **Neon**
 > Postgres + **Brevo** SMTP. The same Docker image runs anywhere — Render is the reference, not a lock-in.
 >
@@ -59,7 +59,7 @@ Tear down with `docker compose --profile app down`.
 
 ## 1. Neon (Postgres, free)
 
-1. Create a project at <https://neon.tech> (Postgres 17). **Do not enable Neon Auth** — this template
+1. Create a project at <https://neon.tech> (Postgres 17). **Do not enable Neon Auth** — this platform
    ships its own auth (ADR-002); a second identity source would only conflict. Use Neon as plain Postgres.
 2. Copy the **Direct connection** string (the host **without** `-pooler`). That's the right default here:
    a single Render instance keeps its own Npgsql connection pool, and the app **polls** (no
@@ -125,7 +125,7 @@ Per provider:
 1. Register an app — **Google**: Cloud Console → APIs & Services → Credentials → OAuth client ID (Web).
    **Microsoft**: Azure Portal → App registrations → New registration.
 2. Set the **redirect URI** to the app's default OAuth callback path (no `CallbackPath` override in this
-   template):
+   platform):
    - Google: `https://<host>/signin-google`
    - Microsoft: `https://<host>/signin-microsoft`
 3. Copy the client id + secret into Render: `Authentication__Google__ClientId` / `__ClientSecret` (and/or

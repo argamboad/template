@@ -145,7 +145,7 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
 ## Part 9 — Make it yours
 - **9.1 Rebrand & de-sample.** The full REBRANDING checklist (including the inline email
   logo everyone forgets), delete the Notes sample, rename the tenant term — turning the
-  rebuilt template into *their* product.
+  rebuilt platform into *their* product.
 
 ## Appendix (optional)
 - **A.1 MAUI shells.** Desktop + Android hosts of the same RCL.

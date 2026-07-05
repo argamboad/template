@@ -1,6 +1,6 @@
 # Stories — Deployment to staging/prod (`DEPLOY`)
 
-> One file per epic. Takes the template from "tested locally + in CI" to **running on a real
+> One file per epic. Takes the platform from "tested locally + in CI" to **running on a real
 > staging environment** on an all-free-tier stack, with a repeatable path to prod. Design decision +
 > constraints in **ADR-017** (hosting: Render free + Neon Postgres + Brevo, **single-origin**).
 > Stories use Gherkin acceptance criteria. **Status: ✅ COMPLETE** — DEPLOY-1 (single-origin + proxy),
@@ -21,7 +21,7 @@ runs against a URL, not just a dev box) and records the prod recipe downstream a
 |---|---|---|
 | API + Web | **Render free** — one container; the API **serves the Blazor WASM bundle** (single origin) | 512 MB, sleeps after ~15 min idle, no card required |
 | Postgres | **Neon free** | 0.5 GB, autosuspends, **auto-wakes ~1 s**; Postgres 17 |
-| Email | **Brevo** free | 300 mails/day; already the template's assumed prod SMTP |
+| Email | **Brevo** free | 300 mails/day; already the platform's assumed prod SMTP |
 | Billing | Stripe **test mode** | free; webhooks point at the staging URL |
 
 **Prerequisites (external, before DEPLOY-2):**
@@ -191,7 +191,7 @@ serves during Render's build) and smoke-tests
 (liveness, readiness, SPA shell + deep-link, `/api/*` → 404 not the shell, `/api/auth/providers`); a red
 smoke fails the run. **`deploy-prod`**: on a push to `main`, behind the `production` GitHub Environment
 (add a required reviewer → manual approval; `main` stays deploy-only). Both **skip cleanly** (log a notice,
-pass) when their hook/URL aren't set, so the template is green out of the box and a downstream app opts in.
+pass) when their hook/URL aren't set, so the platform is green out of the box and a downstream app opts in.
 QA plan gained **§1.5 "Environment B — deployed staging"** (real-Brevo inboxes, cold-start, config-gated
 OAuth, Stripe test triggers), with the PDFs regenerated (B11-8 gate). Verified live end-to-end during
 DEPLOY-2 bring-up (all four sign-in paths on the real staging URL).
@@ -213,7 +213,7 @@ CI is the only trigger. Steps in `docs/DEPLOYMENT.md`.
   journeys stay **manual** on staging (real SMTP — no Mailpit to read; per ADR-017).
 - **Prod path:** a `main`-triggered job behind a **GitHub environment with required approval** —
   honoring the standing rule that `main` is deploy-only and never touched without explicit say-so.
-  The template ships the workflow; actual prod provisioning is the downstream app's step 1 (runbook §prod).
+  The platform ships the workflow; actual prod provisioning is the downstream app's step 1 (runbook §prod).
 - **QA plan integration:** `docs/QA_TEST_PLAN.md` §1 gains an **"Environment B: staging"** setup
   (staging URL, Brevo inbox strategy — plus-addressed real inboxes, Stripe test-mode triggers, the
   wake-from-sleep first-request note) so every existing case can be executed against staging as

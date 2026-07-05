@@ -80,7 +80,7 @@ differ) but captures the majority of the UI. Cheap now, expensive to retrofit �
   economy/portability.
 - **EF Core (Npgsql)** — default .NET ORM; first-class Postgres; maps the data model to migrations.
 - **Custom JWT + rotating refresh tokens** (not ASP.NET Core Identity) — a hardened auth stack the
-  template ships: passwordless (magic link + email OTP) and OAuth account-linking on custom
+  platform ships: passwordless (magic link + email OTP) and OAuth account-linking on custom
   `User`/`UserLogin`/`LoginToken`/`RefreshToken` entities. Tenant scoping layers on top. See ADR-002.
 - **MAUI Blazor Hybrid (committed — ADR-018)** — reuses the C# Blazor UI (via RCL) across mobile +
   Win/macOS desktop, not just the API. Auth is wired; **full feature parity** (verify + CI + signed

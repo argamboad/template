@@ -137,7 +137,7 @@ checklist (§13c).
 
 **Out of scope (per `docs/PROJECT_BRIEF.md` OUT list & current state):** SMS OTP, OAuth providers
 beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — see
-`docs/LOCALIZATION.md`), and any app-specific domain features not yet built on this template.
+`docs/LOCALIZATION.md`), and any app-specific domain features not yet built on this platform.
 
 **Platform services with no client UI (API-/operational-level, not manually testable through the app
 yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
@@ -561,7 +561,7 @@ Then I get a link to a JSON export of the household's data
    (owner-only). No secrets (invitation token hashes) appear in the file.
 
 ### QA-HH-14 — Seat quota blocks inviting past the plan limit 🟠 (Web) ⚙️ Automated in CI
-**Precondition:** the template ships example seat caps (Free = 3 seats, counting members + pending invites;
+**Precondition:** the platform ships example seat caps (Free = 3 seats, counting members + pending invites;
 `PlanCatalog`). A Free household at its cap (e.g. 3 members, or 2 members + 1 pending invite).
 **Gherkin**
 ```gherkin
@@ -838,7 +838,7 @@ And a valid code (or recovery code) finishes sign-in
    response body (native transport), same as a normal native login.
 
 ### QA-NOTIF-01 — Notification bell + list 🟠 (Web) ⚙️ Automated in CI
-**Note:** the template has no built-in producer; to see items, a feature must call
+**Note:** the platform has no built-in producer; to see items, a feature must call
 `INotificationService.NotifyAsync` (seed one in dev, or exercise a downstream feature that notifies).
 **Gherkin**
 ```gherkin
@@ -1630,7 +1630,7 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   in §1.1). The cases these journeys mirror are marked **⚙️ Automated in CI** and listed in §15. The
   Gherkin blocks here are written to be lifted directly into new E2E scenarios — keep the two in sync
   as automation grows.
-- When you add an app-specific domain feature on top of this template, add a matching suite here and
+- When you add an app-specific domain feature on top of this platform, add a matching suite here and
   a row in the traceability matrix (§15) so "entire functionality" stays honest.
 - `docs/FEATURES.md` describes the same JWT-based flows at the design level; this plan is their
   step-by-step verification. Keep the two in sync when behavior changes.
@@ -1685,7 +1685,7 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   (`MfaServiceTests`). **MFA-2 (login step-up):** an MFA-on login returns a **signed challenge** instead
   of a session; `POST /api/auth/mfa/verify` completes it with a TOTP/recovery code. Wired into
   **OTP-verify + native-exchange**; the OAuth/magic-link **redirect** paths route to a client `/mfa` page
-  (needs the MFA UI) and are a flagged **follow-up** — no template-web user can enable MFA via those paths
+  (needs the MFA UI) and are a flagged **follow-up** — no platform-web user can enable MFA via those paths
   today (no enrollment UI). Covered by `MfaChallengeServiceTests` + `MfaLoginServiceTests`.
   **This completes Wave 2** (GDPR + MFA).
 - **Updated 2026-07-01** for in-app notifications (ADR-013, Wave 3): a **per-user** notification center —
@@ -1753,7 +1753,7 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   pending invites vs `Plan.SeatLimit`, enforced on the invite path → **402 `seat_limit_reached`**, with an
   upgrade message in the Household invite UI) and **metered usage** (`TryConsumeAsync` against a monthly,
   self-resetting `UsageCounter`). Limits are `PlanCatalog` data — `null`/absent = unlimited, so it's inert
-  until set (template ships example caps: Free 3/3, Pro 10/100). New entity + migration `AddUsageCounter`.
+  until set (platform ships example caps: Free 3/3, Pro 10/100). New entity + migration `AddUsageCounter`.
   Covered by `QuotaServiceTests` (10 cases); **QA-HH-14**; EN/ES. Only **BILLING-6** (trial/dunning) and a
   billing-dissolve contributor remain from the BILLING epic.
 - **Updated 2026-07-01** — **BILLING-6 (trial/dunning):** the owner-facing reaction to the subscription

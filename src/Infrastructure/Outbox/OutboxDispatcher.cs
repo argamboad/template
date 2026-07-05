@@ -6,7 +6,7 @@ namespace Perezosoft.Infrastructure.Outbox;
 
 /// <summary>
 /// Drains the outbox on an interval. Resolves a fresh DI scope per pass (the processor and its
-/// <c>AppDbContext</c> are scoped). A single in-process poller is the template baseline; the
+/// <c>AppDbContext</c> are scoped). A single in-process poller is the platform baseline; the
 /// processor's <c>FOR UPDATE SKIP LOCKED</c> claim keeps it correct if ever run multi-instance,
 /// and a real scheduler/broker is a documented swap-in (ADR-007).
 /// </summary>

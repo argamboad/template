@@ -1,6 +1,6 @@
 # Stories — Billing & Subscriptions
 
-> One file per epic. Adds monetization to the template: a provider-abstracted billing seam
+> One file per epic. Adds monetization to the platform: a provider-abstracted billing seam
 > (`IBillingProvider`), a Stripe reference implementation, plan-tier **entitlements** (feature
 > flags keyed to plan) and **quotas** (countable limits). **Status: ✅ COMPLETE** — **BILLING-1–8
 > shipped** (entitlement gate; Checkout; webhook → subscription projection; Customer Portal; seat +

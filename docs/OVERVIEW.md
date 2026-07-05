@@ -1,4 +1,4 @@
-# Platform Overview — what this template is, and why it saves you months
+# Platform Overview — what this platform is, and why it saves you months
 
 > A friendly tour for product managers, power users, developers, and architects.
 > No prior knowledge of the codebase assumed. For the operational status snapshot see
@@ -26,7 +26,7 @@ email, data export for GDPR, an audit trail, health checks, a deploy pipeline…
 - **Undifferentiated** — none of it makes your product better than a competitor's; it's the
   price of admission.
 
-This template ships that 80% **pre-built and pre-hardened**: the pieces are wired together (a
+This platform ships that 80% **pre-built and pre-hardened**: the pieces are wired together (a
 notification is delivered through the same reliable job system billing uses; erasing an account
 automatically cancels the Stripe subscription and deletes the tenant's files), the security
 invariants are enforced by automated architecture tests rather than good intentions, and the whole
@@ -163,7 +163,7 @@ choices — every one is mainstream, documented, and replaceable. Full rationale
 | Native shells | **.NET MAUI Blazor Hybrid** | Windows, Android, iOS, macOS from the same RCL |
 | Database | **PostgreSQL 17** | Free, portable, cheap to host |
 | ORM | **EF Core (Npgsql)** | Migrations generated from the data model; the tenant filter lives here |
-| Auth | **Custom JWT + rotating refresh tokens** | Not ASP.NET Identity (ADR-002) — the hardened passwordless/OAuth/MFA stack is the template's own |
+| Auth | **Custom JWT + rotating refresh tokens** | Not ASP.NET Identity (ADR-002) — the hardened passwordless/OAuth/MFA stack is the platform's own |
 | Background jobs | **Postgres-backed outbox/inbox/scheduler** | No message broker to operate; Hangfire/Quartz/MassTransit are the documented swap-ins at scale |
 | Billing | **Stripe.net** | Stripe is the source of truth; local `Subscription` is a projection; fake provider for dev/tests |
 | Email | **MailKit behind an `IEmailSender` seam** | Only `Infrastructure/Email` may touch SMTP (CI-enforced) |
@@ -229,7 +229,7 @@ standard** (integrated, tested, edge cases handled — not a weekend prototype):
 | CI/CD, E2E suite, QA plan, security/supply-chain gates | 3–6 weeks |
 | **Total** | **≈ 35–55 engineer-weeks (8–13 engineer-months)** |
 
-On this template, that becomes: **clone → rebrand → first product feature shipping within days.**
+On this platform, that becomes: **clone → rebrand → first product feature shipping within days.**
 
 Two savings the table can't show:
 
@@ -254,7 +254,7 @@ product direction — never fashion. "The stack is old" doesn't apply here (late
 frontend** with any JS SPA against the unchanged API — a frontend project, not a migration
 (`TECH_STACK.md` names this escape hatch explicitly).
 
-If a full migration *is* justified, these two targets fit this template's shape best:
+If a full migration *is* justified, these two targets fit this platform's shape best:
 
 ### Path 1 — Full-stack TypeScript: Next.js (React) + NestJS or tRPC + Drizzle/Prisma, same Postgres
 
@@ -295,7 +295,7 @@ existing Blazor frontend could keep talking to it during a phased cutover.
 **What you give up on either path:** the single-language C# story, the shared-RCL trick that
 gives four native apps from one UI codebase, and the 35 machine-enforced architecture rules —
 you'd re-encode those invariants in the new stack's idioms (RLS, lint rules, CI checks), and
-budget real time for it: that enforcement layer is a big part of what makes this template safe.
+budget real time for it: that enforcement layer is a big part of what makes this platform safe.
 
 ## If you are a…
 
@@ -314,7 +314,7 @@ budget real time for it: that enforcement layer is a big part of what makes this
 | You want to… | Read |
 |---|---|
 | See current status + what's left | `docs/STATUS.md` |
-| Start a new app on the template | root `CLAUDE.md`, then `docs/PROJECT_BRIEF.md` placeholders |
+| Start a new app on the platform | root `CLAUDE.md`, then `docs/PROJECT_BRIEF.md` placeholders |
 | Rebrand it | `docs/REBRANDING.md` |
 | Build a feature | `docs/WAYS_OF_WORKING.md` + the `Notes` sample |
 | Understand the stack in depth | `docs/TECH_STACK.md` |

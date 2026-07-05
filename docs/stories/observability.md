@@ -83,7 +83,7 @@ exported** (clean dev console; spans still produced) unless `OpenTelemetry:Conso
 **Context / notes:** wire ASP.NET Core + EF Core + HttpClient instrumentation; tag the request span
 with `tenant_id`/`user_id` so traces are filterable per tenant. Exporter is **config-driven**:
 console in dev, OTLP when `OpenTelemetry:Otlp:Endpoint` is set (same config-presence pattern as the
-OAuth providers / Stripe key). Off by default = no external dependency to run the template.
+OAuth providers / Stripe key). Off by default = no external dependency to run the platform.
 
 **Acceptance criteria**
 

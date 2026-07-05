@@ -564,7 +564,7 @@ jobs:
   # Deploy staging (DEPLOY-3, ADR-017). Runs ONLY on a push to develop, and only after every test/build
   # gate above is green — so staging always reflects a passing develop. Triggers the Render deploy via a
   # deploy hook (repo secret), then polls the public URL and smoke-tests it. Both the hook and the base
-  # URL are optional: absent ⇒ the job logs a notice and passes, so the template is green out of the box
+  # URL are optional: absent ⇒ the job logs a notice and passes, so the platform is green out of the box
   # and a downstream app opts in by adding the secret + variable (see docs/DEPLOYMENT.md).
   deploy-staging:
     needs: [build-test, secret-scan, qa-artifacts, license-scan, docker-build, e2e]

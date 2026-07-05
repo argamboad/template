@@ -5,7 +5,7 @@
              xmlns:sharedui="clr-namespace:Perezosoft.Shared.Ui;assembly=Perezosoft.Shared.Ui"
              x:Class="Perezosoft.Maui.MainPage">
 
-    <!-- Root on the SHARED RCL's App component (Router), not the template's sample Routes. -->
+    <!-- Root on the SHARED RCL's App component (Router), not the platform's sample Routes. -->
     <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
         <BlazorWebView.RootComponents>
             <RootComponent Selector="#app" ComponentType="{x:Type sharedui:App}" />

@@ -1,6 +1,6 @@
 # Rebranding checklist
 
-When you stand up a new app from this template, replace every Perezosoft brand touchpoint
+When you stand up a new app from this platform, replace every Perezosoft brand touchpoint
 below.
 
 > **Don't stop at the UI.** The transactional **email templates** carry their own copy of the

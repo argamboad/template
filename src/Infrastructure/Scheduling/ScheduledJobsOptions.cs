@@ -1,6 +1,6 @@
 namespace Perezosoft.Infrastructure.Scheduling;
 
-/// <summary>Tuning for <c>ScheduledJobsHost</c>. Defaults suit the in-process template.</summary>
+/// <summary>Tuning for <c>ScheduledJobsHost</c>. Defaults suit the in-process baseline.</summary>
 public sealed class ScheduledJobsOptions
 {
     /// <summary>

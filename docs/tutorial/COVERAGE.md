@@ -23,22 +23,22 @@
 - `Directory.Build.props` — warnings-as-errors etc.
 - `Directory.Packages.props` — Central Package Management (R25/R27)
 - `Perezosoft.slnx`
-- `src/Api/Properties/launchSettings.json`
 - `src/Api/Perezosoft.Api.csproj` — created here; PackageReferences added as lessons need them
+- `src/Api/Properties/launchSettings.json`
 - `src/Core/Perezosoft.Core.csproj` — created here; PackageReferences added as lessons need them
 - `src/Infrastructure/Perezosoft.Infrastructure.csproj` — created here; PackageReferences added as lessons need them
 - `src/Maui/Perezosoft.Maui.csproj` — created here; PackageReferences added as lessons need them
 - `src/Shared.Ui/Perezosoft.Shared.Ui.csproj` — created here; PackageReferences added as lessons need them
-- `src/Web/Properties/launchSettings.json`
 - `src/Web/Perezosoft.Web.csproj` — created here; PackageReferences added as lessons need them
+- `src/Web/Properties/launchSettings.json`
 - `tests/Api.Tests/Perezosoft.Api.Tests.csproj` — created here; PackageReferences added as lessons need them
 - `tests/Core.Tests/Perezosoft.Core.Tests.csproj` — created here; PackageReferences added as lessons need them
 - `tests/E2E.Tests/Perezosoft.E2E.Tests.csproj` — created here; PackageReferences added as lessons need them
 
 ## 1.2 — First endpoint, first test (6 files)
 
-- `src/Api/Program.cs` — born here; every part adds registrations/middleware
 - `src/Api/Perezosoft.Api.http` — REST client scratchpad — grows with each endpoint
+- `src/Api/Program.cs` — born here; every part adds registrations/middleware
 - `tests/Api.Tests/HarnessSmokeTests.cs`
 - `tests/Api.Tests/Infrastructure/FakeHostEnvironment.cs`
 - `tests/Api.Tests/Infrastructure/IntegrationTestFactory.cs`
@@ -208,7 +208,7 @@
 
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (79 files)
+## 3.4 — The web client & auth UI (78 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -239,7 +239,6 @@
 - `src/Web/_Imports.razor`
 - `src/Web/wwwroot/apple_touch_180.png`
 - `src/Web/wwwroot/appsettings.json`
-- `src/Web/wwwroot/css/app.css`
 - `src/Web/wwwroot/favicon.ico`
 - `src/Web/wwwroot/favicon.png`
 - `src/Web/wwwroot/icon-192.png`
@@ -299,12 +298,16 @@
 - `src/Shared.Ui/Resources/AppStrings.resx`
 - `tests/E2E.Tests/I18nTests.cs`
 
-## 3.6 — The E2E harness (Playwright) (7 files)
+## 3.6 — The E2E harness (Playwright) (11 files)
 
 - `tests/E2E.Tests/AuthFlowTests.cs`
 - `tests/E2E.Tests/E2ETestBase.cs`
 - `tests/E2E.Tests/Mailpit.cs` — read OTPs from the fake inbox
+- `tests/E2E.Tests/Pages/AdminConsolePage.cs` — Page Object Model
 - `tests/E2E.Tests/Pages/BasePage.cs` — Page Object Model
+- `tests/E2E.Tests/Pages/BillingPage.cs` — Page Object Model
+- `tests/E2E.Tests/Pages/HouseholdPage.cs` — Page Object Model
+- `tests/E2E.Tests/Pages/JoinPage.cs` — Page Object Model
 - `tests/E2E.Tests/Pages/LoginPage.cs` — Page Object Model
 - `tests/E2E.Tests/Pages/SettingsPage.cs` — Page Object Model
 - `tests/E2E.Tests/playwright.runsettings`
@@ -563,7 +566,7 @@
 
 *(no repo files — narrative/capstone lesson)*
 
-## A.1 — Appendix — MAUI shells (26 files)
+## A.1 — Appendix — MAUI shells (27 files)
 
 - `src/Maui/App.xaml`
 - `src/Maui/App.xaml.cs`
@@ -588,8 +591,9 @@
 - `src/Maui/Platforms/iOS/Info.plist`
 - `src/Maui/Platforms/iOS/Program.cs`
 - `src/Maui/Platforms/iOS/Resources/PrivacyInfo.xcprivacy`
+- `src/Maui/PreferencesCulturePersistence.cs`
 - `src/Maui/Properties/launchSettings.json`
-- `src/Maui/wwwroot/css/app.css`
+- `src/Maui/ShareFileDownloadLauncher.cs`
 - `src/Maui/wwwroot/index.html`
 
 ## A.2 — Appendix — native auth bridge (9 files)
@@ -597,10 +601,10 @@
 - `src/Api/Controllers/NativeAuthController.cs`
 - `src/Api/Services/NativeAuthCodeService.cs`
 - `src/Api/Services/NativeRedirectPolicy.cs`
-- `src/Maui/Auth/AndroidOAuthInitiator.cs`
 - `src/Maui/Auth/LoopbackOAuthInitiator.cs`
 - `src/Maui/Auth/NativeAuthHeaderHandler.cs`
 - `src/Maui/Auth/SecureStorageSessionStore.cs`
+- `src/Maui/Auth/WebAuthenticatorOAuthInitiator.cs`
 - `tests/Api.Tests/NativeAuthCodeServiceTests.cs`
 - `tests/Api.Tests/NativeRedirectPolicyTests.cs`
 
@@ -706,19 +710,22 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (54 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (66 files)
 
 - `.github/pull_request_template.md` — docs
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
 - `README.md` — docs
-- `_TEMPLATE_PRIMER.md` — docs
+- `_PLATFORM_PRIMER.md` — docs
 - `docs/DATA_MODEL.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/DECISIONS.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/DEPLOYMENT.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/FEATURES.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/LOCALIZATION.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/MOBILE_TESTING.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/NATIVE_PARITY.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/NEW_APP_GUIDE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/OVERVIEW.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/PLATFORM_BACKLOG.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/PROJECT_BRIEF.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/QA_RUN_LOG.pdf` — authoring docs; the course TEACHES writing these in 0.1
@@ -726,6 +733,7 @@
 - `docs/QA_TEST_PLAN.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/REBRANDING.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/ROADMAP.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/STATUS.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/TECH_STACK.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/WAYS_OF_WORKING.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v1-2026-06/AUDIT_REPORT.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -753,14 +761,47 @@
 - `docs/stories/async-jobs.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/billing.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/deploy.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/stories/e2e.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/files.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/gdpr.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/hooks.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/mfa.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/stories/native.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/notify.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/observability.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/pubapi.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/rbac.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/OUTLINE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/SAMPLE_LESSON_2.5.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/gen_coverage.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/0.1-mental-model-and-the-decision-record.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 601 tracked files · 451 built in lessons · 150 bucketed · 0 unmapped
+## ❌ UNMAPPED (22 files) — course holes, fix the rules or add lessons
+
+- `src/Shared.Ui/AppResumeNotifier.cs`
+- `src/Shared.Ui/BrowserFileDownloadLauncher.cs`
+- `src/Shared.Ui/ICulturePersistence.cs`
+- `src/Shared.Ui/IFileDownloadLauncher.cs`
+- `src/Shared.Ui/LocalStorageCulturePersistence.cs`
+- `src/Shared.Ui/Pages/Billing.razor`
+- `src/Shared.Ui/wwwroot/css/app.css`
+- `tests/Api.Tests/Auth/AuthProvidersTests.cs`
+- `tests/Api.Tests/Integration/AuthProvidersEndpointTests.cs`
+- `tests/Api.Tests/Integration/VersionEndpointTests.cs`
+- `tests/E2E.Tests/AnnouncementJourneyTests.cs`
+- `tests/E2E.Tests/BillingJourneyTests.cs`
+- `tests/E2E.Tests/GdprExportJourneyTests.cs`
+- `tests/E2E.Tests/MagicLinkJourneyTests.cs`
+- `tests/E2E.Tests/MembershipLifecycleTests.cs`
+- `tests/E2E.Tests/NativeSmokeTests.cs`
+- `tests/E2E.Tests/NotificationJourneyTests.cs`
+- `tests/E2E.Tests/RosterJourneyTests.cs`
+- `tests/E2E.Tests/SeatQuotaJourneyTests.cs`
+- `tests/native-smoke-android/package-lock.json`
+- `tests/native-smoke-android/package.json`
+- `tests/native-smoke-android/smoke.js`
+
+**Totals:** 639 tracked files · 455 built in lessons · 162 bucketed · 22 unmapped

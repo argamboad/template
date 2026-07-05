@@ -1,7 +1,7 @@
 namespace Perezosoft.Infrastructure.Outbox;
 
 /// <summary>
-/// Tuning for the outbox dispatcher. Defaults are sensible for the in-process template; bind from
+/// Tuning for the outbox dispatcher. Defaults are sensible for the in-process baseline; bind from
 /// configuration if/when these need to vary per environment.
 /// </summary>
 public sealed class OutboxOptions

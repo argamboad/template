@@ -4,7 +4,7 @@
 > Claude Code) from re-litigating settled choices. Append new ones; supersede with a new dated
 > entry rather than rewriting.
 >
-> The **constant ADRs** below (C-prefixed) are pre-decided across all projects from this template
+> The **constant ADRs** below (C-prefixed) are pre-decided across all projects from this platform
 > — keep them. Add **app-specific ADRs** (number them 001, 002, …) as you make decisions during
 > conceptualization.
 
@@ -38,11 +38,11 @@ economy/portability.
 
 **ADR-C8 — Auth is ASP.NET Core Identity; tenant scoping layered on top.**
 *Rationale:* built-in user/auth; tenant association sits above Identity as a query concern.
-> **Superseded by ADR-002 (2026-06-19):** the template ships a custom JWT + refresh-token auth
+> **Superseded by ADR-002 (2026-06-19):** the platform ships a custom JWT + refresh-token auth
 > stack instead of ASP.NET Core Identity.
 
 **ADR-C9 — Non-web clients (mobile + Win/macOS desktop) are MAUI Blazor Hybrid: shells scaffolded with auth wired, feature parity DEFERRED (web-first).**
-The template ships MAUI desktop + Android shells with auth already wired (see `docs/MOBILE_TESTING.md`);
+The platform ships MAUI desktop + Android shells with auth already wired (see `docs/MOBILE_TESTING.md`);
 build each feature on web first and extend the shells once it works there. *Rationale:* reuses the
 Blazor UI via the RCL, not just the API; feature work deferred until it begins (re-check MAUI maturity then). Linux desktop out of scope; if required, tilt to Uno
 Platform or Avalonia. The API being client-agnostic means worst case only the frontend is affected.
@@ -76,7 +76,7 @@ lightweight defined process keeps solo + Claude Code work consistent and mergeab
 `docker-compose.yml` at repo root; configuration via `.env` (gitignored; copy from `.env.example`).
 All **Compose service** ports (DB, Mailpit) are environment-variable-driven so multiple projects can
 run simultaneously without conflicts (the API/Web app ports are fixed in their launch profiles). Both services expose healthchecks; API containers should declare `depends_on: db:
-condition: service_healthy`. No pgAdmin in the template — devs use their own DB client.
+condition: service_healthy`. No pgAdmin in the platform — devs use their own DB client.
 *Rationale:* PostgreSQL is always needed; Mailpit traps passwordless + invitation email in dev with
 zero config; env-var ports prevent port clashes across projects.
 
@@ -123,7 +123,7 @@ sit in the working tree (mitigated by `.gitignore`) rather than the user profile
 this workflow.
 
 **ADR-002 — Auth is a custom JWT + rotating-refresh-token stack, not ASP.NET Core Identity. (2026-06-19)**
-Supersedes ADR-C8 and the Identity parts of ADR-C15. The template implements its own auth on custom
+Supersedes ADR-C8 and the Identity parts of ADR-C15. The platform implements its own auth on custom
 `User` / `UserLogin` / `RefreshToken` / `LoginToken` entities: JWT access tokens (60 min) + rotating,
 hashed refresh tokens (single-use, replay-protected); OAuth (Google + Microsoft) account-linking with
 an unverified-email takeover guard; passwordless magic-link + email OTP via `PasswordlessService`
@@ -188,7 +188,7 @@ scoping is automatic. Full convention in `docs/WAYS_OF_WORKING.md`; reference sl
 clean layering. Features are independent and churn-y — co-locating each one's endpoint/handler/
 models/data makes them easy to add, understand, and delete without touching central code. The
 generic repository + global tenant filter let a slice be added without authoring a repository pair
-or remembering to scope. This is the architectural convention for app work on top of the template.
+or remembering to scope. This is the architectural convention for app work on top of the platform.
 
 *Amendment (v2 audit, 2026-07-01, per v2 decision D7) — config-gated minimal-API PLATFORM surfaces are a
 sanctioned exception; "zero central edits" is really a ~5-touchpoint slice contract.* Two clarifications
@@ -287,7 +287,7 @@ Constraints recorded:
    `Api.Tests` request/response; **Stripe test mode + Stripe CLI** (`stripe listen`/`stripe trigger`)
    for webhook E2E; **Stripe Test Clocks** to simulate trial-end/renewal/dunning deterministically.
    This is the Mailpit-for-billing analogue (ADR-C13: trap it locally, zero real charges).
-*Rationale:* billing is what makes this a SaaS template rather than a multi-tenant CRUD app;
+*Rationale:* billing is what makes this a SaaS platform rather than a multi-tenant CRUD app;
 abstracting the provider keeps Core clean and the test suite offline; projecting Stripe state (rather
 than owning money truth) avoids reconciliation bugs; deferring matches the web-first/business-need
 posture (ADR-C9) — there is no app or plan catalog yet (`PROJECT_BRIEF.md` is still TODO).
@@ -305,7 +305,7 @@ base's `GetMembershipAsync`/`IsOwner`/`Forbid403` gate, with the checkout orches
 `IBillingService` (`src/Api/Services/`). The provider/entitlement/catalog/`Subscription` pieces were
 already platform and are unchanged; `.RequireEntitlement(...)` stays as `Features/`-root scaffolding
 (like `MapTenantFeatureGroup`) that the downstream app's slices call. BILLING-3's webhook lands as a
-controller action too. (The only vertical slice in the template remains the `Notes` 🗑️ DELETE-ME
+controller action too. (The only vertical slice in the platform remains the `Notes` 🗑️ DELETE-ME
 sample.)
 
 *Addendum (BILLING-5, 2026-07-01) — quotas implemented (mechanism-first, policy as data).* Decision
@@ -317,7 +317,7 @@ past the cap) vs `Plan.SeatLimit`; checked in `TenantInvitationService.CreateAsy
 `UsageCounter` (`{tenant, key, yyyy-MM}`) — the calendar-month period key makes it **self-resetting with
 no sweep job** (simpler than the point-5 "usage counter + JOBS-3 reset" sketch). Limits live in
 `PlanCatalog` as **data**: a `null`/absent limit means unlimited, so the mechanism ships **inert** until a
-plan sets a number; the template ships example numbers (Free 3/3, Pro 10/100) to demonstrate. Confirms
+plan sets a number; the platform ships example numbers (Free 3/3, Pro 10/100) to demonstrate. Confirms
 point 5 (quotas ≠ rate limits): these are per-tenant persisted counters, not the per-IP throttle.
 
 *Addendum (BILLING-6, 2026-07-01) — trial/dunning lifecycle (owner-facing reaction, mechanism-first).*
@@ -384,7 +384,7 @@ mirror — same table family with a `direction` discriminator, keyed by an exter
 (trial-expiry sweeps, dunning nudges, expired-token cleanup, quota resets) runs via a lightweight
 timer hosted service.
 Constraints recorded:
-1. **In-process on Postgres, no broker** — keeps the template's run cost "Postgres only" (ADR-C13).
+1. **In-process on Postgres, no broker** — keeps the platform's run cost "Postgres only" (ADR-C13).
    A distributed scheduler (Hangfire/Quartz) or message broker is a documented **swap-in** when
    multi-node arrives, not a dependency now; the `SKIP LOCKED` claim design keeps a single-table
    approach correct even multi-instance.
@@ -396,7 +396,7 @@ Constraints recorded:
 4. **First consumer is the existing email path** — passwordless and invitation sends currently call
    `IEmailSender` **inline in the request**; the first slice migrates them to enqueue-to-outbox (the
    SMTP send moves into a handler), proving the path on existing, already-tested behavior.
-*Rationale:* the template already sends email inline during request handling, so a transient SMTP
+*Rationale:* the platform already sends email inline during request handling, so a transient SMTP
 failure becomes a request error or a silently lost message. A generic outbox makes every side effect
 reliable once, and gives billing webhooks a correct idempotent home. In-process keeps infrastructure
 minimal until scale actually forces a broker.
@@ -430,7 +430,7 @@ Two complementary concerns shipped as one slice group.
 metrics (ASP.NET Core + EF Core + HttpClient instrumentation) with the request span tagged by
 tenant/user; and `/health` (liveness) + `/health/ready` (readiness — DB reachable) endpoints. The
 OTLP exporter is **config-gated** (console in dev, OTLP when an endpoint is configured — same
-config-presence pattern as the OAuth providers), so the template runs with **no external telemetry
+config-presence pattern as the OAuth providers), so the platform runs with **no external telemetry
 dependency** by default.
 **(b) Audit log** — an append-only, tenant-scoped **`AuditEvent`** (`actor_user_id`, `action`,
 `entity_type`, `entity_id`, `metadata` jsonb, `created_at`) for security/compliance-relevant actions
@@ -446,7 +446,7 @@ Constraints recorded:
 4. **Dissolve vs retention tension** — wiping a tenant deletes its audit trail; if legal-hold/
    retention is required, the dissolve contributor must **export-then-wipe** (flagged for the
    GDPR/Account-Lifecycle backlog item).
-*Rationale:* nothing in the template currently emits structured telemetry, a health endpoint, or an
+*Rationale:* nothing in the platform currently emits structured telemetry, a health endpoint, or an
 audit trail — every downstream app would re-invent all three. Adding them once at the platform layer
 means every feature inherits them, and audit slots naturally onto the existing interceptor +
 tenant-scoping machinery (ADR-003 amendment).
@@ -463,7 +463,7 @@ declarative auto-audit-on-SaveChanges interceptor remains an optional future add
 `docs/ROADMAP.md`).
 
 **ADR-009 — RBAC: a third `admin` role + a permission seam (capability checks, not role checks). (2026-06-30)**
-The template shipped with exactly two tenant roles — `owner` and `member` — enforced by `IsOwner(...)`
+The platform shipped with exactly two tenant roles — `owner` and `member` — enforced by `IsOwner(...)`
 boolean checks copied across every tenant controller (`HouseholdController`,
 `HouseholdInvitationsController`, `BillingController`). B2B tenants delegate administration almost
 immediately, and a copied `role == "owner"` test is both too coarse (no middle tier) and too brittle
@@ -524,7 +524,7 @@ Stories + slice plan: `docs/stories/rbac.md` (epic `RBAC`).
 ---
 
 **ADR-010 — File/blob storage: `IFileStorage` abstraction, local-disk dev default, config-gated S3-compatible prod impl; tenant-scoped keys; signed time-limited download URLs. (2026-06-30)**
-The template has no way to store binary content. Avatars, attachments, and the GDPR data-export
+The platform has no way to store binary content. Avatars, attachments, and the GDPR data-export
 artifact (backlog) all block on it, and every downstream app would otherwise re-invent file handling
 (and likely leak files across tenants). This adds one storage seam, mirroring the `IEmailSender` →
 `SmtpEmailSender` shape (Core abstraction + Infrastructure impl, registered by config presence).
@@ -550,9 +550,9 @@ artifact (backlog) all block on it, and every downstream app would otherwise re-
    Data Protection stack is already wired, keys persisted to the DB) and streams the file
    tenant-checked. `GetDownloadUrlAsync` returns the right URL per impl — a **uniform contract** so
    feature code never branches on the backend.
-5. **Uploads flow through `IFileStorage.PutAsync` from feature services.** The template ships the
+5. **Uploads flow through `IFileStorage.PutAsync` from feature services.** The platform ships the
    abstraction + both impls + the download surface; it does **not** prescribe what gets stored or wire
-   an upload endpoint to a specific entity (that's a vertical/app concern — horizontal-only template).
+   an upload endpoint to a specific entity (that's a vertical/app concern — horizontal-only platform).
 
 **Constraints recorded:**
 1. **Tenant isolation is structural** — keys carry the tenant; the layer refuses cross-tenant or
@@ -574,7 +574,7 @@ Stories + slice plan: `docs/stories/files.md` (epic `FILES`).
 ---
 
 **ADR-011 — Account & data lifecycle (GDPR): tenant data export + account erasure, built on the existing contributor + dissolve machinery. (2026-06-30)**
-Once the template has EU users it needs **data portability** ("download my data") and **erasure**
+Once the platform has EU users it needs **data portability** ("download my data") and **erasure**
 ("right to be forgotten") — legal requirements with real penalties, and a credible trust feature. The
 platform already has most of the machinery: the `ITenantDataContributor` seam
 (`HasDataAsync`/`WipeAsync`) that each feature registers, the transactional **dissolve** flow, the
@@ -628,7 +628,7 @@ Stories + slice plan: `docs/stories/gdpr.md` (epic `GDPR`).
 ---
 
 **ADR-012 — MFA: authenticator-app TOTP as a step-up after primary auth; secret encrypted at rest; hashed single-use recovery codes. (2026-07-01)**
-The template's custom auth stack (ADR-002) has no second factor. ADR-C15 once claimed TOTP via
+The platform's custom auth stack (ADR-002) has no second factor. ADR-C15 once claimed TOTP via
 `AddDefaultTokenProviders()`, but that was superseded by ADR-002 and never built — so this is a genuine
 gap, not a re-do. Add authenticator-app **TOTP** (RFC 6238) as an optional second factor, enforced as a
 **step-up** after the existing primary auth, reusing the crypto the platform already has.
@@ -711,7 +711,7 @@ already has (the outbox, ADR-007) rather than a second delivery mechanism.
 4. **A user-scoped notification-center API** — list (paginated), unread count, mark-one/all read, and
    get/update preferences. All scoped to the caller (`NameIdentifier` claim), like `/api/auth/me` — never
    tenant-filtered, never another user's notifications.
-5. **No new delivery infrastructure.** In-app = a DB row; email = the existing outbox path. The template
+5. **No new delivery infrastructure.** In-app = a DB row; email = the existing outbox path. The platform
    ships the center + the fan-out seam; a feature calls `NotifyAsync`, it does not wire channels itself.
 
 **Constraints recorded:**
@@ -830,7 +830,7 @@ initially parked this (no customer-facing API) and **reversed that on 2026-07-01
    minimal-API feature-group convention. No new crypto.
 *Rationale:* a public API is the "others build on this" layer; doing it as a second auth scheme that mints
 the same `tenant_id`-scoped principal means the entire tenant-isolation guarantee applies for free, and
-strong config-gating means the template ships the capability **dormant** rather than exposing a surface no
+strong config-gating means the platform ships the capability **dormant** rather than exposing a surface no
 one asked for. HOOKS (outbound webhooks) is the companion outbound half (ADR-016).
 Stories + slice plan: `docs/stories/pubapi.md` (epic `PUBAPI`).
 
@@ -904,7 +904,7 @@ jobs (outbox dispatcher / scheduler / lapse sweep) must not be silently broken.*
    request cold-starts (~30–60 s) and the outbox/scheduler pause while asleep (queued sends resume on
    wake). Acceptable for staging QA; **prod requires an always-on plan (~$7/mo) or equivalent — never
    ship paid users on a sleeping instance.** The image is plain Docker, so the exit cost is nil.
-3. **Neon free** is the Postgres (17), used as plain Postgres (Neon Auth stays off — this template owns
+3. **Neon free** is the Postgres (17), used as plain Postgres (Neon Auth stays off — this platform owns
    auth, ADR-002). Chosen over Supabase for this role: it is *just* Postgres (no redundant auth/storage
    platform beside our own), and it **auto-wakes in ~1 s** from autosuspend vs Supabase's 7-day idle
    pause needing a manual unpause. **Connection:** use the **direct** endpoint over TLS — a single
@@ -913,12 +913,12 @@ jobs (outbox dispatcher / scheduler / lapse sweep) must not be silently broken.*
    transaction-mode; the app is compatible with it but only benefits it at many-instance scale.) Bonus
    noted for later: Neon DB branching enables free per-preview-environment databases.
 4. **Brevo** (free, 300 mails/day) is staging + prod SMTP through the existing `IEmailSender` — it was
-   already the template's assumed real provider in the `.env` docs. **Consequence:** staging has no
+   already the platform's assumed real provider in the `.env` docs. **Consequence:** staging has no
    Mailpit, so email-based QA cases use real (plus-addressed) inboxes there, and the automated
    post-deploy smoke checks health/app-shell only, never email journeys.
 5. **Environments follow the git model:** `develop` auto-deploys **staging** (behind CI + a
    post-deploy smoke gate); `main` deploys **prod** behind a required-approval GitHub environment —
-   preserving "`main` is deploy-only". The template proves the machinery on staging; actual prod
+   preserving "`main` is deploy-only". The platform proves the machinery on staging; actual prod
    provisioning is each downstream app's first deployment step (runbook: `docs/DEPLOYMENT.md`).
 6. **Proxy correctness, gated:** `UseForwardedHeaders` (for/proto) is added **config-gated, default
    off** — required behind Render's TLS-terminating proxy (else the per-IP passwordless rate limiter
@@ -939,7 +939,7 @@ depends on it.
 Stories + slice plan: `docs/stories/deploy.md` (epic `DEPLOY`).
 
 **ADR-018 — Native (MAUI) client: commit to full feature parity across Android/Windows/iOS/macOS, incl. automated native tests + signed distribution. (2026-07-02)**
-Resolves the deferred "non-web framework commitment" from `docs/TECH_STACK.md`. The template already ships
+Resolves the deferred "non-web framework commitment" from `docs/TECH_STACK.md`. The platform already ships
 **MAUI Blazor Hybrid** shells that reuse the shared RCL (`Shared.Ui`) and have native auth wired (OTP,
 OAuth via system browser, MFA step-up MFA-4, secure-storage tokens) — so the native clients already render
 every web screen. We commit to closing the remaining gap to **full parity**: verify every feature on
@@ -968,7 +968,7 @@ artifacts** for all four platforms. Decided:
 **Accepted trade-off:** native UI tests (Appium / .NET MAUI UITest on emulators/simulators) are slower and
 flakier than Playwright-web — kept to a small smoke suite with retries; the manual native QA pass is the
 broader safety net. **The honest counterweight:** automated native E2E + store distribution are large and
-partly per-app; committing the template to them (vs deferring) is a deliberate choice to make native a
+partly per-app; committing the platform to them (vs deferring) is a deliberate choice to make native a
 first-class, shippable channel rather than an experiment.
 Stories + slice plan: `docs/stories/native.md` (epic `NATIVE`).
 
@@ -980,3 +980,22 @@ every trigger. (2) The Maui project sets `RestorePackagesWithLockFile=false` (a 
 the B11-6 lockfile rule): its TFM list is host-OS-conditional, so the resolved graph differs per OS and a
 single committed lockfile can never satisfy locked-mode on all three runners — CPM alone pins its
 versions.
+
+**ADR-019 — Platform identity: "Perezosoft Platform"; `Perezosoft.*` code identity; downstream apps rebrand by find/replace. (2026-07-05)**
+The repo (formerly "template") is named **perezosoft-platform** and its engineering identity is
+**`Perezosoft.*`** end to end: solution `Perezosoft.slnx`, all project/assembly names, the root
+namespace, the JWT issuer, and the MAUI `ApplicationId` (`com.perezosoft.platform`). "Template" no
+longer appears as an identifier anywhere — it survives only as the English word for the repo's role.
+*Rationale:* "Template" collided with ordinary English (docs, comments, third-party API names),
+making every downstream rename risky; "Perezosoft" is a made-up word, so standing up a new app is one
+unambiguous find/replace of `Perezosoft` → `<Brand>` per `docs/REBRANDING.md`.
+*Downstream convention:* apps clone-and-rebrand (fork-and-forget). Keeping `Perezosoft.*` namespaces
+in a downstream app (for clean upstream `git merge`) and extracting the platform as NuGet packages
+were both considered and deliberately left open — nothing in this rename forecloses either (see
+`docs/PLATFORM_BACKLOG.md`).
+*Deliberately unchanged:* the DataProtection application name (`"template"`) and the four
+`CreateProtector("Template.*.v1")` purpose strings — they feed encryption key derivation, so renaming
+them would orphan MFA/webhook secrets already encrypted at rest; they are guarded by comments and may
+only change alongside a re-encryption migration. The Render service keeps the name `template-staging`
+(Render treats the name as service identity; renaming would mint a new service + URL and churn the
+OAuth consoles for zero functional gain — fold into a future console-touching change if desired).

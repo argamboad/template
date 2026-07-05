@@ -11,11 +11,11 @@
 **Epic key:** `JOBS`
 
 **Prerequisites (external, before any code):**
-- None beyond the existing stack — the template's design keeps this **in-process on Postgres**, no
+- None beyond the existing stack — the platform's design keeps this **in-process on Postgres**, no
   Redis/broker (ADR-C13: run cost stays "Postgres only"). A distributed scheduler (Hangfire/Quartz)
   is a documented swap-in, not a dependency now.
 
-**Why this exists:** the template currently sends email **inline in the request thread** —
+**Why this exists:** the platform currently sends email **inline in the request thread** —
 passwordless send and invitations call `IEmailSender.SendAsync` mid-request
 ([`SmtpEmailSender`](../../src/Infrastructure/Email/SmtpEmailSender.cs)). A transient SMTP failure
 surfaces as a request error or a silently lost email, and "saved the row but the email never went"
@@ -137,7 +137,7 @@ copy the cleanup job's shape.
 **So that** sweeps and nudges (trial expiry, dunning, token cleanup, quota resets) happen on time
 
 **Context / notes:** a lightweight timer `BackgroundService` (`ScheduledJobsHost`) runs registered
-`IScheduledJob`s on intervals/cron. In-process for the template; document the swap to Hangfire/Quartz
+`IScheduledJob`s on intervals/cron. In-process for the platform; document the swap to Hangfire/Quartz
 when multi-node arrives (ADR-007). First real jobs are owned by other epics (BILLING trial-expiry,
 expired-`LoginToken`/`RefreshToken` cleanup) — this slice ships the **host + one reference job**.
 

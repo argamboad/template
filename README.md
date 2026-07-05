@@ -1,6 +1,6 @@
-# Multi-Tenant SaaS Project Template
+# Perezosoft Platform
 
-A reusable starting point for new multi-tenant SaaS apps on a fixed stack
+The Perezosoft foundation for building multi-tenant SaaS apps on a fixed stack
 (ASP.NET Core API + Blazor WASM + shared RCL + PostgreSQL/EF Core + custom JWT auth, with
 MAUI Blazor Hybrid shells for mobile + Win/macOS desktop). It lets a new project skip
 re-deciding the stack and jump straight to discussing **what the app does**.
@@ -8,7 +8,7 @@ re-deciding the stack and jump straight to discussing **what the app does**.
 ## What's in here
 
 ```
-_TEMPLATE_PRIMER.md     ← paste into a new Claude chat to start conceptualizing a project
+_PLATFORM_PRIMER.md     ← paste into a new Claude chat to start conceptualizing a project
 CLAUDE.md               ← Claude Code operating manual skeleton (constant rules pre-filled)
 docs/                   ← doc skeletons (constant parts filled, app-specific = TODO)
   PROJECT_BRIEF.md
@@ -23,12 +23,12 @@ src/ , tests/           ← the complete platform (auth, tenancy, billing, jobs,
 ## How to use it
 
 **Step 1 — Conceptualize (in Claude chat).**
-Start a new chat and paste `_TEMPLATE_PRIMER.md`. Describe your app. Claude runs the
+Start a new chat and paste `_PLATFORM_PRIMER.md`. Describe your app. Claude runs the
 conceptualization session — clarifying questions, recommendations, ADRs, scope discipline — and
 fills in the doc skeletons. The stack is already decided, so the conversation is about the app.
 
 **Step 2 — Create the repo (when the thinking layer is done).**
-Once concept + features + data model + decisions are settled, clone this template tree as
+Once concept + features + data model + decisions are settled, clone this platform tree as
 your new repo (it already has `CLAUDE.md` at root, `docs/`, and the `src/`+`tests/` layout).
 
 **Step 3 — Rebrand + build (in Claude Code).**
@@ -39,7 +39,7 @@ app-specific docs; after that it's your feature slices, with per-epic user stori
 
 **The expected first Claude Code prompt** (copy, fill the brackets, attach the logo):
 
-> We're starting a new app on this template, from the conceptualization docs already in `docs/`.
+> We're starting a new app on this platform, from the conceptualization docs already in `docs/`.
 > The app is **[AppName]**; the tenant's app-facing label is **[Team / Workspace / Household / …]**.
 > Here is the logo: **[file]**.
 >
@@ -70,4 +70,4 @@ app-specific docs; after that it's your feature slices, with per-epic user stori
 **Do not copy app-specific data-model decisions between projects.** Things like single-table
 inheritance, snapshot-vs-reference semantics, or any particular derived rule are designed for one
 app's domain and can quietly mislead another. Only the items listed as "constant" carry forward.
-Re-verify tool/library versions at the start of every project — this template ages.
+Re-verify tool/library versions at the start of every project — this platform ages.

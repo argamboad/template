@@ -1,7 +1,7 @@
 # Ways of Working
 
 > The process layer: how work is sliced, how user stories and PRs are written, and naming
-> conventions. This is constant across projects from this template; project-specific examples are
+> conventions. This is constant across projects from this platform; project-specific examples are
 > marked. Referenced by `CLAUDE.md` so Claude Code follows it.
 
 ## Slices (the unit of build work)
