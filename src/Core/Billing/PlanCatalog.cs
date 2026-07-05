@@ -27,7 +27,7 @@ public static class PlanKeys
 }
 
 /// <summary>
-/// Entitlement (feature-gate) keys. These are **example** keys for the template — replace them with the
+/// Entitlement (feature-gate) keys. These are **example** keys for the platform — replace them with the
 /// app's real feature gates, then gate endpoints with <c>.RequireEntitlement(Entitlements.Xxx)</c>.
 /// </summary>
 public static class Entitlements
@@ -38,7 +38,7 @@ public static class Entitlements
 /// <summary>
 /// Metered-usage keys (BILLING-5) — countable actions capped per month by a plan's <c>UsageLimits</c> and
 /// enforced by calling <c>IQuotaService.TryConsumeAsync(key)</c> at the action. **Example** for the
-/// template; replace with the app's real metered actions.
+/// platform; replace with the app's real metered actions.
 /// </summary>
 public static class UsageKeys
 {

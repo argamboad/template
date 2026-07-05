@@ -49,7 +49,7 @@ public static class ApiScopes
     public const string Read = "read";
     public const string Write = "write";
 
-    /// <summary>All scopes the template knows about — the default grant when none is specified.</summary>
+    /// <summary>All scopes the platform knows about — the default grant when none is specified.</summary>
     public static readonly IReadOnlyList<string> All = [Read, Write];
 
     /// <summary>Parses a stored comma-separated scope string into a set (trimmed, lowercased, de-duped).</summary>

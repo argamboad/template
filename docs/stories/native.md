@@ -377,7 +377,7 @@ Scenario: Signed Apple artifacts are produced
 ### NATIVE-11 — (optional) Store submission
 
 **Context / notes:** automate (or document the manual path for) Play Console / App Store Connect / MS Store
-upload. Store review + accounts are external; the template ships the upload plumbing behind flags/secrets.
+upload. Store review + accounts are external; the platform ships the upload plumbing behind flags/secrets.
 
 **DoD:** upload step wired (guarded/off by default) or the manual submission path documented per store.
 

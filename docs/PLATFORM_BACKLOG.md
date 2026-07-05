@@ -40,7 +40,7 @@
 **What:** self-serve **data export** ("download my data") and **erasure** (right to be forgotten) at
 both user and tenant granularity; a documented data-retention posture.
 **Why:** legal requirement with real penalties; also a credible trust/sales feature.
-**Sketch / hooks:** the template already has the machinery — `ITenantDataContributor`
+**Sketch / hooks:** the platform already has the machinery — `ITenantDataContributor`
 (`HasDataAsync`/`WipeAsync`) is exactly the per-feature enumeration needed. Add an `ExportAsync`
 sibling to the contributor so each feature contributes to a tenant export the same way it contributes
 to wipe. Erasure of a **user** (vs a whole tenant) needs an owner-reassignment rule (can't erase the
@@ -163,6 +163,21 @@ treat it accordingly.
 tenant-prefixed. **Defer hard** — it breaks the "Postgres-only run cost" property (ADR-C13), so don't
 add it until horizontal scale actually forces it. The outbox dispatcher's `SKIP LOCKED` design
 (ADR-007) deliberately avoids needing it for multi-node correctness.
+
+---
+
+## 10. Platform as NuGet packages — `PKG`
+**What:** ship `Perezosoft.Core` / `Perezosoft.Infrastructure` / `Perezosoft.Shared.Ui` as versioned
+NuGet packages so downstream apps consume the platform by package reference instead of clone-and-rebrand.
+**Why:** only once several apps exist on different upgrade cadences and clone-merge starts hurting.
+**Sketch / hooks:** Core/Infrastructure/Shared.Ui pack as-is (RCL static assets flow via `_content/`);
+the hard parts are (1) turning `Perezosoft.Api` into a referenced library (`AddApplicationPart` +
+extracting `Program.cs` composition into extension methods) and (2) the DbContext/migrations seam —
+app-owned context deriving from a platform base, entity configs discovered from app assemblies, per-app
+migration history interleaving with platform schema changes. Hosts (Web/Maui), CI, Dockerfile, and docs
+can never be packages — a thin scaffold repo remains either way. **Defer hard** until the platform API
+surface stabilizes; the ADR-019 naming convention deliberately keeps this door open (a downstream app
+that never renamed `Perezosoft.*` swaps project references for package references with zero code churn).
 
 ---
 

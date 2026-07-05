@@ -43,6 +43,6 @@ public static class WebhookEvents
 {
     public const string Ping = "ping";
 
-    /// <summary>Event types the template knows about (offered in the management UI / validated on subscribe).</summary>
+    /// <summary>Event types the platform knows about (offered in the management UI / validated on subscribe).</summary>
     public static readonly IReadOnlyList<string> Known = [Ping];
 }

@@ -11,7 +11,7 @@ namespace Perezosoft.Infrastructure.Scheduling;
 /// services like a new <c>AppDbContext</c>), and runs each job whose interval has elapsed. One job's
 /// failure is logged and isolated — it never stops the other jobs or the host.
 /// <para>
-/// In-process, single-instance for the template; a distributed scheduler (Hangfire/Quartz) is the
+/// In-process, single-instance for the platform; a distributed scheduler (Hangfire/Quartz) is the
 /// documented swap-in when multi-node arrives (ADR-007). <see cref="RunDueJobsAsync"/> is separated
 /// from the timer loop so it can be unit-tested without waiting on real time.
 /// </para>

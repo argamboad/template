@@ -10,7 +10,7 @@ namespace Perezosoft.Api.Tests.Integration;
 /// DEPLOY-1 (ADR-017): proves single-origin hosting against the REAL app routing. When enabled, the API
 /// serves the Blazor WASM client + framework assets and falls back to the SPA shell for client-side
 /// routes — but an unmatched <c>/api/*</c> must stay an API-shaped 404, never the shell (the sharp edge).
-/// Serving is config-gated OFF by default, so the template's existing behavior is unchanged.
+/// Serving is config-gated OFF by default, so the platform's existing behavior is unchanged.
 /// </summary>
 [Collection(IntegrationCollection.Name)]
 public class SingleOriginHostingTests(IntegrationTestFactory factory)

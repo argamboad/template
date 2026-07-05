@@ -74,7 +74,7 @@ Scenario: The export request is audited
   Then an AuditEvent records the actor and the action
 ```
 
-**Out of scope:** a scheduled/async export job (synchronous is fine at template scale); per-user
+**Out of scope:** a scheduled/async export job (synchronous is fine at platform scale); per-user
 personal-data export distinct from the tenant export (the member list already carries each user's
 identity); CSV/other formats (JSON only).
 **Definition of done:** tests first; `ExportAsync` on each contributor; assembly + `IFileStorage`

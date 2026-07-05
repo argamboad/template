@@ -103,8 +103,8 @@ valid/​wrong-code, tampered-challenge, native-flag preserved).
 
 > **Follow-up (flagged in ADR-012):** the **redirect** login paths — OAuth callback + magic-link verify —
 > are **not yet gated**; enforcing them means redirecting the browser to a client `/mfa?challenge=…` page,
-> which needs the (not-yet-built) MFA **UI**. Tracked as a fast-follow. Since the template ships no MFA
-> enrollment UI, no template-web user can have MFA on via those paths today.
+> which needs the (not-yet-built) MFA **UI**. Tracked as a fast-follow. Since the platform ships no MFA
+> enrollment UI, no platform-web user can have MFA on via those paths today.
 
 **As a** user with MFA enabled
 **I want** to be asked for a code after my primary sign-in

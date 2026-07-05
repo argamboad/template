@@ -1,6 +1,6 @@
 # Project Status & Operator Guide — 2026-07-04
 
-> Point-in-time compass: where the template stands, what remains, and step-by-step guides for the
+> Point-in-time compass: where the platform stands, what remains, and step-by-step guides for the
 > tasks that need a human. Complements `ROADMAP.md` (sequencing) and `DEPLOYMENT.md` (prod runbook).
 > Snapshot as of develop `588a0bb` (PR #117).
 
@@ -96,8 +96,8 @@ toolchain instead.
    Mailpit).
 5. **Clone the repo** (public now, plain https works):
    ```bash
-   git clone https://github.com/argamboad/template.git
-   cd template && git checkout develop
+   git clone https://github.com/argamboad/perezosoft-platform.git
+   cd perezosoft-platform && git checkout develop
    ```
 6. **MAUI workloads** (from the repo root):
    ```bash
@@ -173,7 +173,7 @@ pass unpins the Apple column: the iOS-simulator CI smoke leg gets built, and NAT
    prod deploy then needs a manual approval.
 4. Flow from then on: PR develop → main, merge, approve the deployment.
 
-## 6. What prevents building SaaS apps on this template?
+## 6. What prevents building SaaS apps on this platform?
 
 **For web SaaS: nothing.** The intended flow works end-to-end today: clone → fill in the
 conceptualization docs (`CLAUDE.md` TODOs, `PROJECT_BRIEF.md`, `FEATURES.md`, `DATA_MODEL.md`) →

@@ -18,7 +18,7 @@ Notes: <edge cases, derived-rule references, tenant-scoping considerations>
 
 ## Constant flows (auth + tenant onboarding — always present)
 
-> These reflect the template's **custom JWT + refresh-token** implementation (no ASP.NET Core
+> These reflect the platform's **custom JWT + refresh-token** implementation (no ASP.NET Core
 > Identity). Endpoint names match `AuthController` / `HouseholdInvitationsController`. The
 > step-by-step QA scripts live in `docs/QA_TEST_PLAN.md`.
 

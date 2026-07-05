@@ -67,7 +67,7 @@ Scenario: Erasing my account removes my notifications
 ```
 
 **Out of scope:** preferences + email fan-out (NOTIFY-2); realtime push/SignalR (a later concern —
-polling is fine at template scale); notification templates/i18n beyond a title+body.
+polling is fine at platform scale); notification templates/i18n beyond a title+body.
 **Definition of done:** tests first; create + list (newest-first, paginated), unread count, mark
 one/all read, per-user isolation, erasure wipes notifications; merged, app working; ADR-013 referenced.
 
@@ -117,7 +117,7 @@ Scenario: Email goes through the reliable path
 ```
 
 **Out of scope:** per-notification-kind granularity (a single global channel toggle is enough for the
-template — extendable later); SMS/push channels; digest/batching.
+platform — extendable later); SMS/push channels; digest/batching.
 **Definition of done:** tests first; prefs default-on, get/update, fan-out respects prefs (in-app +
 email-via-outbox), email uses the outbox sender; merged, app working; ADR-013 referenced.
 

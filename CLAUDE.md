@@ -41,7 +41,7 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
    clients cheap.
 4. **Derived values are computed, never stored** as stale flags (confirm the app's specific
    derived rules in `docs/DATA_MODEL.md`).
-5. **Web-first for features.** The template ships MAUI desktop + Android shells with auth wired
+5. **Web-first for features.** The platform ships MAUI desktop + Android shells with auth wired
    (see `docs/MOBILE_TESTING.md`); build each app feature on web first and extend the native
    shells only once it works there.
 6. **Latest stable versions only, never previews.**
