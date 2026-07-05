@@ -1,4 +1,4 @@
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Decides whether a native client's OAuth redirect target is safe to redirect to.

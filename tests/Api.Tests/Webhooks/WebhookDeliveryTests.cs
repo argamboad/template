@@ -2,15 +2,15 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Webhooks;
-using Template.Infrastructure.Repositories;
-using Template.Infrastructure.Webhooks;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Webhooks;
+using Perezosoft.Infrastructure.Repositories;
+using Perezosoft.Infrastructure.Webhooks;
 
-namespace Template.Api.Tests.Webhooks;
+namespace Perezosoft.Api.Tests.Webhooks;
 
 /// <summary>
 /// Drives HOOKS (ADR-016) delivery: the publisher fans an event out to one durable outbox message per

@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Template.Api.Configuration;
-using Template.Api.Services;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Infrastructure;
+namespace Perezosoft.Api.Tests.Infrastructure;
 
 /// <summary>
 /// Wires the real repositories + services around a single <see cref="AppDbContext"/>
@@ -34,7 +34,7 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null, 
     public IUnitOfWork UnitOfWork { get; } = new EfUnitOfWork(db);
     public ITokenGenerator TokenGen { get; } = new TokenGenerator();
     public ITokenHasher Hasher { get; } = new TokenHasher();
-    public IAuditLog Audit { get; } = new Template.Infrastructure.Audit.AuditLog(
+    public IAuditLog Audit { get; } = new Perezosoft.Infrastructure.Audit.AuditLog(
         new EfRepository<AuditEvent>(db), clock ?? TimeProvider.System);
 
     public UserService UserService() => new(Users, Tenants, UnitOfWork, Clock, NullLogger<UserService>.Instance);
@@ -92,7 +92,7 @@ internal sealed class TestInvitationSettings(int lifespanDays = 7) : IInvitation
 internal sealed class TestJwtSettings : IJwtSettings
 {
     public string SecretKey => "test-secret-key-at-least-32-chars-long-000";
-    public string Issuer => "TemplateTests";
+    public string Issuer => "PerezosoftTests";
     public int ExpiryMinutes => 60;
 }
 
@@ -103,7 +103,7 @@ internal sealed class NoopEmailSender : IEmailSender
 }
 
 /// <summary>Test double for the export service — used by controller tests that don't exercise export.</summary>
-internal sealed class StubExportService : Template.Api.Services.ITenantExportService
+internal sealed class StubExportService : Perezosoft.Api.Services.ITenantExportService
 {
     public bool Called { get; private set; }
 

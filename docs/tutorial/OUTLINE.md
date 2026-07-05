@@ -45,11 +45,11 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
   `.gitleaks.toml` secret-scanning gate.
 
 ## Part 1 — The walking skeleton
-- **1.1 Solution, projects & supply chain.** `Template.slnx`, all csproj + references
+- **1.1 Solution, projects & supply chain.** `Perezosoft.slnx`, all csproj + references
   pointing inward, `Directory.Build.props` (warnings-as-errors), Central Package
   Management + locked restore (R25–R27).
 - **1.2 First endpoint, first test.** `Program.cs` is born; `WebApplicationFactory`
-  harness; the Red→Green loop lived once, tiny; `Template.Api.http` scratchpad.
+  harness; the Red→Green loop lived once, tiny; `Perezosoft.Api.http` scratchpad.
 - **1.3 Database & the test container.** `AppDbContext` (v0), design-time factory,
   Testcontainers fixture with **model-derived TRUNCATE** (R11), migrations smoke test.
 - **1.4 Configuration & the options pattern.** `SettingsProvider`, the one blessed

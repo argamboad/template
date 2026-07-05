@@ -1,9 +1,9 @@
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Custom JWT claim names issued by <see cref="JwtTokenService"/> and read server-side
 /// (e.g. by <c>HttpCurrentTenant</c>). These mirror
-/// <c>Template.Shared.Ui.Auth.AppClaims</c> — the client reads the same names over the
+/// <c>Perezosoft.Shared.Ui.Auth.AppClaims</c> — the client reads the same names over the
 /// wire, so keep the two in sync.
 /// </summary>
 public static class JwtClaims
@@ -21,7 +21,7 @@ public static class JwtClaims
 public static class AuthHeaders
 {
     /// <summary>Set by native (MAUI) clients to select body-token transport over cookies.
-    /// Must match the literal set in <c>Template.Maui.MauiProgram</c>.</summary>
+    /// Must match the literal set in <c>Perezosoft.Maui.MauiProgram</c>.</summary>
     public const string NativeClient = "X-Native-Client";
     public const string NativeClientValue = "true";
 }

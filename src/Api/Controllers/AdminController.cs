@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Platform-staff back-office (ADMIN-1, ADR-014): read-only cross-tenant inspection. The global tenant

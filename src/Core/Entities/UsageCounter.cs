@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 /// <summary>
 /// A per-tenant, per-period metered-usage counter (BILLING-5). One row per

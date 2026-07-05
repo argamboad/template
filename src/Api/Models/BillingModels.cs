@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 /// <summary>Request to start a hosted checkout for a paid plan.</summary>
 public record CreateCheckoutRequest

@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
-using Template.Infrastructure.Webhooks;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Webhooks;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>A freshly created subscription plus its signing secret (shown once, never stored plaintext).</summary>
 public sealed record WebhookCreated(WebhookSubscription Subscription, string Secret);

@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Template.Api.Services;
-using Template.Core.Abstractions;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// Per-epic service-registration extensions (DEBT-3). The flat DI block that used to live in

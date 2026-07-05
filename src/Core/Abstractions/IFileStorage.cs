@@ -1,4 +1,4 @@
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 /// <summary>
 /// The single seam for storing and retrieving binary content (ADR-010). Mirrors the

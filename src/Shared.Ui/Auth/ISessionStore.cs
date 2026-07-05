@@ -1,4 +1,4 @@
-namespace Template.Shared.Ui.Auth;
+namespace Perezosoft.Shared.Ui.Auth;
 
 /// <summary>
 /// Abstracts where the refresh token lives, the one thing that differs between hosts.

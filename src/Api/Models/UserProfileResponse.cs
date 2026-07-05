@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 /// <summary>
 /// Current user profile (GET /api/auth/me) — surfaced to the client top bar.

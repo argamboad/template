@@ -1,4 +1,4 @@
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 public interface IEmailSender
 {

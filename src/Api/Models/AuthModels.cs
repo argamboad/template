@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 public record EmailRequest(string Email, string? Culture = null);
 

@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Scheduling;
+namespace Perezosoft.Infrastructure.Scheduling;
 
 /// <summary>
 /// Reference scheduled job (ADR-007): deletes expired passwordless and refresh tokens so the auth

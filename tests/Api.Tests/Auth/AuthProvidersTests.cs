@@ -1,9 +1,9 @@
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
-using Template.Api.Services;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Tests.Auth;
+namespace Perezosoft.Api.Tests.Auth;
 
 /// <summary>
 /// The OAuth provider-discovery logic behind <c>GET /api/auth/providers</c> (used by the login/settings

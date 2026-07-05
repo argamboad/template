@@ -1,8 +1,8 @@
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Outbox;
+namespace Perezosoft.Infrastructure.Outbox;
 
 /// <summary>
 /// EF implementation of <see cref="IOutbox"/>. Stages an <see cref="OutboxMessage"/> on the shared

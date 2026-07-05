@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Shared.Ui\Template.Shared.Ui.csproj" />
+    <ProjectReference Include="..\Shared.Ui\Perezosoft.Shared.Ui.csproj" />
   </ItemGroup>
 
 </Project>

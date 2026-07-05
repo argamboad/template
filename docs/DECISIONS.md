@@ -212,13 +212,13 @@ now live in a distinct namespace/folder, separated from vertical-slice features.
 established that PUBAPI/HOOKS are **platform** (not app features); this refines *where* they live so the
 distinction is structural, not just narrative:
 1. **Config-gated minimal-API PLATFORM surfaces live under `src/Api/Endpoints/`** (namespace
-   `Template.Api.Endpoints`), NOT `src/Api/Features/`. `ApiKeyEndpoints` (PUBAPI) and `WebhookEndpoints`
+   `Perezosoft.Api.Endpoints`), NOT `src/Api/Features/`. `ApiKeyEndpoints` (PUBAPI) and `WebhookEndpoints`
    (HOOKS) moved there. They may use a raw `MapGroup(...)` because they are platform surfaces, not slices.
 2. **The shared endpoint-extension helpers are platform infra and live with Endpoints.**
    `MapTenantFeatureGroup` (`FeatureEndpointExtensions`), `RequirePermission` (`PermissionEndpointExtensions`),
-   and `RequireEntitlement` (`EntitlementEndpointExtensions`) moved from `Template.Api.Features` to
-   `Template.Api.Endpoints`. This is what lets the R8 gate hold: nothing outside `src/Api/Features/` (except
-   `Program.cs`, which composes the Notes sample) references `Template.Api.Features.*`.
+   and `RequireEntitlement` (`EntitlementEndpointExtensions`) moved from `Perezosoft.Api.Features` to
+   `Perezosoft.Api.Endpoints`. This is what lets the R8 gate hold: nothing outside `src/Api/Features/` (except
+   `Program.cs`, which composes the Notes sample) references `Perezosoft.Api.Features.*`.
 3. **Vertical-slice features stay under `src/Api/Features/<X>/`** and register their routes via
    `MapTenantFeatureGroup` — never a raw `MapGroup`. A new build gate (R6,
    `FeatureFiles_RegisterRoutesViaMapTenantFeatureGroup_NotRawMapGroup`) scans `src/Api/Features/**` and

@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
-using Template.Core.Repositories;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 public record AdminTenantSummaryResponse
 {

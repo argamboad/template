@@ -1,7 +1,7 @@
 using Microsoft.Playwright;
-using Template.E2E.Tests.Pages;
+using Perezosoft.E2E.Tests.Pages;
 
-namespace Template.E2E.Tests;
+namespace Perezosoft.E2E.Tests;
 
 /// <summary>
 /// v2 audit B8-5: the security-critical MFA journey end-to-end through the real Blazor app + API.

@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Infrastructure.Files;
+namespace Perezosoft.Infrastructure.Files;
 
 /// <summary>
 /// Signs local-disk download tokens with the Data Protection stack's

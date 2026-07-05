@@ -1,6 +1,6 @@
-using Template.Shared.Ui;
+using Perezosoft.Shared.Ui;
 
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 /// <summary>
 /// Native implementation (NATIVE-3): a WebView can't perform a browser download, so fetch the

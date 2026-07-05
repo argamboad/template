@@ -3,15 +3,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.RateLimiting;
-using Template.Api.Configuration;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Infrastructure;
-using Template.Infrastructure.Email;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure;
+using Perezosoft.Infrastructure.Email;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Authentication controller for the OAuth → JWT + refresh-token flow.

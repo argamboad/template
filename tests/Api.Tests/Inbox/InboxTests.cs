@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
-using Template.Infrastructure.Inbox;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Inbox;
 
-namespace Template.Api.Tests.Inbox;
+namespace Perezosoft.Api.Tests.Inbox;
 
 /// <summary>
 /// Drives JOBS-2 (ADR-007): the inbox gives inbound at-least-once deliveries exactly-once handling.

@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Template.Core.Abstractions;
-using Template.Core.Authorization;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Authorization;
 
-namespace Template.Api.Endpoints;
+namespace Perezosoft.Api.Endpoints;
 
 /// <summary>
 /// Gates an endpoint (or a feature group) behind a tenant <see cref="Permission"/> (ADR-009). A feature

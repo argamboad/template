@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Proves the EF global query filter makes tenant isolation structural: a tenant-scoped

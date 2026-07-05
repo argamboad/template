@@ -1,6 +1,6 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Repositories;
+namespace Perezosoft.Core.Repositories;
 
 /// <summary>Tenant invitations.</summary>
 public interface ITenantInvitationRepository

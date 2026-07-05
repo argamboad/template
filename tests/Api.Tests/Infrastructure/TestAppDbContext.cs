@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Api.Tests.Infrastructure;
+namespace Perezosoft.Api.Tests.Infrastructure;
 
 /// <summary>
 /// A test-only <see cref="ITenantScoped"/> fixture entity. The platform tenancy/GDPR/outbox tests use

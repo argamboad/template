@@ -1,6 +1,6 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Tests;
+namespace Perezosoft.Core.Tests;
 
 /// <summary>
 /// Boundary tests for <see cref="TenantInvitation"/>'s derived rules, evaluated against an explicit

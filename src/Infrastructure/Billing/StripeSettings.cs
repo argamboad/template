@@ -1,4 +1,4 @@
-namespace Template.Infrastructure.Billing;
+namespace Perezosoft.Infrastructure.Billing;
 
 /// <summary>
 /// Stripe configuration (bound from the <c>Billing:Stripe</c> section). Secrets come from <c>.env</c>

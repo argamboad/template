@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
 
-namespace Template.Api.Tests.Integration;
+namespace Perezosoft.Api.Tests.Integration;
 
 /// <summary>
 /// v2 audit B9-5 (ADR-009 RBAC): locks the tenant-permission 403 behavior at the HTTP boundary so the

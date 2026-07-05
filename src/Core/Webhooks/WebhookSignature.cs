@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Template.Core.Webhooks;
+namespace Perezosoft.Core.Webhooks;
 
 /// <summary>
 /// Computes the HMAC-SHA256 signature a webhook delivery is signed with (HOOKS, ADR-016). The receiver

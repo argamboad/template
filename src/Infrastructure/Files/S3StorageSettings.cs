@@ -1,4 +1,4 @@
-namespace Template.Infrastructure.Files;
+namespace Perezosoft.Infrastructure.Files;
 
 /// <summary>
 /// Settings for <see cref="S3FileStorage"/> (ADR-010), bound from <c>Storage:S3</c>. Because the impl

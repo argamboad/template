@@ -1,4 +1,4 @@
-namespace Template.Core.Repositories;
+namespace Perezosoft.Core.Repositories;
 
 /// <summary>
 /// A transactional boundary spanning several repository writes.

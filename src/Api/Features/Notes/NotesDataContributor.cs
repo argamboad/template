@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Features.Notes;
+namespace Perezosoft.Api.Features.Notes;
 
 /// <summary>
 /// 🗑️ DELETE-ME: sample feature's tenant-data hook. Registering this (in Program.cs) is

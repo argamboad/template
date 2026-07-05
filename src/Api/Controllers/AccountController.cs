@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Authentication;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Core.Abstractions;
-using Template.Core.Repositories;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Signed-in account surface: profile, erasure, locale preference, and OAuth login links.

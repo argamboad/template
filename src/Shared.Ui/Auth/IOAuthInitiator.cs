@@ -1,4 +1,4 @@
-namespace Template.Shared.Ui.Auth;
+namespace Perezosoft.Shared.Ui.Auth;
 
 /// <summary>
 /// Performs the interactive, platform-specific part of native OAuth: open the system

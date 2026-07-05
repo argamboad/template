@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
-using Template.Api.Configuration;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 public enum OtpStatus { Success, Invalid, Expired, TooManyAttempts }
 

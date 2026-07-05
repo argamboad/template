@@ -409,7 +409,7 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
-      "template.api": {
+      "perezosoft.api": {
         "type": "Project",
         "dependencies": {
           "DotNetEnv": "[3.2.0, )",
@@ -421,15 +421,15 @@
           "OpenTelemetry.Instrumentation.AspNetCore": "[1.16.0, )",
           "OpenTelemetry.Instrumentation.Http": "[1.16.0, )",
           "Otp.NET": "[1.4.1, )",
-          "Swashbuckle.AspNetCore": "[7.2.0, )",
-          "Template.Core": "[1.0.0, )",
-          "Template.Infrastructure": "[1.0.0, )"
+          "Perezosoft.Core": "[1.0.0, )",
+          "Perezosoft.Infrastructure": "[1.0.0, )",
+          "Swashbuckle.AspNetCore": "[7.2.0, )"
         }
       },
-      "template.core": {
+      "perezosoft.core": {
         "type": "Project"
       },
-      "template.infrastructure": {
+      "perezosoft.infrastructure": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.S3": "[4.0.100, )",
@@ -438,8 +438,8 @@
           "Microsoft.AspNetCore.Authentication.MicrosoftAccount": "[10.0.9, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.9, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.2, )",
-          "Stripe.net": "[52.1.0, )",
-          "Template.Core": "[1.0.0, )"
+          "Perezosoft.Core": "[1.0.0, )",
+          "Stripe.net": "[52.1.0, )"
         }
       },
       "AWSSDK.S3": {

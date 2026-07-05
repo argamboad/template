@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 public record RenameTenantRequest
 {

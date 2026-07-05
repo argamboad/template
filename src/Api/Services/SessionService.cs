@@ -1,9 +1,9 @@
-using Template.Api.Configuration;
-using Template.Api.Models;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Models;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// An issued access session: the <see cref="TokenResponse"/> for the client plus the raw

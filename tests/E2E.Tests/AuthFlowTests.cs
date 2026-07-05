@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using Template.E2E.Tests.Pages;
+using Perezosoft.E2E.Tests.Pages;
 
-namespace Template.E2E.Tests;
+namespace Perezosoft.E2E.Tests;
 
 /// <summary>
 /// End-to-end auth flow through the real Blazor WASM app + API + Mailpit. Covers the

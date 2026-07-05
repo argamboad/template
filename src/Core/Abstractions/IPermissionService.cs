@@ -1,6 +1,6 @@
-using Template.Core.Authorization;
+using Perezosoft.Core.Authorization;
 
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 /// <summary>
 /// Answers "does the current caller's tenant role grant this <see cref="Permission"/>?" for the

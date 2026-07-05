@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Infrastructure.Persistence.Configurations;
+namespace Perezosoft.Infrastructure.Persistence.Configurations;
 
 public class UserLoginConfiguration : IEntityTypeConfiguration<UserLogin>
 {

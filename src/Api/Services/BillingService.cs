@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Configuration;
-using Template.Core.Abstractions;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 public enum CheckoutOutcome { Created, InvalidPlan }
 

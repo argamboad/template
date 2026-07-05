@@ -1,6 +1,6 @@
-using Template.Shared.Ui.Auth;
+using Perezosoft.Shared.Ui.Auth;
 
-namespace Template.Web.Http;
+namespace Perezosoft.Web.Http;
 
 /// <summary>
 /// Web <see cref="ISessionStore"/>: the refresh token is an HttpOnly cookie the browser

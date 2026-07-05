@@ -1,8 +1,8 @@
 using System.Text.Json;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
 
-namespace Template.Infrastructure.Billing;
+namespace Perezosoft.Infrastructure.Billing;
 
 /// <summary>The outbox payload for canceling a subscription at the provider (BILLING-7).</summary>
 public sealed record BillingCancelPayload(string StripeSubscriptionId);

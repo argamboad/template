@@ -8,21 +8,21 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Template.Core.Abstractions;
-using Template.Core.Repositories;
-using Template.Infrastructure.Audit;
-using Template.Infrastructure.Billing;
-using Template.Infrastructure.Email;
-using Template.Infrastructure.Files;
-using Template.Infrastructure.Http;
-using Template.Infrastructure.Inbox;
-using Template.Infrastructure.Outbox;
-using Template.Infrastructure.Scheduling;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
-using Template.Infrastructure.Webhooks;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Audit;
+using Perezosoft.Infrastructure.Billing;
+using Perezosoft.Infrastructure.Email;
+using Perezosoft.Infrastructure.Files;
+using Perezosoft.Infrastructure.Http;
+using Perezosoft.Infrastructure.Inbox;
+using Perezosoft.Infrastructure.Outbox;
+using Perezosoft.Infrastructure.Scheduling;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
+using Perezosoft.Infrastructure.Webhooks;
 
-namespace Template.Infrastructure;
+namespace Perezosoft.Infrastructure;
 
 public static class ServiceCollectionExtensions
 {
@@ -45,6 +45,10 @@ public static class ServiceCollectionExtensions
 
         // Data Protection — keys stored in DB so the OAuth correlation/nonce cookies
         // survive server restarts/redeploys.
+        // The application name is part of key derivation (like the CreateProtector purpose
+        // strings): renaming it makes everything already protected — MFA secrets, webhook
+        // secrets, in-flight tokens — undecryptable. Kept through the Perezosoft rename;
+        // change only alongside a deliberate re-encryption migration.
         services.AddDataProtection()
             .PersistKeysToDbContext<AppDbContext>()
             .SetApplicationName("template");

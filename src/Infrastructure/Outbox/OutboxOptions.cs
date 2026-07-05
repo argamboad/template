@@ -1,4 +1,4 @@
-namespace Template.Infrastructure.Outbox;
+namespace Perezosoft.Infrastructure.Outbox;
 
 /// <summary>
 /// Tuning for the outbox dispatcher. Defaults are sensible for the in-process template; bind from

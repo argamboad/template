@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Infrastructure.Files;
+namespace Perezosoft.Infrastructure.Files;
 
 /// <summary>
 /// Local-filesystem <see cref="IFileStorage"/> — the dev/test default (ADR-010). Objects live under

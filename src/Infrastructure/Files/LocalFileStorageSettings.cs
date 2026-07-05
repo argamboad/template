@@ -1,4 +1,4 @@
-namespace Template.Infrastructure.Files;
+namespace Perezosoft.Infrastructure.Files;
 
 /// <summary>
 /// Settings for <see cref="LocalDiskFileStorage"/> (ADR-010), bound from <c>Storage:Local</c>. When

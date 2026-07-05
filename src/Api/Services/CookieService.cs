@@ -1,6 +1,6 @@
-using Template.Api.Configuration;
+using Perezosoft.Api.Configuration;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Manages refresh token cookie operations.

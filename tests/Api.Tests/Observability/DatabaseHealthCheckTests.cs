@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Template.Api.Observability;
-using Template.Api.Tests.Infrastructure;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Api.Observability;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Api.Tests.Observability;
+namespace Perezosoft.Api.Tests.Observability;
 
 /// <summary>
 /// OBS-3 (ADR-008): the readiness check reflects database reachability — Healthy when the DB is up,

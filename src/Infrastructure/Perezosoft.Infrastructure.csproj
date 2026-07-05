@@ -5,7 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Core\Template.Core.csproj" />
+    <ProjectReference Include="..\Core\Perezosoft.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

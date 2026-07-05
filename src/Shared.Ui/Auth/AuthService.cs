@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 
-namespace Template.Shared.Ui.Auth;
+namespace Perezosoft.Shared.Ui.Auth;
 
 /// <summary>Outcome of a native primary-auth attempt: signed in, failed, or owes an MFA step-up.</summary>
 public enum SignInStatus { Success, Failed, MfaRequired }

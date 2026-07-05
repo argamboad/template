@@ -6,10 +6,10 @@ using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
-using Template.Api.Authentication;
-using Template.Core.Repositories;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Tests.Infrastructure;
+namespace Perezosoft.Api.Tests.Infrastructure;
 
 /// <summary>
 /// Runs the <see cref="RequireTenantPermissionAttribute"/> that guards a controller action, exactly as

@@ -1,6 +1,6 @@
-using Template.Shared.Ui;
+using Perezosoft.Shared.Ui;
 
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 /// <summary>
 /// Native implementation: OS <see cref="Preferences"/>, because that's the only store

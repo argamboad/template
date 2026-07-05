@@ -1,6 +1,6 @@
 using Microsoft.Playwright;
 
-namespace Template.E2E.Tests.Pages;
+namespace Perezosoft.E2E.Tests.Pages;
 
 /// <summary>Page object for the billing page — plan, seats, upgrade/portal actions.</summary>
 public class BillingPage(IPage page) : BasePage(page)

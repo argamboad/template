@@ -1,4 +1,4 @@
-namespace Template.Infrastructure.Email;
+namespace Perezosoft.Infrastructure.Email;
 
 public class SmtpSettings
 {

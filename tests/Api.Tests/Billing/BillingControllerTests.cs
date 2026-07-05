@@ -1,17 +1,17 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Controllers;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Infrastructure.Billing;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Controllers;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Billing;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Billing;
+namespace Perezosoft.Api.Tests.Billing;
 
 /// <summary>
 /// BILLING-2 owner gate on the platform <see cref="BillingController"/>: only the tenant <b>owner</b>

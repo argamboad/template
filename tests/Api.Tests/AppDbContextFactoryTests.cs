@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Api;
-using Template.Core.Entities;
+using Perezosoft.Api;
+using Perezosoft.Core.Entities;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Guards the design-time DbContext factory that EF tooling uses for migrations /

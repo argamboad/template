@@ -1,8 +1,8 @@
 using System.Text.Json;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Email;
+namespace Perezosoft.Infrastructure.Email;
 
 /// <summary>
 /// <see cref="IEmailSender"/> that ENQUEUES the email onto the transactional outbox instead of
@@ -13,7 +13,7 @@ namespace Template.Infrastructure.Email;
 /// </summary>
 public sealed class OutboxEmailSender(IOutbox outbox, AppDbContext db) : IEmailSender
 {
-    /// <summary>The <see cref="Template.Core.Entities.OutboxMessage.Type"/> for email messages.</summary>
+    /// <summary>The <see cref="Perezosoft.Core.Entities.OutboxMessage.Type"/> for email messages.</summary>
     public const string MessageType = "email";
 
     public async Task SendAsync(string to, string subject, string htmlBody,

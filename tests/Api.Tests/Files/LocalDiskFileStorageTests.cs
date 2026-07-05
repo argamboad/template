@@ -1,11 +1,11 @@
 using System.Text;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Files;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Files;
 
-namespace Template.Api.Tests.Files;
+namespace Perezosoft.Api.Tests.Files;
 
 /// <summary>
 /// FILES-1 (ADR-010): <see cref="LocalDiskFileStorage"/> round-trips bytes + content-type, namespaces

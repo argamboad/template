@@ -41,7 +41,7 @@ From Visual Studio: select the Android target + your emulator, F5. Or CLI (emula
 running):
 
 ```bash
-dotnet build src/Maui/Template.Maui.csproj -t:Run -f net10.0-android
+dotnet build src/Maui/Perezosoft.Maui.csproj -t:Run -f net10.0-android
 ```
 
 ## 4. Test email OTP (no extra setup)

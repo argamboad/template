@@ -1,4 +1,4 @@
-namespace Template.Shared.Ui;
+namespace Perezosoft.Shared.Ui;
 
 /// <summary>
 /// Persists the user's chosen UI culture so the host can re-apply it on the next cold start.

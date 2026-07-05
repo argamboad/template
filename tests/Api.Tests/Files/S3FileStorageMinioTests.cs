@@ -1,11 +1,11 @@
 using System.Text;
 using Microsoft.Extensions.Options;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Files;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Files;
 using Testcontainers.Minio;
 
-namespace Template.Api.Tests.Files;
+namespace Perezosoft.Api.Tests.Files;
 
 /// <summary>
 /// Starts one MinIO (S3-compatible) container for the class and creates the test bucket. Proves the
@@ -14,7 +14,7 @@ namespace Template.Api.Tests.Files;
 /// </summary>
 public sealed class MinioFixture : IAsyncLifetime
 {
-    public const string Bucket = "template-test";
+    public const string Bucket = "perezosoft-test";
     private readonly MinioContainer _minio = new MinioBuilder("minio/minio:latest").Build();
 
     public S3StorageSettings Settings { get; private set; } = default!;

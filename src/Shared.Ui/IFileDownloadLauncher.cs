@@ -1,4 +1,4 @@
-namespace Template.Shared.Ui;
+namespace Perezosoft.Shared.Ui;
 
 /// <summary>
 /// Hands a signed download URL (FILES-2) to the host's download affordance. A browser downloads it

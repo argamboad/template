@@ -2,10 +2,10 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using OtpNet;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>The provisioning URI + secret returned once when enrollment begins (MFA-1, ADR-012).</summary>
 public sealed record MfaEnrollment(string ProvisioningUri, string Secret);
@@ -48,6 +48,8 @@ public sealed class MfaService(
     private const string Issuer = "Template"; // rebrandable — appears in the authenticator app
     private const int RecoveryCodeCount = 10;
     private static readonly VerificationWindow Window = new(previous: 1, future: 1); // ±1 step for clock skew
+    // Purpose string feeds DataProtection key derivation — renaming it makes MFA secrets already
+    // encrypted at rest undecryptable. Kept through the Perezosoft rename; bump only with a re-encrypt migration.
     private readonly IDataProtector _protector = dataProtection.CreateProtector("Template.Mfa.Secret.v1");
 
     public async Task<bool> IsEnabledAsync(Guid userId, CancellationToken cancellationToken = default) =>

@@ -7,11 +7,11 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Template.Api.Configuration;
-using Template.Api.Endpoints;
-using Template.Api.Tests.Infrastructure;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Endpoints;
+using Perezosoft.Api.Tests.Infrastructure;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// A feature group registered via <see cref="FeatureEndpointExtensions.MapTenantFeatureGroup"/> is

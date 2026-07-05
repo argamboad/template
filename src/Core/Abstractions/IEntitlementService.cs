@@ -1,4 +1,4 @@
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 /// <summary>
 /// Answers "does the current tenant's plan include this entitlement?" — the server-side gate behind

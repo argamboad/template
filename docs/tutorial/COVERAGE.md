@@ -22,23 +22,23 @@
 
 - `Directory.Build.props` — warnings-as-errors etc.
 - `Directory.Packages.props` — Central Package Management (R25/R27)
-- `Template.slnx`
+- `Perezosoft.slnx`
 - `src/Api/Properties/launchSettings.json`
-- `src/Api/Template.Api.csproj` — created here; PackageReferences added as lessons need them
-- `src/Core/Template.Core.csproj` — created here; PackageReferences added as lessons need them
-- `src/Infrastructure/Template.Infrastructure.csproj` — created here; PackageReferences added as lessons need them
-- `src/Maui/Template.Maui.csproj` — created here; PackageReferences added as lessons need them
-- `src/Shared.Ui/Template.Shared.Ui.csproj` — created here; PackageReferences added as lessons need them
+- `src/Api/Perezosoft.Api.csproj` — created here; PackageReferences added as lessons need them
+- `src/Core/Perezosoft.Core.csproj` — created here; PackageReferences added as lessons need them
+- `src/Infrastructure/Perezosoft.Infrastructure.csproj` — created here; PackageReferences added as lessons need them
+- `src/Maui/Perezosoft.Maui.csproj` — created here; PackageReferences added as lessons need them
+- `src/Shared.Ui/Perezosoft.Shared.Ui.csproj` — created here; PackageReferences added as lessons need them
 - `src/Web/Properties/launchSettings.json`
-- `src/Web/Template.Web.csproj` — created here; PackageReferences added as lessons need them
-- `tests/Api.Tests/Template.Api.Tests.csproj` — created here; PackageReferences added as lessons need them
-- `tests/Core.Tests/Template.Core.Tests.csproj` — created here; PackageReferences added as lessons need them
-- `tests/E2E.Tests/Template.E2E.Tests.csproj` — created here; PackageReferences added as lessons need them
+- `src/Web/Perezosoft.Web.csproj` — created here; PackageReferences added as lessons need them
+- `tests/Api.Tests/Perezosoft.Api.Tests.csproj` — created here; PackageReferences added as lessons need them
+- `tests/Core.Tests/Perezosoft.Core.Tests.csproj` — created here; PackageReferences added as lessons need them
+- `tests/E2E.Tests/Perezosoft.E2E.Tests.csproj` — created here; PackageReferences added as lessons need them
 
 ## 1.2 — First endpoint, first test (6 files)
 
 - `src/Api/Program.cs` — born here; every part adds registrations/middleware
-- `src/Api/Template.Api.http` — REST client scratchpad — grows with each endpoint
+- `src/Api/Perezosoft.Api.http` — REST client scratchpad — grows with each endpoint
 - `tests/Api.Tests/HarnessSmokeTests.cs`
 - `tests/Api.Tests/Infrastructure/FakeHostEnvironment.cs`
 - `tests/Api.Tests/Infrastructure/IntegrationTestFactory.cs`

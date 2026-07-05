@@ -1,4 +1,4 @@
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 public partial class MainPage : ContentPage
 {

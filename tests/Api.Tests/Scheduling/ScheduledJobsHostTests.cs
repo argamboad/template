@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Scheduling;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Scheduling;
 
-namespace Template.Api.Tests.Scheduling;
+namespace Perezosoft.Api.Tests.Scheduling;
 
 /// <summary>
 /// Drives JOBS-3 (ADR-007): the host runs due jobs, isolates a failing job from the others, and

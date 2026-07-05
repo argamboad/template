@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Infrastructure.Outbox;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Outbox;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Api.Tests.Outbox;
+namespace Perezosoft.Api.Tests.Outbox;
 
 /// <summary>
 /// Drives JOBS-1 (ADR-007): the outbox makes side effects atomic with the data change and the

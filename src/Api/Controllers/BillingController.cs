@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Authentication;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Core.Abstractions;
-using Template.Core.Authorization;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Billing &amp; subscriptions (ADR-006). A <b>platform</b> controller — billing is reusable chassis,

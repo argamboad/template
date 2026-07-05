@@ -1,6 +1,6 @@
 using Microsoft.Playwright;
 
-namespace Template.E2E.Tests.Pages;
+namespace Perezosoft.E2E.Tests.Pages;
 
 /// <summary>Page object for the Household page — roster, role badges, and invitations.</summary>
 public class HouseholdPage(IPage page) : BasePage(page)

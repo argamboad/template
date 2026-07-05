@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Infrastructure;
-using Template.Infrastructure.Billing;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure;
+using Perezosoft.Infrastructure.Billing;
 
-namespace Template.Api.Tests.Billing;
+namespace Perezosoft.Api.Tests.Billing;
 
 /// <summary>
 /// GAP-1 (v2 audit, ADR-006): the in-memory <see cref="FakeBillingProvider"/> trusts a literal webhook

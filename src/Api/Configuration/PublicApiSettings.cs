@@ -1,4 +1,4 @@
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// Toggles the public API surface (PUBAPI, ADR-015). **Default off** — a template deployment opts in

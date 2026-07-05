@@ -1,7 +1,7 @@
 ﻿using ObjCRuntime;
 using UIKit;
 
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 public class Program
 {

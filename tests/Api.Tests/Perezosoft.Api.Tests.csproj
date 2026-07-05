@@ -34,9 +34,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Core\Template.Core.csproj" />
-    <ProjectReference Include="..\..\src\Api\Template.Api.csproj" />
-    <ProjectReference Include="..\..\src\Infrastructure\Template.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Core\Perezosoft.Core.csproj" />
+    <ProjectReference Include="..\..\src\Api\Perezosoft.Api.csproj" />
+    <ProjectReference Include="..\..\src\Infrastructure\Perezosoft.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

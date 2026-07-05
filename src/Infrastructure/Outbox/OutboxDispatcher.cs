@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Template.Infrastructure.Outbox;
+namespace Perezosoft.Infrastructure.Outbox;
 
 /// <summary>
 /// Drains the outbox on an interval. Resolves a fresh DI scope per pass (the processor and its

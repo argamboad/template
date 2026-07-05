@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 
-namespace Template.Infrastructure.Webhooks;
+namespace Perezosoft.Infrastructure.Webhooks;
 
 /// <summary>
 /// Encrypts/decrypts a webhook subscription's signing secret at rest (HOOKS, ADR-016), reusing the Data
@@ -16,6 +16,8 @@ public interface IWebhookSecretProtector
 
 public sealed class WebhookSecretProtector(IDataProtectionProvider dataProtection) : IWebhookSecretProtector
 {
+    // Purpose string feeds DataProtection key derivation — renaming it makes webhook secrets already
+    // encrypted at rest undecryptable. Kept through the Perezosoft rename; bump only with a re-encrypt migration.
     private readonly IDataProtector _protector = dataProtection.CreateProtector("Template.Webhook.Secret.v1");
 
     public string Protect(string secret) => _protector.Protect(secret);

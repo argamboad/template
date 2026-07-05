@@ -7,9 +7,9 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Template.Api.Configuration;
+using Perezosoft.Api.Configuration;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Exercises the real rate-limiter policies through actual middleware in a minimal host (no DB / SMTP):

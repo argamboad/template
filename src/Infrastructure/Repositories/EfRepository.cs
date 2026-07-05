@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Repositories;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Repositories;
+namespace Perezosoft.Infrastructure.Repositories;
 
 /// <summary>
 /// EF Core implementation of the generic feature repository. Registered open-generically

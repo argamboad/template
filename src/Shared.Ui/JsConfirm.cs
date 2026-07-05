@@ -1,6 +1,6 @@
 using Microsoft.JSInterop;
 
-namespace Template.Shared.Ui;
+namespace Perezosoft.Shared.Ui;
 
 /// <summary>
 /// Browser <c>confirm()</c> helper that FAILS CLOSED. If the JS-interop call throws — prerender,

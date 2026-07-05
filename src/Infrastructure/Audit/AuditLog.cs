@@ -1,9 +1,9 @@
 using System.Text.Json;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Infrastructure.Audit;
+namespace Perezosoft.Infrastructure.Audit;
 
 /// <summary>
 /// EF implementation of <see cref="IAuditLog"/> (OBS-4, ADR-008). Stages an <see cref="AuditEvent"/> on

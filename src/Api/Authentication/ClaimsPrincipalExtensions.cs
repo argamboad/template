@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace Template.Api.Authentication;
+namespace Perezosoft.Api.Authentication;
 
 /// <summary>
 /// Shared accessors for the authenticated principal, so the "current user id from the NameIdentifier

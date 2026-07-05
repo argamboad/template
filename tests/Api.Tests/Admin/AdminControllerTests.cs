@@ -4,19 +4,19 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Template.Api.Configuration;
-using Template.Api.Controllers;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Api.Tests.Notify;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Infrastructure.Audit;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Controllers;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Api.Tests.Notify;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Audit;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Admin;
+namespace Perezosoft.Api.Tests.Admin;
 
 /// <summary>
 /// ADMIN-1 (ADR-014): the staff back-office. Non-staff callers get 403; staff can list tenants and view

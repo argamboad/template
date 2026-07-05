@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Tests.Infrastructure;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// The generic repository exposes two deliberately distinct read surfaces: <c>Query()</c> is

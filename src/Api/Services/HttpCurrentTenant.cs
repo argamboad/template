@@ -1,6 +1,6 @@
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Resolves <see cref="ICurrentTenant"/> from the authenticated principal's <c>tenant_id</c> claim

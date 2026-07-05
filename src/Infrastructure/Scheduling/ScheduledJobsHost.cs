@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Infrastructure.Scheduling;
+namespace Perezosoft.Infrastructure.Scheduling;
 
 /// <summary>
 /// Runs registered <see cref="IScheduledJob"/>s on their own intervals (ADR-007). Wakes every

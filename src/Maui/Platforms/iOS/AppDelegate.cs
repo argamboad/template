@@ -1,6 +1,6 @@
 ﻿using Foundation;
 
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 [Register("AppDelegate")]
 public class AppDelegate : MauiUIApplicationDelegate

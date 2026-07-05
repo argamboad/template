@@ -1,6 +1,6 @@
-using Template.Api.Configuration;
+using Perezosoft.Api.Configuration;
 
-namespace Template.Api.Endpoints;
+namespace Perezosoft.Api.Endpoints;
 
 /// <summary>
 /// Shared scaffolding for vertical-slice feature endpoints. <see cref="MapTenantFeatureGroup"/> is

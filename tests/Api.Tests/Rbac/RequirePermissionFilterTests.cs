@@ -6,11 +6,11 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Template.Api.Endpoints;
-using Template.Core.Abstractions;
-using Template.Core.Authorization;
+using Perezosoft.Api.Endpoints;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Authorization;
 
-namespace Template.Api.Tests.Rbac;
+namespace Perezosoft.Api.Tests.Rbac;
 
 /// <summary>
 /// Drives RBAC-1's minimal-API enforcement path (ADR-009): <c>.RequirePermission(...)</c> returns

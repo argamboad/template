@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
-using Template.Shared.Ui.Auth;
+using Perezosoft.Shared.Ui.Auth;
 
-namespace Template.Maui.Auth;
+namespace Perezosoft.Maui.Auth;
 
 /// <summary>
 /// Attaches the in-memory JWT access token as a Bearer header on every API request —

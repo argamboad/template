@@ -1,7 +1,7 @@
 ﻿using Android.App;
 using Android.Runtime;
 
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 [Application]
 public class MainApplication : MauiApplication

@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
-using Template.Api.Services;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// The native OAuth flow can't return tokens directly in the loopback redirect URL

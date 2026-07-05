@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Hosting;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Infrastructure.Http;
+namespace Perezosoft.Infrastructure.Http;
 
 /// <summary>
 /// Default <see cref="IOutboundUrlGuard"/>. In Development it is permissive (any http/https URL, so

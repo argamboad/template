@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>A freshly created key: the persisted row plus the one-time raw value (never stored).</summary>
 public sealed record ApiKeyCreated(ApiKey Key, string RawKey);

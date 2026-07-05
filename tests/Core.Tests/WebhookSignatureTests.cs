@@ -1,6 +1,6 @@
-using Template.Core.Webhooks;
+using Perezosoft.Core.Webhooks;
 
-namespace Template.Core.Tests;
+namespace Perezosoft.Core.Tests;
 
 /// <summary>
 /// Boundary tests for the webhook HMAC signature (HOOKS, ADR-016): deterministic for a given secret+body,

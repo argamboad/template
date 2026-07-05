@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Api;
+namespace Perezosoft.Api;
 
 /// <summary>
 /// Design-time factory so EF tooling (<c>migrations add</c>,

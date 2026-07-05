@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Authentication;
-using Template.Api.Configuration;
-using Template.Api.Services;
-using Template.Core.Authorization;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Base for JWT-authenticated, tenant-scoped controllers. Centralizes the

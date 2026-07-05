@@ -3,9 +3,9 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Template.Api.Services;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Authentication;
+namespace Perezosoft.Api.Authentication;
 
 public sealed class ApiKeyAuthenticationOptions : AuthenticationSchemeOptions;
 
