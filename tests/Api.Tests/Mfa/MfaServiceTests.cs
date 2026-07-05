@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using OtpNet;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Mfa;
+namespace Perezosoft.Api.Tests.Mfa;
 
 /// <summary>
 /// MFA-1 (ADR-012): TOTP enrollment/management. Enroll → confirm enables MFA + returns hashed

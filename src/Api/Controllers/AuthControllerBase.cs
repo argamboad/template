@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Authentication;
-using Template.Api.Services;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Shared base for the auth controllers — holds request-scoped helpers common to the

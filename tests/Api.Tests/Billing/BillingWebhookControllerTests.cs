@@ -5,18 +5,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Template.Api.Controllers;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Infrastructure.Billing;
-using Template.Infrastructure.Inbox;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Controllers;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Billing;
+using Perezosoft.Infrastructure.Inbox;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Billing;
+namespace Perezosoft.Api.Tests.Billing;
 
 /// <summary>
 /// GAP-5 (v2 audit): a forged/invalid billing-webhook signature must be observable — the endpoint is

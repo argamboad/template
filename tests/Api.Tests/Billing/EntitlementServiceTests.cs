@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Time.Testing;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Billing;
+namespace Perezosoft.Api.Tests.Billing;
 
 /// <summary>
 /// Drives BILLING-1 (ADR-006): entitlements resolve from the tenant's Subscription projection and

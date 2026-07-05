@@ -1,10 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
 
-namespace Template.Api.Tests.Integration;
+namespace Perezosoft.Api.Tests.Integration;
 
 /// <summary>
 /// v2 audit B8-6: proves the integration harness boots the real app and that the end-to-end pipeline

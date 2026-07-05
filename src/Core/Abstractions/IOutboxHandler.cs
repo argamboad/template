@@ -1,6 +1,6 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 /// <summary>
 /// Handles outbox messages of a single <see cref="Type"/>. The dispatcher resolves all registered

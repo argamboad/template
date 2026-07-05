@@ -2,9 +2,9 @@ using System.Globalization;
 using System.Net;
 using System.Reflection;
 using System.Resources;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Infrastructure.Email;
+namespace Perezosoft.Infrastructure.Email;
 
 /// <summary>A rendered branded email: localized subject, HTML, and the inline images it references.</summary>
 public sealed record EmailBody(string Subject, string Html, IReadOnlyList<EmailInlineImage> InlineImages);
@@ -37,7 +37,7 @@ public static class BrandedEmail
     private const string Font = "'Segoe UI',Helvetica,Arial,sans-serif";
 
     private static readonly ResourceManager Rm =
-        new("Template.Infrastructure.Email.EmailStrings", typeof(BrandedEmail).Assembly);
+        new("Perezosoft.Infrastructure.Email.EmailStrings", typeof(BrandedEmail).Assembly);
     private static readonly CultureInfo DefaultCulture = CultureInfo.GetCultureInfo("en");
 
     /// <summary>Resolves a locale code (e.g. "es") to a culture, defaulting to English.</summary>

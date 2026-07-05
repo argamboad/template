@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
-using Template.Api.Services;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// The per-provider email-trust policy layered on the fail-closed claim check. It must trust

@@ -3,9 +3,9 @@ using System.Security.Claims;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Api.Observability;
+namespace Perezosoft.Api.Observability;
 
 /// <summary>
 /// OpenTelemetry traces + metrics (OBS-2, ADR-008). Instruments ASP.NET Core, outbound HttpClient, and
@@ -24,7 +24,7 @@ public static class TelemetryExtensions
         var useConsole = configuration.GetValue<bool>("OpenTelemetry:ConsoleExporter");
 
         services.AddOpenTelemetry()
-            .ConfigureResource(resource => resource.AddService("Template.Api"))
+            .ConfigureResource(resource => resource.AddService("Perezosoft.Api"))
             .WithTracing(tracing =>
             {
                 tracing

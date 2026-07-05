@@ -30,7 +30,7 @@
 | **Session across restart** | ✅ | `SecureStorageSessionStore` (OS secure store) + body-transport refresh (`AuthService.RunRefreshAsync` native branch). QA-DSK-03/AND-03 cover it. |
 | **Auth: OTP / OAuth / MFA step-up** | ✅ | All native-wired and previously verified: OTP + OAuth via system browser (`LoopbackOAuthInitiator` desktop, custom scheme Android), MFA-4 native step-up, provider discovery (`GET /api/auth/providers`) works over the native client (anonymous endpoint). Magic link N-A by design. |
 | **Impersonation (admin)** | ✅ | In-memory token swap (`BeginImpersonation`); **Stop** calls `TryRefreshAsync`, whose native branch refreshes from SecureStorage — the staff identity restores without a cookie. Banner reads the `impersonated_by` claim (shared UI). 🔍 spot-check on device (NATIVE-6). |
-| **JS interop / vendored scripts** | ✅ | `src/Maui/wwwroot/index.html` includes the same `_content/Template.Shared.Ui/js/qrcode-generator.min.js` + `mfa-qr.js` as web — the MFA QR renders natively. (Keep the two `index.html` files in sync — noted as a maintainer rule below.) |
+| **JS interop / vendored scripts** | ✅ | `src/Maui/wwwroot/index.html` includes the same `_content/Perezosoft.Shared.Ui/js/qrcode-generator.min.js` + `mfa-qr.js` as web — the MFA QR renders natively. (Keep the two `index.html` files in sync — noted as a maintainer rule below.) |
 | **Clipboard** | N-A | No copy-to-clipboard buttons exist (MFA manual key is selectable text; WebView selection works). |
 | **Polling (bell)** | ✅ | `NotificationBell` uses a C# `PeriodicTimer` (60 s) — no browser API dependency. |
 | **Dev networking** | ✅ (documented) | Android dev needs `adb reverse` (auto-run by the csproj target on deploy); prod points at the real URL. `docs/MOBILE_TESTING.md`. |
@@ -70,7 +70,7 @@ RTL (no RTL language shipped); clipboard (no copy affordances exist).
   `src/Maui/wwwroot/index.html`): any script/CSS the RCL depends on (e.g. the MFA QR vendor script)
   must be added to **both**, or the feature silently breaks on one host. *(Reduced surface since
   the brand-tokens refactor: `app.css` is single-sourced from the RCL at
-  `_content/Template.Shared.Ui/css/app.css`; only the bootstrap vendored copies and the script
+  `_content/Perezosoft.Shared.Ui/css/app.css`; only the bootstrap vendored copies and the script
   tags remain per-host.)*
 - **Every emailed link lands on `Auth:AppBaseUrl` (the web app)** — when adding an email that links
   into the product, either the flow must also be reachable in-app without a URL (like G5's token

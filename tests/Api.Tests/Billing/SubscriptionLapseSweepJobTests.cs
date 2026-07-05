@@ -2,14 +2,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Billing;
+namespace Perezosoft.Api.Tests.Billing;
 
 /// <summary>
 /// Drives BILLING-6 (ADR-006/007): the scheduled lapse sweep. A subscription still marked active/trialing

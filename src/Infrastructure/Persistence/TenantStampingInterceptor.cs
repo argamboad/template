@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Infrastructure.Persistence;
+namespace Perezosoft.Infrastructure.Persistence;
 
 /// <summary>
 /// Write-side half of tenant isolation. The global query filter scopes <em>reads</em>; this

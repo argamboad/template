@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Options;
-using Template.Api.Configuration;
-using Template.Core.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Decides whether a user is platform staff (ADR-014) by resolving their email and checking the

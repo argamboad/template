@@ -2,9 +2,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
-using Template.Api.Configuration;
+using Perezosoft.Api.Configuration;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Issues and validates JWT access tokens for API access.

@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// The extracted session assembly: a JWT carrying the tenant claim + a refresh token

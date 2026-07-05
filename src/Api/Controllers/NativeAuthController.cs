@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Configuration;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Infrastructure;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Native (desktop/mobile) OAuth: loopback / custom-scheme one-time-code flow.

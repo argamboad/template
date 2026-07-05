@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Hashes tokens using SHA256.

@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Infrastructure.Billing;
+namespace Perezosoft.Infrastructure.Billing;
 
 /// <summary>
 /// In-memory <see cref="IBillingProvider"/> for tests and for dev when no Stripe key is configured

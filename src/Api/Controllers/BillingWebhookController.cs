@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Services;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Receives billing-provider webhooks (BILLING-3, ADR-006). A <b>system</b> endpoint — the provider

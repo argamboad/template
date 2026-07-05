@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Template.Infrastructure.Persistence.Migrations
+namespace Perezosoft.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class AddOutbox : Migration

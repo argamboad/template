@@ -1,12 +1,12 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Authorization;
-using Template.Core.Entities;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Rbac;
+namespace Perezosoft.Api.Tests.Rbac;
 
 /// <summary>
 /// RBAC-1 (ADR-009): <see cref="PermissionService"/> resolves the authenticated caller's membership

@@ -1,4 +1,4 @@
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Hashes tokens for secure storage.

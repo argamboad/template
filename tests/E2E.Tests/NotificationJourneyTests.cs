@@ -1,7 +1,7 @@
 using Microsoft.Playwright;
-using Template.E2E.Tests.Pages;
+using Perezosoft.E2E.Tests.Pages;
 
-namespace Template.E2E.Tests;
+namespace Perezosoft.E2E.Tests;
 
 /// <summary>
 /// Notification center &amp; preferences journey (E2E-3): the bell's empty state for a fresh user and

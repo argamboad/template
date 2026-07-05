@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 /// <summary>
 /// SAMPLE feature entity — a tenant-scoped note. It exists only to demonstrate the

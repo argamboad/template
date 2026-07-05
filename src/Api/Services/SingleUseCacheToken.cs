@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// A short-lived, single-use opaque token backed by <see cref="IMemoryCache"/>: generate a

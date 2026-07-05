@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// Provides typed configuration settings from IConfiguration.

@@ -1,6 +1,6 @@
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Infrastructure.Files;
+namespace Perezosoft.Infrastructure.Files;
 
 /// <summary>
 /// Shared tenant-scoped key handling for the file-storage backends (ADR-010). One place validates the

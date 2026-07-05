@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Passwordless credential lifecycle: magic-link single-use + expiry, and OTP success,

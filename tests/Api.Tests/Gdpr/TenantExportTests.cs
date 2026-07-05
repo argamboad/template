@@ -2,17 +2,17 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Controllers;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Infrastructure.Audit;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Controllers;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Audit;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Gdpr;
+namespace Perezosoft.Api.Tests.Gdpr;
 
 /// <summary>
 /// GDPR-1 (ADR-011): a tenant data export assembles core (tenant/members/invitations) + every

@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 /// <summary>
 /// A tenant-scoped API key for programmatic access (PUBAPI, ADR-015) — the non-interactive counterpart

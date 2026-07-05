@@ -2,11 +2,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.DependencyInjection;
-using Template.Api.Services;
-using Template.Core.Authorization;
-using Template.Core.Repositories;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Authentication;
+namespace Perezosoft.Api.Authentication;
 
 /// <summary>
 /// Single tenant-permission gate for MVC actions (v2 audit B9-5 / ADR-009). Replaces the copy-pasted

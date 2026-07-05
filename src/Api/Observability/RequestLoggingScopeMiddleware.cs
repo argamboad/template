@@ -1,7 +1,7 @@
 using System.Security.Claims;
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Api.Observability;
+namespace Perezosoft.Api.Observability;
 
 /// <summary>
 /// Opens a per-request logging scope carrying <c>tenant_id</c> and <c>user_id</c>, so every log line

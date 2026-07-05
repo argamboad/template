@@ -1,6 +1,6 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Authorization;
+namespace Perezosoft.Core.Authorization;
 
 /// <summary>
 /// The single source of truth mapping a tenant role to the set of <see cref="Permission"/>s it grants

@@ -2,14 +2,14 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
-using Template.Infrastructure.Outbox;
-using Template.Infrastructure.Repositories;
-using Template.Infrastructure.Webhooks;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Outbox;
+using Perezosoft.Infrastructure.Repositories;
+using Perezosoft.Infrastructure.Webhooks;
 
-namespace Template.Api.Tests.Webhooks;
+namespace Perezosoft.Api.Tests.Webhooks;
 
 /// <summary>
 /// Drives HOOKS-2 (ADR-016): the delivery log + replay. The outbox handler records one
@@ -111,7 +111,7 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
         NextAttemptAt = DateTimeOffset.UtcNow,
     };
 
-    private static WebhookSubscriptionService BuildService(Template.Infrastructure.Persistence.AppDbContext db, Guid tenant) =>
+    private static WebhookSubscriptionService BuildService(Perezosoft.Infrastructure.Persistence.AppDbContext db, Guid tenant) =>
         new(new EfRepository<WebhookSubscription>(db), new EfRepository<WebhookDelivery>(db),
             new EfOutbox(db, TimeProvider.System), new TestCurrentTenant { TenantId = tenant },
             new TokenGenerator(), new WebhookSecretProtector(new EphemeralDataProtectionProvider()),

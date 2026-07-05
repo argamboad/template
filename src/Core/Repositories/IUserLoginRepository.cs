@@ -1,6 +1,6 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Repositories;
+namespace Perezosoft.Core.Repositories;
 
 /// <summary>
 /// Reads/removes the OAuth identities linked to an account.

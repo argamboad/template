@@ -424,10 +424,10 @@
         "resolved": "9.0.0",
         "contentHash": "CJW+x/F6fmRQ7N6K8paasTw9PDZp4t7G76UjGNlSDgoHPF0h08vTzLYbLZpOLEJSg35d5wy2jCXGo84EN05DpQ=="
       },
-      "template.core": {
+      "perezosoft.core": {
         "type": "Project"
       },
-      "template.infrastructure": {
+      "perezosoft.infrastructure": {
         "type": "Project",
         "dependencies": {
           "AWSSDK.S3": "[4.0.100, )",
@@ -436,8 +436,8 @@
           "Microsoft.AspNetCore.Authentication.MicrosoftAccount": "[10.0.9, )",
           "Microsoft.AspNetCore.DataProtection.EntityFrameworkCore": "[10.0.9, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.2, )",
-          "Stripe.net": "[52.1.0, )",
-          "Template.Core": "[1.0.0, )"
+          "Perezosoft.Core": "[1.0.0, )",
+          "Stripe.net": "[52.1.0, )"
         }
       },
       "AWSSDK.S3": {

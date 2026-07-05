@@ -3,16 +3,16 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Template.Api.Controllers;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
-using Template.Infrastructure.Audit;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Controllers;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Audit;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Rbac;
+namespace Perezosoft.Api.Tests.Rbac;
 
 /// <summary>
 /// RBAC-2 (ADR-009): the owner-only role-change endpoint (promote/demote between admin and member) and

@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Outbox;
+namespace Perezosoft.Infrastructure.Outbox;
 
 /// <summary>
 /// The testable core of the dispatcher: claims due outbox messages and records each outcome —

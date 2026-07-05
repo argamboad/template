@@ -101,7 +101,7 @@ toolchain instead.
    ```
 6. **MAUI workloads** (from the repo root):
    ```bash
-   sudo dotnet workload restore src/Maui/Template.Maui.csproj
+   sudo dotnet workload restore src/Maui/Perezosoft.Maui.csproj
    ```
 
 ### Phase 2 — bring up the local stack (15 min)

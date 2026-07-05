@@ -1,8 +1,8 @@
 using System.Text.Json;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
 
-namespace Template.Infrastructure.Email;
+namespace Perezosoft.Infrastructure.Email;
 
 /// <summary>
 /// Outbox handler for <c>"email"</c> messages: deserializes the payload and performs the real SMTP

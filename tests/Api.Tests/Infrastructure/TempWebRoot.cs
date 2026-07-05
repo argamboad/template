@@ -1,4 +1,4 @@
-namespace Template.Api.Tests.Infrastructure;
+namespace Perezosoft.Api.Tests.Infrastructure;
 
 /// <summary>
 /// A throwaway web root for the single-origin hosting tests (DEPLOY-1): a temp directory holding a

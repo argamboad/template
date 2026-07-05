@@ -1,11 +1,11 @@
 using System.Net.Mail;
-using Template.Api.Configuration;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
-using Template.Infrastructure.Email;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Email;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 public enum InviteCreateStatus { Created, InvalidEmail, AlreadyMember, SeatLimitReached }
 

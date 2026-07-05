@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 /// <summary>
 /// Marks an entity as belonging to a single tenant. Every entity implementing this is

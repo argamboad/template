@@ -5,11 +5,11 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace Template.Infrastructure.Persistence.Migrations
+namespace Perezosoft.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     [Migration("20260626000352_AddAuditEvent")]
@@ -44,7 +44,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("DataProtectionKeys");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.AuditEvent", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -82,7 +82,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("AuditEvents");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.InboxMessage", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.InboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -109,7 +109,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("InboxMessages");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.LoginToken", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.LoginToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -149,7 +149,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("LoginTokens");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.Note", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.Note", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -180,7 +180,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("Notes");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.OutboxMessage", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -226,7 +226,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("OutboxMessages");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.RefreshToken", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -269,7 +269,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.Subscription", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.Subscription", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -313,7 +313,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("Subscriptions");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.Tenant", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -335,7 +335,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("Tenants");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.TenantInvitation", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.TenantInvitation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -378,7 +378,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("TenantInvitations");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.TenantMembership", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.TenantMembership", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -408,7 +408,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("TenantMemberships");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.User", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -444,7 +444,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.UserLogin", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.UserLogin", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -476,33 +476,33 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.ToTable("UserLogins");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.TenantInvitation", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.TenantInvitation", b =>
                 {
-                    b.HasOne("Template.Core.Entities.Tenant", null)
+                    b.HasOne("Perezosoft.Core.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.TenantMembership", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.TenantMembership", b =>
                 {
-                    b.HasOne("Template.Core.Entities.Tenant", null)
+                    b.HasOne("Perezosoft.Core.Entities.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Template.Core.Entities.User", null)
+                    b.HasOne("Perezosoft.Core.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.UserLogin", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.UserLogin", b =>
                 {
-                    b.HasOne("Template.Core.Entities.User", "User")
+                    b.HasOne("Perezosoft.Core.Entities.User", "User")
                         .WithMany("Logins")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -511,7 +511,7 @@ namespace Template.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Template.Core.Entities.User", b =>
+            modelBuilder.Entity("Perezosoft.Core.Entities.User", b =>
                 {
                     b.Navigation("Logins");
                 });

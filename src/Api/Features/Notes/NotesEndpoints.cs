@@ -1,6 +1,6 @@
-using Template.Api.Endpoints;
+using Perezosoft.Api.Endpoints;
 
-namespace Template.Api.Features.Notes;
+namespace Perezosoft.Api.Features.Notes;
 
 /// <summary>
 /// 🗑️ DELETE-ME: sample feature endpoints. A vertical slice registers its own routes via

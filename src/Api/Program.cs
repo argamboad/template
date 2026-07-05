@@ -3,15 +3,15 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Extensions;
 using Microsoft.OpenApi.Models;
-using Template.Api.Authentication;
-using Template.Api.Configuration;
-using Template.Api.Endpoints;
-using Template.Api.Features.Notes;
-using Template.Api.Observability;
-using Template.Api.Services;
-using Template.Core.Abstractions;
-using Template.Infrastructure;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Endpoints;
+using Perezosoft.Api.Features.Notes;
+using Perezosoft.Api.Observability;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure;
+using Perezosoft.Infrastructure.Persistence;
 
 // Local dev: load secrets/config from the repo-root .env (the single local source of truth —
 // see docs/DECISIONS.md). TraversePath walks up to find it regardless of the working dir; the

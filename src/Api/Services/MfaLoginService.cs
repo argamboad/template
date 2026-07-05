@@ -1,6 +1,6 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>A completed step-up: the issued session + whether the login was native (drives cookie vs body).</summary>
 public sealed record MfaVerifyOutcome(AccessSession Session, bool Native);

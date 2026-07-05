@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Time.Testing;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// The refresh cookie is pinned to <c>Path=/api/auth</c>. A legacy build that wrote it at a broader

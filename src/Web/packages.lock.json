@@ -313,7 +313,7 @@
           "Microsoft.JSInterop": "10.0.9"
         }
       },
-      "template.shared.ui": {
+      "perezosoft.shared.ui": {
         "type": "Project",
         "dependencies": {
           "Microsoft.AspNetCore.Components.Authorization": "[10.0.9, )",

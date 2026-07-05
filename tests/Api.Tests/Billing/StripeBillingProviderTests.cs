@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Options;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Billing;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Billing;
 
-namespace Template.Api.Tests.Billing;
+namespace Perezosoft.Api.Tests.Billing;
 
 /// <summary>
 /// Unit coverage for the deterministic part of <see cref="StripeBillingProvider"/> — the

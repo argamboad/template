@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>Outcome of an account-erasure attempt (GDPR-2, ADR-011).</summary>
 public enum EraseAccountResult

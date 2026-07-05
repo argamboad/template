@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 /// <summary>
 /// An append-only record of a security/compliance-relevant action within a tenant (OBS-4, ADR-008):

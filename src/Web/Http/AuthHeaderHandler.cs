@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
-using Template.Shared.Ui.Auth;
+using Perezosoft.Shared.Ui.Auth;
 
-namespace Template.Web.Http;
+namespace Perezosoft.Web.Http;
 
 // Attaches the in-memory JWT access token as a Bearer header on every API request.
 public class AuthHeaderHandler(AuthService auth) : DelegatingHandler

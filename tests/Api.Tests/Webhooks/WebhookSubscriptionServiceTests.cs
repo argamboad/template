@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
-using Template.Infrastructure.Outbox;
-using Template.Infrastructure.Repositories;
-using Template.Infrastructure.Webhooks;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Outbox;
+using Perezosoft.Infrastructure.Repositories;
+using Perezosoft.Infrastructure.Webhooks;
 
-namespace Template.Api.Tests.Webhooks;
+namespace Perezosoft.Api.Tests.Webhooks;
 
 /// <summary>
 /// Drives HOOKS (ADR-016) management: create returns the signing secret once and stores it **encrypted**
@@ -121,7 +121,7 @@ public class WebhookSubscriptionServiceTests(PostgresFixture fixture) : Postgres
 
     private static WebhookSecretProtector NewProtector() => new(new EphemeralDataProtectionProvider());
 
-    private static WebhookSubscriptionService Build(Template.Infrastructure.Persistence.AppDbContext db, WebhookSecretProtector? protector = null) =>
+    private static WebhookSubscriptionService Build(Perezosoft.Infrastructure.Persistence.AppDbContext db, WebhookSecretProtector? protector = null) =>
         new(new EfRepository<WebhookSubscription>(db), new EfRepository<WebhookDelivery>(db),
             new EfOutbox(db, TimeProvider.System), new TestCurrentTenant(),
             new TokenGenerator(), protector ?? NewProtector(), new AllowAllUrlGuard(), TimeProvider.System);

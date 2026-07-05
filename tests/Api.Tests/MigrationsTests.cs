@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Template.Api.Tests.Infrastructure;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Guards against migration/snapshot drift, which the rest of the suite cannot see because the

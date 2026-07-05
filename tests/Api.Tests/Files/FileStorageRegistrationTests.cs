@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Infrastructure;
-using Template.Infrastructure.Files;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure;
+using Perezosoft.Infrastructure.Files;
 
-namespace Template.Api.Tests.Files;
+namespace Perezosoft.Api.Tests.Files;
 
 /// <summary>
 /// FILES-3 (ADR-010): the storage backend is config-gated like the billing provider — S3 when a bucket

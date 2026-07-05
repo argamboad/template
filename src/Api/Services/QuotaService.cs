@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Resolves and enforces plan quotas for the current tenant (BILLING-5). The plan is resolved from the

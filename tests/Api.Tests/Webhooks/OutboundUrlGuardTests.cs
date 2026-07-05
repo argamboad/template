@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Hosting;
-using Template.Api.Tests.Infrastructure;
-using Template.Infrastructure.Http;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Infrastructure.Http;
 
-namespace Template.Api.Tests.Webhooks;
+namespace Perezosoft.Api.Tests.Webhooks;
 
 /// <summary>
 /// v2 audit GAP-2: the outbound URL guard blocks SSRF. Outside Development it is https-only and rejects

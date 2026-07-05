@@ -1,4 +1,4 @@
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// Toggles the outbound webhooks surface (HOOKS, ADR-016). **Default off** — like the public API, a

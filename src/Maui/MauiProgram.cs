@@ -1,10 +1,10 @@
 ﻿using System.Globalization;
 using Microsoft.Extensions.Logging;
-using Template.Maui.Auth;
-using Template.Shared.Ui;
-using Template.Shared.Ui.Auth;
+using Perezosoft.Maui.Auth;
+using Perezosoft.Shared.Ui;
+using Perezosoft.Shared.Ui.Auth;
 
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 public static class MauiProgram
 {

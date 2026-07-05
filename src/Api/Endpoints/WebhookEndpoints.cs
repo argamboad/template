@@ -1,13 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Template.Api.Authentication;
-using Template.Api.Configuration;
-using Template.Api.Services;
-using Template.Core.Authorization;
-using Template.Core.Entities;
-using Template.Infrastructure.Webhooks;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Webhooks;
 
-namespace Template.Api.Endpoints;
+namespace Perezosoft.Api.Endpoints;
 
 /// <summary>
 /// Outbound webhook management (HOOKS, ADR-016): owner-only routes to register/list/remove subscriptions

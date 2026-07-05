@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
-using Template.Api.Authentication;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Core.Authorization;
-using Template.Core.Repositories;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
 /// Tenant ("household") management. Authorization goes through the permission seam (ADR-009):

@@ -1,10 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
-using Template.Core.Abstractions;
-using Template.Core.Authorization;
-using Template.Core.Repositories;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Resolves the authenticated caller's tenant membership (by the <see cref="ClaimTypes.NameIdentifier"/>

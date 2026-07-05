@@ -1,4 +1,4 @@
-namespace Template.Core.Billing;
+namespace Perezosoft.Core.Billing;
 
 /// <summary>
 /// A plan tier: the entitlement keys it grants (feature on/off) plus its **quotas** — countable limits

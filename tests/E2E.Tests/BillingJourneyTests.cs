@@ -2,9 +2,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using Template.E2E.Tests.Pages;
+using Perezosoft.E2E.Tests.Pages;
 
-namespace Template.E2E.Tests;
+namespace Perezosoft.E2E.Tests;
 
 /// <summary>
 /// Billing page journey (BILLING-8): the full upgrade loop with NO Stripe involvement, using the

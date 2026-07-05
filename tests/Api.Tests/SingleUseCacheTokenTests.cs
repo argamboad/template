@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
-using Template.Api.Services;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// The single-use guarantee for cache-backed tokens, tested once on the shared

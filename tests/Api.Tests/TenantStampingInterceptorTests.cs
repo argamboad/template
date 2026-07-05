@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Tests.Infrastructure;
+using Perezosoft.Api.Tests.Infrastructure;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Proves tenant isolation is structural on the WRITE side too: the stamping interceptor

@@ -100,14 +100,14 @@ RULES: list[tuple[str, str, str]] = [
     ("docker-compose.yml", "0.2", "Postgres 17 + Mailpit; grows in 2.3/8.2"),
 
     # ---- Part 1 ----
-    ("Template.slnx", "1.1", ""),
+    ("Perezosoft.slnx", "1.1", ""),
     ("Directory.Build.props", "1.1", "warnings-as-errors etc."),
     ("Directory.Packages.props", "1.1", "Central Package Management (R25/R27)"),
-    ("*/Template.*.csproj", "1.1", "created here; PackageReferences added as lessons need them"),
+    ("*/Perezosoft.*.csproj", "1.1", "created here; PackageReferences added as lessons need them"),
     ("src/Api/Properties/launchSettings.json", "1.1", ""),
     ("src/Maui/Properties/launchSettings.json", "A.1", ""),
     ("src/Api/appsettings*.json", "1.4", "non-secret config; grows every config lesson"),
-    ("src/Api/Template.Api.http", "1.2", "REST client scratchpad — grows with each endpoint"),
+    ("src/Api/Perezosoft.Api.http", "1.2", "REST client scratchpad — grows with each endpoint"),
     ("src/Api/Program.cs", "1.2", "born here; every part adds registrations/middleware"),
     ("tests/Api.Tests/HarnessSmokeTests.cs", "1.2", ""),
     ("tests/Api.Tests/Integration/HarnessSmokeTests.cs", "1.2", ""),

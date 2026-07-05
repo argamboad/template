@@ -1,13 +1,13 @@
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.RateLimiting;
-using Template.Api.Authentication;
-using Template.Api.Configuration;
-using Template.Api.Services;
-using Template.Core.Authorization;
-using Template.Core.Entities;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Entities;
 
-namespace Template.Api.Endpoints;
+namespace Perezosoft.Api.Endpoints;
 
 /// <summary>
 /// The public API surface (PUBAPI, ADR-015), split in two: <b>management</b> (owner, JWT) to mint/list/

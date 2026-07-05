@@ -1,8 +1,8 @@
 using System.Text;
-using Template.Core.Abstractions;
-using Template.Core.Webhooks;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Webhooks;
 
-namespace Template.Infrastructure.Webhooks;
+namespace Perezosoft.Infrastructure.Webhooks;
 
 /// <summary>
 /// Performs a single signed webhook HTTP POST (HOOKS, ADR-016) and returns the endpoint's status code.

@@ -1,4 +1,4 @@
-namespace Template.Shared.Ui.Auth;
+namespace Perezosoft.Shared.Ui.Auth;
 
 public static class AppClaims
 {
@@ -6,7 +6,7 @@ public static class AppClaims
     public const string Locale = "locale";
 
     // Server-issued; read API-side to scope tenant queries. Listed here so the claim
-    // names stay in one inventory (see Template.Api.Services.JwtTokenService).
+    // names stay in one inventory (see Perezosoft.Api.Services.JwtTokenService).
     public const string TenantId = "tenant_id";
 
     // Present only on an admin "sign in as" token (ADR-014): the staff user id behind

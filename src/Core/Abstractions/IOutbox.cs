@@ -1,4 +1,4 @@
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 /// <summary>
 /// Enqueues a side effect onto the transactional outbox. The message is staged on the current

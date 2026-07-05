@@ -1,4 +1,4 @@
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 /// <summary>
 /// Enforces plan-tier **quotas** (BILLING-5) — countable limits, distinct from feature entitlements

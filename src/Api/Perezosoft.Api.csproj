@@ -26,12 +26,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Core\Template.Core.csproj" />
-    <ProjectReference Include="..\Infrastructure\Template.Infrastructure.csproj" />
+    <ProjectReference Include="..\Core\Perezosoft.Core.csproj" />
+    <ProjectReference Include="..\Infrastructure\Perezosoft.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Template.Api.Tests" />
+    <InternalsVisibleTo Include="Perezosoft.Api.Tests" />
   </ItemGroup>
 
 </Project>

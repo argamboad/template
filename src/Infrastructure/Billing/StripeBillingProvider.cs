@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Options;
 using Stripe;
 using Stripe.Checkout;
-using Template.Core.Abstractions;
-using Template.Core.Billing;
-using Template.Core.Entities;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
 
-namespace Template.Infrastructure.Billing;
+namespace Perezosoft.Infrastructure.Billing;
 
 /// <summary>
 /// Stripe reference implementation of <see cref="IBillingProvider"/> (ADR-006). Creates a hosted

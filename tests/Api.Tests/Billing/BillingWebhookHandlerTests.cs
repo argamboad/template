@@ -1,17 +1,17 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Core.Billing;
-using Template.Core.Entities;
-using Template.Infrastructure.Billing;
-using Template.Infrastructure.Inbox;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Billing;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Billing;
+using Perezosoft.Infrastructure.Inbox;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Billing;
+namespace Perezosoft.Api.Tests.Billing;
 
 /// <summary>
 /// Drives BILLING-3 (ADR-006): the webhook is what actually grants access. Verifies signature

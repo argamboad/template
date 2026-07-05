@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Options;
-using Template.Api.Configuration;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests.Admin;
+namespace Perezosoft.Api.Tests.Admin;
 
 /// <summary>
 /// ADMIN-1 (ADR-014): platform-staff membership is an out-of-band config email allowlist, checked

@@ -50,7 +50,7 @@ The palette is semantic tokens, single-sourced for web **and** all native shells
 - **`src/Shared.Ui/wwwroot/css/app.css`** — the `:root` vars (`--bs-primary`/`--bs-primary-rgb`,
   `--brand-accent`, `--brand-dark`, `--brand-accent-light`, `--bs-link-color`/`--bs-link-hover-color`,
   `--app-bg`, `--app-border`). One file; both hosts load it via
-  `_content/Template.Shared.Ui/css/app.css`. Typical derivation from a logo: primary = the logo's
+  `_content/Perezosoft.Shared.Ui/css/app.css`. Typical derivation from a logo: primary = the logo's
   dominant mid tone, dark = its darkest shade (hover/active), accent(-light) = supporting tones,
   bg/border = a near-white and a soft border tinted toward the primary. Check WCAG contrast for
   white text on `--bs-primary`.
@@ -64,7 +64,7 @@ These must all match each other **and** your OAuth provider registration:
 - `src/Maui/Platforms/Android/WebAuthenticatorCallbackActivity.cs` — `CallbackScheme` const + intent-filter `DataScheme`
 - `src/Maui/Platforms/iOS/Info.plist` + `src/Maui/Platforms/MacCatalyst/Info.plist` — `CFBundleURLSchemes` entry
 - `src/Api/appsettings.json` — `Auth:Native:CallbackScheme`
-- `src/Maui/Template.Maui.csproj` — `ApplicationId` (`com.companyname.…`)
+- `src/Maui/Perezosoft.Maui.csproj` — `ApplicationId` (`com.companyname.…`)
 - Provider consoles — register `{scheme}://auth` and your `signin-*` redirect URIs
 
 ## Verify the rebrand

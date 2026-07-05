@@ -1,6 +1,6 @@
 :root {
     /* Brand palette — THE single place to re-theme the app (web + all native shells).
-       Single-sourced in the RCL; both hosts load it via _content/Template.Shared.Ui/css/app.css.
+       Single-sourced in the RCL; both hosts load it via _content/Perezosoft.Shared.Ui/css/app.css.
        Rebranding: derive these from the new logo and see docs/REBRANDING.md §4
        (the email templates in Infrastructure/Email/BrandedEmail.cs carry their own copies).
        Current values: Perezosoft sage/forest greens, harmonized with the logo. */

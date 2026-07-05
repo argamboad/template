@@ -1,4 +1,4 @@
-namespace Template.Core.Abstractions;
+namespace Perezosoft.Core.Abstractions;
 
 /// <summary>
 /// Guards server-initiated HTTP to a client-supplied URL against SSRF (v2 audit GAP-2). Outside

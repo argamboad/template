@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
-using Template.Infrastructure.Email;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Email;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>A user's notification delivery preferences (NOTIFY-2). Absence ⇒ both on.</summary>
 public sealed record NotificationPreferences(bool InApp, bool Email);

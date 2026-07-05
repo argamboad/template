@@ -1,6 +1,6 @@
 using Microsoft.JSInterop;
 
-namespace Template.Shared.Ui;
+namespace Perezosoft.Shared.Ui;
 
 /// <summary>
 /// Web implementation: a same-tab navigation. Because signed files are served with

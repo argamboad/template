@@ -1,7 +1,7 @@
-using Template.Core.Authorization;
-using Template.Core.Entities;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Tests;
+namespace Perezosoft.Core.Tests;
 
 /// <summary>
 /// RBAC-1 (ADR-009): the <see cref="RolePermissions"/> matrix is the single source of truth mapping a

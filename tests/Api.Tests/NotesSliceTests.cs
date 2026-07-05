@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
-using Template.Api.Features.Notes;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Entities;
-using Template.Infrastructure.Repositories;
+using Perezosoft.Api.Features.Notes;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Repositories;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Reference-slice tests for the sample Notes feature: it's tenant-scoped purely through
@@ -16,7 +16,7 @@ namespace Template.Api.Tests;
 [Collection(PostgresCollection.Name)]
 public class NotesSliceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
-    private static NotesHandler Handler(Template.Infrastructure.Persistence.AppDbContext db, Guid tenantId, TimeProvider? clock = null) =>
+    private static NotesHandler Handler(Perezosoft.Infrastructure.Persistence.AppDbContext db, Guid tenantId, TimeProvider? clock = null) =>
         new(new EfRepository<Note>(db), new TestCurrentTenant { TenantId = tenantId }, clock ?? TimeProvider.System);
 
     [Fact]

@@ -2,10 +2,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
-using Template.Api.Services;
-using Template.Api.Tests.Infrastructure;
+using Perezosoft.Api.Services;
+using Perezosoft.Api.Tests.Infrastructure;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>JWT issuance/validation — every claim round-trips, including the new tenant_id.</summary>
 public class JwtTokenServiceTests

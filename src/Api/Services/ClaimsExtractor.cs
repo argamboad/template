@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Extracts claims from an authenticated principal, provider-agnostically.

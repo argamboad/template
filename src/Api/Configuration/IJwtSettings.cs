@@ -1,4 +1,4 @@
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// JWT token configuration settings.

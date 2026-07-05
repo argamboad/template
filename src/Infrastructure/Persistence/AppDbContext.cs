@@ -1,10 +1,10 @@
 using System.Reflection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
 
-namespace Template.Infrastructure.Persistence;
+namespace Perezosoft.Infrastructure.Persistence;
 
 public class AppDbContext : DbContext, IDataProtectionKeyContext
 {

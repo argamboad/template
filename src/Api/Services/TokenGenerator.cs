@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Generates cryptographically secure random tokens.

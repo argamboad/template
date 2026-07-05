@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 public enum WebhookResult { Applied, Duplicate, Ignored, InvalidSignature }
 

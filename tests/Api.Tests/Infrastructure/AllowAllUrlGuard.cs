@@ -1,6 +1,6 @@
-using Template.Core.Abstractions;
+using Perezosoft.Core.Abstractions;
 
-namespace Template.Api.Tests.Infrastructure;
+namespace Perezosoft.Api.Tests.Infrastructure;
 
 /// <summary>
 /// Permissive <see cref="IOutboundUrlGuard"/> for tests that aren't exercising the SSRF guard itself —

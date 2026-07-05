@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
-using Template.Infrastructure.Files;
+using Perezosoft.Infrastructure.Files;
 
-namespace Template.Api.Tests.Files;
+namespace Perezosoft.Api.Tests.Files;
 
 /// <summary>
 /// FILES-2 (ADR-010): the download token binds tenant + key + expiry and fails closed for expired,

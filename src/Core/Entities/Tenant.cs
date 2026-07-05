@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 public class Tenant
 {

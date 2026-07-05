@@ -1,6 +1,6 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Repositories;
+namespace Perezosoft.Core.Repositories;
 
 /// <summary>
 /// Tenants and their membership. Identity (logins, inboxes) stays user-scoped;
@@ -59,7 +59,7 @@ public interface ITenantRepository
     /// <summary>
     /// Core tenant teardown in one transaction: removes invitations, memberships, and the
     /// tenant row. Feature/domain data is wiped separately by each
-    /// <see cref="Template.Core.Abstractions.ITenantDataContributor"/>; user-scoped data
+    /// <see cref="Perezosoft.Core.Abstractions.ITenantDataContributor"/>; user-scoped data
     /// (logins, tokens) is untouched.
     /// </summary>
     Task WipeDataAsync(Guid tenantId, CancellationToken cancellationToken = default);

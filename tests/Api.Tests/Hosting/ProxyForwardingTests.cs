@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Template.Api.Configuration;
+using Perezosoft.Api.Configuration;
 
-namespace Template.Api.Tests.Hosting;
+namespace Perezosoft.Api.Tests.Hosting;
 
 /// <summary>
 /// DEPLOY-1 (ADR-017): the reverse-proxy correctness gate. Exercises <see cref="ProxyForwardingExtensions"/>

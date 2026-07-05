@@ -1,4 +1,4 @@
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// Platform-staff allowlist (ADR-014), bound from <c>Admin</c>. Staff are configured <b>out-of-band</b>

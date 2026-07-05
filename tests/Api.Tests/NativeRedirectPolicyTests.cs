@@ -1,6 +1,6 @@
-using Template.Api.Services;
+using Perezosoft.Api.Services;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// The native OAuth callback redirects to a client-supplied URL, so this guard is the

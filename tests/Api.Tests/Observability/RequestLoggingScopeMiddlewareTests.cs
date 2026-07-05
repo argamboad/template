@@ -1,10 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Template.Api.Observability;
-using Template.Api.Tests.Infrastructure;
+using Perezosoft.Api.Observability;
+using Perezosoft.Api.Tests.Infrastructure;
 
-namespace Template.Api.Tests.Observability;
+namespace Perezosoft.Api.Tests.Observability;
 
 /// <summary>
 /// OBS-1 (ADR-008): the per-request log scope carries tenant_id + user_id for an authenticated request,

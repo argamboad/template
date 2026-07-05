@@ -1,7 +1,7 @@
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 /// <summary>
 /// Service for user management (creation, lookup, login linking).

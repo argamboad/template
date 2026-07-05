@@ -1,4 +1,4 @@
-namespace Template.Api.Tests.Infrastructure;
+namespace Perezosoft.Api.Tests.Infrastructure;
 
 /// <summary>
 /// Base for relational test classes that share the Postgres container. Truncates the database

@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 public record NotificationResponse
 {

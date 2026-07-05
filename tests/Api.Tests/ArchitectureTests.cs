@@ -2,13 +2,13 @@ using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Template.Api.Controllers;
-using Template.Api.Tests.Infrastructure;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Api.Controllers;
+using Perezosoft.Api.Tests.Infrastructure;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Api.Tests;
+namespace Perezosoft.Api.Tests;
 
 /// <summary>
 /// Architecture invariants enforced by the build (B9-1), so the structural guarantees the audit
@@ -282,7 +282,7 @@ public class ArchitectureTests
             foreach (var file in SourceFiles(Path.Combine(featuresDir, slice!)))
             {
                 var text = File.ReadAllText(file);
-                if (others.Any(o => text.Contains($"Template.Api.Features.{o}", StringComparison.Ordinal)))
+                if (others.Any(o => text.Contains($"Perezosoft.Api.Features.{o}", StringComparison.Ordinal)))
                     offenders.Add(Path.GetFileName(file)!);
             }
         }
@@ -295,19 +295,19 @@ public class ArchitectureTests
     public void OnlyProgram_ReferencesFeatureNamespaces_FromOutsideFeatures()
     {
         // R8: the clean state is that composition happens in one place — only Program.cs wires the feature
-        // endpoints. Nothing else outside src/Api/Features/ may reach into Template.Api.Features.*.
+        // endpoints. Nothing else outside src/Api/Features/ may reach into Perezosoft.Api.Features.*.
         var apiDir = Path.Combine(RepoRoot(), "src", "Api");
         var featuresPath = $"{Path.DirectorySeparatorChar}Features{Path.DirectorySeparatorChar}";
 
         var offenders = SourceFiles(apiDir)
             .Where(f => !f.Contains(featuresPath))                     // scope: outside the Features tree
             .Where(f => Path.GetFileName(f) != "Program.cs")           // Program.cs is the sanctioned composer
-            .Where(f => File.ReadAllText(f).Contains("Template.Api.Features", StringComparison.Ordinal))
+            .Where(f => File.ReadAllText(f).Contains("Perezosoft.Api.Features", StringComparison.Ordinal))
             .Select(Path.GetFileName)
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            $"Only Program.cs may reference Template.Api.Features.* from outside Features/: {string.Join(", ", offenders)}");
+            $"Only Program.cs may reference Perezosoft.Api.Features.* from outside Features/: {string.Join(", ", offenders)}");
     }
 
     [Fact]

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using Template.Api.Tests.Infrastructure;
+using Perezosoft.Api.Tests.Infrastructure;
 
-namespace Template.Api.Tests.Integration;
+namespace Perezosoft.Api.Tests.Integration;
 
 /// <summary>
 /// The anonymous <c>GET /api/version</c> build-identity endpoint (DEPLOY-3). The post-deploy smoke polls

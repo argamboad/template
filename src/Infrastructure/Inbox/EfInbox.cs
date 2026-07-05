@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Abstractions;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Inbox;
+namespace Perezosoft.Infrastructure.Inbox;
 
 /// <summary>
 /// EF implementation of <see cref="IInbox"/>. Claims a delivery with a single
