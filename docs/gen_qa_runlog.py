@@ -127,9 +127,10 @@ meta = [
     [Paragraph("<b>Build / commit SHA</b>", CELL), Paragraph("&nbsp;", CELL),
      Paragraph("<b>Branch</b>", CELL), Paragraph("&nbsp;", CELL)],
     [Paragraph("<b>Client(s) under test</b>", CELL),
-     Paragraph("Web %s&nbsp;&nbsp; Desktop %s&nbsp;&nbsp; Android %s" % (CHK, CHK, CHK), CELL),
-     Paragraph("<b>Mail -&gt; Mailpit?</b>", CELL),
-     Paragraph("Yes %s&nbsp;&nbsp; No %s" % (CHK, CHK), CELL)],
+     Paragraph("Web %s&nbsp; Desktop %s&nbsp; Android %s&nbsp; iOS %s&nbsp; macOS %s"
+               % (CHK, CHK, CHK, CHK, CHK), CELL),
+     Paragraph("<b>Mail delivery</b>", CELL),
+     Paragraph("Mailpit %s&nbsp;&nbsp; Real email %s" % (CHK, CHK), CELL)],
 ]
 mt = Table(meta, colWidths=[34*mm, 60*mm, 30*mm, 58*mm])
 mt.setStyle(TableStyle([
