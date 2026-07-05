@@ -302,7 +302,7 @@ CDP connect w/ retry → login renders (a G7-style boot crash dies here) → OTP
 Household loads over the native Bearer path. New CI job **`native-smoke-windows`** (develop pushes
 only — Windows bills 2×, ~10 min; NOT in deploy-staging needs so native flake can't block web
 deploys): preinstalled-Postgres + downloaded Mailpit + API on plain HTTP + the built exe, pointed at
-the stack via the new **`TEMPLATE_API_BASE_URL`** override in `MauiProgram` (also useful for
+the stack via the new **`PEREZOSOFT_API_BASE_URL`** override in `MauiProgram` (also useful for
 physical-device testing against a LAN API). Verified locally with the exact CI shape (smoke green in
 5 s against the live app). **Android leg ✅ Implemented**
 (`feat/native-7b-android-smoke`): Android WebView's CDP lacks the browser-context management

@@ -45,7 +45,7 @@ public sealed class MfaService(
     ITokenHasher hasher,
     TimeProvider clock) : IMfaService
 {
-    private const string Issuer = "Template"; // rebrandable — appears in the authenticator app
+    private const string Issuer = "Perezosoft"; // rebrandable — appears in the authenticator app
     private const int RecoveryCodeCount = 10;
     private static readonly VerificationWindow Window = new(previous: 1, future: 1); // ±1 step for clock skew
     // Purpose string feeds DataProtection key derivation — renaming it makes MFA secrets already

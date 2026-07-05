@@ -160,7 +160,7 @@ pass unpins the Apple column: the iOS-simulator CI smoke leg gets built, and NAT
 | App loads but sign-in spins / TLS errors (iOS) | Redo Phase 4 step 2 with the simulator **booted**; restart the app |
 | OTP email never arrives | Mailpit running? `docker compose ps`; UI at :8025 |
 | App can't reach the API | API must be on the **https** profile (port 7160); check `/health` in Safari on the Mac |
-| Want to test on a physical iPhone | Different setup (LAN-bound API + `TEMPLATE_API_BASE_URL` + free-provisioning signing) — not needed for §13b; ask Claude when ready |
+| Want to test on a physical iPhone | Different setup (LAN-bound API + `PEREZOSOFT_API_BASE_URL` + free-provisioning signing) — not needed for §13b; ask Claude when ready |
 
 ## 5. Guide — activate production (~10 min, whenever you want a real prod)
 
