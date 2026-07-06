@@ -177,16 +177,48 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 | `Authentication__Google/Microsoft__*` | optional | enable OAuth |
 | `PublicApi__Enabled`, `Webhooks__Enabled` | optional | default off |
 | `Admin__StaffEmails__0…` | optional | platform-staff allowlist |
+| `ConnectionStrings__Migrations` | prod (two-role RLS) | owner/migrator connection — startup migrations do DDL (§7) |
+| `Rls__EnforceRuntimeRole` | prod (two-role RLS) | `true` — fail-closed startup check that RLS actually applies (§7) |
 
 Secrets live only in the Render dashboard / your local `.env` (gitignored) — **never** in the repo
 (`render.yaml` declares keys, not values; gitleaks enforces this in CI).
 
 ---
 
+## 7. Row-level security — the two-role topology (ADR-020)
+
+The RLS tenancy backstop ships in the schema (the `RlsTenancyBackstop` migration `FORCE`s RLS +
+fail-closed policies on every tenant table) and is driven per command by the app
+(`RlsSessionInterceptor` sets the tenant/bypass GUCs). **What varies per environment is only the
+role the app connects as** — Postgres exempts superusers/`BYPASSRLS` roles entirely:
+
+- **Local dev** — the compose `dev` user is a superuser: RLS is present but bypassed, on purpose
+  (zero-friction inner loop). The integration suite ALWAYS runs RLS-enforced via its own runtime
+  role; to run the app enforced locally, see the optional block in `.env.example`.
+- **Staging (Neon, single role)** — the Neon owner is *not* a superuser, and `FORCE` subjects
+  owners to policies: **RLS is live on staging with no config change.** Migrations still work
+  (owner does DDL).
+- **Prod (two roles — activate with production, `STATUS.md` §5):**
+  1. `psql` into the database **as the owner** and run
+     `docker/db/provision-rls-runtime-role.sql` — **change the password literal first**.
+  2. Set `ConnectionStrings__DefaultConnection` to the `app_runtime` connection (same host/db,
+     `Username=app_runtime;Password=<yours>;SSL Mode=Require`).
+  3. Set `ConnectionStrings__Migrations` to the owner connection (startup migrations bootstrap
+     DDL the runtime role must not be allowed to run).
+  4. Set `Rls__EnforceRuntimeRole=true` — the app then refuses to boot if its runtime connection
+     would silently bypass RLS (superuser / `BYPASSRLS` / table owner), mirroring the Stripe-key
+     guard.
+
+Adding a new `ITenantScoped` entity? Ship its policy in the same migration
+(`RlsDdl.StatementsFor`) — the `RlsMigrationGateTests` parity gate fails CI if you forget.
+
+---
+
 ## Prod, later
 
 When a downstream app has real users, repeat §1–§5 as a second Render service fed from `main` (an
-always-on plan), with **live** Stripe keys, a verified email sender domain (DKIM), and — optionally — a
+always-on plan), with **live** Stripe keys, the **two-role RLS setup (§7 — required by the
+prod-activation checklist)**, a verified email sender domain (DKIM), and — optionally — a
 custom domain (~$10/yr, the first worthwhile paid upgrade: nicer URLs + deliverability). Rehearse risky
 migrations against a **Neon branch** (a free copy-of-prod DB) before promoting. The `main`→prod deploy is
 gated behind a manual approval (DEPLOY-3).

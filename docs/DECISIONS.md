@@ -1048,3 +1048,24 @@ generates, plus one `SET LOCAL` round-trip per transaction).
 E2E stack, Neon staging/prod, `.env.example`, and a `DEPLOYMENT.md` section.
 *Sequencing:* deferred behind the in-flight NATIVE work; **gates §5 of `STATUS.md` (production
 activation)**. Design detail: `docs/PLATFORM_BACKLOG.md` §11.
+
+*Addendum (implemented, 2026-07-06) — three findings from the build sharpened the design:*
+1. **The GUCs are set by a separate parameterized command, not `SET LOCAL` prepended to the main
+   command** — a prepended statement occupies a result position and corrupts EF's positional
+   consumption of SaveChanges batches. `RlsSessionInterceptor` (command + connection + transaction
+   facets) asserts session-level `set_config` per connection with change-tracking, invalidated on
+   connection open and transaction/savepoint rollback (`set_config` is transactional).
+2. **EF does not render query tags into the `ExecuteUpdate`/`ExecuteDelete` pipeline** (pinned by
+   test), so tags only sanction cross-tenant *reads* (`QueryAllTenants()`, the enumerated
+   Infrastructure sites). Set-based cross-tenant *writes* use `ITenantContext.EnterTenant` — the
+   invitation accept now enters the invitation's tenant for the conditional flip (same trusted
+   contract as the billing webhook); dissolve wipes already run with the target tenant current.
+3. **The HTTP integration harness runs as the non-privileged runtime role** (superuser only
+   pre-migrates + provisions), so the full Api.Tests suite exercises the app RLS-ENFORCED — the
+   same posture as Neon, where `FORCE` makes even the (non-superuser) owner subject, meaning
+   **staging gets live enforcement with no config change**. Also shipped: the optional
+   `ConnectionStrings:Migrations` split (startup DDL vs runtime), the config-gated fail-closed
+   `Rls:EnforceRuntimeRole` posture guard (mirrors the Stripe-key guard; prod activation enables
+   it), `docker/db/provision-rls-runtime-role.sql`, `DEPLOYMENT.md` §7, and the
+   `RlsMigrationGateTests` parity gate (a new `ITenantScoped` entity without its policy migration
+   fails CI).

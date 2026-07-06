@@ -41,6 +41,16 @@ public class ArchitectureTests
             .ToList();
         Assert.True(queryAllOffenders.Count == 0,
             $"Request-path feature code must not call QueryAllTenants (allowed only in *DataContributor.cs). Offenders: {string.Join(", ", queryAllOffenders)}");
+
+        // The RLS bypass tag (ADR-020) self-sanctions a query to the DB-level backstop — feature
+        // code must never apply it directly; the only sanctioned uses are QueryAllTenants() and the
+        // enumerated Infrastructure escape hatches.
+        var rlsTagOffenders = SourceFiles(featuresDir)
+            .Where(f => File.ReadAllText(f).Contains("RlsTags"))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(rlsTagOffenders.Count == 0,
+            $"Feature code must not use RlsTags — go through IRepository<T>.QueryAllTenants(). Offenders: {string.Join(", ", rlsTagOffenders)}");
     }
 
     [Fact]

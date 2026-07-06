@@ -61,7 +61,8 @@ public sealed class ServiceHarness(AppDbContext db, TimeProvider? clock = null, 
     public TenantInvitationService InvitationService(IInvitationSettings? invitation = null) =>
         new(Invitations, Tenants, TokenGen, Hasher, UnitOfWork, new NoopEmailSender(),
             UserService(), new TestAppSettings(), invitation ?? new TestInvitationSettings(),
-            [], QuotaService(), Clock, NullLogger<TenantInvitationService>.Instance);
+            [], QuotaService(), CurrentTenant as ITenantContext ?? new TestCurrentTenant(),
+            Clock, NullLogger<TenantInvitationService>.Instance);
 }
 
 internal sealed class TestRefreshSettings(int expiryDays = 30) : IRefreshTokenSettings

@@ -65,6 +65,7 @@ public class TenantInvitationService(
     IInvitationSettings invitationSettings,
     IEnumerable<ITenantDataContributor> dataContributors,
     IQuotaService quota,
+    ITenantContext tenantContext,
     TimeProvider clock,
     ILogger<TenantInvitationService> logger) : ITenantInvitationService
 {
@@ -218,8 +219,17 @@ public class TenantInvitationService(
         // Conditional flip — only one concurrent accept can update the row. If another
         // accept already won the race, the scope disposes without CommitAsync and the
         // membership move rolls back.
-        if (!await invitations.TryAcceptAsync(invitation.Id, cancellationToken))
-            return AcceptStatus.InvalidToken;
+        //
+        // EnterTenant: the flip updates the INVITATION's tenant's row while the caller's JWT still
+        // carries their old tenant. The RLS backstop (ADR-020) scopes set-based writes to the
+        // current tenant (query tags don't render in the ExecuteUpdate pipeline), so the accept
+        // enters the invitation's tenant for this one write — the token was verified above, which
+        // is exactly the trusted-scoping contract of ITenantContext (same as the billing webhook).
+        using (tenantContext.EnterTenant(invitation.TenantId))
+        {
+            if (!await invitations.TryAcceptAsync(invitation.Id, cancellationToken))
+                return AcceptStatus.InvalidToken;
+        }
 
         if (dissolveOld)
             await tenants.DeleteTenantAsync(oldTenantId, cancellationToken);

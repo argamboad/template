@@ -13,7 +13,10 @@ public class EfRepository<TEntity>(AppDbContext db) : IRepository<TEntity> where
 {
     public IQueryable<TEntity> Query() => db.Set<TEntity>();
 
-    public IQueryable<TEntity> QueryAllTenants() => db.Set<TEntity>().IgnoreQueryFilters();
+    // TagWith declares the sanctioned cross-tenant read to the RLS backstop (ADR-020) — without it
+    // the DB policy would still scope the query to the caller's current tenant.
+    public IQueryable<TEntity> QueryAllTenants() =>
+        db.Set<TEntity>().IgnoreQueryFilters().TagWith(RlsTags.CrossTenant);
 
     public async Task AddAsync(TEntity entity, CancellationToken cancellationToken = default) =>
         await db.Set<TEntity>().AddAsync(entity, cancellationToken);

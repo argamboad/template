@@ -83,11 +83,13 @@ enroll/step-up, GDPR export/erasure, notification bell menu, admin console) all 
 **Open items:** HOOKS-3 (a Blazor webhook/API-key management UI) and API-key rotation. **Deferred:**
 CACHE (Redis — until multi-node).
 
-**Queued (decided 2026-07-06): `RLS` — Postgres row-level-security tenancy backstop** (ADR-020,
-`PLATFORM_BACKLOG.md` §11). A DB-level second wall under the ADR-003 query filter; ~1–2 slices,
-plumbing-first. Sequenced as the **next platform slice after the in-flight NATIVE work**, and a
-**hard prerequisite for production activation** (`STATUS.md` §5) — cheapest while no live tenants
-exist.
+**`RLS` — Postgres row-level-security tenancy backstop → ✅ COMPLETE (decided + built 2026-07-06,
+ADR-020 + addendum).** DB-level second wall under the ADR-003 query filter: FORCEd fail-closed
+policies on every `ITenantScoped` table, `RlsSessionInterceptor` GUC propagation, tags/EnterTenant
+for the sanctioned cross-tenant paths, the integration harness running RLS-ENFORCED as a
+non-privileged role, the migration-parity CI gate, and the two-role prod topology (+ posture
+guard) documented in `DEPLOYMENT.md` §7. Staging is live-enforced with no config change; prod
+activation (`STATUS.md` §5) enables the guard.
 
 ## Next up: DEPLOY (planned 2026-07-02)
 

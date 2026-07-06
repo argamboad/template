@@ -183,7 +183,28 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     if (db.Database.IsRelational())
+    {
+        // Two-role topology (ADR-020): when the app runs as the RLS-subject runtime role, DDL —
+        // including EF's own history-table bootstrap — needs the owner/migrator connection.
+        // ConnectionStrings:Migrations is optional; absent (single-role setups: local dev, current
+        // staging) migrations run over the default connection as before. The override only affects
+        // this scoped context, which exists solely to migrate.
+        var migrationsConnection = app.Configuration.GetConnectionString("Migrations");
+        if (!string.IsNullOrEmpty(migrationsConnection))
+            db.Database.SetConnectionString(migrationsConnection);
         db.Database.Migrate();
+    }
+}
+
+// RLS posture guard (ADR-020, config-gated; prod activation enables it): refuse to start if the
+// runtime connection would silently bypass row-level security. Fresh scope — the migrate scope's
+// context may have been repointed at the migrator connection above.
+if (builder.Configuration.GetValue<bool>(RlsPostureGuard.EnforceConfigKey))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (db.Database.IsRelational())
+        await RlsPostureGuard.EnsureRuntimeRoleIsNotPrivilegedAsync(db);
 }
 
 // Forwarded headers must run FIRST — before HTTPS redirect, auth, or the rate limiter read the

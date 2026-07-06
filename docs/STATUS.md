@@ -27,8 +27,8 @@ The platform is **feature-complete and continuously verified**:
 | 1 | NATIVE-6 manual QA pass — Android + Windows (§3) | **You** | NATIVE-8/9 (signing) |
 | 2 | Apple first-run smoke on the MacBook (§4) | **You** | iOS-sim CI leg, NATIVE-10/11 |
 | 3 | NATIVE-8/9 signed AAB + MSIX release plumbing | Claude, after #1 | Store distribution |
-| 4 | RLS tenancy backstop (ADR-020, `PLATFORM_BACKLOG.md` §11) — **gates #5** | Claude | Production deploy activation |
-| 5 | Production deploy activation (§5) | **You** (~10 min), after #4 | A real prod environment |
+| 4 | ~~RLS tenancy backstop~~ → **✅ BUILT** (ADR-020 addendum; prod activation now includes the two-role setup, `DEPLOYMENT.md` §7) | — | Production deploy activation |
+| 5 | Production deploy activation (§5) | **You** (~15 min incl. RLS §7) | A real prod environment |
 | 6 | Parked by choice: HOOKS-3 UI, API-key rotation, CACHE (multi-node), FR/DE/PT translations | — | Nothing today |
 
 ## 3. Guide — native QA pass on Android + Windows (~1–2 h)

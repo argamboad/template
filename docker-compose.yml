@@ -10,6 +10,9 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      # RLS runtime role (ADR-020) — auto-provisioned on a FRESH volume only; for an existing
+      # volume run the script once via psql (see the script header).
+      - ./docker/db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dev} -d ${DB_NAME:-dev_db}"]
       interval: 5s
