@@ -31,7 +31,8 @@ public sealed class WebhookOutboxHandler(
             ?? throw new InvalidOperationException($"Outbox message {message.Id} has an unreadable webhook payload.");
 
         // The outbox is tenant-less, so bypass the tenant filter to load the target subscription by id.
-        var subscription = await db.Set<WebhookSubscription>().IgnoreQueryFilters()
+        // (The RLS tag is belt-and-braces: the tenant-less system context already bypasses — ADR-020.)
+        var subscription = await db.Set<WebhookSubscription>().IgnoreQueryFilters().TagWith(RlsTags.CrossTenant)
             .FirstOrDefaultAsync(s => s.Id == payload.SubscriptionId, cancellationToken);
         if (subscription is null || !subscription.IsActive)
             return; // removed/disabled since enqueue — nothing to deliver, don't retry

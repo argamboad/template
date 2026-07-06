@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -38,6 +39,9 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17").Build();
 
+    /// <summary>Superuser connection string of the throwaway container (for catalog-level asserts).</summary>
+    public string DatabaseConnectionString => _container.GetConnectionString();
+
     public IntegrationTestFactory()
     {
         // Must be present when Program reads Jwt:Secret at CreateBuilder time (before Build) — env vars
@@ -48,7 +52,24 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
     public async Task InitializeAsync()
     {
         await _container.StartAsync(); // must be up before the host is first built (Program migrates on boot)
+
+        // RLS backstop (ADR-020): the container's default user is a superuser, which Postgres
+        // exempts from RLS — so the harness would silently skip the DB-level tenancy wall. Instead
+        // the app is pointed at a non-privileged runtime role (like staging/prod on Neon): migrate
+        // as the superuser first, provision the role + grants, and hand the app the runtime
+        // connection (Program's startup Migrate() is then an idempotent no-op needing only SELECT
+        // on the history table). Every HTTP integration test therefore runs with RLS ENFORCED.
+        var superuserOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_container.GetConnectionString())
+            .Options;
+        await using var db = new AppDbContext(superuserOptions, new TestCurrentTenant());
+        await db.Database.MigrateAsync();
+        await Rls.RlsTestSetup.ProvisionAsync(db);
     }
+
+    /// <summary>Connection string the app under test uses: the RLS-subject runtime role.</summary>
+    private string RuntimeConnectionString =>
+        Rls.RlsTestSetup.RuntimeConnectionString(_container.GetConnectionString());
 
     async Task IAsyncLifetime.DisposeAsync()
     {
@@ -59,12 +80,18 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        // EF's startup Migrate() bootstraps its history table with DDL the runtime role must not be
+        // allowed to run — route migrations over the superuser, exactly like the two-role prod
+        // topology (ConnectionStrings:Migrations, read after Build so this hook is early enough).
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
+            [new("ConnectionStrings:Migrations", _container.GetConnectionString())]));
         builder.ConfigureTestServices(services =>
         {
             // Repoint the DbContext at the throwaway container — bulletproof regardless of config/.env.
+            // As the RUNTIME role, not the superuser, so RLS (ADR-020) is enforced across the suite.
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<AppDbContext>();
-            services.AddDbContext<AppDbContext>(o => o.UseNpgsql(_container.GetConnectionString()));
+            services.AddDbContext<AppDbContext>(o => o.UseNpgsql(RuntimeConnectionString));
 
             // Swap the External (OAuth carrier) cookie scheme's handler for a test one that authenticates
             // from headers — so the OAuth callback's [Authorize(External)] can be driven without a real

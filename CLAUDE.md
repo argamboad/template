@@ -35,7 +35,10 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
    `IRepository<T>.QueryAllTenants()`, and signature-/system-authenticated tenant-scoped writes
    (the billing webhook, admin impersonation) enter their tenant via `ITenantContext.EnterTenant`.
    `IgnoreQueryFilters()` is **banned in `src/Api/Features/**`** (fails CI). Only preferences are
-   per-user.
+   per-user. **A Postgres RLS backstop (ADR-020) re-enforces this at the DB**: a new `ITenantScoped`
+   entity must ship its policy in the same migration (`RlsDdl.StatementsFor` — the
+   `RlsMigrationGateTests` parity gate fails CI otherwise), and set-based cross-tenant *writes*
+   (`ExecuteUpdate/Delete`) need `EnterTenant` — query tags don't render there.
 2. **Clean API boundary.** The UI is a client of the API and never accesses the DB directly.
 3. **Blazor UI components live in the shared RCL**, not inline in the web app — keeps non-web
    clients cheap.

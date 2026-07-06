@@ -29,7 +29,7 @@
 | 7 | ~~Public API + API keys~~ → **✅ DONE** (ADR-015, `stories/pubapi.md`) | `PUBAPI` | Programmatic access distinct from the user session | RBAC helps |
 | 8 | ~~Admin back-office + impersonation~~ → **✅ DONE** (ADR-014, `stories/admin.md`) | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
 | 9 | Distributed cache (Redis) | `CACHE` | Only once you scale past one node | none (defer hard) |
-| 10 | **Postgres RLS tenancy backstop** (§11) | `RLS` | **Next platform slice — hard prerequisite for prod activation** (ADR-020); cheapest while no live tenants exist | none |
+| 10 | ~~Postgres RLS tenancy backstop~~ (§11) → **✅ DONE** (ADR-020 + addendum) | `RLS` | Was the prod-activation prerequisite; built 2026-07-06 | none |
 
 ---
 
@@ -182,7 +182,12 @@ that never renamed `Perezosoft.*` swaps project references for package reference
 
 ---
 
-## 11. Postgres RLS tenancy backstop — `RLS` → **decided (ADR-020), implementation deferred; gates prod activation**
+## 11. Postgres RLS tenancy backstop — `RLS` → **✅ DONE (ADR-020 + addendum, 2026-07-06)**
+> **Shipped** — FORCEd fail-closed policies (`RlsTenancyBackstop` migration), `RlsSessionInterceptor`
+> GUC propagation, tag/EnterTenant sanctioning, RLS-enforced integration harness, migration-parity
+> gate, two-role prod topology + posture guard (`DEPLOYMENT.md` §7). Implementation learnings in the
+> ADR-020 addendum. Sketch below retained for context.
+
 **What:** Postgres **row-level security** on every `ITenantScoped` table as an independent,
 DB-level second wall under the ADR-003 global query filter — a query that escapes the EF filter
 still returns zero foreign rows.

@@ -6,10 +6,27 @@ using Testcontainers.PostgreSql;
 namespace Perezosoft.Api.Tests.Infrastructure;
 
 /// <summary>Test double for the request's current tenant. Settable so a test can run
-/// "as" a given tenant and exercise the global query filter.</summary>
-public sealed class TestCurrentTenant : ICurrentTenant
+/// "as" a given tenant and exercise the global query filter. Also implements
+/// <see cref="ITenantContext"/> with the same enter/restore semantics as
+/// <c>HttpCurrentTenant</c>, so services that EnterTenant (webhook, invitation accept)
+/// can be exercised against the same ambient-tenant instance the context filters by.</summary>
+public sealed class TestCurrentTenant : ICurrentTenant, ITenantContext
 {
     public Guid? TenantId { get; set; }
+
+    public IDisposable EnterTenant(Guid tenantId)
+    {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Cannot enter the empty tenant.", nameof(tenantId));
+        var previous = TenantId;
+        TenantId = tenantId;
+        return new RestoreScope(this, previous);
+    }
+
+    private sealed class RestoreScope(TestCurrentTenant owner, Guid? previous) : IDisposable
+    {
+        public void Dispose() => owner.TenantId = previous;
+    }
 }
 
 /// <summary>

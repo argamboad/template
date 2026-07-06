@@ -118,6 +118,10 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
         // makes the delete depend on the argument alone, not on who is calling. ExecuteDeleteAsync
         // enlists in the ambient transaction (db.Database.CurrentTransaction) the dissolve flow opens,
         // so the wipe stays all-or-nothing.
+        // RLS (ADR-020): tags don't render for ExecuteDelete, so the DB policy sanctions these via
+        // the current tenant — every dissolve path runs with the ARGUMENT tenant current (owner
+        // dissolve, account erasure, accept-consumes-empty-solo all enter/carry the tenant being
+        // wiped) or as the tenant-less system context (explicit bypass).
         await db.TenantInvitations.IgnoreQueryFilters()
             .Where(i => i.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);

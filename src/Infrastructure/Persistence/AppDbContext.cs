@@ -32,6 +32,13 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     /// </summary>
     public Guid CurrentTenantId => _currentTenant.TenantId ?? Guid.Empty;
 
+    /// <summary>
+    /// Nullable tenant for the RLS backstop (ADR-020): unlike <see cref="CurrentTenantId"/>, the
+    /// interceptor must distinguish "no tenant" (system context → explicit bypass GUC) from a real
+    /// tenant (tenant GUC), so the null is preserved rather than collapsed to <see cref="Guid.Empty"/>.
+    /// </summary>
+    internal Guid? RlsTenantId => _currentTenant.TenantId;
+
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
@@ -84,7 +91,12 @@ public class AppDbContext : DbContext, IDataProtectionKeyContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         base.OnConfiguring(optionsBuilder);
-        optionsBuilder.AddInterceptors(TenantStampingInterceptor.Instance, AuditAppendOnlyInterceptor.Instance);
+        optionsBuilder.AddInterceptors(
+            TenantStampingInterceptor.Instance,
+            AuditAppendOnlyInterceptor.Instance,
+            // RLS backstop (ADR-020): carries the ambient tenant to Postgres per command, so the
+            // DB-level policies scope even queries that escaped the EF filter.
+            RlsSessionInterceptor.Instance);
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
