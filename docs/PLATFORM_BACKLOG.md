@@ -29,6 +29,7 @@
 | 7 | ~~Public API + API keys~~ → **✅ DONE** (ADR-015, `stories/pubapi.md`) | `PUBAPI` | Programmatic access distinct from the user session | RBAC helps |
 | 8 | ~~Admin back-office + impersonation~~ → **✅ DONE** (ADR-014, `stories/admin.md`) | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
 | 9 | Distributed cache (Redis) | `CACHE` | Only once you scale past one node | none (defer hard) |
+| 10 | **Postgres RLS tenancy backstop** (§11) | `RLS` | **Next platform slice — hard prerequisite for prod activation** (ADR-020); cheapest while no live tenants exist | none |
 
 ---
 
@@ -178,6 +179,33 @@ migration history interleaving with platform schema changes. Hosts (Web/Maui), C
 can never be packages — a thin scaffold repo remains either way. **Defer hard** until the platform API
 surface stabilizes; the ADR-019 naming convention deliberately keeps this door open (a downstream app
 that never renamed `Perezosoft.*` swaps project references for package references with zero code churn).
+
+---
+
+## 11. Postgres RLS tenancy backstop — `RLS` → **decided (ADR-020), implementation deferred; gates prod activation**
+**What:** Postgres **row-level security** on every `ITenantScoped` table as an independent,
+DB-level second wall under the ADR-003 global query filter — a query that escapes the EF filter
+still returns zero foreign rows.
+**Why:** cross-tenant leakage is the worst bug class a multi-tenant SaaS has, and the app-level
+wall is enforced by review discipline that downstream apps' vertical slices won't inherit; the
+backstop multiplies across every clone. Pre-production is the cheap window — roles are provisioning
+config now, a data migration with a rollback plan after live tenants exist.
+**Sketch / hooks (full decision record in ADR-020):**
+- `FORCE ROW LEVEL SECURITY` + one policy per tenant table (6 real + Notes sample):
+  `tenant_id = current_setting('app.tenant_id', true)::uuid`, explicit **null ⇒ deny** (fail-closed).
+- EF interceptor issues **`SET LOCAL app.tenant_id`** at transaction start off the existing
+  `ITenantContext` seam — transaction-scoped is mandatory (Npgsql pooling leaks connection-scoped
+  settings across requests).
+- **Two DB roles:** migrator/owner for EF migrations (owners bypass RLS — keep out of runtime) vs a
+  runtime role subject to policies. System paths (outbox dispatcher, sweeps, admin, GDPR export,
+  webhook `EnterTenant`) get an **explicit** bypass; the call sites are already enumerated behind
+  `QueryAllTenants()`/`EnterTenant`.
+- **Keystone TDD test:** raw SQL as the runtime role, tenant A set, read tenant B's rows with the
+  EF filter out of the picture ⇒ 0 rows. Pin with a B11-style arch/CI gate.
+- Bulk of the effort is env plumbing: roles in local compose, the CI E2E stack, Neon
+  staging/prod, `.env.example`, `DEPLOYMENT.md`.
+**Scope guard:** no per-user RLS, no tenant-timezone quota resets, no policy-based admin scoping.
+**Deps:** none. **Size:** ~1–2 slices (2–4 days), plumbing-first.
 
 ---
 
