@@ -27,8 +27,9 @@ The platform is **feature-complete and continuously verified**:
 | 1 | NATIVE-6 manual QA pass — Android + Windows (§3) | **You** | NATIVE-8/9 (signing) |
 | 2 | Apple first-run smoke on the MacBook (§4) | **You** | iOS-sim CI leg, NATIVE-10/11 |
 | 3 | NATIVE-8/9 signed AAB + MSIX release plumbing | Claude, after #1 | Store distribution |
-| 4 | Production deploy activation (§5) | **You** (~10 min) | A real prod environment |
-| 5 | Parked by choice: HOOKS-3 UI, API-key rotation, CACHE (multi-node), FR/DE/PT translations | — | Nothing today |
+| 4 | RLS tenancy backstop (ADR-020, `PLATFORM_BACKLOG.md` §11) — **gates #5** | Claude | Production deploy activation |
+| 5 | Production deploy activation (§5) | **You** (~10 min), after #4 | A real prod environment |
+| 6 | Parked by choice: HOOKS-3 UI, API-key rotation, CACHE (multi-node), FR/DE/PT translations | — | Nothing today |
 
 ## 3. Guide — native QA pass on Android + Windows (~1–2 h)
 
@@ -163,6 +164,11 @@ pass unpins the Apple column: the iOS-simulator CI smoke leg gets built, and NAT
 | Want to test on a physical iPhone | Different setup (LAN-bound API + `PEREZOSOFT_API_BASE_URL` + free-provisioning signing) — not needed for §13b; ask Claude when ready |
 
 ## 5. Guide — activate production (~10 min, whenever you want a real prod)
+
+> **Prerequisite (hard gate):** the **Postgres RLS tenancy backstop** (ADR-020,
+> `PLATFORM_BACKLOG.md` §11) must be implemented and merged first. Pre-production it's a
+> provisioning-config change; retrofitting DB roles + policies under live tenants becomes a data
+> migration with a rollback plan. Don't activate prod without it.
 
 1. In Render, create the prod service (same Docker setup as staging — `docs/DEPLOYMENT.md` is the
    runbook) with a **separate Neon database** and prod env vars. Note the Production Stripe-key

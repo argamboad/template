@@ -981,6 +981,15 @@ the B11-6 lockfile rule): its TFM list is host-OS-conditional, so the resolved g
 single committed lockfile can never satisfy locked-mode on all three runners — CPM alone pins its
 versions.
 
+*Amendment (2026-07-06) — distribution scope is re-confirmed per platform at the NATIVE-8 gate.*
+Before starting the signing/distribution slices (NATIVE-8…11), re-confirm **per platform** that
+concrete downstream demand justifies the distribution tail (signing material, the Apple
+account/hardware, per-release QA columns, store review friction). The parity commitment is about
+**capability** — every feature works on every platform, proven by the CI build gate and the QA plan —
+not about shipped store artifacts; a platform may therefore hold at "builds green in CI, distribution
+deferred per-app" without violating this ADR. This keeps point 4's recorded costs a decision that is
+re-made at the gate rather than an autopilot consequence of the original commitment.
+
 **ADR-019 — Platform identity: "Perezosoft Platform"; `Perezosoft.*` code identity; downstream apps rebrand by find/replace. (2026-07-05)**
 The repo (formerly "template") is named **perezosoft-platform** and its engineering identity is
 **`Perezosoft.*`** end to end: solution `Perezosoft.slnx`, all project/assembly names, the root
@@ -999,3 +1008,43 @@ them would orphan MFA/webhook secrets already encrypted at rest; they are guarde
 only change alongside a re-encryption migration. The Render service keeps the name `template-staging`
 (Render treats the name as service identity; renaming would mint a new service + URL and churn the
 OAuth consoles for zero functional gain — fold into a future console-touching change if desired).
+
+**ADR-020 — Tenancy defense-in-depth: Postgres row-level security as a second, DB-level wall under the EF query filter. Implementation DEFERRED — hard prerequisite for production activation. (2026-07-06)**
+Tenant isolation is currently enforced entirely in the application layer: the ADR-003 global query
+filter, the write-side interceptor (V2-B2), and the arch-test bans. One missed seam in a future
+feature — most plausibly a downstream app's vertical slice, written outside this repo's review
+discipline — is a cross-tenant leak, the worst bug class a multi-tenant SaaS has. **Decision:** add
+Postgres **row-level security** as an independent second wall, so a query that escapes the EF filter
+still returns zero foreign rows at the database. Decided:
+
+1. **`FORCE ROW LEVEL SECURITY` + one policy per `ITenantScoped` table** (currently six real ones;
+   the Notes sample inherits the pattern). Policy shape:
+   `tenant_id = current_setting('app.tenant_id', true)::uuid` with an explicit **null ⇒ deny** — a
+   missing setting fails closed (R-rules ethos), never "no setting = see everything".
+2. **The setting rides the existing tenant seam.** An EF Core interceptor issues
+   `SET LOCAL app.tenant_id = …` at transaction start, fed by the same `ITenantContext` that feeds
+   the query filter. `SET LOCAL` (transaction-scoped) is mandatory — Npgsql connection pooling makes
+   connection-scoped settings leak across requests.
+3. **Two database roles.** A **migrator/owner** role runs EF migrations (table owners bypass RLS
+   even with FORCE via ownership semantics — keep it out of the runtime path) and a **runtime** role
+   subject to policies. System paths that legitimately cross tenants — the outbox dispatcher,
+   scheduled sweeps, admin inspection, GDPR export, the billing webhook's `EnterTenant` — get an
+   **explicit** bypass (dedicated role or system GUC settable only by the system context); all such
+   call sites are already enumerated behind `QueryAllTenants()`/`EnterTenant`, so the bypass audit
+   is a grep, not an investigation.
+4. **The keystone test is the feature:** open a raw connection as the runtime role, set tenant A,
+   read tenant B's rows with the EF query filter out of the picture ⇒ **0 rows**. Locked in with a
+   B11-style arch/CI gate so the fail-closed property cannot silently regress.
+5. **Scope guard:** no per-user RLS, no tenant-timezone quota resets, no policy-based admin scoping —
+   separate decisions, separate ADRs.
+
+*Rationale:* the marginal cost is unusually low here (single choke-point tenant context, sanctioned
+escape hatches already enumerated) and the payoff multiplies — every downstream clone inherits the
+backstop. Pre-production is the cheap window: with no live tenants the two-role topology is
+provisioning config; after activation it becomes a data migration with a rollback plan. Perf is
+negligible (the policy predicate is the same indexed `tenant_id` comparison the filter already
+generates, plus one `SET LOCAL` round-trip per transaction).
+*Cost accepted:* environment plumbing is the bulk of the slice — roles across local compose, the CI
+E2E stack, Neon staging/prod, `.env.example`, and a `DEPLOYMENT.md` section.
+*Sequencing:* deferred behind the in-flight NATIVE work; **gates §5 of `STATUS.md` (production
+activation)**. Design detail: `docs/PLATFORM_BACKLOG.md` §11.

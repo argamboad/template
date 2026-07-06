@@ -83,6 +83,12 @@ enroll/step-up, GDPR export/erasure, notification bell menu, admin console) all 
 **Open items:** HOOKS-3 (a Blazor webhook/API-key management UI) and API-key rotation. **Deferred:**
 CACHE (Redis — until multi-node).
 
+**Queued (decided 2026-07-06): `RLS` — Postgres row-level-security tenancy backstop** (ADR-020,
+`PLATFORM_BACKLOG.md` §11). A DB-level second wall under the ADR-003 query filter; ~1–2 slices,
+plumbing-first. Sequenced as the **next platform slice after the in-flight NATIVE work**, and a
+**hard prerequisite for production activation** (`STATUS.md` §5) — cheapest while no live tenants
+exist.
+
 ## Next up: DEPLOY (planned 2026-07-02)
 
 The one untested dimension left: the app has only ever run on localhost + CI. Epic **`DEPLOY`**
