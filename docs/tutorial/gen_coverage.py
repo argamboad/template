@@ -64,8 +64,9 @@ LESSONS: dict[str, str] = {
     "8.1": "Single-origin hosting",
     "8.2": "Container & staging",
     "8.3": "The deploy pipeline & CI gates",
+    "8.4": "The RLS tenancy backstop",
     "9.1": "Make it yours (rebrand & de-sample)",
-    "A.1": "Appendix — MAUI shells",
+    "A.1": "Appendix — MAUI shells & parity",
     "A.2": "Appendix — native auth bridge",
 }
 
@@ -446,6 +447,36 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Shared.Ui/wwwroot/js/mfa-qr.js", "6.5", "JS interop to render the TOTP QR"),
     ("src/Web/Properties/launchSettings.json", "1.1", ""),
     ("tests/E2E.Tests/playwright.runsettings", "3.6", ""),
+
+    # ---- drift absorbed 2026-07-06 (NATIVE waves 1-2, BILLING-8, E2E expansion, DEPLOY-3) ----
+    ("src/Shared.Ui/Pages/Billing.razor", "5.1", "BILLING-8 billing summary page"),
+    ("tests/E2E.Tests/BillingJourneyTests.cs", "5.1", "fake-provider upgrade loop"),
+    ("tests/E2E.Tests/SeatQuotaJourneyTests.cs", "5.3", "seat-quota 402 UX"),
+    ("tests/Api.Tests/Auth/AuthProvidersTests.cs", "2.5", ""),
+    ("tests/Api.Tests/Integration/AuthProvidersEndpointTests.cs", "2.5", ""),
+    ("tests/E2E.Tests/MagicLinkJourneyTests.cs", "3.6", "happy + single-use"),
+    ("tests/E2E.Tests/RosterJourneyTests.cs", "6.1", ""),
+    ("tests/E2E.Tests/MembershipLifecycleTests.cs", "6.1", "transfer/leave/dissolve/delete-account journeys"),
+    ("tests/E2E.Tests/GdprExportJourneyTests.cs", "7.1", ""),
+    ("tests/E2E.Tests/NotificationJourneyTests.cs", "7.2", ""),
+    ("tests/E2E.Tests/AnnouncementJourneyTests.cs", "7.5", "ADMIN-3 announce -> NOTIFY fan-out"),
+    ("tests/Api.Tests/Integration/VersionEndpointTests.cs", "8.3", "version-gated deploy smoke"),
+    ("src/Shared.Ui/wwwroot/css/app.css", "3.4", ""),
+    ("src/Shared.Ui/ICulturePersistence.cs", "3.5", "culture bootstrap seam (NATIVE-5); MAUI impl in A.1"),
+    ("src/Shared.Ui/LocalStorageCulturePersistence.cs", "3.5", ""),
+    ("src/Shared.Ui/IFileDownloadLauncher.cs", "6.3", "download seam (NATIVE-3): web same-tab, native share sheet"),
+    ("src/Shared.Ui/BrowserFileDownloadLauncher.cs", "6.3", ""),
+    ("src/Shared.Ui/AppResumeNotifier.cs", "A.1", "refresh-on-resume seam (NATIVE-4 G2)"),
+    ("tests/E2E.Tests/NativeSmokeTests.cs", "A.1", "NATIVE-7 emulator/WebView2 smoke"),
+    ("tests/native-smoke-android/*", "A.1", "Android playwright-core smoke harness"),
+
+    # ---- drift absorbed 2026-07-07 (RLS tenancy backstop, ADR-020 / PR #124) ----
+    ("src/Infrastructure/Persistence/RlsDdl.cs", "8.4", "policy DDL — source of the RlsMigrationGateTests parity gate"),
+    ("src/Infrastructure/Persistence/RlsSessionInterceptor.cs", "8.4", "sets the tenant GUC per connection"),
+    ("src/Infrastructure/Persistence/RlsPostureGuard.cs", "8.4", "gates prod activation (ADR-020)"),
+    ("src/Infrastructure/Persistence/RlsTags.cs", "8.4", ""),
+    ("docker/db/provision-rls-runtime-role.sql", "8.4", "non-BYPASSRLS runtime role — mirrors prod (Neon) provisioning"),
+    ("tests/Api.Tests/Rls/*", "8.4", "backstop + migration-parity + posture-guard tests"),
 
     # ---- Appendix ----
     ("src/Api/Controllers/NativeAuthController.cs", "A.2", ""),

@@ -128,7 +128,7 @@
 - `tests/Api.Tests/SingleUseCacheTokenTests.cs`
 - `tests/Core.Tests/LoginTokenTests.cs`
 
-## 2.5 — OAuth & account linking (11 files)
+## 2.5 — OAuth & account linking (13 files)
 
 - `src/Api/Services/AuthProviders.cs` — 'new provider = one line'
 - `src/Api/Services/ClaimsExtractor.cs` — fail-closed normalization (R17)
@@ -139,7 +139,9 @@
 - `src/Core/Repositories/IUserLoginRepository.cs`
 - `src/Infrastructure/Persistence/Configurations/UserLoginConfiguration.cs`
 - `src/Infrastructure/Repositories/UserLoginRepository.cs`
+- `tests/Api.Tests/Auth/AuthProvidersTests.cs`
 - `tests/Api.Tests/ClaimsExtractorTests.cs`
+- `tests/Api.Tests/Integration/AuthProvidersEndpointTests.cs`
 - `tests/Api.Tests/ProviderEmailTrustTests.cs`
 
 ## 2.6 — Tenancy I — the global query filter (reads) (6 files)
@@ -208,7 +210,7 @@
 
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (78 files)
+## 3.4 — The web client & auth UI (79 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -232,6 +234,7 @@
 - `src/Shared.Ui/wwwroot/brand/icon_light_1024.png` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/brand/lockup_light.svg` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/brand/lockup_light_1520.png` — placeholder brand assets — replaced in 9.1
+- `src/Shared.Ui/wwwroot/css/app.css`
 - `src/Web/Http/AuthHeaderHandler.cs`
 - `src/Web/Http/CookieHandler.cs`
 - `src/Web/Http/CookieSessionStore.cs`
@@ -289,19 +292,22 @@
 - `src/Web/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map`
 - `src/Web/wwwroot/og_image_1200x630.png`
 
-## 3.5 — Localization (EN/ES) (6 files)
+## 3.5 — Localization (EN/ES) (8 files)
 
 - `src/Infrastructure/Email/EmailStrings.es.resx`
 - `src/Shared.Ui/Components/LanguageSwitcher.razor`
+- `src/Shared.Ui/ICulturePersistence.cs` — culture bootstrap seam (NATIVE-5); MAUI impl in A.1
+- `src/Shared.Ui/LocalStorageCulturePersistence.cs`
 - `src/Shared.Ui/Resources/AppStrings.cs`
 - `src/Shared.Ui/Resources/AppStrings.es.resx`
 - `src/Shared.Ui/Resources/AppStrings.resx`
 - `tests/E2E.Tests/I18nTests.cs`
 
-## 3.6 — The E2E harness (Playwright) (11 files)
+## 3.6 — The E2E harness (Playwright) (12 files)
 
 - `tests/E2E.Tests/AuthFlowTests.cs`
 - `tests/E2E.Tests/E2ETestBase.cs`
+- `tests/E2E.Tests/MagicLinkJourneyTests.cs` — happy + single-use
 - `tests/E2E.Tests/Mailpit.cs` — read OTPs from the fake inbox
 - `tests/E2E.Tests/Pages/AdminConsolePage.cs` — Page Object Model
 - `tests/E2E.Tests/Pages/BasePage.cs` — Page Object Model
@@ -370,7 +376,7 @@
 - `src/Infrastructure/Persistence/Configurations/AuditEventConfiguration.cs`
 - `tests/Api.Tests/AuditLogTests.cs`
 
-## 5.1 — Billing abstraction & entitlements (17 files)
+## 5.1 — Billing abstraction & entitlements (19 files)
 
 - `src/Api/Controllers/BillingController.cs`
 - `src/Api/Endpoints/EntitlementEndpointExtensions.cs` — RequireEntitlement -> 402
@@ -383,12 +389,14 @@
 - `src/Core/Entities/Subscription.cs` — projection, not source of truth
 - `src/Infrastructure/Billing/FakeBillingProvider.cs` — throws outside Development (R1)
 - `src/Infrastructure/Persistence/Configurations/SubscriptionConfiguration.cs`
+- `src/Shared.Ui/Pages/Billing.razor` — BILLING-8 billing summary page
 - `tests/Api.Tests/Billing/BillingControllerTests.cs`
 - `tests/Api.Tests/Billing/BillingProviderRegistrationTests.cs`
 - `tests/Api.Tests/Billing/BillingServiceTests.cs`
 - `tests/Api.Tests/Billing/EntitlementServiceTests.cs`
 - `tests/Api.Tests/Billing/RequireEntitlementFilterTests.cs`
 - `tests/Api.Tests/Billing/SubscriptionTenantIsolationTests.cs`
+- `tests/E2E.Tests/BillingJourneyTests.cs` — fake-provider upgrade loop
 
 ## 5.2 — Stripe: checkout, webhook, portal (7 files)
 
@@ -400,7 +408,7 @@
 - `tests/Api.Tests/Billing/BillingWebhookHandlerTests.cs`
 - `tests/Api.Tests/Billing/StripeBillingProviderTests.cs`
 
-## 5.3 — Quotas, dunning & billing dissolve (11 files)
+## 5.3 — Quotas, dunning & billing dissolve (12 files)
 
 - `src/Api/Services/BillingDataContributor.cs`
 - `src/Api/Services/BillingNotifier.cs`
@@ -413,8 +421,9 @@
 - `tests/Api.Tests/Billing/BillingDissolveTests.cs`
 - `tests/Api.Tests/Billing/QuotaServiceTests.cs`
 - `tests/Api.Tests/Billing/SubscriptionLapseSweepJobTests.cs`
+- `tests/E2E.Tests/SeatQuotaJourneyTests.cs` — seat-quota 402 UX
 
-## 6.1 — RBAC: roles & the permission seam (14 files)
+## 6.1 — RBAC: roles & the permission seam (16 files)
 
 - `src/Api/Authentication/RequireTenantPermissionAttribute.cs`
 - `src/Api/Controllers/TenantApiControllerBase.cs` — controllers inherit the gate (R4)
@@ -430,6 +439,8 @@
 - `tests/Api.Tests/Rbac/PermissionServiceTests.cs`
 - `tests/Api.Tests/Rbac/RequirePermissionFilterTests.cs`
 - `tests/Core.Tests/RolePermissionsTests.cs`
+- `tests/E2E.Tests/MembershipLifecycleTests.cs` — transfer/leave/dissolve/delete-account journeys
+- `tests/E2E.Tests/RosterJourneyTests.cs`
 
 ## 6.2 — File storage (9 files)
 
@@ -443,10 +454,12 @@
 - `tests/Api.Tests/Files/LocalDiskFileStorageTests.cs`
 - `tests/Api.Tests/Files/S3FileStorageMinioTests.cs`
 
-## 6.3 — Data protection: signed URLs & secrets at rest (4 files)
+## 6.3 — Data protection: signed URLs & secrets at rest (6 files)
 
 - `src/Api/Controllers/FilesController.cs`
 - `src/Infrastructure/Files/FileDownloadTokenizer.cs` — DataProtection-signed URLs
+- `src/Shared.Ui/BrowserFileDownloadLauncher.cs`
+- `src/Shared.Ui/IFileDownloadLauncher.cs` — download seam (NATIVE-3): web same-tab, native share sheet
 - `tests/Api.Tests/Files/FileDownloadTokenizerTests.cs`
 - `tests/Api.Tests/Files/FilesControllerTests.cs`
 
@@ -479,7 +492,7 @@
 - `tests/E2E.Tests/MfaJourneyTests.cs`
 - `tests/E2E.Tests/Totp.cs`
 
-## 7.1 — GDPR: export & erasure (6 files)
+## 7.1 — GDPR: export & erasure (7 files)
 
 - `src/Api/Controllers/AccountController.cs`
 - `src/Api/Services/AccountErasureService.cs`
@@ -487,8 +500,9 @@
 - `src/Core/Abstractions/IUserDataContributor.cs` — per-user erasure seam (R12)
 - `tests/Api.Tests/Gdpr/AccountErasureTests.cs`
 - `tests/Api.Tests/Gdpr/TenantExportTests.cs`
+- `tests/E2E.Tests/GdprExportJourneyTests.cs`
 
-## 7.2 — In-app notifications (12 files)
+## 7.2 — In-app notifications (13 files)
 
 - `src/Api/Controllers/NotificationsController.cs`
 - `src/Api/Models/NotificationModels.cs`
@@ -502,6 +516,7 @@
 - `src/Shared.Ui/Components/NotificationPrefsCard.razor`
 - `tests/Api.Tests/Notify/NotificationFanOutTests.cs`
 - `tests/Api.Tests/Notify/NotificationServiceTests.cs`
+- `tests/E2E.Tests/NotificationJourneyTests.cs`
 
 ## 7.3 — Public API & API keys (9 files)
 
@@ -533,7 +548,7 @@
 - `tests/Api.Tests/Webhooks/WebhookSubscriptionServiceTests.cs`
 - `tests/Core.Tests/WebhookSignatureTests.cs`
 
-## 7.5 — Admin back-office & impersonation (8 files)
+## 7.5 — Admin back-office & impersonation (9 files)
 
 - `src/Api/Configuration/PlatformAdminSettings.cs`
 - `src/Api/Controllers/AdminApiControllerBase.cs`
@@ -543,6 +558,7 @@
 - `src/Shared.Ui/Pages/AdminConsole.razor`
 - `tests/Api.Tests/Admin/AdminControllerTests.cs`
 - `tests/Api.Tests/Admin/PlatformStaffServiceTests.cs`
+- `tests/E2E.Tests/AnnouncementJourneyTests.cs` — ADMIN-3 announce -> NOTIFY fan-out
 
 ## 8.1 — Single-origin hosting (4 files)
 
@@ -557,16 +573,29 @@
 - `Dockerfile` — DEPLOY-2
 - `render.yaml` — Render blueprint (ADR-017)
 
-## 8.3 — The deploy pipeline & CI gates (2 files)
+## 8.3 — The deploy pipeline & CI gates (3 files)
 
 - `.github/forbidden-licenses.json` — copyleft ban (R26)
 - `.github/workflows/ci.yml` — CI gates: locked restore, arch tests, license scan
+- `tests/Api.Tests/Integration/VersionEndpointTests.cs` — version-gated deploy smoke
+
+## 8.4 — The RLS tenancy backstop (9 files)
+
+- `docker/db/provision-rls-runtime-role.sql` — non-BYPASSRLS runtime role — mirrors prod (Neon) provisioning
+- `src/Infrastructure/Persistence/RlsDdl.cs` — policy DDL — source of the RlsMigrationGateTests parity gate
+- `src/Infrastructure/Persistence/RlsPostureGuard.cs` — gates prod activation (ADR-020)
+- `src/Infrastructure/Persistence/RlsSessionInterceptor.cs` — sets the tenant GUC per connection
+- `src/Infrastructure/Persistence/RlsTags.cs`
+- `tests/Api.Tests/Rls/RlsBackstopTests.cs` — backstop + migration-parity + posture-guard tests
+- `tests/Api.Tests/Rls/RlsMigrationGateTests.cs` — backstop + migration-parity + posture-guard tests
+- `tests/Api.Tests/Rls/RlsPostureGuardTests.cs` — backstop + migration-parity + posture-guard tests
+- `tests/Api.Tests/Rls/RlsTestSetup.cs` — backstop + migration-parity + posture-guard tests
 
 ## 9.1 — Make it yours (rebrand & de-sample)
 
 *(no repo files — narrative/capstone lesson)*
 
-## A.1 — Appendix — MAUI shells (27 files)
+## A.1 — Appendix — MAUI shells & parity (32 files)
 
 - `src/Maui/App.xaml`
 - `src/Maui/App.xaml.cs`
@@ -595,6 +624,11 @@
 - `src/Maui/Properties/launchSettings.json`
 - `src/Maui/ShareFileDownloadLauncher.cs`
 - `src/Maui/wwwroot/index.html`
+- `src/Shared.Ui/AppResumeNotifier.cs` — refresh-on-resume seam (NATIVE-4 G2)
+- `tests/E2E.Tests/NativeSmokeTests.cs` — NATIVE-7 emulator/WebView2 smoke
+- `tests/native-smoke-android/package-lock.json` — Android playwright-core smoke harness
+- `tests/native-smoke-android/package.json` — Android playwright-core smoke harness
+- `tests/native-smoke-android/smoke.js` — Android playwright-core smoke harness
 
 ## A.2 — Appendix — native auth bridge (9 files)
 
@@ -608,7 +642,7 @@
 - `tests/Api.Tests/NativeAuthCodeServiceTests.cs`
 - `tests/Api.Tests/NativeRedirectPolicyTests.cs`
 
-## [GEN] Generated by tooling in the lesson noted (dotnet ef / dotnet restore) — never hand-typed (45 files)
+## [GEN] Generated by tooling in the lesson noted (dotnet ef / dotnet restore) — never hand-typed (47 files)
 
 - `src/Api/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
 - `src/Core/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
@@ -648,6 +682,8 @@
 - `src/Infrastructure/Persistence/Migrations/20260701225704_AddMfaLastVerifiedTimeStep.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/Persistence/Migrations/20260701230337_AddSubscriptionLastEventAt.Designer.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/Persistence/Migrations/20260701230337_AddSubscriptionLastEventAt.cs` — dotnet ef migrations add — in the lesson that adds each entity
+- `src/Infrastructure/Persistence/Migrations/20260706222645_RlsTenancyBackstop.Designer.cs` — dotnet ef migrations add — in the lesson that adds each entity
+- `src/Infrastructure/Persistence/Migrations/20260706222645_RlsTenancyBackstop.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/Persistence/Migrations/AppDbContextModelSnapshot.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
 - `src/Shared.Ui/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
@@ -779,29 +815,4 @@
 - `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-## ❌ UNMAPPED (22 files) — course holes, fix the rules or add lessons
-
-- `src/Shared.Ui/AppResumeNotifier.cs`
-- `src/Shared.Ui/BrowserFileDownloadLauncher.cs`
-- `src/Shared.Ui/ICulturePersistence.cs`
-- `src/Shared.Ui/IFileDownloadLauncher.cs`
-- `src/Shared.Ui/LocalStorageCulturePersistence.cs`
-- `src/Shared.Ui/Pages/Billing.razor`
-- `src/Shared.Ui/wwwroot/css/app.css`
-- `tests/Api.Tests/Auth/AuthProvidersTests.cs`
-- `tests/Api.Tests/Integration/AuthProvidersEndpointTests.cs`
-- `tests/Api.Tests/Integration/VersionEndpointTests.cs`
-- `tests/E2E.Tests/AnnouncementJourneyTests.cs`
-- `tests/E2E.Tests/BillingJourneyTests.cs`
-- `tests/E2E.Tests/GdprExportJourneyTests.cs`
-- `tests/E2E.Tests/MagicLinkJourneyTests.cs`
-- `tests/E2E.Tests/MembershipLifecycleTests.cs`
-- `tests/E2E.Tests/NativeSmokeTests.cs`
-- `tests/E2E.Tests/NotificationJourneyTests.cs`
-- `tests/E2E.Tests/RosterJourneyTests.cs`
-- `tests/E2E.Tests/SeatQuotaJourneyTests.cs`
-- `tests/native-smoke-android/package-lock.json`
-- `tests/native-smoke-android/package.json`
-- `tests/native-smoke-android/smoke.js`
-
-**Totals:** 639 tracked files · 455 built in lessons · 162 bucketed · 22 unmapped
+**Totals:** 650 tracked files · 486 built in lessons · 164 bucketed · 0 unmapped

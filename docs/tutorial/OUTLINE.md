@@ -5,8 +5,10 @@
 > each file as it's created. Coverage is not asserted — it is **machine-checked**:
 > `gen_coverage.py` maps every tracked file to the lesson that builds it and fails on
 > any unmapped file. See `COVERAGE.md` for the full file→lesson manifest
-> (currently: 601 tracked files · 451 built in lessons · 150 explicitly bucketed as
-> generated/vendored/meta · **0 unmapped**).
+> (currently: 650 tracked files · 486 built in lessons · 164 explicitly bucketed as
+> generated/vendored/meta · **0 unmapped** — last reconciled 2026-07-07 after the
+> Perezosoft rename, NATIVE waves 1–2, BILLING-8, DEPLOY completion, the E2E expansion
+> and the RLS tenancy backstop, ADR-020 → lesson 8.4).
 
 ## Pedagogical spine
 
@@ -141,6 +143,13 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
 - **8.3 The deploy pipeline & CI gates.** develop→staging auto + smoke; main→prod gated;
   the CI jobs that enforce everything this course taught (locked restore, arch tests,
   license ban R26, secret scan).
+- **8.4 The RLS tenancy backstop.** Postgres row-level security as the DB-level *second
+  wall* under the EF filter (ADR-020) — defense in depth for the platform's core invariant.
+  Policy DDL derived from the EF model (`RlsDdl`) + the migration-parity gate (a new
+  `ITenantScoped` entity without its policy fails CI); the session interceptor carrying
+  tenant/bypass GUCs per command; the sanctioned escape hatches declaring themselves via
+  query tags — and why tags don't render for `ExecuteUpdate/Delete`; the two-role topology
+  + fail-closed posture guard that gates prod activation.
 
 ## Part 9 — Make it yours
 - **9.1 Rebrand & de-sample.** The full REBRANDING checklist (including the inline email
@@ -148,9 +157,16 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
   rebuilt platform into *their* product.
 
 ## Appendix (optional)
-- **A.1 MAUI shells.** Desktop + Android hosts of the same RCL.
+- **A.1 MAUI shells & parity.** Desktop + Android hosts of the same RCL; the parity-audit
+  method (WebView-vs-browser deltas → gap register → seams: resume-refresh, culture
+  bootstrap, download launcher); the WebView2/emulator smoke harness (ADR-018).
 - **A.2 Native auth bridge.** Loopback/deep-link OAuth, secure storage sessions, native
   MFA step-up.
+
+> Note: the native *seams* themselves (`ICulturePersistence`, `IFileDownloadLauncher`)
+> are taught in the main track (3.5, 6.3) where their web implementations land — a
+> deliberate beat: designing the RCL seam web-first is what makes the native shells
+> cheap later (Golden Rule 5).
 
 ---
 
