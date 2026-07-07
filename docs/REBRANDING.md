@@ -32,6 +32,9 @@ Backstop after working through the list: `git grep -i perezosoft` and a search f
 ## 3. Logos & images — replace the files (keep the filenames to avoid touching references)
 In-app UI (shared RCL — used by web + desktop + mobile):
 - `src/Shared.Ui/wwwroot/brand/{icon_light.svg, icon_light_1024.png, lockup_light.svg, lockup_light_1520.png, lockup_dark.svg, lockup_dark_1520.png}`
+- **The UI references the PNG lockups, not the SVGs.** Webfonts don't load inside an `<img>`-embedded
+  SVG, so an SVG lockup's wordmark silently falls back to Helvetica/Arial. Keep the SVGs as the
+  editable source, render the PNGs from them, and point `Login.razor`/`Home.razor` at the PNGs.
 
 **Email logo (CID-embedded — shown in every transactional email):**
 - **`src/Infrastructure/Email/Assets/logo.png`** — keep it a **PNG** (email clients strip SVG and block data-URIs); a ~128px square is plenty.
