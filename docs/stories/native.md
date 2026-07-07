@@ -359,6 +359,18 @@ Scenario: Native smoke runs on every push
 
 ### NATIVE-8 — Android: signed AAB/APK in CI
 
+**Context / notes (decisions scoped 2026-07-07):** the keystore IS the app's identity — updates only
+install over the same signature, so losing it is unrecoverable and it never enters git (base64 →
+repo secrets + an offline backup; ADR-001 discipline). Generated once locally with `keytool`.
+Release build = `AndroidKeyStore=true` + `AndroidSigningKeyStore/KeyAlias/StorePass/KeyPass` from
+env + `AndroidPackageFormat=aab`; version code derives from the release tag (csproj currently pins
+`ApplicationVersion=1`). New **tag-triggered release workflow** (not per-push; `ubuntu-latest`,
+cheap) + an `apksigner`/`jarsigner -verify` assertion on the artifact. **Deferred decision (bites
+at NATIVE-11, not here):** Play App Signing — Google holds the app-signing key and this keystore
+becomes the upload key (safer, resettable, effectively required for new Play apps); the keystore
+works identically either way. Non-issue verified: OAuth runs through the system browser against
+the API redirect URI, so signing-key fingerprints don't affect sign-in.
+
 ```gherkin
 Scenario: A signed Android artifact is produced
   Given the release keystore (from repo secrets, never committed)
@@ -370,6 +382,19 @@ Scenario: A signed Android artifact is produced
 
 ### NATIVE-9 — Windows: MSIX package + code-signing
 
+**Context / notes (decisions scoped 2026-07-07):** today the app runs **unpackaged**
+(`WindowsPackageType=None`) — this slice adds a packaged Release flavor (`MSIX` +
+`Package.appxmanifest`) in the same tag-triggered release workflow (windows-latest leg). Signing
+reality: an MSIX must be signed by a cert matching the manifest publisher, and since 2023 real OV
+code-signing certs require an HSM/hardware token — "cert in GitHub secrets" only works for a
+**self-signed cert**, which is this slice's scope (CI plumbing + sideload onto machines that trust
+it). For real users the pragmatic path is **Microsoft Store distribution (NATIVE-11): the Store
+signs the package, no cert to own** (~$19 one-time individual account); the alternative is Azure
+Trusted Signing (~$10/mo). The slice must include a manual boot + sign-in check of the PACKAGED
+build on Windows — MSIX apps run containerized, and Preferences/SecureStorage/file-path behavior
+can differ from the unpackaged build all QA so far has exercised (same failure class as the
+Catalyst keychain surprise, PR #125).
+
 ```gherkin
 Scenario: A signed MSIX is produced
   Then a code-signed MSIX is built in CI (cert from secrets) and uploaded
@@ -379,8 +404,12 @@ Scenario: A signed MSIX is produced
 
 ### NATIVE-10 — iOS + macOS: signed IPA / pkg (Apple)
 
-**Context / notes:** needs the Apple Developer account + certs/provisioning profiles (secrets, base64),
-built + signed on the macOS runner. iOS `.ipa` + macCatalyst `.pkg`.
+**Context / notes:** needs the Apple Developer account ($99/**yr, recurring** — certs/apps lapse if
+it stops) + certs/provisioning profiles (secrets, base64), built + signed on the macOS runner. iOS
+`.ipa` + macCatalyst `.pkg`. **Must also re-verify SecureStorage under the real signing identity**:
+properly-signed + provisioned builds can claim `keychain-access-groups`, at which point the
+Catalyst store `Entitlements.plist` path works and `DebugFileSessionStore` (the ad-hoc Debug
+fallback from PR #125) should be re-tested and considered for retirement.
 
 ```gherkin
 Scenario: Signed Apple artifacts are produced
@@ -394,6 +423,10 @@ Scenario: Signed Apple artifacts are produced
 
 **Context / notes:** automate (or document the manual path for) Play Console / App Store Connect / MS Store
 upload. Store review + accounts are external; the platform ships the upload plumbing behind flags/secrets.
+**Account costs (checked 2026-07-07):** Apple $99/yr recurring; Google Play $25 one-time; Microsoft
+Store ~$19 one-time (individual). Decisions parked here from earlier slices: enroll in **Play App
+Signing** (NATIVE-8's keystore becomes the upload key) and let the **MS Store sign the MSIX**
+(NATIVE-9 needs no purchased cert).
 
 **DoD:** upload step wired (guarded/off by default) or the manual submission path documented per store.
 
