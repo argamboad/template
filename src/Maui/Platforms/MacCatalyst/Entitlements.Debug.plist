@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <!-- Local-dev entitlements (ad-hoc signed Debug builds). The store entitlements in
+         Entitlements.plist enable the App Sandbox, and sandboxed keychain access needs the
+         keychain-access-groups entitlement — which is restricted: an ad-hoc signature that
+         claims it gets SIGKILLed at launch (no provisioning profile). Debug therefore runs
+         unsandboxed, where SecureStorage reaches the login keychain with no entitlement.
+         Release/store builds (NATIVE-9) keep Entitlements.plist and a real signing identity. -->
+    <dict>
+        <key>com.apple.security.network.client</key>
+        <true/>
+    </dict>
+</plist>
