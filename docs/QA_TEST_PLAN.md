@@ -1823,3 +1823,17 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   already ⚙️-automated (`Member_Joins_By_Pasting_The_Invite_Code`, `Owner_Downloads_The_Data_Export`);
   the OS-chrome halves (share sheets, hardware back, real focus-return, safe areas) are exactly what
   these manual cases exist for.
+- **Updated 2026-07-06** — **first Apple run of §13b** (maintainer's MacBook Air M1, iOS 26.5 simulator +
+  Mac Catalyst): **QA-IOS-01 PASS** (boots to login — validates the G7 fix on a real Apple runtime),
+  **QA-IOS-02 PASS**, **QA-IOS-04 PASS** (first-ever exercise of the `ASWebAuthenticationSession` →
+  `perezosoft://auth` path; also verified on iPhone 17 Pro Max + iPad Air 11" simulators), **QA-MAC-01
+  PASS**, **QA-MAC-02 PASS** and the OAuth leg of QA-MAC-03 PASS. Remaining: the core-flows spot-checks
+  (QA-IOS-03, rest of QA-MAC-03 — share sheet, language + restart persistence). The pass surfaced two
+  platform gaps, fixed in the same PR as this entry: (1) macOS trust evaluation fails Brevo's SMTP TLS
+  handshake ("incomplete certificate revocation check") → new `Email:Smtp:CheckCertificateRevocation`
+  setting, default **on**, dev-box opt-out documented in `.env.example` (`SmtpSettingsTests`); (2)
+  sign-in on ad-hoc-signed Mac Catalyst Debug builds died storing the refresh token — MAUI SecureStorage
+  needs the restricted `keychain-access-groups` entitlement (MissingEntitlement without it, SIGKILL at
+  launch with it) → store entitlement added to `Entitlements.plist` for signed builds, Debug builds swap
+  to `Entitlements.Debug.plist` (unsandboxed) + a `DebugFileSessionStore` fallback (`MACCATALYST && DEBUG`
+  only); NATIVE-9 must re-verify SecureStorage under real signing.
