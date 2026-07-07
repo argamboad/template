@@ -98,18 +98,29 @@
         <ProjectReference Include="..\Shared.Ui\Perezosoft.Shared.Ui.csproj" />
     </ItemGroup>
 
+    <!-- Dev convenience (Android): make sure VS invokes MSBuild on every Debug F5 so the
+         adb-reverse hook below always fires. VS's fast up-to-date check would otherwise skip the
+         build (and with it the hook) when nothing changed — exactly the "rebooted the emulator,
+         bridge gone, F5 does nothing" case. Costs a fast incremental-build invocation per F5;
+         Release/CI unaffected. -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    </PropertyGroup>
+
     <!-- Dev convenience (Android): re-establish the loopback bridge to the local API on every
-         deploy/run, so http://localhost:5238 on the device reaches the host. `adb reverse` is
-         wiped on emulator reboot/reconnect; this removes the need to re-run it by hand. It never
-         fails the build (ContinueOnError) and only runs when deploying the Android target. -->
-    <Target Name="AndroidReverseDevApiPort" AfterTargets="Install;_Run"
-            Condition="$(TargetFramework.Contains('-android'))">
+         Debug build/deploy/run — CLI installs (Install/_Run) AND VS F5 (Build; VS deploy skips
+         Install when the APK is up-to-date) — so http://localhost:5238 on the device reaches the
+         host. `adb reverse` is wiped on emulator reboot/reconnect; this removes the need to re-run
+         it by hand. Uses VS's selected device ($(AdbTarget)) when set so multi-device setups don't
+         error. It never fails the build (ContinueOnError) and stays out of Release/CI builds. -->
+    <Target Name="AndroidReverseDevApiPort" AfterTargets="Build;Install;_Run"
+            Condition="$(TargetFramework.Contains('-android')) And '$(Configuration)' == 'Debug'">
         <PropertyGroup>
             <_AdbExe Condition="'$(AndroidSdkDirectory)' != ''">$([System.IO.Path]::Combine('$(AndroidSdkDirectory)', 'platform-tools', 'adb.exe'))</_AdbExe>
             <_AdbExe Condition="'$(_AdbExe)' == '' or !Exists('$(_AdbExe)')">adb</_AdbExe>
         </PropertyGroup>
-        <Message Importance="high" Text="[dev] adb reverse tcp:5238 tcp:5238 — bridging the device to the local API" />
-        <Exec Command="&quot;$(_AdbExe)&quot; reverse tcp:5238 tcp:5238" ContinueOnError="true" />
+        <Message Importance="high" Text="[dev] adb $(AdbTarget) reverse tcp:5238 tcp:5238 — bridging the device to the local API" />
+        <Exec Command="&quot;$(_AdbExe)&quot; $(AdbTarget) reverse tcp:5238 tcp:5238" ContinueOnError="true" />
     </Target>
 
 </Project>
