@@ -315,8 +315,19 @@ and the smoke waits for the app process before attaching. **Rehearsed green on a
 emulator** (boot + OTP + roster). The same PR adds the **`native-paths` cost gate** (docs-only
 develop pushes skip the Apple builds + both smokes — the 2026-07-03 sprint exhausted the month's
 free Actions minutes in a day) and **deploy-staging concurrency** (back-to-back merges cancel the
-older deploy's version-gated smoke instead of failing it). **Remaining:** the iOS-simulator leg
-(parked with the Apple pin).
+older deploy's version-gated smoke instead of failing it). **iOS-simulator leg ✅ Implemented
+2026-07-06** (unpinned by the NATIVE-6 Apple QA pass the same day): CI job **`native-smoke-ios`**
+(macos-26, same Xcode pin + cost conditions as `native-build-apple`) boots a simulator
+(`simctl bootstatus -b`), installs the Debug app, launches it with
+`SIMCTL_CHILD_PEREZOSOFT_API_BASE_URL` pointed at a plain-HTTP API (ATS exempts loopback — the
+login page fully renders over http; brew-installed Postgres, no Mailpit since a boot smoke sends
+no email), and asserts **boot-to-login**: the app process survives startup (the G7 crash class)
+AND the login page's provider probe lands `GET /api/auth/providers → 200` in the API log
+(`Logging__LogLevel__Microsoft.AspNetCore=Information` makes it grep-able); screenshot uploaded
+as an artifact. **Deliberately shallower than the Windows/Android legs:** WKWebView exposes no
+CDP, so driving the UI would need XCUITest/Appium — too heavy/flaky for a canary; sign-in
+journeys stay manual (§13b/§13c). The exact launch → probe → grep sequence was rehearsed green
+on real hardware during the 2026-07-06 QA session (~3 s from launch to assertion locally).
 
 **As a** maintainer
 **I want** the native critical paths driven automatically against a real emulator/simulator
@@ -394,10 +405,13 @@ upload. Store review + accounts are external; the platform ships the upload plum
    `AppResumeNotifier` + G3 Android back handler). All six audit gaps closed; OS-chrome behaviors
    (share sheet, hardware back, real focus transitions) queue for the NATIVE-6 device pass.
 3. 🚧 **NATIVE-6** manual native QA pass — plan authored (117 cases incl. iOS/macCatalyst first-run
-   smoke + §13c release checklist; G7 Apple-boot fix shipped alongside); **execution needs the
-   maintainer's devices** (Apple column explicitly PINNED by the maintainer until Apple hardware is
-   available — 2026-07-03). **NATIVE-7** Windows smoke ✅ in CI (WebView2-CDP `native-smoke-windows`,
-   develop pushes); Android-emulator leg 📝 next; iOS-simulator leg parked with the Apple pin.
+   smoke + §13c release checklist; G7 Apple-boot fix shipped alongside). **Apple column UNPINNED
+   2026-07-06** — the maintainer ran §13b on a MacBook Air M1: QA-IOS-01/02/04 + QA-MAC-01/02 +
+   the OAuth leg of QA-MAC-03 PASS (two platform gaps found and fixed, PR #125); remaining:
+   QA-IOS-03 + rest of QA-MAC-03 spot-checks, then the Windows/Android device pass. **NATIVE-7 ✅
+   COMPLETE — all three smokes in CI:** Windows (WebView2-CDP `native-smoke-windows`), Android
+   (`native-smoke-android`), and iOS-simulator (`native-smoke-ios`, boot-to-login canary, added
+   2026-07-06 once the QA pass validated the runtime).
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:
