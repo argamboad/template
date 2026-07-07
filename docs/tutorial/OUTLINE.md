@@ -5,10 +5,10 @@
 > each file as it's created. Coverage is not asserted — it is **machine-checked**:
 > `gen_coverage.py` maps every tracked file to the lesson that builds it and fails on
 > any unmapped file. See `COVERAGE.md` for the full file→lesson manifest
-> (currently: 650 tracked files · 486 built in lessons · 164 explicitly bucketed as
-> generated/vendored/meta · **0 unmapped** — last reconciled 2026-07-07 after the
-> Perezosoft rename, NATIVE waves 1–2, BILLING-8, DEPLOY completion, the E2E expansion
-> and the RLS tenancy backstop, ADR-020 → lesson 8.4).
+> (currently: 653 tracked files · 489 built in lessons · 164 explicitly bucketed as
+> generated/vendored/meta · **0 unmapped** — last reconciled 2026-07-07, pre-QA pass:
+> Perezosoft rename, NATIVE waves 1–2 + smokes, BILLING-8, DEPLOY completion, the E2E
+> expansion, the RLS tenancy backstop (ADR-020 → lesson 8.4) and the PR #125 SMTP knob).
 
 ## Pedagogical spine
 

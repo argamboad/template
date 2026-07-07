@@ -106,7 +106,7 @@
 - `tests/Api.Tests/CookieServiceTests.cs`
 - `tests/Api.Tests/SessionServiceTests.cs`
 
-## 2.3 — Email I — the IEmailSender seam (6 files)
+## 2.3 — Email I — the IEmailSender seam (7 files)
 
 - `src/Core/Abstractions/IEmailSender.cs` — the ONLY way to send email
 - `src/Infrastructure/Email/Assets/logo.png`
@@ -114,6 +114,7 @@
 - `src/Infrastructure/Email/EmailStrings.resx` — localized in 3.5
 - `src/Infrastructure/Email/SmtpEmailSender.cs` — MailKit quarantined here
 - `src/Infrastructure/Email/SmtpSettings.cs`
+- `tests/Api.Tests/SmtpSettingsTests.cs` — incl. the SMTP-revocation knob (PR #125)
 
 ## 2.4 — Passwordless: magic link + OTP (10 files)
 
@@ -595,7 +596,7 @@
 
 *(no repo files — narrative/capstone lesson)*
 
-## A.1 — Appendix — MAUI shells & parity (32 files)
+## A.1 — Appendix — MAUI shells & parity (33 files)
 
 - `src/Maui/App.xaml`
 - `src/Maui/App.xaml.cs`
@@ -609,6 +610,7 @@
 - `src/Maui/Platforms/Android/Resources/xml/network_security_config.xml`
 - `src/Maui/Platforms/Android/WebAuthenticatorCallbackActivity.cs`
 - `src/Maui/Platforms/MacCatalyst/AppDelegate.cs`
+- `src/Maui/Platforms/MacCatalyst/Entitlements.Debug.plist`
 - `src/Maui/Platforms/MacCatalyst/Entitlements.plist`
 - `src/Maui/Platforms/MacCatalyst/Info.plist`
 - `src/Maui/Platforms/MacCatalyst/Program.cs`
@@ -630,11 +632,12 @@
 - `tests/native-smoke-android/package.json` — Android playwright-core smoke harness
 - `tests/native-smoke-android/smoke.js` — Android playwright-core smoke harness
 
-## A.2 — Appendix — native auth bridge (9 files)
+## A.2 — Appendix — native auth bridge (10 files)
 
 - `src/Api/Controllers/NativeAuthController.cs`
 - `src/Api/Services/NativeAuthCodeService.cs`
 - `src/Api/Services/NativeRedirectPolicy.cs`
+- `src/Maui/Auth/DebugFileSessionStore.cs`
 - `src/Maui/Auth/LoopbackOAuthInitiator.cs`
 - `src/Maui/Auth/NativeAuthHeaderHandler.cs`
 - `src/Maui/Auth/SecureStorageSessionStore.cs`
@@ -815,4 +818,4 @@
 - `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 650 tracked files · 486 built in lessons · 164 bucketed · 0 unmapped
+**Totals:** 653 tracked files · 489 built in lessons · 164 bucketed · 0 unmapped

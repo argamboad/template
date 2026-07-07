@@ -164,6 +164,7 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Core/Abstractions/IEmailSender.cs", "2.3", "the ONLY way to send email"),
     ("src/Infrastructure/Email/SmtpEmailSender.cs", "2.3", "MailKit quarantined here"),
     ("src/Infrastructure/Email/SmtpSettings.cs", "2.3", ""),
+    ("tests/Api.Tests/SmtpSettingsTests.cs", "2.3", "incl. the SMTP-revocation knob (PR #125)"),
     ("src/Infrastructure/Email/BrandedEmail.cs", "2.3", "inline-branded templates — the rebrand trap"),
     ("src/Infrastructure/Email/EmailStrings.resx", "2.3", "localized in 3.5"),
     ("src/Infrastructure/Email/EmailStrings.es.resx", "3.5", ""),
