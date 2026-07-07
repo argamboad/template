@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-  <g transform="translate(60 63) scale(1.16) translate(-60 -63)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 160">
+  <g transform="scale(1.15)">
     <ellipse cx="60" cy="64" rx="45" ry="43" fill="#ddd2b6"/>
     <ellipse cx="60" cy="66" rx="39" ry="37" fill="#efe6d0"/>
     <path d="M15.8 56 A45 43 0 0 1 104.2 56 Q82 42 60 42 Q38 42 15.8 56 Z" fill="#465d4d"/>
@@ -16,4 +16,6 @@
     <path d="M60 83 L60 89" stroke="#465d4d" stroke-width="2" stroke-linecap="round" fill="none"/>
     <path d="M40 86 Q60 101 80 86" stroke="#465d4d" stroke-width="3" stroke-linecap="round" fill="none"/>
   </g>
+  <text x="180" y="82" font-family="Space Grotesk, Helvetica, Arial, sans-serif" font-size="54" letter-spacing="-1"><tspan font-weight="700" fill="#efe6d0">Perezo</tspan><tspan font-weight="400" fill="#9bb6a1">soft</tspan></text>
+  <text x="182" y="118" font-family="Space Grotesk, Helvetica, Arial, sans-serif" font-size="20" fill="#cfdccf">Lazy reputation. Efficient engineering.</text>
 </svg>

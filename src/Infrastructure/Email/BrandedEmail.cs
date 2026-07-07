@@ -131,7 +131,7 @@ public static class BrandedEmail
         <tr><td align="center" style="padding:32px 16px;">
           <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;max-width:480px;">
             <tr><td align="center" style="padding:4px 0 24px;">
-              <img src="cid:{LogoCid}" width="56" height="52" alt="Perezosoft" style="display:block;border:0;outline:none;text-decoration:none;">
+              <img src="cid:{LogoCid}" width="56" height="56" alt="Perezosoft" style="display:block;border:0;outline:none;text-decoration:none;">
               <div style="font-family:{Font};font-size:20px;font-weight:700;letter-spacing:-.01em;color:{Green};margin-top:8px;">Perezosoft</div>
             </td></tr>
             <tr><td style="background:#ffffff;border:1px solid {Border};border-radius:14px;padding:36px 32px;">

@@ -31,19 +31,24 @@ Backstop after working through the list: `git grep -i perezosoft` and a search f
 
 ## 3. Logos & images — replace the files (keep the filenames to avoid touching references)
 In-app UI (shared RCL — used by web + desktop + mobile):
-- `src/Shared.Ui/wwwroot/brand/{icon_light.svg, icon_light_1024.png, lockup_light.svg, lockup_light_1520.png}`
+- `src/Shared.Ui/wwwroot/brand/{icon_light.svg, icon_light_1024.png, lockup_light.svg, lockup_light_1520.png, lockup_dark.svg, lockup_dark_1520.png}`
 
 **Email logo (CID-embedded — shown in every transactional email):**
 - **`src/Infrastructure/Email/Assets/logo.png`** — keep it a **PNG** (email clients strip SVG and block data-URIs); a ~128px square is plenty.
 
 Web host chrome:
-- `src/Web/wwwroot/{favicon.ico, favicon.png, apple_touch_180.png, og_image_1200x630.png}`
+- `src/Web/wwwroot/{favicon.ico, favicon.svg, favicon.png, apple_touch_180.png, og_image_1200x630.png}`
+- PWA icon set (ready for a future manifest): `src/Web/wwwroot/{icon-192.png, icon-512.png, icon-maskable-512.png}`
 
-Native launcher icon (MAUI):
-- `src/Maui/Resources/AppIcon/{appicon.svg, appiconfg.svg}` — still the stock .NET icon; replace before shipping.
+Native launcher icon + splash (MAUI):
+- `src/Maui/Resources/AppIcon/{appicon.svg, appiconfg.svg}` — background layer + foreground mark
+  (foreground sized to the Android adaptive-icon safe zone, ~61% of canvas)
+- `src/Maui/Resources/Splash/splash.svg` + the `Color` attrs on `MauiIcon`/`MauiSplashScreen` in
+  `src/Maui/Perezosoft.Maui.csproj` (brand background colour behind icon + splash)
 
-Marketing (not shipped in the app):
+Marketing & store submission (not shipped in the app):
 - `docs/brand/{linkedin_banner_1128x191.png, linkedin_logo_300.png}`
+- `docs/brand/{app_store_icon_1024.png, play_store_icon_512.png, android_adaptive_foreground_432.png}` — NATIVE-8..11 store assets
 
 ## 4. Colour palette — derive from your logo
 The palette is semantic tokens, single-sourced for web **and** all native shells:

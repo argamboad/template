@@ -211,7 +211,7 @@
 
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (79 files)
+## 3.4 — The web client & auth UI (84 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -233,6 +233,8 @@
 - `src/Shared.Ui/_Imports.razor`
 - `src/Shared.Ui/wwwroot/brand/icon_light.svg` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/brand/icon_light_1024.png` — placeholder brand assets — replaced in 9.1
+- `src/Shared.Ui/wwwroot/brand/lockup_dark.svg` — placeholder brand assets — replaced in 9.1
+- `src/Shared.Ui/wwwroot/brand/lockup_dark_1520.png` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/brand/lockup_light.svg` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/brand/lockup_light_1520.png` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/css/app.css`
@@ -245,7 +247,10 @@
 - `src/Web/wwwroot/appsettings.json`
 - `src/Web/wwwroot/favicon.ico`
 - `src/Web/wwwroot/favicon.png`
+- `src/Web/wwwroot/favicon.svg`
 - `src/Web/wwwroot/icon-192.png`
+- `src/Web/wwwroot/icon-512.png`
+- `src/Web/wwwroot/icon-maskable-512.png`
 - `src/Web/wwwroot/index.html`
 - `src/Web/wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css`
 - `src/Web/wwwroot/lib/bootstrap/dist/css/bootstrap-grid.css.map`
@@ -749,7 +754,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (66 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (69 files)
 
 - `.github/pull_request_template.md` — docs
 - `CLAUDE.md` — docs
@@ -789,8 +794,11 @@
 - `docs/audits/v2-2026-07/tooling/packages.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v2-2026-07/tooling/test-run.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v2-2026-07/tooling/vulnerable.txt` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/brand/android_adaptive_foreground_432.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/brand/app_store_icon_1024.png` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/brand/linkedin_banner_1128x191.png` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/brand/linkedin_logo_300.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/brand/play_store_icon_512.png` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/check_qa_artifacts.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_guide.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_runlog.py` — authoring docs; the course TEACHES writing these in 0.1
@@ -818,4 +826,4 @@
 - `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 653 tracked files · 489 built in lessons · 164 bucketed · 0 unmapped
+**Totals:** 661 tracked files · 494 built in lessons · 167 bucketed · 0 unmapped
