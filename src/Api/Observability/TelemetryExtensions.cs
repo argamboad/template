@@ -50,7 +50,9 @@ public static class TelemetryExtensions
     /// <summary>Tags the request span with <c>tenant_id</c>/<c>user_id</c> — identifiers only, never secrets.</summary>
     internal static void EnrichSpan(Activity activity, HttpContext context)
     {
-        if (context.RequestServices.GetService<ICurrentTenant>()?.TenantId is { } tenantId)
+        // RequestServices is null (annotation notwithstanding) for requests rejected before the
+        // pipeline runs — Kestrel bad requests, early aborts. Enrichment must never fail a request.
+        if (context.RequestServices?.GetService<ICurrentTenant>()?.TenantId is { } tenantId)
             activity.SetTag("tenant_id", tenantId.ToString());
 
         if (context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value is { } userId)

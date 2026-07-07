@@ -38,6 +38,19 @@ public class TelemetryEnrichmentTests
         Assert.Null(activity.GetTagItem("user_id"));
     }
 
+    [Fact]
+    public void EnrichSpan_RequestServicesNull_DoesNotThrow()
+    {
+        // Requests rejected before the pipeline runs (Kestrel bad requests, early aborts) reach the
+        // enrichment hook with RequestServices unset — the non-nullable annotation notwithstanding.
+        using var activity = new Activity("request").Start();
+
+        TelemetryExtensions.EnrichSpan(activity, new DefaultHttpContext());
+
+        Assert.Null(activity.GetTagItem("tenant_id"));
+        Assert.Null(activity.GetTagItem("user_id"));
+    }
+
     private static DefaultHttpContext ContextWith(Guid? tenant, string? userId)
     {
         var services = new ServiceCollection();
