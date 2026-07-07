@@ -184,7 +184,7 @@ jobs:
   # legs at 10× + Windows at 2×]); the repo is public now (2026-07-04) so standard-runner minutes
   # are free, but the gate still pays for itself in wall-clock and runner-queue time — and keeps
   # any future return to private billable-safe. This cheap job diffs each develop push; docs-only
-  # merges (stories, QA plan/PDFs, parity matrix, ...) skip the Apple builds and both native smokes.
+  # merges (stories, QA plan/PDFs, parity matrix, ...) skip the Apple builds and all three native smokes.
   # Anything that could affect a native binary or the smoke harness (src/**, the E2E project,
   # package pins, this workflow) still runs them. A schedule can't replace this: scheduled
   # workflows execute from the DEFAULT branch (main here, which is deploy-only and behind develop).
@@ -242,6 +242,152 @@ jobs:
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Perezosoft.Maui.csproj -f ${{ matrix.tfm }} -c Debug
+
+  # Native smoke — Apple (iOS simulator + Mac Catalyst; the legs the 2026-07-06 Apple QA pass
+  # unpinned; ADR-018 cost pattern). ONE job for both targets: the expensive setup (workload
+  # restore, brew Postgres, API build) is most of the macOS wall-clock, so paying it once beats two
+  # jobs. Boots the REAL MAUI apps against a real API + Postgres and asserts boot-to-login per
+  # target: the app process survives startup (the G7 crash class) AND its login page's provider
+  # probe (GET /api/auth/providers) lands a 200 on the API — proving Blazor booted inside the
+  # WebView and reached the network. Deliberately shallower than the Windows/Android legs:
+  # WKWebView exposes no CDP, so DRIVING the UI needs XCUITest/Appium — not worth the flake budget
+  # for a canary; sign-in flows stay manual (§13b/§13c). The apps are pointed at the plain-HTTP API
+  # via PEREZOSOFT_API_BASE_URL (SIMCTL_CHILD_-prefixed for the simulator; ATS exempts loopback, so
+  # the login page fully renders over http — verified 2026-07-06; only real OAuth needs the
+  # https/cert ceremony). Catalyst runs the Debug entitlements path (unsandboxed +
+  # DebugFileSessionStore — ad-hoc builds can't reach the keychain, see PR #125). No Mailpit: no
+  # email is sent in a boot smoke. Not in deploy-staging needs (same accepted-risk note as the
+  # other native smokes). macOS bills 10× — develop pushes with native-relevant changes only.
+  native-smoke-apple:
+    needs: native-paths
+    if: needs.native-paths.outputs.changed == 'true'
+    # Same Xcode-pin reasoning as native-build-apple: macos-26 is the image whose default Xcode
+    # (26.5) matches the .NET-for-iOS/macCatalyst workloads; macos-latest can lag behind.
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install the MAUI workloads (host-aware)
+        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
+
+      - name: Build the apps (Catalyst + iOS simulator) + API
+        run: |
+          dotnet build src/Maui/Perezosoft.Maui.csproj -f net10.0-maccatalyst -c Debug
+          dotnet build src/Maui/Perezosoft.Maui.csproj -f net10.0-ios -c Debug
+          dotnet restore src/Api/Perezosoft.Api.csproj --locked-mode
+          dotnet build src/Api/Perezosoft.Api.csproj -c Debug --no-restore
+
+      - name: Start Postgres (Homebrew)
+        # macOS runners can't host Linux service containers; brew's postgresql@17 fills in.
+        # The brew service runs as the runner user with no password — trust auth on localhost.
+        run: |
+          brew install postgresql@17
+          PGBIN="$(brew --prefix postgresql@17)/bin"
+          brew services start postgresql@17
+          for i in $(seq 1 30); do "$PGBIN/pg_isready" -h localhost && break; sleep 2; done
+          "$PGBIN/pg_isready" -h localhost || { echo "::error::Postgres never became ready"; exit 1; }
+          "$PGBIN/createdb" -h localhost smoke
+
+      - name: Boot a simulator
+        # Prefer a pre-created iPhone from the image; create one only if none exists. bootstatus -b
+        # boots AND blocks until ready, bounded by the step's own logic (no unbounded waits).
+        run: |
+          set -e
+          UDID=$(xcrun simctl list devices available | grep -Eo 'iPhone [^(]*\(([0-9A-F-]{36})\)' | head -1 | grep -Eo '[0-9A-F-]{36}' || true)
+          if [ -z "$UDID" ]; then
+            echo "no pre-created iPhone — creating one on the newest iOS runtime"
+            RUNTIME=$(xcrun simctl list runtimes | grep -Eo 'com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9-]+' | tail -1)
+            DEVTYPE=$(xcrun simctl list devicetypes | grep -Eo 'com\.apple\.CoreSimulator\.SimDeviceType\.iPhone-[0-9A-Za-z-]+' | tail -1)
+            UDID=$(xcrun simctl create smoke "$DEVTYPE" "$RUNTIME")
+          fi
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          echo "booting $UDID…"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl list devices | grep "$UDID"
+
+      - name: Boot API + apps, assert boot-to-login (Catalyst, then iOS)
+        # One step for everything process-bound (the runner tears down a step's process tree).
+        # Request logging is raised so each app's provider probe is grep-able in api.log — the
+        # assertion that Blazor booted in the WKWebView and reached the API over the network.
+        # Both targets share the API; the iOS assert requires the probe COUNT to grow past the
+        # Catalyst phase's, so one target's probe can't satisfy the other's check.
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          Jwt__Secret: "ci-native-smoke-jwt-signing-key-0123"
+        run: |
+          set -e
+          export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=smoke;Username=$(whoami)"
+          # The dotted logging key can't be a shell export (invalid identifier) — env(1) sets it.
+          # It raises AspNetCore request logging so the provider probe is grep-able below.
+          env 'Logging__LogLevel__Microsoft.AspNetCore=Information' \
+            dotnet run --project src/Api/Perezosoft.Api.csproj -c Debug --no-build --urls http://localhost:5238 > api.log 2>&1 &
+
+          echo "Waiting for the API…"
+          for i in $(seq 1 60); do
+            api=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5238/health/ready || echo 000)
+            [ "$api" = "200" ] && { echo "ready"; break; }
+            sleep 3
+          done
+          [ "$api" = "200" ] || { echo "::error::API did not become ready"; tail -60 api.log; exit 1; }
+
+          probes() { grep -c 'Request finished.*GET.*/api/auth/providers.*200' api.log || true; }
+
+          echo "=== Mac Catalyst: launch + boot-to-login ==="
+          CAT_BIN=$(ls src/Maui/bin/Debug/net10.0-maccatalyst/maccatalyst-*/*.app/Contents/MacOS/* | head -1)
+          PEREZOSOFT_API_BASE_URL=http://localhost:5238 "$CAT_BIN" > catalyst-app.log 2>&1 &
+          CAT_PID=$!
+          ok=0
+          for i in $(seq 1 40); do   # up to 2 min
+            kill -0 "$CAT_PID" 2>/dev/null || { echo "::error::the Catalyst app died after launch (startup crash)"; tail -30 catalyst-app.log; break; }
+            [ "$(probes)" -ge 1 ] && { ok=1; echo "Catalyst provider probe hit the API after ~$((i*3))s"; break; }
+            sleep 3
+          done
+          screencapture -x mac-smoke.png 2>/dev/null || true
+          kill "$CAT_PID" 2>/dev/null || true
+          [ "$ok" = "1" ] || { echo "::error::the Catalyst app never reached /api/auth/providers"; tail -40 api.log; exit 1; }
+          CAT_PROBES=$(probes)
+
+          echo "=== iOS simulator: install + launch + boot-to-login ==="
+          APP=$(ls -d src/Maui/bin/Debug/net10.0-ios/iossimulator-*/Perezosoft.Maui.app | head -1)
+          xcrun simctl install "$UDID" "$APP"
+          SIMCTL_CHILD_PEREZOSOFT_API_BASE_URL=http://localhost:5238 \
+            xcrun simctl launch "$UDID" com.perezosoft.platform | tee launch.out
+          APP_PID=$(grep -Eo '[0-9]+$' launch.out)
+
+          echo "Waiting for the login page's provider probe (app pid $APP_PID, past $CAT_PROBES Catalyst probes)…"
+          ok=0
+          for i in $(seq 1 40); do   # up to 2 min — first Blazor boot on a cold simulator is slow
+            kill -0 "$APP_PID" 2>/dev/null || { echo "::error::the iOS app process died after launch (startup crash)"; break; }
+            [ "$(probes)" -gt "$CAT_PROBES" ] && { ok=1; echo "iOS provider probe hit the API after ~$((i*3))s"; break; }
+            sleep 3
+          done
+
+          xcrun simctl io "$UDID" screenshot ios-smoke.png || true
+          [ "$ok" = "1" ] || { echo "::error::the iOS app never reached /api/auth/providers — Blazor did not boot or cannot reach the API"; tail -40 api.log; exit 1; }
+
+      - name: Screenshot artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-smoke-screenshots
+          path: |
+            ios-smoke.png
+            mac-smoke.png
+          if-no-files-found: ignore
+
+      - name: Logs (diagnostics)
+        # always(), not failure() — see the Android leg: a timed-out job's cancelled steps never
+        # satisfy failure(), and then there are zero diagnostics.
+        if: always()
+        run: |
+          tail -n 60 api.log || true
+          tail -n 30 catalyst-app.log || true
+          xcrun simctl spawn "$UDID" log show --last 5m --predicate 'process == "Perezosoft.Maui"' --style compact 2>/dev/null | tail -n 40 || true
 
   # Native smoke — Windows (NATIVE-7, ADR-018). Runs the REAL MAUI Windows app against a real API +
   # Postgres + Mailpit, and drives its WebView2 over the Chrome DevTools Protocol (Playwright

@@ -25,7 +25,7 @@ The platform is **feature-complete and continuously verified**:
 | # | Item | Owner | Unblocks |
 |---|------|-------|----------|
 | 1 | NATIVE-6 manual QA pass — Android + Windows (§3) | **You** | NATIVE-8/9 (signing) |
-| 2 | Apple first-run smoke on the MacBook (§4) | **You** | iOS-sim CI leg, NATIVE-10/11 |
+| 2 | ~~Apple first-run smoke~~ → **✅ RUN 2026-07-06** (5/7 cases + OAuth PASS; two fixes PR #125; CI Apple smokes shipped — `native-smoke-apple`). Remaining: QA-IOS-03 + rest of QA-MAC-03 (§4 note) | **You** (~10 min) | NATIVE-10/11 (with the Apple account) |
 | 3 | NATIVE-8/9 signed AAB + MSIX release plumbing | Claude, after #1 | Store distribution |
 | 4 | ~~RLS tenancy backstop~~ → **✅ BUILT** (ADR-020 addendum; prod activation now includes the two-role setup, `DEPLOYMENT.md` §7) | — | Production deploy activation |
 | 5 | Production deploy activation (§5) | **You** (~15 min incl. RLS §7) | A real prod environment |
@@ -51,11 +51,20 @@ The platform is **feature-complete and continuously verified**:
 
 ## 4. Guide — Apple first-run smoke on the MacBook (§13b: QA-IOS-01..04, QA-MAC-01..03)
 
-These seven cases have **never been run** — iOS/macCatalyst compile in CI but the app has only ever
-booted on Apple hardware in theory. QA-IOS-01 alone (it boots at all) validates the G7 crash fix on
-a real Apple runtime. **No paid Apple Developer account is needed for any of this** — the simulator
-and Mac Catalyst run free; the $99/yr account only matters later for physical-iPhone installs and
-store distribution (NATIVE-10/11).
+> **Executed 2026-07-06** (results in the QA_TEST_PLAN changelog): QA-IOS-01/02/04 + QA-MAC-01/02 +
+> the OAuth leg of QA-MAC-03 **PASS** on the maintainer's MacBook (iPhone 17 / 17 Pro Max / iPad Air
+> simulators + Mac Catalyst). Two platform gaps were found and fixed (PR #125: SMTP revocation knob;
+> Catalyst Debug session store), and the pass unpinned the CI Apple smokes (`native-smoke-apple`).
+> Remaining: QA-IOS-03 + the rest of QA-MAC-03 (share sheet, language + restart persistence).
+> **One recipe correction is baked in below** (Phase 4 step 2): the ASP.NET dev cert **cannot** be a
+> simulator trust anchor — it's `CA:FALSE`, and iOS rejects it with `errSSL -9813`, which reads as
+> "OAuth buttons missing on the login page". Use the CA-signed localhost cert instead.
+
+These seven cases had **never been run** before 2026-07-06 — iOS/macCatalyst compile in CI but the
+app had only ever booted on Apple hardware in theory. QA-IOS-01 alone (it boots at all) validates
+the G7 crash fix on a real Apple runtime. **No paid Apple Developer account is needed for any of
+this** — the simulator and Mac Catalyst run free; the $99/**yr, recurring** account only matters
+later for physical-iPhone installs and store distribution (NATIVE-10/11).
 
 ### Phase 0 — check the MacBook is viable (5 min)
 
@@ -110,14 +119,19 @@ toolchain instead.
 1. `cp .env.example .env` and fill in the dev values — easiest is copying your Windows repo-root
    `.env` across (AirDrop/USB; **never commit it**).
 2. `docker compose up -d db mail` — Postgres 17 + Mailpit.
-3. Trust the ASP.NET dev certificate on the Mac: `dotnet dev-certs https --trust` (keychain
-   password prompt).
+3. HTTPS certificate — **skip `dotnet dev-certs` if the simulator is on the menu** and go straight
+   to the CA-signed cert (Phase 4 step 2 explains why the dev cert can't work there); Kestrel is
+   pointed at it via two `Kestrel__Certificates__Default__Path/KeyPath` lines in `.env`. For a
+   Catalyst/web-only session, `dotnet dev-certs https --trust` (keychain password prompt) is enough.
 4. Start the API: `dotnet run --project src/Api --launch-profile https`. Verify
    <https://localhost:7160/health> returns Healthy; Mailpit UI at <http://localhost:8025>.
 
 ### Phase 3 — Mac Catalyst first (it's the easy one)
 
-The app runs on the Mac itself, so the keychain-trusted dev cert just works:
+The app runs on the Mac itself, so the keychain-trusted cert just works. Note that local Debug
+builds are ad-hoc signed and run **unsandboxed with a file-based session store** — the keychain
+needs a restricted entitlement no ad-hoc build can claim (see `Entitlements.Debug.plist` and
+`DebugFileSessionStore`, PR #125):
 
 ```bash
 dotnet build src/Maui -t:Run -f net10.0-maccatalyst
@@ -130,10 +144,16 @@ restart persistence).
 ### Phase 4 — iOS simulator
 
 1. Boot a simulator: `open -a Simulator` (or let step 3 pick the default device).
-2. **Trust the dev cert inside the simulator** (its trust store is separate from the Mac's):
+2. **Trust a CA-signed localhost cert in the simulator** (2026-07-06 correction — the ASP.NET dev
+   cert is `CA:FALSE`, so `add-root-cert` on it silently buys nothing and TLS fails `errSSL -9813`;
+   symptom: the login page renders email-only, no OAuth buttons). One-time setup: create a tiny
+   local CA + a CA-signed `localhost` leaf (SANs `localhost`,`127.0.0.1`,`::1`; LibreSSL needs
+   config-file syntax, no `-addext`), point Kestrel at the leaf via
+   `Kestrel__Certificates__Default__Path/KeyPath` in `.env`, trust the **leaf** in the login
+   keychain (`security add-trusted-cert -r trustAsRoot -p ssl -k ~/Library/Keychains/login.keychain-db localhost.pem`)
+   and the **CA root** in the simulator — per booted device:
    ```bash
-   dotnet dev-certs https --export-path ~/dev-cert.pem --format PEM
-   xcrun simctl keychain booted add-root-cert ~/dev-cert.pem
+   xcrun simctl keychain booted add-root-cert /path/to/ca.pem
    ```
 3. Build & run:
    ```bash

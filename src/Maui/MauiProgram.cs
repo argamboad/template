@@ -83,7 +83,13 @@ public static class MauiProgram
 		// platform-agnostic. EVERY target platform must register one — the AuthService factory
 		// below resolves it with GetRequiredService, so a missing branch here crashes the app at
 		// first resolve (exactly how iOS/macCatalyst were dead-on-arrival before G7).
+#if MACCATALYST && DEBUG
+		// Ad-hoc-signed local builds can't reach the data-protection keychain (restricted
+		// entitlement) — see DebugFileSessionStore. Signed builds use the secure store below.
+		builder.Services.AddSingleton<ISessionStore, DebugFileSessionStore>();
+#else
 		builder.Services.AddSingleton<ISessionStore, SecureStorageSessionStore>();
+#endif
 #if ANDROID || IOS || MACCATALYST
 		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
 			new WebAuthenticatorOAuthInitiator(ApiBaseUrl, CallbackScheme, sp.GetRequiredService<ILogger<WebAuthenticatorOAuthInitiator>>()));

@@ -35,6 +35,7 @@ public class SmtpEmailSender(IOptions<SmtpSettings> options, ILogger<SmtpEmailSe
         {
             // Bound a hung server: without this, a stuck Connect/Send stalls the request forever.
             Timeout = _settings.TimeoutSeconds * 1000,
+            CheckCertificateRevocation = _settings.CheckCertificateRevocation,
         };
         try
         {

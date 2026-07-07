@@ -315,8 +315,24 @@ and the smoke waits for the app process before attaching. **Rehearsed green on a
 emulator** (boot + OTP + roster). The same PR adds the **`native-paths` cost gate** (docs-only
 develop pushes skip the Apple builds + both smokes — the 2026-07-03 sprint exhausted the month's
 free Actions minutes in a day) and **deploy-staging concurrency** (back-to-back merges cancel the
-older deploy's version-gated smoke instead of failing it). **Remaining:** the iOS-simulator leg
-(parked with the Apple pin).
+older deploy's version-gated smoke instead of failing it). **Apple legs ✅ Implemented 2026-07-06**
+(unpinned by the NATIVE-6 Apple QA pass the same day): one CI job **`native-smoke-apple`**
+(macos-26, same Xcode pin + cost conditions as `native-build-apple`; one job for both targets so
+the expensive setup — workload restore, brew Postgres, API build — is paid once) covers **Mac
+Catalyst** (launches the Debug .app binary directly on the runner — the unsandboxed
+Debug-entitlements path from PR #125) and the **iOS simulator** (`simctl bootstatus -b`, install,
+launch with `SIMCTL_CHILD_PEREZOSOFT_API_BASE_URL`), both against a plain-HTTP API (ATS exempts
+loopback — the login page fully renders over http; no Mailpit since a boot smoke sends no email).
+Each target asserts **boot-to-login**: the app process survives startup (the G7 crash class) AND
+the login page's provider probe lands `GET /api/auth/providers → 200` in the API log
+(`Logging__LogLevel__Microsoft.AspNetCore=Information` makes it grep-able; the iOS assert requires
+the probe count to grow past the Catalyst phase's, so the shared API can't cross-satisfy);
+screenshots uploaded as artifacts. **Deliberately shallower than the Windows/Android legs:**
+WKWebView exposes no CDP, so driving the UI would need XCUITest/Appium — too heavy/flaky for a
+canary; sign-in journeys stay manual (§13b/§13c). Rehearsed green on real hardware during the
+2026-07-06 QA session: iOS ran the exact launch → probe → grep sequence (~3 s to assertion);
+Catalyst verified boot + API reach (locally a stored session skips the login page and hits
+`/api/auth/refresh` instead — impossible on a fresh runner, which always lands on login).
 
 **As a** maintainer
 **I want** the native critical paths driven automatically against a real emulator/simulator
@@ -343,6 +359,18 @@ Scenario: Native smoke runs on every push
 
 ### NATIVE-8 — Android: signed AAB/APK in CI
 
+**Context / notes (decisions scoped 2026-07-07):** the keystore IS the app's identity — updates only
+install over the same signature, so losing it is unrecoverable and it never enters git (base64 →
+repo secrets + an offline backup; ADR-001 discipline). Generated once locally with `keytool`.
+Release build = `AndroidKeyStore=true` + `AndroidSigningKeyStore/KeyAlias/StorePass/KeyPass` from
+env + `AndroidPackageFormat=aab`; version code derives from the release tag (csproj currently pins
+`ApplicationVersion=1`). New **tag-triggered release workflow** (not per-push; `ubuntu-latest`,
+cheap) + an `apksigner`/`jarsigner -verify` assertion on the artifact. **Deferred decision (bites
+at NATIVE-11, not here):** Play App Signing — Google holds the app-signing key and this keystore
+becomes the upload key (safer, resettable, effectively required for new Play apps); the keystore
+works identically either way. Non-issue verified: OAuth runs through the system browser against
+the API redirect URI, so signing-key fingerprints don't affect sign-in.
+
 ```gherkin
 Scenario: A signed Android artifact is produced
   Given the release keystore (from repo secrets, never committed)
@@ -354,6 +382,19 @@ Scenario: A signed Android artifact is produced
 
 ### NATIVE-9 — Windows: MSIX package + code-signing
 
+**Context / notes (decisions scoped 2026-07-07):** today the app runs **unpackaged**
+(`WindowsPackageType=None`) — this slice adds a packaged Release flavor (`MSIX` +
+`Package.appxmanifest`) in the same tag-triggered release workflow (windows-latest leg). Signing
+reality: an MSIX must be signed by a cert matching the manifest publisher, and since 2023 real OV
+code-signing certs require an HSM/hardware token — "cert in GitHub secrets" only works for a
+**self-signed cert**, which is this slice's scope (CI plumbing + sideload onto machines that trust
+it). For real users the pragmatic path is **Microsoft Store distribution (NATIVE-11): the Store
+signs the package, no cert to own** (~$19 one-time individual account); the alternative is Azure
+Trusted Signing (~$10/mo). The slice must include a manual boot + sign-in check of the PACKAGED
+build on Windows — MSIX apps run containerized, and Preferences/SecureStorage/file-path behavior
+can differ from the unpackaged build all QA so far has exercised (same failure class as the
+Catalyst keychain surprise, PR #125).
+
 ```gherkin
 Scenario: A signed MSIX is produced
   Then a code-signed MSIX is built in CI (cert from secrets) and uploaded
@@ -363,8 +404,12 @@ Scenario: A signed MSIX is produced
 
 ### NATIVE-10 — iOS + macOS: signed IPA / pkg (Apple)
 
-**Context / notes:** needs the Apple Developer account + certs/provisioning profiles (secrets, base64),
-built + signed on the macOS runner. iOS `.ipa` + macCatalyst `.pkg`.
+**Context / notes:** needs the Apple Developer account ($99/**yr, recurring** — certs/apps lapse if
+it stops) + certs/provisioning profiles (secrets, base64), built + signed on the macOS runner. iOS
+`.ipa` + macCatalyst `.pkg`. **Must also re-verify SecureStorage under the real signing identity**:
+properly-signed + provisioned builds can claim `keychain-access-groups`, at which point the
+Catalyst store `Entitlements.plist` path works and `DebugFileSessionStore` (the ad-hoc Debug
+fallback from PR #125) should be re-tested and considered for retirement.
 
 ```gherkin
 Scenario: Signed Apple artifacts are produced
@@ -378,6 +423,10 @@ Scenario: Signed Apple artifacts are produced
 
 **Context / notes:** automate (or document the manual path for) Play Console / App Store Connect / MS Store
 upload. Store review + accounts are external; the platform ships the upload plumbing behind flags/secrets.
+**Account costs (checked 2026-07-07):** Apple $99/yr recurring; Google Play $25 one-time; Microsoft
+Store ~$19 one-time (individual). Decisions parked here from earlier slices: enroll in **Play App
+Signing** (NATIVE-8's keystore becomes the upload key) and let the **MS Store sign the MSIX**
+(NATIVE-9 needs no purchased cert).
 
 **DoD:** upload step wired (guarded/off by default) or the manual submission path documented per store.
 
@@ -394,10 +443,14 @@ upload. Store review + accounts are external; the platform ships the upload plum
    `AppResumeNotifier` + G3 Android back handler). All six audit gaps closed; OS-chrome behaviors
    (share sheet, hardware back, real focus transitions) queue for the NATIVE-6 device pass.
 3. 🚧 **NATIVE-6** manual native QA pass — plan authored (117 cases incl. iOS/macCatalyst first-run
-   smoke + §13c release checklist; G7 Apple-boot fix shipped alongside); **execution needs the
-   maintainer's devices** (Apple column explicitly PINNED by the maintainer until Apple hardware is
-   available — 2026-07-03). **NATIVE-7** Windows smoke ✅ in CI (WebView2-CDP `native-smoke-windows`,
-   develop pushes); Android-emulator leg 📝 next; iOS-simulator leg parked with the Apple pin.
+   smoke + §13c release checklist; G7 Apple-boot fix shipped alongside). **Apple column UNPINNED
+   2026-07-06** — the maintainer ran §13b on a MacBook Air M1: QA-IOS-01/02/04 + QA-MAC-01/02 +
+   the OAuth leg of QA-MAC-03 PASS (two platform gaps found and fixed, PR #125); remaining:
+   QA-IOS-03 + rest of QA-MAC-03 spot-checks, then the Windows/Android device pass. **NATIVE-7 ✅
+   COMPLETE — smokes for all four platforms in CI:** Windows (WebView2-CDP `native-smoke-windows`),
+   Android (`native-smoke-android`), and iOS-simulator + Mac Catalyst (`native-smoke-apple`,
+   boot-to-login canaries in one macOS job, added 2026-07-06 once the QA pass validated the
+   runtimes).
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:
