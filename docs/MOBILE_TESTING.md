@@ -26,7 +26,12 @@ An Android emulator (AVD) running, or a physical device with USB debugging enabl
 
 ## 2. Bridge the device to the host
 
-Run this **every time** the emulator/device (re)starts — it does not persist:
+**Usually automatic:** the csproj's `AndroidReverseDevApiPort` target re-runs the bridge on
+**every Debug build/deploy** — CLI installs *and* VS F5 (the project disables VS's fast
+up-to-date check in Debug so the hook can't be skipped). So after an emulator reboot, just
+build/F5 again and the bridge is back.
+
+To set it by hand (it does not persist across emulator/device restarts):
 
 ```bash
 adb reverse tcp:5238 tcp:5238
