@@ -315,19 +315,24 @@ and the smoke waits for the app process before attaching. **Rehearsed green on a
 emulator** (boot + OTP + roster). The same PR adds the **`native-paths` cost gate** (docs-only
 develop pushes skip the Apple builds + both smokes — the 2026-07-03 sprint exhausted the month's
 free Actions minutes in a day) and **deploy-staging concurrency** (back-to-back merges cancel the
-older deploy's version-gated smoke instead of failing it). **iOS-simulator leg ✅ Implemented
-2026-07-06** (unpinned by the NATIVE-6 Apple QA pass the same day): CI job **`native-smoke-ios`**
-(macos-26, same Xcode pin + cost conditions as `native-build-apple`) boots a simulator
-(`simctl bootstatus -b`), installs the Debug app, launches it with
-`SIMCTL_CHILD_PEREZOSOFT_API_BASE_URL` pointed at a plain-HTTP API (ATS exempts loopback — the
-login page fully renders over http; brew-installed Postgres, no Mailpit since a boot smoke sends
-no email), and asserts **boot-to-login**: the app process survives startup (the G7 crash class)
-AND the login page's provider probe lands `GET /api/auth/providers → 200` in the API log
-(`Logging__LogLevel__Microsoft.AspNetCore=Information` makes it grep-able); screenshot uploaded
-as an artifact. **Deliberately shallower than the Windows/Android legs:** WKWebView exposes no
-CDP, so driving the UI would need XCUITest/Appium — too heavy/flaky for a canary; sign-in
-journeys stay manual (§13b/§13c). The exact launch → probe → grep sequence was rehearsed green
-on real hardware during the 2026-07-06 QA session (~3 s from launch to assertion locally).
+older deploy's version-gated smoke instead of failing it). **Apple legs ✅ Implemented 2026-07-06**
+(unpinned by the NATIVE-6 Apple QA pass the same day): one CI job **`native-smoke-apple`**
+(macos-26, same Xcode pin + cost conditions as `native-build-apple`; one job for both targets so
+the expensive setup — workload restore, brew Postgres, API build — is paid once) covers **Mac
+Catalyst** (launches the Debug .app binary directly on the runner — the unsandboxed
+Debug-entitlements path from PR #125) and the **iOS simulator** (`simctl bootstatus -b`, install,
+launch with `SIMCTL_CHILD_PEREZOSOFT_API_BASE_URL`), both against a plain-HTTP API (ATS exempts
+loopback — the login page fully renders over http; no Mailpit since a boot smoke sends no email).
+Each target asserts **boot-to-login**: the app process survives startup (the G7 crash class) AND
+the login page's provider probe lands `GET /api/auth/providers → 200` in the API log
+(`Logging__LogLevel__Microsoft.AspNetCore=Information` makes it grep-able; the iOS assert requires
+the probe count to grow past the Catalyst phase's, so the shared API can't cross-satisfy);
+screenshots uploaded as artifacts. **Deliberately shallower than the Windows/Android legs:**
+WKWebView exposes no CDP, so driving the UI would need XCUITest/Appium — too heavy/flaky for a
+canary; sign-in journeys stay manual (§13b/§13c). Rehearsed green on real hardware during the
+2026-07-06 QA session: iOS ran the exact launch → probe → grep sequence (~3 s to assertion);
+Catalyst verified boot + API reach (locally a stored session skips the login page and hits
+`/api/auth/refresh` instead — impossible on a fresh runner, which always lands on login).
 
 **As a** maintainer
 **I want** the native critical paths driven automatically against a real emulator/simulator
@@ -409,9 +414,10 @@ upload. Store review + accounts are external; the platform ships the upload plum
    2026-07-06** — the maintainer ran §13b on a MacBook Air M1: QA-IOS-01/02/04 + QA-MAC-01/02 +
    the OAuth leg of QA-MAC-03 PASS (two platform gaps found and fixed, PR #125); remaining:
    QA-IOS-03 + rest of QA-MAC-03 spot-checks, then the Windows/Android device pass. **NATIVE-7 ✅
-   COMPLETE — all three smokes in CI:** Windows (WebView2-CDP `native-smoke-windows`), Android
-   (`native-smoke-android`), and iOS-simulator (`native-smoke-ios`, boot-to-login canary, added
-   2026-07-06 once the QA pass validated the runtime).
+   COMPLETE — smokes for all four platforms in CI:** Windows (WebView2-CDP `native-smoke-windows`),
+   Android (`native-smoke-android`), and iOS-simulator + Mac Catalyst (`native-smoke-apple`,
+   boot-to-login canaries in one macOS job, added 2026-07-06 once the QA pass validated the
+   runtimes).
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:
