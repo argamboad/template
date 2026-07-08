@@ -61,6 +61,38 @@ public class AuthFlowTests : E2ETestBase
     }
 
     [Test]
+    public async Task Otp_Lockout_ShowsDistinctTooManyAttemptsMessage()
+    {
+        await Mailpit.ClearAsync();
+        var email = UniqueEmail();
+
+        var login = new LoginPage(Page);
+        await login.GotoAsync();
+        await Expect(login.Email).ToBeVisibleAsync(new() { Timeout = 30_000 });
+
+        // Request a real code so we can submit a guaranteed-wrong variant of it.
+        var code = await login.RequestOtpAndReadCodeAsync(email);
+        var wrong = WrongVariant(code);
+
+        // Burn the whole per-email budget (Auth:Otp:MaxAttempts, default 5) on wrong guesses. The
+        // E2E stack raises the per-IP limit to 1000, so the 429 throttle can't mask the lockout.
+        for (var i = 0; i < 5; i++)
+            await login.SubmitOtpAsync(wrong);
+
+        // The lockout must read as its own signal — NOT the generic "incorrect or has expired", which
+        // would (wrongly) suggest the user just mistyped and should retry. (QA-AUTH-04, CONF-5.)
+        await Expect(login.OtpError).ToContainTextAsync("Too many attempts", new() { Timeout = 15_000 });
+    }
+
+    // Flip the first digit so the guess is certainly wrong but still a well-formed 6-digit code.
+    private static string WrongVariant(string code)
+    {
+        var chars = code.ToCharArray();
+        chars[0] = chars[0] == '0' ? '1' : '0';
+        return new string(chars);
+    }
+
+    [Test]
     public async Task Invalid_Email_IsRejected_NoCodeStep()
     {
         var login = new LoginPage(Page);

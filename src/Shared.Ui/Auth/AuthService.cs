@@ -8,11 +8,16 @@ namespace Perezosoft.Shared.Ui.Auth;
 /// <summary>Outcome of a native primary-auth attempt: signed in, failed, or owes an MFA step-up.</summary>
 public enum SignInStatus { Success, Failed, MfaRequired }
 
-/// <summary>A native sign-in result; carries the MFA challenge when <see cref="SignInStatus.MfaRequired"/>.</summary>
-public sealed record SignInResult(SignInStatus Status, string? Challenge = null)
+/// <summary>
+/// A native sign-in result; carries the MFA challenge when <see cref="SignInStatus.MfaRequired"/>,
+/// and on failure the server's error code (e.g. <c>too_many_attempts</c>) so the UI can pick the
+/// right copy instead of a blanket "incorrect or expired".
+/// </summary>
+public sealed record SignInResult(SignInStatus Status, string? Challenge = null, string? Error = null)
 {
     public static readonly SignInResult Failed = new(SignInStatus.Failed);
     public static readonly SignInResult Success = new(SignInStatus.Success);
+    public static SignInResult FailedWith(string? error) => new(SignInStatus.Failed, Error: error);
     public static SignInResult Mfa(string challenge) => new(SignInStatus.MfaRequired, challenge);
 }
 
@@ -235,7 +240,12 @@ public class AuthService(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Native auth call failed: {StatusCode}", response.StatusCode);
-            return SignInResult.Failed;
+            // Surface the server's error code (e.g. too_many_attempts) so the caller can distinguish
+            // a lockout from a plain wrong/expired code. Body may be absent/unreadable → null.
+            string? error = null;
+            try { error = (await response.Content.ReadFromJsonAsync<NativeAuthResponse>())?.Error; }
+            catch { /* no/unreadable body → generic failure */ }
+            return SignInResult.FailedWith(error);
         }
 
         var payload = await response.Content.ReadFromJsonAsync<NativeAuthResponse>();
@@ -445,6 +455,10 @@ public class AuthService(
 
         [System.Text.Json.Serialization.JsonPropertyName("challenge")]
         public string? Challenge { get; init; }
+
+        // Present only on a failure body (ErrorResponse); e.g. too_many_attempts on OTP lockout.
+        [System.Text.Json.Serialization.JsonPropertyName("error")]
+        public string? Error { get; init; }
     }
 
     // Mirrors the API's TokenResponse (snake_case JSON).

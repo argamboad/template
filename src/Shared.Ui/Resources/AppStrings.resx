@@ -71,6 +71,7 @@
   <data name="Login_ErrCouldntSendLink" xml:space="preserve"><value>Couldn't send the link. Please try again.</value></data>
   <data name="Login_ErrCouldntSendCode" xml:space="preserve"><value>Couldn't send the code. Please try again.</value></data>
   <data name="Login_ErrCodeIncorrect" xml:space="preserve"><value>That code is incorrect or has expired.</value></data>
+  <data name="Login_ErrTooManyAttempts" xml:space="preserve"><value>Too many attempts. Please wait a few minutes, then request a new code.</value></data>
   <data name="Login_ErrVerificationFailed" xml:space="preserve"><value>Verification failed. Please try again.</value></data>
   <data name="Login_ErrEnterCode" xml:space="preserve"><value>Enter the code from your email.</value></data>
   <data name="Login_ErrOAuthCancelled" xml:space="preserve"><value>Sign-in was cancelled or didn't complete. Please try again.</value></data>
