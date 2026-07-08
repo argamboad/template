@@ -91,6 +91,13 @@ the Android Keystore and silently exchanged on startup).
 - **Cleartext blocked** → the app talks HTTP to `localhost`, permitted by
   `Platforms/Android/Resources/xml/network_security_config.xml`. If you change the host,
   add it there.
+- **VS breaks on `TypeError: Failed to execute 'query' on 'Permissions': Illegal invocation`
+  during Google sign-in** (Windows shell, F5) → not an app bug. It's Google's own obfuscated
+  anti-abuse script (an eval'd `VM…` blob) probing `navigator.permissions.query`; the throw is
+  expected and handled by Google's code, but VS's JavaScript debugger attached to the WebView2
+  can't see the handler and reports it "unhandled". Continue (F5) and sign-in proceeds. To
+  silence it for good: Tools → Options → Debugging → General → uncheck **Enable JavaScript
+  debugging for ASP.NET (Chrome, Edge and IE)**.
 - **Physical device** → `adb reverse` works over USB too; no other change needed.
 - **Pointing the app somewhere else** → set `PEREZOSOFT_API_BASE_URL` before launching (any
   platform): overrides the compiled per-platform API base — e.g. a LAN address for a device that
