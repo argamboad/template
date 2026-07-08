@@ -1480,6 +1480,26 @@ if this fails, it becomes a small safe-area fix slice.)*
 the app (or swipe it away) and relaunch. **Expected:** boots dark, no light flash (Android WebView
 localStorage persists). **Auto** follows the system dark theme toggle live.
 
+### QA-AND-15 — OAuth sign-in survives process death (NATIVE-12) 🟠 (Android)
+**Gherkin**
+```gherkin
+Given I tapped Continue with Google and the consent tab is open
+When Android kills the app process before I finish consent
+Then approving still signs me in — the redirect relaunches the app and completes on startup
+```
+**Walkthrough**
+1. Tap **Continue with Google**. **Expected:** the browser tab opens to Google consent.
+2. With the tab in the foreground, kill the app process:
+   `adb shell am kill com.perezosoft.platform` (works because the app is backgrounded behind the
+   browser; *Don't keep activities* + memory pressure reproduces it the organic way).
+3. Approve consent in the still-open tab. **Expected:** the `perezosoft://auth` redirect cold-starts
+   the app, which **stays open** and lands signed in on Home (the stashed code is exchanged during
+   startup — no "flash open and close").
+4. (MFA account) same steps. **Expected:** the app opens on the Login MFA code prompt; entering the
+   TOTP completes sign-in.
+5. (Staleness) repeat 1–2, wait > 5 min before approving. **Expected:** the app opens on Login with
+   "Your sign-in took too long to complete. Please try again." — no crash, retry works.
+
 ---
 
 ## 13b. iOS + macCatalyst — first-run smoke 🟠

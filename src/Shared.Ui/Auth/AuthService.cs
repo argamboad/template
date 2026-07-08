@@ -33,7 +33,9 @@ public class AuthService(
     HttpClient httpClient,
     ILogger<AuthService> logger,
     ISessionStore sessionStore,
-    IOAuthInitiator? oauth = null)
+    IOAuthInitiator? oauth = null,
+    IOAuthResumeStore? resumeStore = null,
+    TimeProvider? timeProvider = null)
 {
     private string? _accessToken;
     private Task<bool>? _refreshInFlight;
@@ -47,6 +49,8 @@ public class AuthService(
     /// session must not adopt/apply the impersonated user's preferences as its own).
     /// </summary>
     public event Action? SignedIn;
+
+    private TimeProvider Time => timeProvider ?? TimeProvider.System;
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && !IsTokenExpired(_accessToken);
 
@@ -159,7 +163,7 @@ public class AuthService(
         }
         try
         {
-            var result = await oauth.RunBrowserFlowAsync(provider);
+            var result = await RunResumableBrowserFlowAsync(provider, linkToken: null);
             var code = result is not null && result.TryGetValue("code", out var c) ? c : null;
             if (string.IsNullOrEmpty(code))
                 return SignInResult.Failed;
@@ -187,7 +191,7 @@ public class AuthService(
             return "unsupported";
         try
         {
-            var result = await oauth.RunBrowserFlowAsync(provider, linkToken);
+            var result = await RunResumableBrowserFlowAsync(provider, linkToken);
             if (result is null)
                 return "cancelled";
             if (result.TryGetValue("error", out var error))
@@ -199,6 +203,148 @@ public class AuthService(
             logger.LogError(ex, "Native provider link failed for {Provider}", provider);
             return "link_failed";
         }
+    }
+
+    // ── OAuth resume across process death (NATIVE-12) ────────────────────────
+
+    /// <summary>
+    /// How long a stashed callback stays exchangeable. Mirrors the API's one-time-code
+    /// TTL (<c>NativeAuthCodeService</c>, 5 min) — an older stash is dead server-side,
+    /// so we fail it with a friendly retry instead of a doomed exchange.
+    /// </summary>
+    public static readonly TimeSpan OAuthResumeTtl = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// True while an OAuth browser flow is awaiting its callback in THIS process. The
+    /// Android callback activity reads it to tell warm delivery (WebAuthenticator will
+    /// complete normally) from a cold start after process death (the callback must be
+    /// stashed for the startup resume instead).
+    /// </summary>
+    public bool OAuthFlowInFlightInProcess { get; private set; }
+
+    private OAuthResumeResult? _resumeHandoff;
+
+    /// <summary>
+    /// One-shot handoff of a resume outcome the Login page must act on (MFA step-up,
+    /// expired stash, failed exchange). Set by <see cref="TryCompletePendingOAuthAsync"/>;
+    /// consumed by Login's OnInitialized.
+    /// </summary>
+    public OAuthResumeResult? TakeOAuthResumeHandoff()
+    {
+        var handoff = _resumeHandoff;
+        _resumeHandoff = null;
+        return handoff;
+    }
+
+    /// <summary>
+    /// Runs the platform browser flow with a persisted in-flight marker around it, so a
+    /// process killed mid-round-trip can resume from the stashed callback on next start.
+    /// The marker is cleared the moment the flow returns to this process — from here on
+    /// the normal in-memory path owns the result.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>?> RunResumableBrowserFlowAsync(string provider, string? linkToken)
+    {
+        resumeStore?.SetInFlight(new OAuthFlowMarker(provider, linkToken, Time.GetUtcNow()));
+        OAuthFlowInFlightInProcess = true;
+        try
+        {
+            return await oauth!.RunBrowserFlowAsync(provider, linkToken);
+        }
+        finally
+        {
+            OAuthFlowInFlightInProcess = false;
+            resumeStore?.ClearInFlight();
+        }
+    }
+
+    /// <summary>
+    /// Startup entry point (called once from MainLayout, right after
+    /// <see cref="InitializeAsync"/>): if the previous process died during an OAuth
+    /// browser round-trip and the callback was stashed by the platform callback
+    /// activity, finish the flow — exchange the one-time code through the normal native
+    /// login path, or report the link outcome. Consumes the persisted state either way;
+    /// a no-op returning <see cref="OAuthResumeResult.None"/> on web and on normal starts.
+    /// </summary>
+    public async Task<OAuthResumeResult> TryCompletePendingOAuthAsync()
+    {
+        if (resumeStore is null)
+            return OAuthResumeResult.None;
+
+        var marker = resumeStore.GetInFlight();
+        var callback = resumeStore.TakePendingCallback();
+        // One-shot: any persisted flight reaching a fresh startup is dead — never leave
+        // state behind to re-trigger on the next launch.
+        resumeStore.ClearInFlight();
+        if (marker is null || string.IsNullOrEmpty(callback))
+            return OAuthResumeResult.None;
+
+        try
+        {
+            var props = ParseCallbackQuery(callback);
+
+            if (!string.IsNullOrEmpty(marker.LinkToken))
+            {
+                // Linking completes server-side at redirect time — nothing to exchange,
+                // just surface the outcome (Settings shows its usual banner).
+                if (props.ContainsKey("linked"))
+                    return new(OAuthResumeOutcome.LinkCompleted, marker.Provider);
+                props.TryGetValue("error", out var linkError);
+                return new(OAuthResumeOutcome.LinkFailed, marker.Provider,
+                    Error: string.IsNullOrEmpty(linkError) ? "link_failed" : linkError);
+            }
+
+            if (props.TryGetValue("error", out _) || !props.TryGetValue("code", out var code) || string.IsNullOrEmpty(code))
+                return Handoff(new(OAuthResumeOutcome.Failed, marker.Provider));
+
+            if (Time.GetUtcNow() - marker.StartedUtc > OAuthResumeTtl)
+                return Handoff(new(OAuthResumeOutcome.Expired, marker.Provider));
+
+            logger.LogInformation("Resuming OAuth sign-in for {Provider} after process death", marker.Provider);
+            var response = await httpClient.PostAsJsonAsync("/api/auth/native/exchange", new { code });
+            var result = await CompleteFromResponseAsync(response);
+            return result.Status switch
+            {
+                SignInStatus.Success => new(OAuthResumeOutcome.SignedIn, marker.Provider),
+                SignInStatus.MfaRequired => Handoff(new(OAuthResumeOutcome.MfaRequired, marker.Provider, result.Challenge)),
+                _ => Handoff(new(OAuthResumeOutcome.Failed, marker.Provider)),
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Resuming interrupted OAuth failed for {Provider}", marker.Provider);
+            return Handoff(new(OAuthResumeOutcome.Failed, marker.Provider));
+        }
+
+        OAuthResumeResult Handoff(OAuthResumeResult result)
+        {
+            _resumeHandoff = result;
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Parses the callback redirect's query into the same shape as
+    /// <c>WebAuthenticatorResult.Properties</c> (<c>code</c>, or <c>linked</c>/<c>error</c>).
+    /// </summary>
+    private static Dictionary<string, string> ParseCallbackQuery(string callbackUri)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var queryStart = callbackUri.IndexOf('?');
+        if (queryStart < 0)
+            return properties;
+        var query = callbackUri[(queryStart + 1)..];
+        var fragmentStart = query.IndexOf('#');
+        if (fragmentStart >= 0)
+            query = query[..fragmentStart];
+
+        foreach (var pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = pair.IndexOf('=');
+            var key = separator < 0 ? pair : pair[..separator];
+            var value = separator < 0 ? string.Empty : pair[(separator + 1)..];
+            properties[Uri.UnescapeDataString(key.Replace('+', ' '))] = Uri.UnescapeDataString(value.Replace('+', ' '));
+        }
+        return properties;
     }
 
     /// <summary>

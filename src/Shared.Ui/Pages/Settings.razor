@@ -140,6 +140,9 @@
             _banner = (Localizer["Settings_LinkErrInUse"], false);
         else if (LinkError == "expired")
             _banner = (Localizer["Settings_LinkErrExpired"], false);
+        else if (!string.IsNullOrEmpty(LinkError))
+            // Any other error key (e.g. a link resumed after process death, NATIVE-12).
+            _banner = (Localizer["Settings_LinkFailed"], false);
     }
 
     private async Task LoadLogins()

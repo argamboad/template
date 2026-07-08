@@ -220,6 +220,20 @@
 
     protected override void OnInitialized()
     {
+        // A native sign-in resumed after process death (NATIVE-12) may need follow-up:
+        // enter the MFA step-up with the resumed challenge, or explain why it failed.
+        var resume = Auth.TakeOAuthResumeHandoff();
+        if (resume is { Outcome: OAuthResumeOutcome.MfaRequired, Challenge: not null })
+        {
+            _challenge = resume.Challenge;
+            _mode = Mode.MfaChallenge;
+            return;
+        }
+        if (resume is { Outcome: OAuthResumeOutcome.Expired })
+            _error = Localizer["Login_ErrOAuthResumeExpired"];
+        else if (resume is { Outcome: OAuthResumeOutcome.Failed })
+            _error = Localizer["Login_ErrOAuthCancelled"];
+
         // A redirect login (OAuth / magic link) that needs a second factor lands here with ?mfa=<challenge>.
         // Enter the step-up prompt directly — the user isn't signed in yet (no session was issued).
         if (!string.IsNullOrEmpty(MfaChallengeToken))
