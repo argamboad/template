@@ -133,7 +133,7 @@
                 </div>
                 @if (!string.IsNullOrEmpty(_error))
                 {
-                    <div class="alert alert-danger py-2">@_error</div>
+                    <div class="alert alert-danger py-2" data-testid="login-otp-error">@_error</div>
                 }
                 <div class="d-grid">
                     <button class="btn btn-primary" data-testid="login-verify-otp" @onclick="VerifyOtp" disabled="@_busy">
@@ -321,12 +321,28 @@
                 return;
             }
             _otpError = true;
+            // A lockout (too_many_attempts) is a distinct, user-relevant signal: retrying or
+            // requesting a fresh code won't help until the window elapses (CONF-5). Surfacing the
+            // generic "incorrect or expired" here would wrongly imply a mistype. The server keeps
+            // wrong-vs-no-active-code collapsed to invalid_code for enumeration safety (CONF-6).
             _error = res.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                ? Localizer["Login_ErrCodeIncorrect"]
+                ? await OtpErrorAsync(res)
                 : Localizer["Login_ErrVerificationFailed"];
         }
         catch { _error = Localizer["Login_ErrVerificationFailed"]; }
         finally { _busy = false; }
+    }
+
+    // Maps the 401 body's error code to a message: lockout gets its own copy, everything else
+    // (wrong / expired) stays the deliberately generic line.
+    private async Task<string> OtpErrorAsync(HttpResponseMessage res)
+    {
+        string? code = null;
+        try { code = (await res.Content.ReadFromJsonAsync<ApiError>())?.Error; }
+        catch { /* no/again-unreadable body → fall through to the generic message */ }
+        return code == "too_many_attempts"
+            ? Localizer["Login_ErrTooManyAttempts"]
+            : Localizer["Login_ErrCodeIncorrect"];
     }
 
     private async Task VerifyMfa()
@@ -417,6 +433,12 @@
     {
         [JsonPropertyName("mfa_required")] public bool MfaRequired { get; init; }
         [JsonPropertyName("challenge")] public string? Challenge { get; init; }
+    }
+
+    // Shape of the API's ErrorResponse (code + message); we key the OTP copy off the code.
+    private sealed record ApiError
+    {
+        [JsonPropertyName("error")] public string? Error { get; init; }
     }
 
     // Provider glyphs, shared by the web (anchor) and native (button) variants.

@@ -11,6 +11,7 @@ public class LoginPage(IPage page) : BasePage(page)
     public ILocator SendOtp => Page.GetByTestId("login-send-otp");
     public ILocator SendMagicLink => Page.GetByTestId("login-send-magic-link");
     public ILocator ErrorAlert => Page.GetByTestId("login-error");
+    public ILocator OtpError => Page.GetByTestId("login-otp-error");
     public ILocator OtpCode => Page.GetByTestId("login-otp-code");
     public ILocator VerifyOtp => Page.GetByTestId("login-verify-otp");
     public ILocator MfaCode => Page.GetByTestId("login-mfa-code");
@@ -31,6 +32,21 @@ public class LoginPage(IPage page) : BasePage(page)
         await SendOtp.ClickAsync();
 
         var code = await Mailpit.WaitForOtpAsync(email, TimeSpan.FromSeconds(20));
+        await OtpCode.FillAsync(code);
+        await VerifyOtp.ClickAsync();
+    }
+
+    /// <summary>Requests an OTP and returns the real code read from Mailpit (without submitting it).</summary>
+    public async Task<string> RequestOtpAndReadCodeAsync(string email)
+    {
+        await Email.FillAsync(email);
+        await SendOtp.ClickAsync();
+        return await Mailpit.WaitForOtpAsync(email, TimeSpan.FromSeconds(20));
+    }
+
+    /// <summary>Enters a code into the OTP field and submits it.</summary>
+    public async Task SubmitOtpAsync(string code)
+    {
         await OtpCode.FillAsync(code);
         await VerifyOtp.ClickAsync();
     }
