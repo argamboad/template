@@ -766,7 +766,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (92 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (95 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -859,6 +859,9 @@
 - `docs/tutorial/lessons/4.4-the-scheduler.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/4.5-observability.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/4.6-the-append-only-audit-log.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/5.1-billing-abstraction-and-entitlements.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/5.2-stripe-checkout-webhook-portal.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/5.3-quotas-dunning-and-dissolve.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 694 tracked files · 504 built in lessons · 190 bucketed · 0 unmapped
+**Totals:** 697 tracked files · 504 built in lessons · 193 bucketed · 0 unmapped
