@@ -122,7 +122,7 @@
 - `src/Infrastructure/Email/SmtpSettings.cs`
 - `tests/Api.Tests/SmtpSettingsTests.cs` — incl. the SMTP-revocation knob (PR #125)
 
-## 2.4 — Passwordless: magic link + OTP (10 files)
+## 2.4 — Passwordless: magic link + OTP (11 files)
 
 - `src/Api/Services/PasswordlessService.cs` — single-use, hashed, time-limited
 - `src/Api/Services/SingleUseCacheToken.cs` — one-shot handoff token
@@ -133,6 +133,7 @@
 - `tests/Api.Tests/OtpErrorMappingTests.cs`
 - `tests/Api.Tests/PasswordlessServiceTests.cs`
 - `tests/Api.Tests/SingleUseCacheTokenTests.cs`
+- `tests/Core.Tests/Auth/NativeOtpLockoutTests.cs` — OTP resend-proof lockout coverage on the native verify path (landed on develop post-write)
 - `tests/Core.Tests/LoginTokenTests.cs`
 
 ## 2.5 — OAuth & account linking (13 files)
@@ -217,10 +218,11 @@
 
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (84 files)
+## 3.4 — The web client & auth UI (85 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
+- `src/Shared.Ui/Auth/AuthErrorCopy.cs` — server error code -> localized copy key; keeps 2.4's enumeration-safe collapse client-side (landed on develop post-write)
 - `src/Shared.Ui/Auth/AuthService.cs`
 - `src/Shared.Ui/Auth/IOAuthInitiator.cs`
 - `src/Shared.Ui/Auth/ISessionStore.cs` — per-platform session seam
@@ -764,7 +766,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (86 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (92 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -851,6 +853,12 @@
 - `docs/tutorial/lessons/3.5-localization.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/3.6-the-e2e-harness.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/3.7-build-your-own-slice.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.1-the-transactional-outbox.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.2-email-ii-the-outbox-decorator.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.3-the-inbox.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.4-the-scheduler.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.5-observability.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.6-the-append-only-audit-log.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 686 tracked files · 502 built in lessons · 184 bucketed · 0 unmapped
+**Totals:** 694 tracked files · 504 built in lessons · 190 bucketed · 0 unmapped
