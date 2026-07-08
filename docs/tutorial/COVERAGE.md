@@ -69,6 +69,12 @@
 
 - `src/Api/Services/ErrorResponse.cs` — shared envelope; never ex.Message (R16/R18)
 
+## 1.6 — CI from commit one (3 files)
+
+- `.github/forbidden-licenses.json` — copyleft ban (R26)
+- `.github/pull_request_template.md` — the PR checklist — process as a gate
+- `.github/workflows/ci.yml` — born here (build+test+secret/license gates); every part adds jobs — e2e 3.6, docker 8.2, deploy 8.3, native A.1
+
 ## 2.1 — Users & JWT access tokens (21 files)
 
 - `src/Api/Authentication/ClaimsPrincipalExtensions.cs`
@@ -573,16 +579,16 @@
 - `tests/Api.Tests/Infrastructure/TempWebRoot.cs`
 - `tests/Api.Tests/Integration/SingleOriginHostingTests.cs`
 
-## 8.2 — Container & staging (3 files)
+## 8.2 — Container & staging (4 files)
 
 - `.dockerignore`
 - `Dockerfile` — DEPLOY-2
+- `docs/DEPLOYMENT.md` — the runbook is a taught artifact — the learner writes their own
 - `render.yaml` — Render blueprint (ADR-017)
 
-## 8.3 — The deploy pipeline & CI gates (3 files)
+## 8.3 — The deploy pipeline & CI gates (2 files)
 
-- `.github/forbidden-licenses.json` — copyleft ban (R26)
-- `.github/workflows/ci.yml` — CI gates: locked restore, arch tests, license scan
+- `docs/QA_TEST_PLAN.md` — release readiness: manual QA plan beside the automated gates
 - `tests/Api.Tests/Integration/VersionEndpointTests.cs` — version-gated deploy smoke
 
 ## 8.4 — The RLS tenancy backstop (9 files)
@@ -597,9 +603,13 @@
 - `tests/Api.Tests/Rls/RlsPostureGuardTests.cs` — backstop + migration-parity + posture-guard tests
 - `tests/Api.Tests/Rls/RlsTestSetup.cs` — backstop + migration-parity + posture-guard tests
 
-## 9.1 — Make it yours (rebrand & de-sample)
+## 9.1 — Make it yours (rebrand & de-sample) (5 files)
 
-*(no repo files — narrative/capstone lesson)*
+- `docs/brand/android_adaptive_foreground_432.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
+- `docs/brand/app_store_icon_1024.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
+- `docs/brand/linkedin_banner_1128x191.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
+- `docs/brand/linkedin_logo_300.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
+- `docs/brand/play_store_icon_512.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
 
 ## A.1 — Appendix — MAUI shells & parity (33 files)
 
@@ -754,16 +764,14 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (69 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (61 files)
 
-- `.github/pull_request_template.md` — docs
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
 - `README.md` — docs
 - `_PLATFORM_PRIMER.md` — docs
 - `docs/DATA_MODEL.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/DECISIONS.md` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/DEPLOYMENT.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/FEATURES.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/LOCALIZATION.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/MOBILE_TESTING.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -774,7 +782,6 @@
 - `docs/PROJECT_BRIEF.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/QA_RUN_LOG.pdf` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/QA_TEST_GUIDE.pdf` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/QA_TEST_PLAN.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/REBRANDING.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/ROADMAP.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/STATUS.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -794,11 +801,6 @@
 - `docs/audits/v2-2026-07/tooling/packages.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v2-2026-07/tooling/test-run.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v2-2026-07/tooling/vulnerable.txt` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/brand/android_adaptive_foreground_432.png` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/brand/app_store_icon_1024.png` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/brand/linkedin_banner_1128x191.png` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/brand/linkedin_logo_300.png` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/brand/play_store_icon_512.png` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/check_qa_artifacts.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_guide.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_runlog.py` — authoring docs; the course TEACHES writing these in 0.1
@@ -826,4 +828,4 @@
 - `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 661 tracked files · 494 built in lessons · 167 bucketed · 0 unmapped
+**Totals:** 661 tracked files · 502 built in lessons · 159 bucketed · 0 unmapped

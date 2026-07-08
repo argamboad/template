@@ -5,10 +5,10 @@
 > each file as it's created. Coverage is not asserted — it is **machine-checked**:
 > `gen_coverage.py` maps every tracked file to the lesson that builds it and fails on
 > any unmapped file. See `COVERAGE.md` for the full file→lesson manifest
-> (currently: 653 tracked files · 489 built in lessons · 164 explicitly bucketed as
-> generated/vendored/meta · **0 unmapped** — last reconciled 2026-07-07, pre-QA pass:
-> Perezosoft rename, NATIVE waves 1–2 + smokes, BILLING-8, DEPLOY completion, the E2E
-> expansion, the RLS tenancy backstop (ADR-020 → lesson 8.4) and the PR #125 SMTP knob).
+> (currently: 661 tracked files · 502 built in lessons · 159 explicitly bucketed as
+> generated/vendored/meta · **0 unmapped** — last reconciled 2026-07-08, pre-QA pass;
+> now includes the DevOps thread: CI born in lesson 1.6 and growing a job per part,
+> deploy pipeline + release readiness in 8.3, the RLS backstop in 8.4).
 
 ## Pedagogical spine
 
@@ -59,6 +59,11 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
   doc-sync test forcing every key into `.env.example` + `appsettings.json` (R20).
 - **1.5 The error envelope.** `ErrorResponse`: one shape for every error; why
   `ex.Message` never crosses the API boundary (R16/R18).
+- **1.6 CI from commit one.** `ci.yml` is born: build + test with `--locked-mode`,
+  gitleaks secret scan (0.2's backstop becomes policy), the copyleft license gate (R26),
+  and the PR-template checklist. Like `ArchitectureTests`, **the pipeline grows a job per
+  part from here** — e2e (3.6), docker build (8.2), deploy stages (8.3), native legs (A.1).
+  A gate you add at the end is a gate you never designed for; this course gates from day one.
 
 ## Part 2 — Identity & tenancy (the chassis)
 - **2.1 Users & JWT access tokens.** Custom JWT vs ASP.NET Identity — the fork and why
@@ -138,11 +143,16 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
 ## Part 8 — Ship it
 - **8.1 Single-origin hosting.** API serves the WASM bundle; why this kills the
   cross-site refresh-cookie failure class; config-gated forwarded headers (ADR-017).
-- **8.2 Container & staging.** Dockerfile, `render.yaml`, Render/Neon/Brevo bring-up;
-  free-tier trade-offs as recorded decisions.
-- **8.3 The deploy pipeline & CI gates.** develop→staging auto + smoke; main→prod gated;
-  the CI jobs that enforce everything this course taught (locked restore, arch tests,
-  license ban R26, secret scan).
+- **8.2 Container & staging.** Dockerfile (+ the compose `app` profile as local parity
+  check: "does the image that ships actually boot, migrate, serve?"), `render.yaml`,
+  Render/Neon/Brevo bring-up; free-tier trade-offs as recorded decisions; the learner
+  writes their own `DEPLOYMENT.md` runbook — an ops artifact, taught like one.
+- **8.3 The deploy pipeline & release readiness.** The pipeline born in 1.6 gets its
+  deploy stages: develop→staging auto with a version-gated post-deploy smoke; main→prod
+  behind environment approval; deploy concurrency. Plus the *manual* half of release
+  readiness: a QA test plan as a maintained artifact (the reference repo's has 117 cases
+  across web + four native platforms) — automation gates regressions, the QA pass gates
+  releases.
 - **8.4 The RLS tenancy backstop.** Postgres row-level security as the DB-level *second
   wall* under the EF filter (ADR-020) — defense in depth for the platform's core invariant.
   Policy DDL derived from the EF model (`RlsDdl`) + the migration-parity gate (a new
