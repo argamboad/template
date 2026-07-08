@@ -298,7 +298,8 @@
                     return;
                 }
                 _otpError = true;
-                _error = Localizer["Login_ErrCodeIncorrect"];
+                // Native shares the web mapping: a lockout reads distinctly, wrong/expired stays generic.
+                _error = Localizer[AuthErrorCopy.OtpErrorKey(result.Error)];
                 return;
             }
 
@@ -333,16 +334,14 @@
         finally { _busy = false; }
     }
 
-    // Maps the 401 body's error code to a message: lockout gets its own copy, everything else
-    // (wrong / expired) stays the deliberately generic line.
+    // Reads the 401 body's error code and maps it via the shared helper (same copy rules as native):
+    // lockout gets its own line, everything else (wrong / expired) stays deliberately generic.
     private async Task<string> OtpErrorAsync(HttpResponseMessage res)
     {
         string? code = null;
         try { code = (await res.Content.ReadFromJsonAsync<ApiError>())?.Error; }
         catch { /* no/again-unreadable body → fall through to the generic message */ }
-        return code == "too_many_attempts"
-            ? Localizer["Login_ErrTooManyAttempts"]
-            : Localizer["Login_ErrCodeIncorrect"];
+        return Localizer[AuthErrorCopy.OtpErrorKey(code)];
     }
 
     private async Task VerifyMfa()
