@@ -345,8 +345,6 @@ def lesson_files():
         m = re.match(r'^(\d+)\.(\d+)-', base)
         if m:
             files.append((int(m.group(1)), int(m.group(2)), f))
-    if os.path.exists(SAMPLE):
-        files.append((2, 5, SAMPLE))   # sample is lesson 2.5
     files.sort()
     return files
 
