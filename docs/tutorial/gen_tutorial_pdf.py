@@ -359,25 +359,35 @@ class Book(BaseDocTemplate):
             PageTemplate(id="cover", frames=[frame], onPage=self._blank),
             PageTemplate(id="body", frames=[frame], onPage=self._furniture),
         ])
-        self.cur_head = ""
+        self.cur_part = ""      # e.g. "Part 2 — Identity & tenancy"  (header, left)
+        self.cur_lesson = ""    # e.g. "2.6 · Tenancy I: the global query filter"  (header, right)
 
     def _blank(self, canvas, doc): pass
 
     def _furniture(self, canvas, doc):
         canvas.saveState()
-        canvas.setFont("Body", 8)
         canvas.setFillColor(MUTE)
-        # header
-        canvas.drawString(30*mm, A4[1]-14*mm, "Perezosoft Platform — a build-from-scratch course")
-        if self.cur_head:
-            canvas.drawRightString(A4[0]-30*mm, A4[1]-14*mm, self.cur_head[:60])
+        # header breadcrumb — Part (left) · Lesson (right): "you are here" on every page
+        canvas.setFont("Body-Bold", 8)
+        left = self.cur_part or "Perezosoft Platform · a build-from-scratch course"
+        canvas.drawString(30*mm, A4[1]-14*mm, left[:64])
+        if self.cur_lesson:
+            canvas.setFont("Body", 8)
+            canvas.drawRightString(A4[0]-30*mm, A4[1]-14*mm, self.cur_lesson[:70])
         canvas.setStrokeColor(CODEBORDER)
         canvas.line(30*mm, A4[1]-16*mm, A4[0]-30*mm, A4[1]-16*mm)
-        # footer
+        # footer — centred page number
+        canvas.setFont("Body", 8)
         canvas.drawCentredString(A4[0]/2, 12*mm, str(doc.page))
         canvas.restoreState()
 
     def afterFlowable(self, flowable):
+        # Part-divider pages carry a _part tag: set the left breadcrumb, clear the lesson.
+        part = getattr(flowable, "_part", None)
+        if part is not None:
+            self.cur_part = part
+            self.cur_lesson = ""
+            return
         toc = getattr(flowable, "_toc", None)
         if toc:
             level, text, key = toc
@@ -385,8 +395,16 @@ class Book(BaseDocTemplate):
                 self.notify("TOCEntry", (level-1, text, self.page, key))
             self.canv.bookmarkPage(key)
             self.canv.addOutlineEntry(text, key, level=min(level-1, 3), closed=(level>1))
-            if level in (1, 2):
-                self.cur_head = text
+            # Breadcrumb: a lesson H1 ("Lesson 2.6 — Title") sets Part + Lesson and holds
+            # them across the whole lesson; section H2s no longer clobber the header.
+            if level == 1:
+                m = re.match(r'^Lesson\s+(\d+)\.(\d+)\s*[—–:\-]\s*(.*)$', text)
+                if m:
+                    self.cur_part = PART_TITLES.get(m.group(1), self.cur_part)
+                    self.cur_lesson = f"{m.group(1)}.{m.group(2)} · {m.group(3)}"
+                else:
+                    self.cur_part = text   # front-matter section (Preface, etc.)
+                    self.cur_lesson = ""
 
 def build():
     doc = Book(OUT)
@@ -431,9 +449,11 @@ def build():
             cur_part = part_key
             story.append(PageBreak())
             story.append(Spacer(1, 30*mm))
-            story.append(Paragraph(PART_TITLES.get(part_key, "Part " + part_key),
-                                   P("pt", fontName="Head", fontSize=24, leading=30,
-                                     textColor=INK, alignment=TA_CENTER)))
+            part_title = PART_TITLES.get(part_key, "Part " + part_key)
+            div = Paragraph(part_title, P("pt", fontName="Head", fontSize=24, leading=30,
+                                          textColor=INK, alignment=TA_CENTER))
+            div._part = part_title   # picked up in afterFlowable to set the header breadcrumb
+            story.append(div)
             story.append(PageBreak())
         md = open(path, encoding="utf-8").read()
         parse_md(md, story)
