@@ -98,10 +98,11 @@ the Android Keystore and silently exchanged on startup).
   browser/WebView (on web via the Blazor WASM debug proxy — the `inspectUri` in
   `src/Web/Properties/launchSettings.json`; the "Enable JavaScript debugging for ASP.NET"
   option does **not** control this) can't see the handler and reports it "unhandled".
-  Continue (F5) and sign-in proceeds. To silence it for good: Debug → Windows → Exception
-  Settings (Ctrl+Alt+E) → uncheck the **JavaScript Exceptions** category (or untick "Break
-  when this exception type is user-unhandled" in the popup itself). Removing `inspectUri`
-  also stops it, at the cost of C# breakpoints inside the WASM client.
+  Continue (F5) and sign-in proceeds. `inspectUri` was removed from the Web launch profiles
+  (2026-07-08) precisely because of this, so on web VS no longer attaches to the browser at
+  all — the trade-off is no C# breakpoints inside the WASM client (browser F12 still works).
+  If you re-add `inspectUri` to debug WASM C#, silence the break via Debug → Windows →
+  Exception Settings (Ctrl+Alt+E) → uncheck the **JavaScript Exceptions** category.
 - **Physical device** → `adb reverse` works over USB too; no other change needed.
 - **Pointing the app somewhere else** → set `PEREZOSOFT_API_BASE_URL` before launching (any
   platform): overrides the compiled per-platform API base — e.g. a LAN address for a device that
