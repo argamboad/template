@@ -615,7 +615,9 @@ jobs:
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
           tail -n 40 emulator.log || true
           tail -n 60 api.log || true
-          adb logcat -d 2>/dev/null | grep -iE "companyname|FATAL|blazor" | tail -n 60 || true
+          # "chromium" is the tag Blazor WebView unhandled .NET exceptions surface under —
+          # run 28949312350 only kept the last stack frame because the filter missed it.
+          adb logcat -d 2>/dev/null | grep -iE "companyname|FATAL|blazor|chromium" | tail -n 120 || true
 
   # End-to-end tests (v2 audit B8-5). Boots the REAL stack — Postgres + Mailpit (service containers) +
   # the API + the Blazor WASM Web app — and drives a headless Chromium through the QA smoke journeys,

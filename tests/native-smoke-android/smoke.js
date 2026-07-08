@@ -47,6 +47,13 @@ async function waitForOtp(toEmail, timeoutMs) {
   const page = await webView.page();
   console.log(`connected: ${page.url()}`);
 
+  // Unhandled .NET exceptions in the Blazor WebView only show up as console errors; without
+  // this the smoke just times out waiting for UI and the root cause lives in logcat noise.
+  page.on('console', msg => {
+    if (msg.type() === 'error' || msg.type() === 'warning') console.error(`[webview ${msg.type()}] ${msg.text()}`);
+  });
+  page.on('pageerror', e => console.error(`[webview pageerror] ${e.message}`));
+
   const emailBox = page.getByTestId('login-email');
   await emailBox.waitFor({ state: 'visible', timeout: 60_000 });
 
