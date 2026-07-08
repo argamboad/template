@@ -441,8 +441,13 @@ flow), and `AuthService.TryCompletePendingOAuthAsync()` — called from MainLayo
 `/api/auth/native/exchange` path (MFA challenge handed to Login), link outcomes routed to Settings'
 existing `linked`/`link_error` banners, stashes older than the 5-min code TTL failed with a
 friendly retry message. TDD: 14 red-first unit tests (`OAuthResumeTests`) pin the marker lifecycle,
-resume outcomes, and TTL guard; web is a structural no-op (no store registered). On-device kill
-test = QA-AND-14 (NATIVE-6 pass).
+resume outcomes, and TTL guard; web is a structural no-op (no store registered). **Mechanism proven
+on the tablet emulator** with a scripted drill (playwright-core `_android`): tap Continue-with-Google
+→ Custom Tab foregrounds → `am kill` (process verified dead) → fire
+`perezosoft://auth?code=<invalid>` → the app cold-starts, **stays open**, runs the startup exchange,
+and lands on Login with the friendly OAuth error (pre-fix behavior: flash open + close, no UI); the
+standard Android smoke (boot + OTP + roster) passed after, so the warm path is unregressed. The
+real-consent variant (valid code → signed in) = QA-AND-14 in the NATIVE-6 device pass.
 
 **As a** native Android user signing in with Google/Microsoft
 **I want** the sign-in to complete even if Android kills the app while I'm on the provider's page
