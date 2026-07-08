@@ -764,7 +764,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (61 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (86 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -820,12 +820,37 @@
 - `docs/stories/observability.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/pubapi.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/rbac.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/CONCEPTS.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/FRONTMATTER.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/OUTLINE.md` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/tutorial/SAMPLE_LESSON_2.5.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/PEREZOSOFT_COURSE.pdf` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/gen_coverage.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/gen_tutorial_pdf.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/0.1-mental-model-and-the-decision-record.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.1-solution-projects-and-supply-chain.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.2-first-endpoint-first-test.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.3-database-and-the-test-container.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.4-configuration-and-the-options-pattern.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.5-the-error-envelope.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.6-ci-from-commit-one.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.1-users-and-jwt-access-tokens.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.2-rotating-refresh-tokens-and-sessions.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.3-email-i-the-iemailsender-seam.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.4-passwordless-magic-link-and-otp.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.5-oauth-and-account-linking.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.6-tenancy-i-the-global-query-filter.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.7-tenancy-ii-write-side-and-entertenant.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.8-tenants-and-membership.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.9-invitations-dissolve-and-the-contributor-seam.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.1-the-repository-seam.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.2-anatomy-of-a-vertical-slice.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.3-injected-clocks-and-architecture-tests.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.4-the-web-client-and-auth-ui.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.5-localization.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.6-the-e2e-harness.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.7-build-your-own-slice.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 661 tracked files · 502 built in lessons · 159 bucketed · 0 unmapped
+**Totals:** 686 tracked files · 502 built in lessons · 184 bucketed · 0 unmapped
