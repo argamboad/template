@@ -92,12 +92,16 @@ the Android Keystore and silently exchanged on startup).
   `Platforms/Android/Resources/xml/network_security_config.xml`. If you change the host,
   add it there.
 - **VS breaks on `TypeError: Failed to execute 'query' on 'Permissions': Illegal invocation`
-  during Google sign-in** (Windows shell, F5) → not an app bug. It's Google's own obfuscated
-  anti-abuse script (an eval'd `VM…` blob) probing `navigator.permissions.query`; the throw is
-  expected and handled by Google's code, but VS's JavaScript debugger attached to the WebView2
-  can't see the handler and reports it "unhandled". Continue (F5) and sign-in proceeds. To
-  silence it for good: Tools → Options → Debugging → General → uncheck **Enable JavaScript
-  debugging for ASP.NET (Chrome, Edge and IE)**.
+  during Google sign-in** (any F5 run — web or Windows shell) → not an app bug. It's Google's
+  own obfuscated anti-abuse script (an eval'd `VM…` blob) probing `navigator.permissions.query`;
+  the throw is expected and handled by Google's code, but the debugger VS attaches to the
+  browser/WebView (on web via the Blazor WASM debug proxy — the `inspectUri` in
+  `src/Web/Properties/launchSettings.json`; the "Enable JavaScript debugging for ASP.NET"
+  option does **not** control this) can't see the handler and reports it "unhandled".
+  Continue (F5) and sign-in proceeds. To silence it for good: Debug → Windows → Exception
+  Settings (Ctrl+Alt+E) → uncheck the **JavaScript Exceptions** category (or untick "Break
+  when this exception type is user-unhandled" in the popup itself). Removing `inspectUri`
+  also stops it, at the cost of C# breakpoints inside the WASM client.
 - **Physical device** → `adb reverse` works over USB too; no other change needed.
 - **Pointing the app somewhere else** → set `PEREZOSOFT_API_BASE_URL` before launching (any
   platform): overrides the compiled per-platform API base — e.g. a LAN address for a device that
