@@ -118,7 +118,7 @@ public class MfaLoginServiceTests(PostgresFixture fixture) : PostgresTestBase(fi
     {
         var mfa = new MfaService(
             new EfRepository<UserMfa>(db), new EfRepository<MfaRecoveryCode>(db), new UserRepository(db),
-            new EphemeralDataProtectionProvider(), new TokenGenerator(), new TokenHasher(), TimeProvider.System);
+            new EphemeralDataProtectionProvider(), new TokenHasher(), TimeProvider.System);
         var challenges = new MfaChallengeService(new EphemeralDataProtectionProvider(), new MemoryCache(new MemoryCacheOptions()));
         var harness = new ServiceHarness(db);
         var login = new MfaLoginService(mfa, challenges, harness.SessionService(), harness.UserService());

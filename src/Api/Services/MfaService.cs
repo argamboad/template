@@ -41,12 +41,18 @@ public sealed class MfaService(
     IRepository<MfaRecoveryCode> recoveryCodes,
     IUserRepository users,
     IDataProtectionProvider dataProtection,
-    ITokenGenerator tokenGenerator,
     ITokenHasher hasher,
     TimeProvider clock) : IMfaService
 {
     private const string Issuer = "Perezosoft"; // rebrandable — appears in the authenticator app
     private const int RecoveryCodeCount = 10;
+    // Recovery codes are HUMAN-entered fallbacks, so they use a short, unambiguous alphabet (no
+    // 0/O/1/I/L) formatted as two 5-char groups (e.g. "k7m2q-9xr4t"). NOT the 88-char opaque token
+    // generator — that overflowed the maxlength-14 code inputs so the codes could never be entered.
+    // Matched case- and separator-insensitively (CanonicalizeRecoveryCode); stored only as the hash
+    // of that canonical form.
+    private const string RecoveryAlphabet = "23456789abcdefghjkmnpqrstuvwxyz"; // 31 chars, ambiguity removed
+    private const int RecoveryCodeLength = 10; // ~49 bits/code; single-use, hashed, and rate-limited
     private static readonly VerificationWindow Window = new(previous: 1, future: 1); // ±1 step for clock skew
     // Purpose string feeds DataProtection key derivation — renaming it makes MFA secrets already
     // encrypted at rest undecryptable. Kept through the Perezosoft rename; bump only with a re-encrypt migration.
@@ -97,9 +103,9 @@ public sealed class MfaService(
         var raw = new List<string>(RecoveryCodeCount);
         for (var i = 0; i < RecoveryCodeCount; i++)
         {
-            var codeRaw = tokenGenerator.GenerateToken();
+            var codeRaw = GenerateRecoveryCode();
             raw.Add(codeRaw);
-            await recoveryCodes.AddAsync(new MfaRecoveryCode { UserId = userId, CodeHash = hasher.HashToken(codeRaw) }, cancellationToken);
+            await recoveryCodes.AddAsync(new MfaRecoveryCode { UserId = userId, CodeHash = hasher.HashToken(CanonicalizeRecoveryCode(codeRaw)) }, cancellationToken);
         }
         await mfa.SaveChangesAsync(cancellationToken);
         return (MfaConfirmResult.Enabled, raw);
@@ -141,8 +147,8 @@ public sealed class MfaService(
             return true;
         }
 
-        // Otherwise try a single-use recovery code.
-        var hash = hasher.HashToken(code.Trim());
+        // Otherwise try a single-use recovery code (case- and separator-insensitive).
+        var hash = hasher.HashToken(CanonicalizeRecoveryCode(code));
         var recovery = await recoveryCodes.Query()
             .FirstOrDefaultAsync(c => c.UserId == userId && c.CodeHash == hash && c.UsedAt == null, cancellationToken);
         if (recovery is null)
@@ -163,5 +169,27 @@ public sealed class MfaService(
         catch (CryptographicException) { return false; }
 
         return new Totp(Base32Encoding.ToBytes(secret)).VerifyTotp(code.Trim(), out timeStep, Window);
+    }
+
+    /// <summary>A short, human-typeable one-time recovery code: two 5-char groups drawn from an
+    /// unambiguous alphabet, e.g. <c>k7m2q-9xr4t</c>. <see cref="RandomNumberGenerator.GetInt32(int)"/>
+    /// is unbiased across the (non-power-of-two) alphabet.</summary>
+    private static string GenerateRecoveryCode()
+    {
+        var chars = new char[RecoveryCodeLength];
+        for (var i = 0; i < RecoveryCodeLength; i++)
+            chars[i] = RecoveryAlphabet[RandomNumberGenerator.GetInt32(RecoveryAlphabet.Length)];
+        return $"{new string(chars, 0, 5)}-{new string(chars, 5, 5)}";
+    }
+
+    /// <summary>Canonical form for hashing and lookup: letters and digits only, lower-cased — so a code
+    /// entered with or without the hyphen, in any case, matches the hash stored at enrollment.</summary>
+    private static string CanonicalizeRecoveryCode(string code)
+    {
+        var sb = new System.Text.StringBuilder(code.Length);
+        foreach (var ch in code)
+            if (char.IsLetterOrDigit(ch))
+                sb.Append(char.ToLowerInvariant(ch));
+        return sb.ToString();
     }
 }
