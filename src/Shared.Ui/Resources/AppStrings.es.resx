@@ -73,6 +73,7 @@
   <data name="Login_ErrCodeIncorrect" xml:space="preserve"><value>Ese código es incorrecto o ha caducado.</value></data>
   <data name="Login_ErrTooManyAttempts" xml:space="preserve"><value>Demasiados intentos. Espera unos minutos y luego solicita un código nuevo.</value></data>
   <data name="Login_ErrVerificationFailed" xml:space="preserve"><value>La verificación falló. Inténtalo de nuevo.</value></data>
+  <data name="Login_ErrTooManyRequests" xml:space="preserve"><value>Demasiadas solicitudes. Espera un minuto y vuelve a intentarlo.</value></data>
   <data name="Login_ErrEnterCode" xml:space="preserve"><value>Introduce el código de tu correo.</value></data>
   <data name="Login_ErrOAuthCancelled" xml:space="preserve"><value>El inicio de sesión se canceló o no se completó. Inténtalo de nuevo.</value></data>
   <data name="Common_Loading" xml:space="preserve"><value>Cargando…</value></data>

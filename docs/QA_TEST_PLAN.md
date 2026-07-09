@@ -343,8 +343,9 @@ Then further requests are rejected with HTTP 429 until the window resets
 **Walkthrough**
 1. From `/login`, request an OTP (or magic link) repeatedly in quick succession — more than 5 within
    a minute.
-2. **Expected:** after the limit the request is throttled (**HTTP 429**, surfaced as a "try again
-   shortly" / send-failed state). The same throttle applies to **OTP verify**.
+2. **Expected:** after the limit the request is throttled (**HTTP 429**), surfaced on `/login` as
+   **"Too many requests. Please wait a minute, then try again."** The same throttle — and the same
+   message — applies to **OTP verify**.
 3. Wait ~1 minute; requests succeed again.
 > Protects against email-bombing and OTP brute-forcing. Expected behavior, not a defect — see the
 > §1.1 pacing note.
