@@ -122,7 +122,7 @@
 - `src/Infrastructure/Email/SmtpSettings.cs`
 - `tests/Api.Tests/SmtpSettingsTests.cs` — incl. the SMTP-revocation knob (PR #125)
 
-## 2.4 — Passwordless: magic link + OTP (10 files)
+## 2.4 — Passwordless: magic link + OTP (11 files)
 
 - `src/Api/Services/PasswordlessService.cs` — single-use, hashed, time-limited
 - `src/Api/Services/SingleUseCacheToken.cs` — one-shot handoff token
@@ -133,6 +133,7 @@
 - `tests/Api.Tests/OtpErrorMappingTests.cs`
 - `tests/Api.Tests/PasswordlessServiceTests.cs`
 - `tests/Api.Tests/SingleUseCacheTokenTests.cs`
+- `tests/Core.Tests/Auth/NativeOtpLockoutTests.cs` — OTP resend-proof lockout coverage on the native verify path (landed on develop post-write)
 - `tests/Core.Tests/LoginTokenTests.cs`
 
 ## 2.5 — OAuth & account linking (13 files)
@@ -217,10 +218,11 @@
 
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (84 files)
+## 3.4 — The web client & auth UI (85 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
+- `src/Shared.Ui/Auth/AuthErrorCopy.cs` — server error code -> localized copy key; keeps 2.4's enumeration-safe collapse client-side (landed on develop post-write)
 - `src/Shared.Ui/Auth/AuthService.cs`
 - `src/Shared.Ui/Auth/IOAuthInitiator.cs`
 - `src/Shared.Ui/Auth/ISessionStore.cs` — per-platform session seam
@@ -764,7 +766,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (61 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (109 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -820,12 +822,60 @@
 - `docs/stories/observability.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/pubapi.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/rbac.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/CONCEPTS.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/FRONTMATTER.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/OUTLINE.md` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/tutorial/SAMPLE_LESSON_2.5.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/PEREZOSOFT_COURSE.pdf` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/gen_coverage.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/gen_tutorial_pdf.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/0.1-mental-model-and-the-decision-record.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.1-solution-projects-and-supply-chain.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.2-first-endpoint-first-test.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.3-database-and-the-test-container.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.4-configuration-and-the-options-pattern.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.5-the-error-envelope.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/1.6-ci-from-commit-one.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.1-users-and-jwt-access-tokens.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.2-rotating-refresh-tokens-and-sessions.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.3-email-i-the-iemailsender-seam.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.4-passwordless-magic-link-and-otp.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.5-oauth-and-account-linking.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.6-tenancy-i-the-global-query-filter.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.7-tenancy-ii-write-side-and-entertenant.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.8-tenants-and-membership.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/2.9-invitations-dissolve-and-the-contributor-seam.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.1-the-repository-seam.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.2-anatomy-of-a-vertical-slice.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.3-injected-clocks-and-architecture-tests.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.4-the-web-client-and-auth-ui.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.5-localization.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.6-the-e2e-harness.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/3.7-build-your-own-slice.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.1-the-transactional-outbox.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.2-email-ii-the-outbox-decorator.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.3-the-inbox.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.4-the-scheduler.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.5-observability.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/4.6-the-append-only-audit-log.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/5.1-billing-abstraction-and-entitlements.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/5.2-stripe-checkout-webhook-portal.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/5.3-quotas-dunning-and-dissolve.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/6.1-rbac-roles-and-permissions.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/6.2-file-storage.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/6.3-data-protection-and-signed-downloads.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/6.4-the-ssrf-seam.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/6.5-mfa-totp.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/7.1-gdpr-export-and-erasure.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/7.2-in-app-notifications.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/7.3-public-api-and-api-keys.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/7.4-outbound-webhooks.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/7.5-admin-back-office.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/8.1-single-origin-hosting.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/8.2-container-and-staging.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/8.3-deploy-pipeline-and-release-readiness.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/8.4-rls-tenancy-backstop.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 661 tracked files · 502 built in lessons · 159 bucketed · 0 unmapped
+**Totals:** 711 tracked files · 504 built in lessons · 207 bucketed · 0 unmapped

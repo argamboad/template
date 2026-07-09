@@ -342,9 +342,10 @@ def lesson_files():
     files = []
     for f in glob.glob(os.path.join(LESSON_DIR, "*.md")):
         base = os.path.basename(f)
-        m = re.match(r'^(\d+)\.(\d+)-', base)
+        m = re.match(r'^(\d+|A)\.(\d+)-', base)
         if m:
-            files.append((int(m.group(1)), int(m.group(2)), f))
+            major = 10 if m.group(1) == "A" else int(m.group(1))  # "A.x" appendix sorts after Part 9
+            files.append((major, int(m.group(2)), f))
     files.sort()
     return files
 
@@ -398,7 +399,7 @@ class Book(BaseDocTemplate):
             # Breadcrumb: a lesson H1 ("Lesson 2.6 — Title") sets Part + Lesson and holds
             # them across the whole lesson; section H2s no longer clobber the header.
             if level == 1:
-                m = re.match(r'^Lesson\s+(\d+)\.(\d+)\s*[—–:\-]\s*(.*)$', text)
+                m = re.match(r'^Lesson\s+(\d+|A)\.(\d+)\s*[—–:\-]\s*(.*)$', text)
                 if m:
                     self.cur_part = PART_TITLES.get(m.group(1), self.cur_part)
                     self.cur_lesson = f"{m.group(1)}.{m.group(2)} · {m.group(3)}"
