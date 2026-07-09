@@ -155,6 +155,18 @@ and gated so docs-only changes skip the native legs entirely. This is the DevOps
 extended to the hardest-to-test surface: even a canary that only proves "the Apple app still boots to
 a login screen" would have caught G7 the day it landed.
 
+> **A red build you'll hit the moment you add `src/Maui` — the arch test vs XAML code-behind.** The
+> `SourceFile_DeclaresATypeMatchingItsName` arch test (3.3) — "a file `Foo.cs` should declare a type
+> `Foo`" — scans *all* of `src/`, and MAUI's XAML code-behind breaks its naming assumption: the file
+> is `App.xaml.cs`, so the naive filename is `App.xaml`, but the type is `App`. Add the MAUI project
+> and that test goes red until you teach the arch test to strip the `.xaml` before comparing (one line:
+> `if (name.EndsWith(".xaml")) name = name[..^5];`). It's a small fix, but the point is the *pattern* —
+> extending the platform to a new file convention (XAML) means the *arch tests* that enforce conventions
+> must learn about it too, or they fire on the newcomer. The gate isn't wrong; it's asking you to
+> explicitly accommodate the new convention, exactly as `WebhookDelivery` had to be allowlisted in 7.4.
+> (A smaller ripple in the same vein: central-managing a new MAUI package can reclassify it in a
+> transitive consumer's `packages.lock.json`, so regenerate the lockfiles — the Part-4 discipline.)
+
 ## 7. Two maintainer rules the audit surfaced
 
 Worth stating because they're easy to violate silently:
