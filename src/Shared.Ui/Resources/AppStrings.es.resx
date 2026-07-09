@@ -103,6 +103,9 @@
   <data name="Mfa_ErrDisable" xml:space="preserve"><value>No se pudo desactivar la verificación en dos pasos. Inténtalo de nuevo.</value></data>
   <data name="Notif_Title" xml:space="preserve"><value>Notificaciones</value></data>
   <data name="Notif_MarkAllRead" xml:space="preserve"><value>Marcar todas como leídas</value></data>
+  <data name="Notif_ClearRead" xml:space="preserve"><value>Borrar leídas</value></data>
+  <data name="Notif_ClearAll" xml:space="preserve"><value>Borrar todas</value></data>
+  <data name="Notif_Delete" xml:space="preserve"><value>Eliminar notificación</value></data>
   <data name="Notif_Empty" xml:space="preserve"><value>Estás al día.</value></data>
   <data name="Notif_JustNow" xml:space="preserve"><value>ahora mismo</value></data>
   <data name="NotifPrefs_Title" xml:space="preserve"><value>Notificaciones</value></data>
