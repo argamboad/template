@@ -40,6 +40,13 @@ public interface INotificationService
     Task<bool> MarkReadAsync(Guid userId, Guid notificationId, CancellationToken cancellationToken = default);
 
     Task MarkAllReadAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes one of the user's notifications. False if it isn't theirs / doesn't exist.</summary>
+    Task<bool> DeleteAsync(Guid userId, Guid notificationId, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes the user's notifications — only the already-read ones when <paramref name="onlyRead"/>
+    /// is true, otherwise all of them. Returns the number of rows removed.</summary>
+    Task<int> DeleteAllAsync(Guid userId, bool onlyRead, CancellationToken cancellationToken = default);
 }
 
 public sealed class NotificationService(
@@ -139,5 +146,21 @@ public sealed class NotificationService(
         return notifications.Query()
             .Where(n => n.UserId == userId && n.ReadAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAt, now), cancellationToken);
+    }
+
+    public async Task<bool> DeleteAsync(Guid userId, Guid notificationId, CancellationToken cancellationToken = default) =>
+        await notifications.Query()
+            .Where(n => n.Id == notificationId && n.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken) > 0;
+
+    public Task<int> DeleteAllAsync(Guid userId, bool onlyRead, CancellationToken cancellationToken = default)
+    {
+        // Per-user, not tenant-scoped (ADR-C2), so a UserId-filtered set delete is safe here — there is no
+        // tenant filter/RLS to render for a set-based delete. onlyRead lets a client reclaim just what's
+        // already been seen (retention-style) without dropping unread items the user hasn't looked at.
+        var query = notifications.Query().Where(n => n.UserId == userId);
+        if (onlyRead)
+            query = query.Where(n => n.ReadAt != null);
+        return query.ExecuteDeleteAsync(cancellationToken);
     }
 }

@@ -85,6 +85,70 @@ public class NotificationServiceTests(PostgresFixture fixture) : PostgresTestBas
     }
 
     [Fact]
+    public async Task Delete_RemovesOwnNotification_ThenGone()
+    {
+        var userId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        await service.NotifyAsync(userId, "k", "n", "");
+        await db.SaveChangesAsync();
+        var id = (await service.ListAsync(userId, null, 10))[0].Id;
+
+        Assert.True(await service.DeleteAsync(userId, id));
+        Assert.Empty(await service.ListAsync(userId, null, 10));
+        Assert.False(await service.DeleteAsync(userId, id)); // idempotent: already gone
+    }
+
+    [Fact]
+    public async Task Delete_AnotherUsersNotification_ReturnsFalse_AndKeepsIt()
+    {
+        var mine = Guid.CreateVersion7();
+        var theirs = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        await service.NotifyAsync(theirs, "k", "theirs", "");
+        await db.SaveChangesAsync();
+        var theirId = (await service.ListAsync(theirs, null, 10))[0].Id;
+
+        Assert.False(await service.DeleteAsync(mine, theirId)); // can't delete another user's
+        Assert.Single(await service.ListAsync(theirs, null, 10)); // still there
+    }
+
+    [Fact]
+    public async Task DeleteAll_OnlyRead_RemovesReadKeepsUnread_ReturnsCount()
+    {
+        var userId = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        for (var i = 0; i < 3; i++) await service.NotifyAsync(userId, "k", $"n{i}", "");
+        await db.SaveChangesAsync();
+        await service.MarkReadAsync(userId, (await service.ListAsync(userId, null, 10))[0].Id); // read one
+
+        var removed = await service.DeleteAllAsync(userId, onlyRead: true);
+
+        Assert.Equal(1, removed);
+        Assert.Equal(2, (await service.ListAsync(userId, null, 10)).Count); // the two unread remain
+    }
+
+    [Fact]
+    public async Task DeleteAll_All_RemovesEverything_AndIsPerUser()
+    {
+        var mine = Guid.CreateVersion7();
+        var theirs = Guid.CreateVersion7();
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        for (var i = 0; i < 3; i++) await service.NotifyAsync(mine, "k", $"n{i}", "");
+        await service.NotifyAsync(theirs, "k", "theirs", "");
+        await db.SaveChangesAsync();
+
+        var removed = await service.DeleteAllAsync(mine, onlyRead: false);
+
+        Assert.Equal(3, removed);
+        Assert.Empty(await service.ListAsync(mine, null, 10));
+        Assert.Single(await service.ListAsync(theirs, null, 10)); // another user's untouched
+    }
+
+    [Fact]
     public async Task MarkRead_AnotherUsersNotification_ReturnsFalse_AndDoesNotMark()
     {
         var mine = Guid.CreateVersion7();
