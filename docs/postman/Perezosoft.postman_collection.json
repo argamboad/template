@@ -50,14 +50,22 @@
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"200 (429 = rate limit, wait ~1 min)\", () => pm.expect(pm.response.code).to.be.oneOf([200, 429]));"], "type": "text/javascript" } }]
         },
         {
-          "name": "OTP — fetch code from Mailpit",
+          "name": "OTP — fetch code from Mailpit (local envs only)",
           "request": {
             "auth": { "type": "noauth" },
             "method": "GET",
             "url": { "raw": "{{mailpitUrl}}/api/v1/messages?limit=1", "host": ["{{mailpitUrl}}"], "path": ["api", "v1", "messages"], "query": [{ "key": "limit", "value": "1" }] },
-            "description": "Reads the newest Mailpit message and extracts the 6-digit OTP into {{otpCode}}. Requires SMTP → Mailpit (localhost:1025)."
+            "description": "Reads the newest Mailpit message and extracts the 6-digit OTP into {{otpCode}}. Only works in environments with a mailpitUrl (local). On hosted envs (staging/prod) email goes to REAL inboxes — read the code there and set {{otpCode}} manually (or paste it straight into 'OTP — verify')."
           },
-          "event": [{ "listen": "test", "script": { "exec": [
+          "event": [
+            { "listen": "prerequest", "script": { "exec": [
+              "const mailpit = pm.environment.get('mailpitUrl');",
+              "if (!mailpit) {",
+              "  console.warn('This environment has no Mailpit (hosted env — real email). Read the OTP from your inbox and set {{otpCode}} manually.');",
+              "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+              "}"
+            ], "type": "text/javascript" } },
+            { "listen": "test", "script": { "exec": [
             "pm.test(\"Mailpit reachable\", () => pm.response.to.have.status(200));",
             "const msgs = pm.response.json().messages || [];",
             "if (!msgs.length) { console.warn('Mailpit is empty — send the OTP first; delivery is async (wait ~2-5s).'); }",
@@ -70,7 +78,8 @@
             "    else console.warn('No 6-digit code in the newest email — is it the OTP email?');",
             "  });",
             "}"
-          ], "type": "text/javascript" } }]
+          ], "type": "text/javascript" } }
+          ]
         },
         {
           "name": "OTP — verify (signs in)",
@@ -496,7 +505,7 @@
             ],
             "body": { "mode": "raw", "raw": "{\n  \"EventId\": \"evt_postman_{{$timestamp}}\",\n  \"TenantId\": \"{{tenantId}}\",\n  \"PlanKey\": \"pro\",\n  \"Status\": \"active\",\n  \"StripeCustomerId\": \"cus_postman\",\n  \"OccurredAt\": \"{{$isoTimestamp}}\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/billing/webhook", "host": ["{{baseUrl}}"], "path": ["api", "billing", "webhook"] },
-            "description": "Upgrades {{tenantId}} to pro/active as if checkout completed (QA-BILL upgrade loop). Requires the fake provider (default in dev). Run 'Get household' first to populate {{tenantId}}. Re-sending the same EventId is deduped (inbox); an older OccurredAt than the last applied event is ignored."
+            "description": "Upgrades {{tenantId}} to pro/active as if checkout completed (QA-BILL upgrade loop). Requires the FAKE provider (dev default) — on an environment wired to real Stripe (test mode), this returns 400 invalid signature by design; use `stripe trigger` there instead. Run 'Get household' first to populate {{tenantId}}. Re-sending the same EventId is deduped (inbox); an older OccurredAt than the last applied event is ignored."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"200 applied\", () => pm.response.to.have.status(200));"], "type": "text/javascript" } }]
         }

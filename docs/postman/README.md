@@ -11,18 +11,49 @@ config-gated Public API + outbound webhooks.
 
 | File | Import as |
 |------|-----------|
-| `Perezosoft.postman_collection.json` | Collection (v2.1) |
-| `Perezosoft.local.postman_environment.json` | Environment ("Perezosoft — local dev") |
+| `Perezosoft.postman_collection.json` | Collection (v2.1) — one collection for **all** environments |
+| `Perezosoft.local.postman_environment.json` | Environment "Perezosoft — local dev" |
+| `Perezosoft.staging.postman_environment.json` | Environment "Perezosoft — staging (Render)" |
 
-## Quick start
+## Environments — switching & adding
+
+Every request is variable-driven (`{{baseUrl}}`, `{{mailpitUrl}}`, emails, tokens), so the
+**environment selector in Postman's top-right corner is the only switch** — the collection never
+changes. Tokens/ids live in the environment too, so each env keeps its **own session**: you can
+stay signed in to local and staging simultaneously and flip between them.
+
+| Environment | baseUrl | Email / OTP |
+|-------------|---------|-------------|
+| local dev | `https://localhost:7160` | Mailpit — the fetch request auto-extracts the code |
+| staging (Render) | `https://template-staging.onrender.com` | **Real inboxes** (Brevo) — no Mailpit; read the OTP in your mail and set `{{otpCode}}` manually. Use a real address you own as `userEmail`. |
+
+**Adding an environment** (e.g. production, once activated): duplicate a `*.postman_environment.json`,
+change `name` + `baseUrl`, set `mailpitUrl` to `""` for hosted envs (the Mailpit fetch then skips
+itself with a console hint), point `userEmail` at an inbox you own, and import. Commit the file
+here so the team shares it.
+
+Hosted-env caveats: the fake-provider **billing webhook** request only works where the fake
+provider is configured (local dev) — against real Stripe it 400s by design (`stripe trigger`
+instead). **Admin** requires your email in that environment's `Admin__StaffEmails__*` config;
+**PUBAPI/HOOKS** gates are per-environment config too.
+
+## Quick start (local)
 
 1. `docker compose up -d` (Postgres + Mailpit) and run the API with the **https** profile
    (`dotnet run --project src/Api --launch-profile https` → `https://localhost:7160`).
-2. Import both files, select the **Perezosoft — local dev** environment.
+2. Import the collection + both environments, select **Perezosoft — local dev**.
 3. **SMTP must point at Mailpit** (`localhost:1025`). If your local `.env` overrides SMTP to a
    real provider (e.g. Brevo), switch it back — the OTP auto-fetch reads Mailpit's API.
-4. Folder **1 · Sign in**: run `OTP — send` → wait ~2–5 s (outbox is async) → `OTP — fetch code
+4. For `https://localhost` allow self-signed certs: Postman → Settings → General → **SSL
+   certificate verification OFF** (or add the dev cert). Not needed for hosted envs.
+5. Folder **1 · Sign in**: run `OTP — send` → wait ~2–5 s (outbox is async) → `OTP — fetch code
    from Mailpit` → `OTP — verify`. Tokens land in the environment; everything else just works.
+
+## Quick start (staging / any hosted env)
+
+1. Select the env, set `userEmail` to a real inbox you own.
+2. `OTP — send` → read the 6-digit code in your inbox → paste it into `{{otpCode}}` (or directly
+   into the `OTP — verify` body) → `OTP — verify`. Everything else is identical to local.
 
 ## How auth is wired
 
