@@ -141,6 +141,14 @@
   <data name="Admin_ConfirmAnnounce" xml:space="preserve"><value>Send this announcement to all members of "{0}"?</value></data>
   <data name="Admin_AnnounceSent" xml:space="preserve"><value>Announcement sent to {0} member(s).</value></data>
   <data name="Admin_ErrAnnounce" xml:space="preserve"><value>Couldn't send the announcement.</value></data>
+  <data name="Admin_SubscriptionTitle" xml:space="preserve"><value>Subscription</value></data>
+  <data name="Admin_CompPro" xml:space="preserve"><value>Upgrade to Pro (comp)</value></data>
+  <data name="Admin_RevertFree" xml:space="preserve"><value>Revert to Free</value></data>
+  <data name="Admin_ProviderManaged" xml:space="preserve"><value>Managed by the billing provider — change the plan there.</value></data>
+  <data name="Admin_ConfirmComp" xml:space="preserve"><value>Put "{0}" on the Pro plan at no charge?</value></data>
+  <data name="Admin_ConfirmRevert" xml:space="preserve"><value>Revert "{0}" to the Free plan?</value></data>
+  <data name="Admin_SubscriptionUpdated" xml:space="preserve"><value>Subscription updated.</value></data>
+  <data name="Admin_ErrSubscription" xml:space="preserve"><value>Couldn't update the subscription.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Household</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>

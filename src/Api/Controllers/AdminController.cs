@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Perezosoft.Api.Models;
 using Perezosoft.Api.Services;
 using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Billing;
 using Perezosoft.Core.Entities;
 using Perezosoft.Core.Repositories;
 
@@ -28,7 +29,8 @@ public class AdminController(
     IJwtTokenService jwt,
     INotificationService notifications,
     IOutbox outbox,
-    IUnitOfWork unitOfWork) : AdminApiControllerBase(staff)
+    IUnitOfWork unitOfWork,
+    TimeProvider clock) : AdminApiControllerBase(staff)
 {
     // Impersonation tokens are deliberately short-lived and non-refreshable (ADR-014).
     private static readonly TimeSpan ImpersonationLifetime = TimeSpan.FromMinutes(15);
@@ -91,8 +93,110 @@ public class AdminController(
                 CreatedAt = tenant.CreatedAt,
                 Members = members.Select(TenantMemberResponse.From).ToList(),
                 SubscriptionStatus = subscription?.Status ?? "none",
+                PlanKey = subscription?.PlanKey ?? PlanKeys.Free,
+                ProviderManaged = subscription?.StripeSubscriptionId is not null,
                 AuditEventCount = auditCount,
             });
+        }
+    }
+
+    /// <summary>
+    /// Comps a tenant onto a paid plan (staff only): writes the same <see cref="Subscription"/>
+    /// projection a completed checkout produces — <c>active</c>, no <c>CurrentPeriodEnd</c> (a comp
+    /// never lapses) — but with <b>no provider ids</b>. Refused with 409 when the tenant already has a
+    /// live provider subscription: Stripe is the source of truth for real money (ADR-006) — manage
+    /// those in the provider, not here. Audited in-tenant. Revert with the DELETE sibling.
+    /// </summary>
+    [HttpPut("tenants/{id:guid}/subscription")]
+    public async Task<IActionResult> SetSubscription(Guid id, [FromBody] AdminSetSubscriptionRequest request, CancellationToken cancellationToken)
+    {
+        var (staffUserId, denied) = await RequireStaffAsync(cancellationToken);
+        if (denied is not null)
+            return denied;
+
+        // A valid target is a known catalog plan other than Free (PlanCatalog.Get falls back to Free,
+        // so require the round-trip key to match — an unknown key must 400, never silently comp Free).
+        var planKey = request.PlanKey?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(planKey) || planKey == PlanKeys.Free || PlanCatalog.Get(planKey).Key != planKey)
+            return BadRequest(new ErrorResponse("invalid_plan",
+                $"plan_key must be a known paid plan (e.g. \"{PlanKeys.Pro}\"). To revert to Free, DELETE the subscription."));
+
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        using (tenantContext.EnterTenant(id))
+        {
+            var tenant = await tenants.GetByIdAsync(id, cancellationToken);
+            if (tenant is null)
+                return NotFound(new ErrorResponse("tenant_not_found", "Tenant not found"));
+
+            var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken);
+            if (subscription?.StripeSubscriptionId is not null)
+                return Conflict(new ErrorResponse("provider_managed",
+                    "This tenant has a live provider subscription; manage its plan at the billing provider."));
+
+            var now = clock.GetUtcNow();
+            if (subscription is null)
+            {
+                // TenantId is stamped from the entered tenant by the write-stamping interceptor.
+                await subscriptions.AddAsync(new Subscription
+                {
+                    PlanKey = planKey,
+                    Status = SubscriptionStatus.Active,
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                }, cancellationToken);
+            }
+            else
+            {
+                subscription.PlanKey = planKey;
+                subscription.Status = SubscriptionStatus.Active;
+                subscription.CurrentPeriodEnd = null; // a comp never lapses
+                subscription.UpdatedAt = now;
+                subscriptions.Update(subscription);
+            }
+
+            await audit.RecordAsync("admin.subscription.comped", staffUserId, nameof(Subscription), id.ToString(),
+                new { plan_key = planKey }, cancellationToken);
+            await auditEvents.SaveChangesAsync(cancellationToken);
+            await scope.CommitAsync(cancellationToken);
+
+            return Ok(new AdminSubscriptionResponse { PlanKey = planKey, Status = SubscriptionStatus.Active });
+        }
+    }
+
+    /// <summary>
+    /// Reverts a staff comp: deletes the tenant's <see cref="Subscription"/> projection, and absence ⇒
+    /// Free (the documented fail-closed default). Idempotent — reverting an already-Free tenant is a
+    /// no-op 204. Refused with 409 for a provider-managed subscription (cancel it at the provider; the
+    /// webhook then updates the projection). Audited in-tenant.
+    /// </summary>
+    [HttpDelete("tenants/{id:guid}/subscription")]
+    public async Task<IActionResult> RemoveSubscription(Guid id, CancellationToken cancellationToken)
+    {
+        var (staffUserId, denied) = await RequireStaffAsync(cancellationToken);
+        if (denied is not null)
+            return denied;
+
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        using (tenantContext.EnterTenant(id))
+        {
+            var tenant = await tenants.GetByIdAsync(id, cancellationToken);
+            if (tenant is null)
+                return NotFound(new ErrorResponse("tenant_not_found", "Tenant not found"));
+
+            var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken);
+            if (subscription is null)
+                return NoContent(); // already Free — nothing to revert
+            if (subscription.StripeSubscriptionId is not null)
+                return Conflict(new ErrorResponse("provider_managed",
+                    "This tenant has a live provider subscription; cancel it at the billing provider instead."));
+
+            subscriptions.Remove(subscription);
+            await audit.RecordAsync("admin.subscription.reverted", staffUserId, nameof(Subscription), id.ToString(),
+                new { previous_plan = subscription.PlanKey }, cancellationToken);
+            await auditEvents.SaveChangesAsync(cancellationToken);
+            await scope.CommitAsync(cancellationToken);
+
+            return NoContent();
         }
     }
 

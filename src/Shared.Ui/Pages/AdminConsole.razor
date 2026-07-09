@@ -75,7 +75,10 @@
                                     <h2 class="h6 fw-bold mb-1">@_detail.Name</h2>
                                     <div class="text-muted small">@_detail.Id</div>
                                 </div>
-                                <span class="badge bg-info-subtle text-info-emphasis">@_detail.SubscriptionStatus</span>
+                                <span>
+                                    <span class="badge bg-primary-subtle text-primary-emphasis" data-testid="admin-plan">@_detail.PlanKey</span>
+                                    <span class="badge bg-info-subtle text-info-emphasis">@_detail.SubscriptionStatus</span>
+                                </span>
                             </div>
 
                             <dl class="row small mb-3">
@@ -84,6 +87,32 @@
                                 <dt class="col-5 text-muted fw-normal">@Localizer["Admin_AuditEvents"]</dt>
                                 <dd class="col-7">@_detail.AuditEventCount</dd>
                             </dl>
+
+                            @* ── Staff plan override (comp). The server refuses provider-managed subs (409). ── *@
+                            <h3 class="h6 fw-semibold mb-2">@Localizer["Admin_SubscriptionTitle"]</h3>
+                            @if (!string.IsNullOrEmpty(_subscriptionMsg))
+                            {
+                                <div class="alert alert-success py-2" data-testid="admin-sub-status">@_subscriptionMsg</div>
+                            }
+                            @if (_detail.ProviderManaged)
+                            {
+                                <p class="small text-muted mb-3">@Localizer["Admin_ProviderManaged"]</p>
+                            }
+                            else
+                            {
+                                <div class="d-flex gap-2 mb-3">
+                                    @if (_detail.PlanKey != "pro")
+                                    {
+                                        <button class="btn btn-outline-primary btn-sm" data-testid="admin-comp-pro"
+                                                disabled="@_busy" @onclick="CompPro">@Localizer["Admin_CompPro"]</button>
+                                    }
+                                    @if (_detail.PlanKey != "free")
+                                    {
+                                        <button class="btn btn-outline-danger btn-sm" data-testid="admin-revert-free"
+                                                disabled="@_busy" @onclick="RevertFree">@Localizer["Admin_RevertFree"]</button>
+                                    }
+                                </div>
+                            }
 
                             <h3 class="h6 fw-semibold mb-2">@Localizer["Admin_Members"] <span class="text-muted">(@_detail.Members.Count)</span></h3>
                             <div class="table-responsive">
@@ -183,6 +212,7 @@
         _detailLoading = true;
         _error = null;
         _announceStatus = null;
+        _subscriptionMsg = null;
         try
         {
             _detail = await Http.GetFromJsonAsync<TenantDetailDto>($"/api/admin/tenants/{id}");
@@ -221,6 +251,55 @@
     private string _announceTitle = "";
     private string _announceBody = "";
     private string? _announceStatus;
+    private string? _subscriptionMsg;
+
+    private async Task CompPro()
+    {
+        if (_detail is null) return;
+        if (!await JS.ConfirmAsync(Localizer["Admin_ConfirmComp", _detail.Name])) return;
+
+        _busy = true; _subscriptionMsg = null; _error = null;
+        try
+        {
+            var res = await Http.PutAsJsonAsync($"/api/admin/tenants/{_detail.Id}/subscription", new { plan_key = "pro" });
+            if (res.IsSuccessStatusCode)
+            {
+                _subscriptionMsg = Localizer["Admin_SubscriptionUpdated"];
+                await ReloadDetail();
+            }
+            else { _error = Localizer["Admin_ErrSubscription"]; }
+        }
+        catch { _error = Localizer["Admin_ErrSubscription"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task RevertFree()
+    {
+        if (_detail is null) return;
+        if (!await JS.ConfirmAsync(Localizer["Admin_ConfirmRevert", _detail.Name])) return;
+
+        _busy = true; _subscriptionMsg = null; _error = null;
+        try
+        {
+            var res = await Http.DeleteAsync($"/api/admin/tenants/{_detail.Id}/subscription");
+            if (res.IsSuccessStatusCode)
+            {
+                _subscriptionMsg = Localizer["Admin_SubscriptionUpdated"];
+                await ReloadDetail();
+            }
+            else { _error = Localizer["Admin_ErrSubscription"]; }
+        }
+        catch { _error = Localizer["Admin_ErrSubscription"]; }
+        finally { _busy = false; }
+    }
+
+    // Re-fetch the open tenant so the plan badge/buttons reflect the change (keeps _subscriptionMsg).
+    private async Task ReloadDetail()
+    {
+        if (_selectedId is not { } id) return;
+        try { _detail = await Http.GetFromJsonAsync<TenantDetailDto>($"/api/admin/tenants/{id}"); }
+        catch { /* detail stays; next select refreshes */ }
+    }
 
     private async Task SendAnnouncement()
     {
@@ -265,6 +344,8 @@
         [JsonPropertyName("created_at")] public DateTimeOffset CreatedAt { get; init; }
         [JsonPropertyName("members")] public List<MemberDto> Members { get; init; } = new();
         [JsonPropertyName("subscription_status")] public string SubscriptionStatus { get; init; } = string.Empty;
+        [JsonPropertyName("plan_key")] public string PlanKey { get; init; } = string.Empty;
+        [JsonPropertyName("provider_managed")] public bool ProviderManaged { get; init; }
         [JsonPropertyName("audit_event_count")] public int AuditEventCount { get; init; }
     }
 
