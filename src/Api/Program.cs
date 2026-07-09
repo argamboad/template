@@ -1,5 +1,3 @@
-// CI trip: touch a src/ file so native-paths sets changed=true and the
-// native-build-apple matrix expands to its two legs (net10.0-ios + maccatalyst).
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
