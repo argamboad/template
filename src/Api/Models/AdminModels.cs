@@ -30,16 +30,24 @@ public record AdminStatusResponse
     [JsonPropertyName("is_staff")] public required bool IsStaff { get; init; }
 }
 
-/// <summary>Staff announcement to every member of a tenant (ADMIN-3).</summary>
+/// <summary>Staff announcement to a tenant (ADMIN-3). With no <see cref="UserIds"/> it reaches every
+/// member; with a non-empty list it targets just those members (ids that aren't members are ignored).</summary>
 public record AdminAnnounceRequest
 {
     [JsonPropertyName("title")] public string? Title { get; init; }
     [JsonPropertyName("body")] public string? Body { get; init; }
+    [JsonPropertyName("user_ids")] public IReadOnlyList<Guid>? UserIds { get; init; }
 }
 
 public record AdminAnnounceResponse
 {
     [JsonPropertyName("notified_count")] public required int NotifiedCount { get; init; }
+}
+
+/// <summary>Ack for a platform-wide broadcast (ADMIN-3): the fan-out is queued, not yet delivered.</summary>
+public record AdminBroadcastResponse
+{
+    [JsonPropertyName("status")] public required string Status { get; init; }
 }
 
 public record ImpersonationResponse

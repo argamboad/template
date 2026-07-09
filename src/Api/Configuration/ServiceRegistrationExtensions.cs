@@ -78,6 +78,8 @@ public static class ServiceRegistrationExtensions
         // Per-user in-app notifications (NOTIFY-1, ADR-013). NotifyAsync stages an in-app row on the caller's
         // unit of work; the center API reads/marks the caller's own notifications.
         services.AddScoped<INotificationService, NotificationService>();
+        // Staff broadcast fan-out (ADMIN-3): enqueued by /api/admin/announce-all, delivered out-of-band.
+        services.AddScoped<IOutboxHandler, AdminBroadcastOutboxHandler>();
         return services;
     }
 
