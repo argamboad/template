@@ -149,6 +149,14 @@
   <data name="Admin_ConfirmRevert" xml:space="preserve"><value>¿Revertir «{0}» al plan Free?</value></data>
   <data name="Admin_SubscriptionUpdated" xml:space="preserve"><value>Suscripción actualizada.</value></data>
   <data name="Admin_ErrSubscription" xml:space="preserve"><value>No se pudo actualizar la suscripción.</value></data>
+  <data name="Admin_AnnounceSendSelected" xml:space="preserve"><value>Enviar a {0} seleccionado(s)</value></data>
+  <data name="Admin_ConfirmAnnounceSelected" xml:space="preserve"><value>¿Enviar este anuncio a {0} miembro(s) seleccionado(s) de «{1}»?</value></data>
+  <data name="Admin_BroadcastTitle" xml:space="preserve"><value>Anunciar a todos</value></data>
+  <data name="Admin_BroadcastHint" xml:space="preserve"><value>Envía una notificación a todos los usuarios de todos los inquilinos de la plataforma. La entrega se pone en cola y se procesa en segundo plano.</value></data>
+  <data name="Admin_BroadcastSend" xml:space="preserve"><value>Enviar a todos</value></data>
+  <data name="Admin_ConfirmBroadcast" xml:space="preserve"><value>¿Enviar este anuncio a TODOS los usuarios de TODOS los inquilinos de la plataforma?</value></data>
+  <data name="Admin_BroadcastQueued" xml:space="preserve"><value>Difusión en cola para su entrega.</value></data>
+  <data name="Admin_ErrBroadcast" xml:space="preserve"><value>No se pudo poner en cola la difusión.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>

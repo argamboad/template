@@ -149,6 +149,14 @@
   <data name="Admin_ConfirmRevert" xml:space="preserve"><value>Revert "{0}" to the Free plan?</value></data>
   <data name="Admin_SubscriptionUpdated" xml:space="preserve"><value>Subscription updated.</value></data>
   <data name="Admin_ErrSubscription" xml:space="preserve"><value>Couldn't update the subscription.</value></data>
+  <data name="Admin_AnnounceSendSelected" xml:space="preserve"><value>Send to {0} selected</value></data>
+  <data name="Admin_ConfirmAnnounceSelected" xml:space="preserve"><value>Send this announcement to {0} selected member(s) of "{1}"?</value></data>
+  <data name="Admin_BroadcastTitle" xml:space="preserve"><value>Announce to everyone</value></data>
+  <data name="Admin_BroadcastHint" xml:space="preserve"><value>Sends a notification to every user of every tenant on the platform. Delivery is queued and processed in the background.</value></data>
+  <data name="Admin_BroadcastSend" xml:space="preserve"><value>Send to everyone</value></data>
+  <data name="Admin_ConfirmBroadcast" xml:space="preserve"><value>Send this announcement to EVERY user of EVERY tenant on the platform?</value></data>
+  <data name="Admin_BroadcastQueued" xml:space="preserve"><value>Broadcast queued for delivery.</value></data>
+  <data name="Admin_ErrBroadcast" xml:space="preserve"><value>Couldn't queue the broadcast.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Household</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>

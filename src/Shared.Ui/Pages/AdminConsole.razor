@@ -34,6 +34,34 @@
             <div class="alert alert-danger py-2">@_error</div>
         }
 
+        @* ── Platform-wide broadcast (ADMIN-3): queued on the outbox, delivered out-of-band.
+             Opinionated template feature — rebranders can remove this card. ── *@
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="h6 fw-bold mb-1">@Localizer["Admin_BroadcastTitle"]</h2>
+                <p class="small text-muted mb-2">@Localizer["Admin_BroadcastHint"]</p>
+                @if (!string.IsNullOrEmpty(_broadcastStatus))
+                {
+                    <div class="alert alert-success py-2" data-testid="admin-broadcast-status">@_broadcastStatus</div>
+                }
+                <div class="row g-2 align-items-start">
+                    <div class="col-12 col-md-4">
+                        <input class="form-control" maxlength="200" data-testid="admin-broadcast-title"
+                               placeholder="@Localizer["Admin_AnnounceTitlePlaceholder"]" @bind="_broadcastTitle" />
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <textarea class="form-control" rows="1" maxlength="2000" data-testid="admin-broadcast-body"
+                                  placeholder="@Localizer["Admin_AnnounceBodyPlaceholder"]" @bind="_broadcastBody"></textarea>
+                    </div>
+                    <div class="col-12 col-md-2 d-grid">
+                        <button class="btn btn-outline-danger btn-sm" data-testid="admin-broadcast-send"
+                                disabled="@(_busy || string.IsNullOrWhiteSpace(_broadcastTitle) || string.IsNullOrWhiteSpace(_broadcastBody))"
+                                @onclick="SendBroadcast">@Localizer["Admin_BroadcastSend"]</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row g-4">
             @* ── Tenant list ── *@
             <div class="col-12 col-lg-5">
@@ -119,6 +147,7 @@
                                 <table class="table table-sm align-middle mb-0">
                                     <thead>
                                         <tr class="small text-muted">
+                                            <th style="width:1.75rem"></th>
                                             <th>@Localizer["Admin_ColMember"]</th>
                                             <th>@Localizer["Admin_ColRole"]</th>
                                             <th class="text-end"></th>
@@ -128,6 +157,12 @@
                                         @foreach (var m in _detail.Members)
                                         {
                                             <tr>
+                                                <td>
+                                                    @* Target this member in the announcement below (none checked = all members). *@
+                                                    <input type="checkbox" class="form-check-input" data-testid="admin-member-check"
+                                                           checked="@_selectedMembers.Contains(m.UserId)"
+                                                           @onchange="e => ToggleMember(m.UserId, (bool)e.Value!)" />
+                                                </td>
                                                 <td>
                                                     <div class="fw-medium small">@(string.IsNullOrEmpty(m.DisplayName) ? m.Email : m.DisplayName)</div>
                                                     @if (!string.IsNullOrEmpty(m.DisplayName))
@@ -164,7 +199,11 @@
                             </div>
                             <button class="btn btn-outline-primary btn-sm" data-testid="admin-announce-send"
                                     disabled="@(_busy || string.IsNullOrWhiteSpace(_announceTitle) || string.IsNullOrWhiteSpace(_announceBody))"
-                                    @onclick="SendAnnouncement">@Localizer["Admin_AnnounceSend"]</button>
+                                    @onclick="SendAnnouncement">
+                                @(_selectedMembers.Count > 0
+                                    ? Localizer["Admin_AnnounceSendSelected", _selectedMembers.Count]
+                                    : Localizer["Admin_AnnounceSend"])
+                            </button>
                         </div>
                     </div>
                 }
@@ -213,6 +252,7 @@
         _error = null;
         _announceStatus = null;
         _subscriptionMsg = null;
+        _selectedMembers.Clear();
         try
         {
             _detail = await Http.GetFromJsonAsync<TenantDetailDto>($"/api/admin/tenants/{id}");
@@ -301,26 +341,69 @@
         catch { /* detail stays; next select refreshes */ }
     }
 
+    // Member targeting: checked rows become the announce recipients; none checked = all members.
+    private readonly HashSet<Guid> _selectedMembers = new();
+
+    private void ToggleMember(Guid userId, bool selected)
+    {
+        if (selected) _selectedMembers.Add(userId);
+        else _selectedMembers.Remove(userId);
+    }
+
     private async Task SendAnnouncement()
     {
         if (_detail is null) return;
-        if (!await JS.ConfirmAsync(Localizer["Admin_ConfirmAnnounce", _detail.Name])) return;
+        var confirm = _selectedMembers.Count > 0
+            ? Localizer["Admin_ConfirmAnnounceSelected", _selectedMembers.Count, _detail.Name]
+            : Localizer["Admin_ConfirmAnnounce", _detail.Name];
+        if (!await JS.ConfirmAsync(confirm)) return;
 
         _busy = true; _announceStatus = null; _error = null;
         try
         {
             var res = await Http.PostAsJsonAsync($"/api/admin/tenants/{_detail.Id}/announce",
-                new { title = _announceTitle.Trim(), body = _announceBody.Trim() });
+                new
+                {
+                    title = _announceTitle.Trim(),
+                    body = _announceBody.Trim(),
+                    user_ids = _selectedMembers.Count > 0 ? _selectedMembers.ToArray() : null,
+                });
             if (res.IsSuccessStatusCode)
             {
                 var body = await res.Content.ReadFromJsonAsync<AnnounceResultDto>();
                 _announceStatus = Localizer["Admin_AnnounceSent", body?.NotifiedCount ?? 0];
                 _announceTitle = "";
                 _announceBody = "";
+                _selectedMembers.Clear();
             }
             else { _error = Localizer["Admin_ErrAnnounce"]; }
         }
         catch { _error = Localizer["Admin_ErrAnnounce"]; }
+        finally { _busy = false; }
+    }
+
+    private string _broadcastTitle = "";
+    private string _broadcastBody = "";
+    private string? _broadcastStatus;
+
+    private async Task SendBroadcast()
+    {
+        if (!await JS.ConfirmAsync(Localizer["Admin_ConfirmBroadcast"])) return;
+
+        _busy = true; _broadcastStatus = null; _error = null;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("/api/admin/announce-all",
+                new { title = _broadcastTitle.Trim(), body = _broadcastBody.Trim() });
+            if (res.IsSuccessStatusCode) // 202: queued on the outbox, delivered out-of-band
+            {
+                _broadcastStatus = Localizer["Admin_BroadcastQueued"];
+                _broadcastTitle = "";
+                _broadcastBody = "";
+            }
+            else { _error = Localizer["Admin_ErrBroadcast"]; }
+        }
+        catch { _error = Localizer["Admin_ErrBroadcast"]; }
         finally { _busy = false; }
     }
 
