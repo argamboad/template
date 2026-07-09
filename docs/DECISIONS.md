@@ -1069,3 +1069,37 @@ activation)**. Design detail: `docs/PLATFORM_BACKLOG.md` §11.
    it), `docker/db/provision-rls-runtime-role.sql`, `DEPLOYMENT.md` §7, and the
    `RlsMigrationGateTests` parity gate (a new `ITenantScoped` entity without its policy migration
    fails CI).
+
+**ADR-021 — Admin back-office writes: narrow, enumerated, audited mutations (amends ADR-014's "read-only" posture). (2026-07-09)**
+ADR-014 point 2 declared admin **read-only over tenant data** ("inspect, don't mutate"), with the
+ADMIN-3 announcement as the one sanctioned write (per-user notification rows via the normal fan-out).
+The 2026-07 manual QA pass surfaced legitimate operator needs that are writes: sending targeted (not
+whole-roster) announcements, messaging **every** user (maintenance/incident notices), and putting a
+tenant on a paid plan without a checkout (comps, QA, support goodwill). Doing these by impersonation
+would be worse — broader power, weaker attribution; doing them off-platform (SQL) breaks the API
+boundary. So the read-only posture is **amended, not abandoned**: admin writes exist, but only as an
+**enumerated list**, each riding existing seams with existing guardrails.
+
+**Decision:**
+1. **Read-only remains the default posture.** Any new admin write must be added to this enumeration by
+   a future ADR/amendment — "staff can mutate tenant data" is never a general capability.
+2. **Enumerated writes (as of this ADR):**
+   a. **Announcements** — per-tenant (all members or an explicit `user_ids` subset, **intersected with
+      the actual roster** so a stray id cannot reach outside the tenant) and **platform-wide broadcast**
+      (`POST /api/admin/announce-all`). All delivery rides the ADR-013 notification fan-out
+      (preference-respecting, per-user rows only — never tenant data).
+   b. **Subscription comp/revert** (`PUT|DELETE /api/admin/tenants/{id}/subscription`) — writes the same
+      `Subscription` projection a completed checkout produces (active, no period end, **no provider
+      ids**); revert deletes the projection (absence ⇒ Free, the ADR-006 fail-closed default). Refused
+      **409** whenever a live provider subscription exists (`StripeSubscriptionId` present): Stripe
+      remains the sole source of truth for real money (ADR-006) — a staff override must never mask or
+      fight provider state.
+3. **Every write is scoped and attributed.** In-tenant writes go through `ITenantContext.EnterTenant`
+   (ADR-003; the filter stays engaged, RLS satisfied) and are audited in the affected tenant
+   (`admin.announcement.sent`, `admin.subscription.comped`, `admin.subscription.reverted`).
+4. **The platform-wide broadcast is asynchronous and outbox-recorded.** The unbounded fan-out never runs
+   in the HTTP request: the endpoint enqueues one outbox message (202) and `AdminBroadcastOutboxHandler`
+   delivers out-of-band, idempotent by construction (handler + status flip commit in one transaction,
+   ADR-007). It has **no in-tenant audit row** — `AuditEvent` is tenant-scoped and the action spans all
+   tenants; the durable outbox message is the record. A platform-level (cross-tenant) audit trail is a
+   known gap, deliberately deferred until a second cross-tenant action needs it.

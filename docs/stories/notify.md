@@ -6,7 +6,11 @@
 > criteria. **Status: ✅ COMPLETE** — NOTIFY-1 (in-app center) + NOTIFY-2 (preferences + email fan-out).
 > **UI shipped** (`feat/ui-3-notifications`): a header **bell** (`NotificationBell` — unread badge,
 > dropdown list, mark-read / mark-all-read) and a **Notifications** preferences card in Settings
-> (`NotificationPrefsCard` — in-app/email switches). EN/ES; QA-NOTIF-01..03.
+> (`NotificationPrefsCard` — in-app/email switches). EN/ES; QA-NOTIF-01..04.
+> **Extended 2026-07-09 (QA pass):** caller-scoped **deletion** — `DELETE /api/notifications/{id}` and
+> `DELETE /api/notifications` (`?read=true` = only already-read) — surfaced in the bell as a per-row
+> trash icon + footer **Clear read** / **Clear all**, so downstream apps can let users clear
+> notifications without touching the platform or the DB.
 
 **Epic key:** `NOTIFY`
 
@@ -26,11 +30,12 @@ user's data. Wiped by account erasure (GDPR-2).
 `Metadata` jsonb/`ReadAt`/`CreatedAt`; migration `AddNotifications`). `NotificationService`:
 `NotifyAsync` **stages** the in-app row on the caller's unit of work (transactional, like `IAuditLog`);
 `ListAsync` (newest-first, `before` cursor, ≤100), `UnreadCountAsync`, `MarkReadAsync` (own only),
-`MarkAllReadAsync`. User-scoped `NotificationsController`
-(`GET /api/notifications`, `/unread-count`, `POST /{id}/read`, `/read-all`) — scoped to the
-`NameIdentifier` claim. Account erasure (GDPR-2) wipes notifications. Tests
+`MarkAllReadAsync`, `DeleteAsync` (own only), `DeleteAllAsync` (all or only-read). User-scoped
+`NotificationsController` (`GET /api/notifications`, `/unread-count`, `POST /{id}/read`, `/read-all`,
+`DELETE /{id}`, `DELETE /api/notifications` + `?read=true`) — scoped to the `NameIdentifier` claim.
+Account erasure (GDPR-2) wipes notifications. Tests
 `tests/Api.Tests/Notify/NotificationServiceTests.cs` (list/newest-first/paginate, unread count, mark
-one/all, per-user isolation, metadata-as-json).
+one/all, delete one/bulk + read-only sweep, per-user isolation, metadata-as-json).
 
 **As a** user
 **I want** an in-app list of notifications with read/unread state

@@ -34,7 +34,10 @@
 Otp.NET): begin (secret + `otpauth://` URI, not enabled), confirm (valid code → enable + 10 hashed
 recovery codes returned once), disable (valid code → wipe), status, and `VerifyAsync` (TOTP or a
 single-use recovery code) for the MFA-2 step-up. Secret encrypted via `IDataProtector`; recovery codes
-hashed via `ITokenHasher`. Endpoints `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]`. Account
+hashed via `ITokenHasher` over a canonical form — the codes are short, human-typeable `xxxxx-xxxxx`
+(unambiguous alphabet, case/hyphen/space-insensitive entry; **fixed 2026-07-09** — they were 88-char
+opaque tokens that overflowed the maxlength-14 inputs and could never be entered). Endpoints
+`GET|POST /api/auth/mfa[/enroll|/confirm|/disable]`. Account
 erasure (GDPR-2) extended to wipe both tables. Tests `tests/Api.Tests/Mfa/MfaServiceTests.cs`
 (enroll/confirm/verify/recovery-single-use/disable + secret-encrypted + hashed codes).
 
