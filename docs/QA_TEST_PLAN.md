@@ -65,9 +65,12 @@ dotnet run --project src/Api --launch-profile https    # binds https:7160 (web/d
   > ⚠️ Always use the **https** profile for both web and API. Chrome treats `http://localhost` and
   > `https://localhost` as different sites, so the refresh cookie is dropped over http and sign-in
   > silently fails to persist. (See `docs/DECISIONS.md` / the schemeful-same-site note.)
-  > ⚠️ **The passwordless endpoints are rate-limited** (default **5 requests/minute per IP** on
-  > `/otp/send`, `/magic-link/send`, and `/otp/verify`). If you fire many code/link requests or
-  > verify attempts in quick succession you may get **HTTP 429** — that's the abuse guard working
+  > ⚠️ **The passwordless endpoints are rate-limited** per client IP: the **send** endpoints
+  > (`/otp/send`, `/magic-link/send`) default to **5/minute**; the **verify** endpoints
+  > (`/otp/verify`, `/mfa/verify`) have their **own, larger budget** (the OTP attempt cap + headroom,
+  > default **10/minute**) so the cumulative lockout's distinct message (QA-AUTH-04) surfaces before
+  > the throttle can mask it. Exceeding a budget returns **HTTP 429**, shown on `/login` as
+  > "Too many requests. Please wait a minute, then try again." — that's the abuse guard working
   > (QA-AUTH-11), **not** a bug. Pace requests, or wait ~1 minute for the window to reset.
 
 ### 1.2 Test accounts & data
@@ -150,10 +153,11 @@ and **account erasure** (`DELETE /api/auth/me`) now **have a web UI** (UI-1: own
 Settings → Danger zone) — covered by the manual cases QA-HH-13 + QA-SET-07. **RBAC role management now has a web UI**
 (RBAC-3) — covered by the household cases QA-HH-09..12. **MFA now has a web UI** (UI-2) — enrollment/
 disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..03. The **in-app
-notification center now has a web UI** (UI-3) — the header bell (list, unread count, mark-read) and
-Settings delivery-preference switches — covered by QA-NOTIF-01..03. The **platform-staff admin surface
-now has a web UI** (UI-4) — a staff-only `/admin` console (tenant list/detail + impersonation) — covered
-by QA-ADMIN-01..03. The **public API (PUBAPI)** and **outbound webhooks (HOOKS)** are intentionally
+notification center now has a web UI** (UI-3) — the header bell (list, unread count, mark-read,
+delete/clear) and Settings delivery-preference switches — covered by QA-NOTIF-01..04. The
+**platform-staff admin surface now has a web UI** (UI-4) — a staff-only `/admin` console (tenant
+list/detail + impersonation + targeted/broadcast announcements + plan comp/revert) — covered
+by QA-ADMIN-01..06. The **public API (PUBAPI)** and **outbound webhooks (HOOKS)** are intentionally
 UI-less (they're for machines) and **config-gated off** — they have **manual curl/Postman cases in §14b**
 (QA-API-01..06), in addition to automated tests.
 
@@ -330,8 +334,9 @@ And separately, an unused code is rejected once it passes its lifespan (default 
    (default 10) — the stale code is rejected.
 > **Note (enumeration):** OTP verify returns the **same** generic "invalid code" error whether the
 > code was wrong or there is no active code — it never reveals whether an address has an outstanding
-> OTP. *(Long-wait cases — lower the config to test fast. Mind the per-IP rate limit, QA-AUTH-11:
-> 5 wrong verifies in a minute also trips the 429 throttle.)*
+> OTP. *(Long-wait cases — lower the config to test fast. The verify throttle's budget deliberately
+> sits **above** the attempt cap — QA-AUTH-11 — so you reach this lockout and see its distinct
+> message before any 429; only hammering faster than ~10 verifies/minute trips the throttle.)*
 
 ### QA-AUTH-11 — Passwordless endpoints are rate-limited 🟠 (Web)
 **Gherkin**
@@ -769,8 +774,9 @@ Then two-factor turns On and I'm shown one-time recovery codes
 1. **Settings** → **Two-factor authentication** shows an **Off** badge → **Enable two-factor**.
 2. A **QR code** renders next to a **manual key** (Base32). Scan it (or type the key) into the app.
 3. Enter the app's current **6-digit code** → **Verify & enable**.
-4. **Expected:** a success banner, the badge flips to **On**, and a grid of **recovery codes** appears
-   (shown once). **I've saved my codes** returns to the On state.
+4. **Expected:** a success banner, the badge flips to **On**, and a grid of 10 **recovery codes**
+   appears (shown once) — short, typeable `xxxxx-xxxxx` codes (e.g. `k7m2q-9xr4t`; no ambiguous
+   `0/O/1/I/L` glyphs). **I've saved my codes** returns to the On state.
 5. **Wrong code:** an inline error ("that code is incorrect or has expired"); nothing changes.
 
 ### QA-MFA-02 — Two-factor is required at sign-in 🟠 (Web) ⚙️ Automated in CI
@@ -799,6 +805,8 @@ And I can disable two-factor from Settings with a valid code
 ```
 **Walkthrough**
 1. Sign in as in QA-MFA-02; at the step-up, enter one **recovery code** instead of a TOTP → signs in.
+   Entry is forgiving: wrong case, a dropped hyphen, or stray spaces still match (`K7M2Q9XR4T` ≡
+   `k7m2q-9xr4t`).
 2. **Settings** → **Two-factor authentication** (On) → **Disable two-factor** → enter a current TOTP
    (or another recovery code) → **Disable**.
 3. **Expected:** the badge flips to **Off**; a subsequent sign-in no longer asks for a second step.
@@ -868,6 +876,24 @@ And "Mark all read" zeroes the count
 1. Open the bell → click an **unread** row. **Expected:** its dot/bold clears; the count decrements.
 2. Click **Mark all read**. **Expected:** the count badge disappears; all rows show as read.
 3. Reload the page → the counts/read state persist (server-side).
+
+### QA-NOTIF-04 — Delete a notification / clear read / clear all 🟢 (Web)
+**Precondition:** a mix of read and unread notifications (see QA-NOTIF-01 note).
+**Gherkin**
+```gherkin
+Given I have read and unread notifications
+When I click a row's trash icon (and, separately, "Clear read" / "Clear all")
+Then that row is removed (unread ones also drop the count)
+And "Clear read" removes only the read rows; "Clear all" empties the list
+```
+**Walkthrough**
+1. Open the bell → click the **trash icon** on the left of a row. **Expected:** the row disappears
+   (without marking anything read — the trash doesn't trigger the row click); if it was unread the
+   count decrements.
+2. Footer → **Clear read**. **Expected:** only the already-read rows vanish; unread ones (and the
+   badge) survive. The button is disabled when nothing is read.
+3. Footer → **Clear all**. **Expected:** the list empties ("You're all caught up."), badge gone.
+4. Reload → deletions persist (server-side; `DELETE /api/notifications/{id}`, `?read=true`, and all).
 
 ### QA-NOTIF-03 — Delivery preferences 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
@@ -993,6 +1019,50 @@ And an admin.announcement.sent audit event is recorded in that tenant
    opening it shows title + message; clicking it marks it read and the badge clears. Members with
    email delivery on also get the email (Mailpit).
 3. The send is audited **in that tenant** (`admin.announcement.sent`, with the member count).
+4. **Targeted variant:** check one or more member rows (new checkbox column) — the button becomes
+   **"Send to N selected"** and only those members are notified (the count in the confirmation and
+   the "sent to N" ack match the selection). Unchecking all reverts to all-members. The selection
+   clears after a send and when switching tenants.
+
+### QA-ADMIN-05 — Platform-wide broadcast reaches every user 🟢 (Web)
+**Gherkin**
+```gherkin
+Given I am staff on /admin
+When I send an "Announce to everyone" broadcast and confirm
+Then the request is acknowledged as queued
+And every user of every tenant receives it once the outbox delivers
+```
+**Walkthrough**
+1. As staff on `/admin`, the **Announce to everyone** card sits above the tenant grid (it is not
+   tenant-scoped). Fill title + message → **Send to everyone** → the confirm spells out the blast
+   radius (EVERY user of EVERY tenant).
+2. **Expected:** "Broadcast queued for delivery." — the fan-out is **asynchronous** (outbox): give the
+   dispatcher a few seconds; delivery is not instant by design.
+3. Sign in as users of **two different tenants**. **Expected:** both bells show the announcement.
+4. There is **no in-tenant audit row** for a broadcast (the audit trail is per-tenant and this spans
+   all tenants); the durable outbox message is the record.
+
+### QA-ADMIN-06 — Comp a tenant to Pro and revert 🟢 (Web)
+**Gherkin**
+```gherkin
+Given I am staff on a tenant's detail in /admin
+When I use "Upgrade to Pro (comp)" (and later "Revert to Free")
+Then the tenant's entitlements match the plan immediately, with no payment involved
+And a provider-managed (Stripe-backed) subscription refuses the override
+```
+**Walkthrough**
+1. As staff, open a **Free** tenant's detail. The header shows a **plan badge** (`free`) next to the
+   status badge; the **Subscription** section shows **Upgrade to Pro (comp)**.
+2. Comp it → confirm. **Expected:** "Subscription updated."; badge flips to `pro` / `active`; the
+   button is replaced by **Revert to Free**. The comp **never lapses** (no period end) and is audited
+   in-tenant (`admin.subscription.comped`).
+3. As that tenant's owner, check `/billing`. **Expected:** plan **Pro**, seat limit 10 — identical to
+   a completed checkout (this simulates payment completion; QA-BILL/QA-HH-14 behaviors follow the plan).
+4. **Revert to Free** → confirm. **Expected:** badge back to `free`; entitlements fall back
+   (absence ⇒ Free, fail-closed); audited (`admin.subscription.reverted`). Reverting again is a no-op.
+5. **Provider-managed guard:** for a tenant with a **real Stripe subscription** (QA-BILL-02), the
+   section shows "Managed by the billing provider — change the plan there." and **no** comp/revert
+   buttons; the API refuses with 409 (Stripe stays the source of truth — ADR-006).
 
 ---
 
@@ -1575,8 +1645,8 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | GDPR data export | **HH-13** (owner Household → Data → download, ⚙️ E2E `GdprExportJourneyTests`) + **DSK-10 / AND-10** (native share — NATIVE-3) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP | **MFA-01..05**, **DSK-12 / AND-12** (native) (Settings enroll/QR/confirm/recovery + disable; step-up on OTP, OAuth/magic-link, **and** native logins) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). **Every sign-in path enforces it** (web + native): OTP returns the challenge as JSON; OAuth callback + magic-link redirect to `/login?mfa=<challenge>`; native OTP/OAuth-exchange return the challenge in the body and the MAUI client steps up in-app. |
-| In-app notifications | **NOTIF-01..03**, **DSK-13** (header bell: list/unread-count/mark-read; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
-| Admin back-office | **ADMIN-01..03**, **DSK-14** (native spot) (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}`) inspection, `POST /api/admin/impersonate/{userId}` — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
+| In-app notifications | **NOTIF-01..04**, **DSK-13** (header bell: list/unread-count/mark-read/delete/clear; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, `DELETE /{id}`, `DELETE /api/notifications` (+ `?read=true` for read-only clear), and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
+| Admin back-office | **ADMIN-01..06**, **DSK-14** (native spot) (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop; targeted/broadcast announce; plan comp/revert) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}` — returns `plan_key` + `provider_managed`), `POST /api/admin/impersonate/{userId}`, `POST /api/admin/tenants/{id}/announce` (optional `user_ids[]` subset, intersected with membership), `POST /api/admin/announce-all` (202; outbox fan-out to **every** user), `PUT|DELETE /api/admin/tenants/{id}/subscription` (comp/revert; 409 when Stripe-backed) — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..14 (auth + per-feature parity).
 Android = AND-01..13 (auth + per-feature parity incl. hardware back + share sheet). iOS = IOS-01..04
@@ -1838,3 +1908,17 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   launch with it) → store entitlement added to `Entitlements.plist` for signed builds, Debug builds swap
   to `Entitlements.Debug.plist` (unsandboxed) + a `DebugFileSessionStore` fallback (`MACCATALYST && DEBUG`
   only); NATIVE-9 must re-verify SecureStorage under real signing.
+- **Updated 2026-07-09** — first findings + features from the manual QA pass (`bugfix/qa-manual-pass`):
+  (1) **rate-limit split** — passwordless *verify* endpoints got their own per-IP budget (attempt cap +
+  headroom, default 10/min) so the cumulative-lockout 401 (QA-AUTH-04) surfaces before the 429 can mask
+  it, and the login UI now shows a dedicated "Too many requests…" message on 429 (QA-AUTH-11 names the
+  exact copy; §1.1 pacing note updated). (2) **MFA recovery codes fixed** — they were 88-char opaque
+  tokens that overflowed the maxlength-14 inputs (unusable); now short `xxxxx-xxxxx` codes, matched
+  case-/separator-insensitively (QA-MFA-01/03). (3) **Notification delete/clear** — per-row trash +
+  "Clear read"/"Clear all" in the bell, backed by new per-user `DELETE /api/notifications` endpoints
+  (new **QA-NOTIF-04**). (4) **Staff announce upgrades** — optional member targeting on the per-tenant
+  announce (checkbox column → `user_ids[]`) and a platform-wide **Announce to everyone** card backed by
+  an outbox fan-out (`POST /api/admin/announce-all`, 202 queued) (QA-ADMIN-04 extended, new
+  **QA-ADMIN-05**). (5) **Staff plan comp** — `PUT|DELETE /api/admin/tenants/{id}/subscription` +
+  console buttons simulate a completed checkout (Pro) and revert to Free; refused 409 for Stripe-backed
+  subs (new **QA-ADMIN-06**). Suite 117 → **120** cases.
