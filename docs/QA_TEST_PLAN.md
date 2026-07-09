@@ -1521,8 +1521,11 @@ the API directly:
 ## 14b. API surfaces — PUBAPI + HOOKS (config-gated; curl / Postman) 🟠
 
 > These two surfaces are **off by default** and have **no web UI** by design — they're for machines, so
-> they're QA'd with an HTTP client. Any client works; the steps use `curl`. **Postman:** import
-> `GET /api/public/openapi.json` (once PUBAPI is on) to get a ready collection for the public routes.
+> they're QA'd with an HTTP client. Any client works; the steps use `curl`. **Postman:** the repo ships a
+> **complete, chained collection for the entire API** (all surfaces, not just these two) in
+> `docs/postman/` — import the collection + local environment; it signs in via OTP (auto-fetching the
+> code from Mailpit) and stores/rotates tokens per request. Alternatively, import
+> `GET /api/public/openapi.json` (once PUBAPI is on) for just the public routes.
 >
 > **Preconditions (do once):** in the repo-root `.env` set `PublicApi__Enabled=true` and
 > `Webhooks__Enabled=true`, then restart the API. Management of keys/webhooks is **owner-only**, so sign in
