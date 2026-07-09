@@ -303,7 +303,7 @@ public class AuthController(
     /// token in the body to persist in its OS secure store. Both get the access token.
     /// </summary>
     [HttpPost("otp/verify")]
-    [EnableRateLimiting(RateLimiting.PasswordlessPolicy)]
+    [EnableRateLimiting(RateLimiting.PasswordlessVerifyPolicy)]
     public async Task<IActionResult> VerifyOtp([FromBody] OtpVerifyRequest req, CancellationToken cancellationToken)
     {
         var result = await passwordless.RedeemOtpAsync(req.Email, req.Code, cancellationToken);

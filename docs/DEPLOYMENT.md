@@ -180,6 +180,11 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 | `ConnectionStrings__Migrations` | prod (two-role RLS) | owner/migrator connection — startup migrations do DDL (§7) |
 | `Rls__EnforceRuntimeRole` | prod (two-role RLS) | `true` — fail-closed startup check that RLS actually applies (§7) |
 
+This table is the deploy-oriented subset (what to set to go live). For the **complete list of every
+configurable key and its default** — plus what's compiled-in and *not* configurable — see the
+CONFIGURATION REFERENCE block in `.env.example`, the CI-enforced source of truth (the
+`ConfigKeys_ReadInCode_AreDocumented` gate checks every key read in code against it).
+
 Secrets live only in the Render dashboard / your local `.env` (gitignored) — **never** in the repo
 (`render.yaml` declares keys, not values; gitleaks enforces this in CI).
 

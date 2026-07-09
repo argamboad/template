@@ -78,7 +78,7 @@ public class MfaController(
     /// the body). Any bad/expired challenge or wrong code is a single 401 — no oracle.
     /// </summary>
     [HttpPost("mfa/verify")]
-    [EnableRateLimiting(RateLimiting.PasswordlessPolicy)]
+    [EnableRateLimiting(RateLimiting.PasswordlessVerifyPolicy)]
     public async Task<IActionResult> MfaVerify([FromBody] MfaVerifyRequest req, CancellationToken cancellationToken)
     {
         var outcome = await mfaLogin.VerifyChallengeAsync(req.Challenge ?? "", req.Code ?? "", ClientIp, cancellationToken);

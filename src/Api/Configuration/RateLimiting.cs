@@ -8,16 +8,27 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Perezosoft.Api.Configuration;
 
 /// <summary>
-/// Rate-limiting policies for abuse-prone endpoints. The passwordless send/verify endpoints are an
+/// Rate-limiting policies for abuse-prone endpoints. The passwordless endpoints are an
 /// unauthenticated email-bomb / outbound-cost amplifier and a brute-force surface, so they're
 /// throttled per client IP (CONF-5). The per-email dimension — making resends unable to reset a
 /// brute-force budget across IPs — is enforced independently and IP-agnostically by the cumulative
 /// OTP lockout in <c>PasswordlessService.RedeemOtpAsync</c>.
+///
+/// <para><b>Send and verify get SEPARATE budgets on purpose.</b> They used to share one per-IP
+/// window, so the <c>/otp/send</c> that issues the code plus a few guesses would exhaust the budget
+/// and the limiter's 429 masked the OTP lockout's distinct 401 <c>too_many_attempts</c> — the user
+/// saw a generic "verification failed" instead of the lockout message. Splitting them (and sizing the
+/// verify budget above the attempt cap via <see cref="VerifyPermitFor"/>) lets the server-side lockout
+/// win the race.</para>
 /// </summary>
 public static class RateLimiting
 {
-    /// <summary>Named policy applied to <c>/otp/send</c>, <c>/magic-link/send</c>, and <c>/otp/verify</c>.</summary>
+    /// <summary>Named policy for the email-producing send endpoints: <c>/otp/send</c>, <c>/magic-link/send</c>.</summary>
     public const string PasswordlessPolicy = "passwordless";
+
+    /// <summary>Named policy for the guess-checking verify endpoints: <c>/otp/verify</c>, <c>/mfa/verify</c>.
+    /// Separate budget from <see cref="PasswordlessPolicy"/> so the server-side lockout's 401 fires first.</summary>
+    public const string PasswordlessVerifyPolicy = "passwordless-verify";
 
     /// <summary>Per-API-key throttle for the public API (PUBAPI-2) — partitions by the key id.</summary>
     public const string PublicApiPolicy = "public-api";
@@ -28,6 +39,16 @@ public static class RateLimiting
     public const int PermitLimit = 5;
     public static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
 
+    /// <summary>Headroom the verify budget keeps above the OTP attempt cap (<c>Auth:Otp:MaxAttempts</c>)
+    /// so the 401 <c>too_many_attempts</c> lockout always returns before this throttle's 429 can mask it.</summary>
+    public const int VerifyPermitBuffer = 5;
+
+    /// <summary>The per-IP verify budget: the larger of the send limit and (attempt cap + buffer), so a
+    /// user can always reach the attempt cap and see the distinct lockout message. Shared by production
+    /// wiring and the rate-limit tests so the two can't drift.</summary>
+    public static int VerifyPermitFor(int passwordlessLimit, int otpMaxAttempts) =>
+        Math.Max(passwordlessLimit, otpMaxAttempts + VerifyPermitBuffer);
+
     /// <summary>Requests allowed per API key per <see cref="PublicApiWindow"/> before 429.</summary>
     public const int PublicApiPermitLimit = 60;
     public static readonly TimeSpan PublicApiWindow = TimeSpan.FromMinutes(1);
@@ -35,17 +56,33 @@ public static class RateLimiting
     public static IServiceCollection AddApiRateLimiters(this IServiceCollection services, IConfiguration? configuration = null)
     {
         var passwordlessLimit = configuration?.GetValue("Auth:RateLimit:PasswordlessPermitLimit", PermitLimit) ?? PermitLimit;
+        var otpMaxAttempts = configuration?.GetValue("Auth:Otp:MaxAttempts", 5) ?? 5;
+        var verifyLimit = VerifyPermitFor(passwordlessLimit, otpMaxAttempts);
         return services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-            // Unauthenticated passwordless endpoints: per-IP (email-bomb / brute-force — CONF-5).
+            // Passwordless SEND endpoints (email-producing): per-IP email-bomb / outbound-cost guard (CONF-5).
             options.AddPolicy(PasswordlessPolicy, httpContext =>
             {
                 var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = passwordlessLimit,
+                    Window = Window,
+                    QueueLimit = 0,
+                });
+            });
+
+            // Passwordless VERIFY endpoints (guess-checking): separate per-IP budget sized above the OTP
+            // attempt cap so the server-side lockout's 401 too_many_attempts returns before this 429 can
+            // mask it. Brute force across resends/IPs is still bounded by the cumulative OTP lockout.
+            options.AddPolicy(PasswordlessVerifyPolicy, httpContext =>
+            {
+                var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = verifyLimit,
                     Window = Window,
                     QueueLimit = 0,
                 });
