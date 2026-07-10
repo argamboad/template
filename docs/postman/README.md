@@ -9,11 +9,33 @@ config-gated Public API + outbound webhooks.
 
 ## Files
 
-| File | Import as |
+| File | Becomes in Postman |
 |------|-----------|
 | `Perezosoft.postman_collection.json` | Collection (v2.1) — one collection for **all** environments |
 | `Perezosoft.local.postman_environment.json` | Environment "Perezosoft — local dev" |
 | `Perezosoft.staging.postman_environment.json` | Environment "Perezosoft — staging (Render)" |
+
+## Workspace sync — git → Postman, automatic (no export/import)
+
+These files are the **canonical copy** (CLAUDE.md "API documentation"); the Postman workspace is
+a mirror kept fresh by CI. The `postman-sync` workflow pushes the collection + every
+`*postman_environment.json` to the workspace (matched **by name**: update if present, create if
+not) on any change to `docs/postman/**` on `develop` — so the team never imports JSON by hand.
+
+**One-time setup** (until then the job skips with a notice):
+1. Postman → avatar → **Settings → API keys** → generate a key → GitHub repo →
+   **Settings → Secrets → Actions** → secret `POSTMAN_API_KEY`.
+2. Postman → workspace **Overview** → copy the workspace **ID** → GitHub →
+   **Settings → Variables → Actions** → variable `POSTMAN_WORKSPACE_ID`.
+3. Delete any duplicate same-name collections/environments in the workspace once (with
+   duplicates, the first name-match wins). Trigger the first run via **Actions →
+   postman-sync → Run workflow** (or merge any `docs/postman/` change).
+
+**Direction is one-way.** Edits made in the Postman UI are overwritten on the next sync — change
+the JSON here (PR-reviewed, versioned) instead. Postman's built-in "connect repository" (API
+Builder) was considered and rejected: it doesn't sync environments and needs manual UI pulls.
+
+Manual fallback: importing the three files by hand still works anywhere.
 
 ## Environments — switching & adding
 

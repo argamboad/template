@@ -96,8 +96,11 @@ _TODO_
   collection-level Bearer auth; chaining test scripts that capture shown-once secrets; request
   descriptions stating roles, config gates, and expected error codes; env-specific values live in
   the `*.postman_environment.json` files (one per deploy target), never in the collection.
-- Copies imported into the Postman app/workspace are **disposable mirrors** — re-import after
-  changes; never treat a workspace copy as the source (it isn't versioned or reviewed).
+- Copies in the Postman app/workspace are **mirrors, never the source** (not versioned or
+  reviewed). CI keeps the workspace mirror fresh: the `postman-sync` workflow pushes
+  `docs/postman/**` to the workspace on every `develop` change (needs `POSTMAN_API_KEY` secret +
+  `POSTMAN_WORKSPACE_ID` variable; syncs by name — see `docs/postman/README.md`). Edits made in
+  the Postman UI are overwritten on the next sync.
 
 ## Scope discipline
 Before building anything, check the **"OUT" list in `docs/PROJECT_BRIEF.md`**. Don't implement
