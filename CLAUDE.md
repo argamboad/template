@@ -85,6 +85,20 @@ _TODO_
   `JwtBearerDefaults.AuthenticationScheme`). The token carries a `tenant_id` claim that drives
   tenant query scoping.
 
+## API documentation (constant)
+- **The Postman collection mirrors the API — and the repo copy is canonical.** Any change to API
+  endpoints (route, verb, path/query params, request/response shape, auth requirements, or error
+  codes) must update **`docs/postman/Perezosoft.postman_collection.json`** (+ the environment
+  files when config/env expectations change) in the same slice. Controllers in
+  `src/Api/Controllers/` and slices under `src/Api/Features/` are the source of truth; the
+  collection documents them.
+- Keep its conventions: numbered folders per area; `{{baseUrl}}`/`{{accessToken}}` variables with
+  collection-level Bearer auth; chaining test scripts that capture shown-once secrets; request
+  descriptions stating roles, config gates, and expected error codes; env-specific values live in
+  the `*.postman_environment.json` files (one per deploy target), never in the collection.
+- Copies imported into the Postman app/workspace are **disposable mirrors** — re-import after
+  changes; never treat a workspace copy as the source (it isn't versioned or reviewed).
+
 ## Scope discipline
 Before building anything, check the **"OUT" list in `docs/PROJECT_BRIEF.md`**. Don't implement
 deferred items without an explicit decision.
