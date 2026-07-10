@@ -85,6 +85,23 @@ _TODO_
   `JwtBearerDefaults.AuthenticationScheme`). The token carries a `tenant_id` claim that drives
   tenant query scoping.
 
+## API documentation (constant)
+- **The Postman collection mirrors the API — and the repo copy is canonical.** Any change to API
+  endpoints (route, verb, path/query params, request/response shape, auth requirements, or error
+  codes) must update **`docs/postman/Perezosoft.postman_collection.json`** (+ the environment
+  files when config/env expectations change) in the same slice. Controllers in
+  `src/Api/Controllers/` and slices under `src/Api/Features/` are the source of truth; the
+  collection documents them.
+- Keep its conventions: numbered folders per area; `{{baseUrl}}`/`{{accessToken}}` variables with
+  collection-level Bearer auth; chaining test scripts that capture shown-once secrets; request
+  descriptions stating roles, config gates, and expected error codes; env-specific values live in
+  the `*.postman_environment.json` files (one per deploy target), never in the collection.
+- Copies in the Postman app/workspace are **mirrors, never the source** (not versioned or
+  reviewed). CI keeps the workspace mirror fresh: the `postman-sync` workflow pushes
+  `docs/postman/**` to the workspace on every `develop` change (needs `POSTMAN_API_KEY` secret +
+  `POSTMAN_WORKSPACE_ID` variable; syncs by name — see `docs/postman/README.md`). Edits made in
+  the Postman UI are overwritten on the next sync.
+
 ## Scope discipline
 Before building anything, check the **"OUT" list in `docs/PROJECT_BRIEF.md`**. Don't implement
 deferred items without an explicit decision.
@@ -114,7 +131,7 @@ deferred items without an explicit decision.
 | `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
-| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (117 cases: smoke + regression + §13c native release checklist) |
+| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (120 cases: smoke + regression + §13c native release checklist) |
 | `docs/ROADMAP.md` | Sequenced plan — pillars done (JOBS/BILLING/OBS) + the next waves (RBAC, files, GDPR, MFA, …) |
 | `docs/STATUS.md` | 2026-07-04 status snapshot + operator guides — native QA pass, Apple first-run smoke (MacBook walkthrough), prod activation; SaaS-readiness assessment |
 | `docs/PLATFORM_BACKLOG.md` | Per-item design sketches for the future foundation slices (the detail behind ROADMAP) |
@@ -126,8 +143,8 @@ deferred items without an explicit decision.
 | `docs/stories/files.md` | epic `FILES` ✅ COMPLETE — `IFileStorage` local/S3, tenant-scoped keys, signed URLs (FILES-1 abstraction, FILES-2 download, FILES-3 S3); ADR-010 |
 | `docs/stories/gdpr.md` | epic `GDPR` ✅ COMPLETE — tenant data export + account erasure on the contributor/dissolve/file-storage machinery (GDPR-1 export, GDPR-2 erasure); ADR-011 |
 | `docs/stories/mfa.md` | epic `MFA` ✅ COMPLETE — authenticator TOTP; Otp.NET, secret encrypted, hashed recovery codes (MFA-1 enroll/manage, MFA-2 JSON-path step-up, MFA-3 OAuth/magic-link redirect step-up, MFA-4 native step-up — enforced on **every** sign-in path); ADR-012 |
-| `docs/stories/notify.md` | epic `NOTIFY` ✅ COMPLETE — per-user in-app notification center + delivery prefs, fan-out via the outbox (NOTIFY-1 center, NOTIFY-2 prefs+email); ADR-013 |
-| `docs/stories/admin.md` | epic `ADMIN` ✅ COMPLETE — config-gated platform-staff surface: cross-tenant inspection + short-lived audited impersonation + staff announcements via NOTIFY fan-out (ADMIN-1 gate/inspect, ADMIN-2 impersonate, ADMIN-3 announce — audited in-tenant, per-user rows only); ADR-014 |
+| `docs/stories/notify.md` | epic `NOTIFY` ✅ COMPLETE — per-user in-app notification center + delivery prefs, fan-out via the outbox (NOTIFY-1 center, NOTIFY-2 prefs+email); 2026-07-09: caller-scoped delete/clear (`DELETE /{id}`, bulk `?read=true`/all) + bell trash/clear-read/clear-all UI; ADR-013 |
+| `docs/stories/admin.md` | epic `ADMIN` ✅ COMPLETE — config-gated platform-staff surface: cross-tenant inspection + short-lived audited impersonation + staff announcements via NOTIFY fan-out (ADMIN-1 gate/inspect, ADMIN-2 impersonate, ADMIN-3 announce — audited in-tenant, per-user rows only); 2026-07-09 (ADR-021 — enumerated admin **writes**): announce `user_ids` targeting + platform-wide `announce-all` (202 → outbox fan-out) + subscription comp/revert (409 when Stripe-backed) w/ console UI; ADR-014 |
 | `docs/stories/pubapi.md` | epic `PUBAPI` — public API + tenant API keys, **config-gated default-off** (PUBAPI-1 ✅ — hash-only keys, API-key auth scheme → `tenant_id`-scoped principal, owner mgmt, scoped `/api/public`; PUBAPI-2 ✅ — per-key rate limit + anonymous public OpenAPI doc `/api/public/openapi.json`); ADR-015 |
 | `docs/stories/hooks.md` | epic `HOOKS` — outbound webhooks, **config-gated default-off** (HOOKS-1 ✅ — `WebhookSubscription` encrypted secret, `IWebhookPublisher` fan-out → outbox → HMAC-signed POST w/ retry, owner `/api/webhooks` + send-test; HOOKS-2 ✅ — delivery log + replay); ADR-016 |
 | `docs/stories/e2e.md` | epic `E2E` ✅ COMPLETE — Playwright journeys (suite 7→26 tests): E2E-1 RBAC roster; E2E-2 billing seat-quota 402 UX; E2E-3 notification bell/prefs (list/mark-read covered via ADMIN-3 announcements); E2E-4 magic-link sign-in (happy + single-use); E2E-5 membership lifecycle (transfer/leave/dissolve/delete-account); BILLING-8 added the fake-provider upgrade-loop journey. Health = DEPLOY-3 smoke, not a browser test |
@@ -135,5 +152,7 @@ deferred items without an explicit decision.
 | `docs/DEPLOYMENT.md` | Deployment runbook (DEPLOY-2/3) — Render + Neon + Brevo free-tier bring-up; `Dockerfile` + `render.yaml` reference; required env incl. the Production Stripe-key guard; §6 CI-gated auto-deploy |
 | `docs/stories/native.md` | epic `NATIVE` 🚧 — full MAUI parity (Android/Windows/iOS/macOS): NATIVE-1 ✅ CI build gate (all 4 TFMs; Apple legs on develop pushes — 10× macOS minutes; Maui lockfile excluded by design) + NATIVE-2 ✅ parity audit → gaps G1–G6 + NATIVE-4b ✅ join-by-invite-code on /join (G5 closed; E2E suite 26→28) + NATIVE-5 ✅ culture bootstrap (G6 closed: ICulturePersistence seam, MAUI Preferences + MauiProgram bootstrap; Windows-verified via WebView2 CDP) + NATIVE-3 ✅ downloads (G1 closed: Content-Disposition attachment + IFileDownloadLauncher — web same-tab download, native OS share sheet; E2E suite 28→29); + NATIVE-4 ✅ (G2 refresh-on-resume AppResumeNotifier + G3 Android back handler) — Wave 2 COMPLETE, all six gaps closed; NATIVE-6 QA plan authored (117 cases: DSK-08..14, AND-07..13, iOS/mac first-run smoke, release checklist) + G7 Apple-boot fix (iOS/macCatalyst crashed at startup — WebAuthenticator initiator generalized + Info.plist schemes); **Apple column UNPINNED 2026-07-06** — §13b run on the maintainer's MacBook: QA-IOS-01/02/04 + QA-MAC-01/02 + OAuth PASS (two gaps fixed in PR #125: SMTP revocation knob + Catalyst Debug session store); NATIVE-7 ✅ COMPLETE smokes for all four platforms in CI (Windows WebView2-CDP + Android emulator playwright-core _android + iOS-simulator & Mac Catalyst boot-to-login canaries in one `native-smoke-apple` job — WKWebView has no CDP, so they assert process-alive + provider-probe-200, no UI driving; native-paths gate skips Apple/smoke legs on docs-only pushes; deploy-staging concurrency); next: remaining §13b spot-checks + Windows/Android device pass; NATIVE-8/9/10 signed AAB/MSIX/IPA/pkg + NATIVE-11 store submission (needs Apple Developer account; NATIVE-9 must re-verify SecureStorage under real signing); ADR-018 |
 | `docs/NATIVE_PARITY.md` | NATIVE-2 audit — WebView-vs-browser deltas × platform × screen (✅/⚠️/🔍 verdicts); gap register G1–G6 → Wave-2 slices; maintainer rules (index.html sync, emailed links land on web, forceLoad = leaves the app) |
+| `docs/postman/` | **Postman collection for the whole API** (collection + local environment + README) — chained OTP sign-in w/ Mailpit auto-fetch, token rotation, all surfaces incl. config-gated PUBAPI/HOOKS and the admin writes; rename on rebrand |
+| `.env.example` | **Config catalog** — every configurable key + its default (CONFIGURATION REFERENCE block) + the compiled-in "not configurable" limits; CI-enforced source of truth (`ConfigKeys_ReadInCode_AreDocumented`) |
 | `.github/pull_request_template.md` | PR checklist (auto-loaded by GitHub) |
 | `src/Infrastructure/Persistence/Migrations/` | Concrete schema — EF Core migrations generated from DATA_MODEL.md |

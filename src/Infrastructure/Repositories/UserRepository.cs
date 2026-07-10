@@ -29,6 +29,13 @@ public class UserRepository(AppDbContext db) : IUserRepository
         return await db.Users.FindAsync([userId], cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default)
+    {
+        // Users are a global identity (not ITenantScoped), so this enumerates everyone — the caller
+        // (a platform-staff broadcast) is authorized platform-wide.
+        return await db.Users.Select(u => u.Id).ToListAsync(cancellationToken);
+    }
+
     public async Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
         db.Users.Add(user);

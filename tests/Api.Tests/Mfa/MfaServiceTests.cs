@@ -112,6 +112,28 @@ public class MfaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture
     }
 
     [Fact]
+    public async Task RecoveryCodes_AreShort_AndVerifyCaseAndSeparatorInsensitively()
+    {
+        // Regression: recovery codes were the 88-char opaque token, which overflowed the maxlength-14
+        // code inputs and could never be entered. They must be short, unambiguous, and forgiving of
+        // how the user retypes them (hyphen dropped, different case).
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        var userId = await SeedUserAsync(db);
+        var secret = (await service.BeginEnrollmentAsync(userId))!.Secret;
+        var (_, codes) = await service.ConfirmEnrollmentAsync(userId, CurrentCode(secret));
+
+        var code = codes[0];
+        Assert.Equal(11, code.Length);                                       // "xxxxx-xxxxx" fits maxlength=14
+        Assert.All(code.Replace("-", ""), c => Assert.True(char.IsLetterOrDigit(c)));
+        Assert.DoesNotContain(code, c => "01oilOIL".Contains(char.ToLowerInvariant(c))); // no ambiguous glyphs
+
+        // Typed without the hyphen and in a different case, it still verifies — once.
+        Assert.True(await service.VerifyAsync(userId, code.Replace("-", "").ToUpperInvariant()));
+        Assert.False(await service.VerifyAsync(userId, code));               // now consumed
+    }
+
+    [Fact]
     public async Task Disable_WithValidCode_WipesEverything()
     {
         await using var db = Fixture.CreateContext();
@@ -155,7 +177,6 @@ public class MfaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture
             new EfRepository<MfaRecoveryCode>(db),
             new UserRepository(db),
             new EphemeralDataProtectionProvider(),
-            new TokenGenerator(),
             new TokenHasher(),
             TimeProvider.System);
 

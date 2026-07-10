@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ using Perezosoft.Api.Tests.Notify;
 using Perezosoft.Core.Billing;
 using Perezosoft.Core.Entities;
 using Perezosoft.Infrastructure.Audit;
+using Perezosoft.Infrastructure.Outbox;
 using Perezosoft.Infrastructure.Persistence;
 using Perezosoft.Infrastructure.Repositories;
 
@@ -244,6 +246,194 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         }
     }
 
+    [Fact]
+    public async Task Staff_Announce_WithUserIds_NotifiesOnlyThoseMembers()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Theta", members: 3);
+        var title = $"Targeted {Guid.NewGuid():N}";
+
+        List<Guid> memberIds;
+        await using (var seed = Fixture.CreateContext(tenantId))
+            memberIds = await seed.Set<TenantMembership>()
+                .Where(m => m.TenantId == tenantId).Select(m => m.UserId).ToListAsync();
+        var target = memberIds[0];
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.Announce(
+                tenantId, new AdminAnnounceRequest { Title = title, Body = "Just you.", UserIds = [target] }, default));
+            Assert.Equal(1, Assert.IsType<AdminAnnounceResponse>(ok.Value).NotifiedCount);
+        }
+
+        await using var read = Fixture.CreateContext(tenantId);
+        var notified = await read.Set<Notification>().Where(n => n.Title == title).Select(n => n.UserId).ToListAsync();
+        Assert.Equal(new[] { target }, notified); // exactly the targeted member, nobody else
+    }
+
+    [Fact]
+    public async Task NonStaff_AnnounceAll_Returns403()
+    {
+        var callerId = await SeedUserAsync("normal2@corp.com");
+        var (controller, db) = BuildController(callerId);
+        await using (db)
+        {
+            var obj = Assert.IsType<ObjectResult>(
+                await controller.AnnounceAll(new AdminAnnounceRequest { Title = "t", Body = "b" }, default));
+            Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Staff_AnnounceAll_EnqueuesBroadcastOutboxMessage()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var accepted = Assert.IsType<AcceptedResult>(await controller.AnnounceAll(
+                new AdminAnnounceRequest { Title = "All hands", Body = "Please read." }, default));
+            Assert.Equal("queued", Assert.IsType<AdminBroadcastResponse>(accepted.Value).Status);
+        }
+
+        await using var read = Fixture.CreateContext();
+        Assert.True(await read.Set<OutboxMessage>()
+            .AnyAsync(m => m.Type == AdminBroadcastOutboxHandler.MessageType && m.Status == OutboxStatus.Pending));
+    }
+
+    [Fact]
+    public async Task AdminBroadcastHandler_NotifiesEveryUser()
+    {
+        var u1 = await SeedUserAsync($"bc1-{Guid.NewGuid():N}@x.com");
+        var u2 = await SeedUserAsync($"bc2-{Guid.NewGuid():N}@x.com");
+        var title = $"Broadcast {Guid.NewGuid():N}";
+
+        await using var db = Fixture.CreateContext();
+        var notifications = new NotificationService(
+            new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db),
+            new UserRepository(db), new CapturingEmailSender(), TimeProvider.System);
+        var handler = new AdminBroadcastOutboxHandler(new UserRepository(db), notifications);
+
+        await handler.HandleAsync(new OutboxMessage
+        {
+            Type = AdminBroadcastOutboxHandler.MessageType,
+            Payload = JsonSerializer.Serialize(new AdminBroadcastPayload(title, "Everyone gets this.")),
+        });
+        await db.SaveChangesAsync(); // handler stages; the outbox processor's tx commits in prod
+
+        var recipients = await db.Set<Notification>()
+            .Where(n => n.Title == title).Select(n => n.UserId).ToListAsync();
+        Assert.Contains(u1, recipients);
+        Assert.Contains(u2, recipients); // fan-out reached every user
+    }
+
+    [Fact]
+    public async Task NonStaff_SetSubscription_Returns403()
+    {
+        var callerId = await SeedUserAsync("normal3@corp.com");
+        var tenantId = await SeedTenantAsync("Iota", members: 1);
+        var (controller, db) = BuildController(callerId);
+        await using (db)
+        {
+            var obj = Assert.IsType<ObjectResult>(await controller.SetSubscription(
+                tenantId, new AdminSetSubscriptionRequest { PlanKey = PlanKeys.Pro }, default));
+            Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Staff_CompPro_CreatesActiveProjection_NoProviderIds_NeverLapses_AndAudits()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Kappa", members: 1);
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.SetSubscription(
+                tenantId, new AdminSetSubscriptionRequest { PlanKey = PlanKeys.Pro }, default));
+            var body = Assert.IsType<AdminSubscriptionResponse>(ok.Value);
+            Assert.Equal(PlanKeys.Pro, body.PlanKey);
+            Assert.Equal(SubscriptionStatus.Active, body.Status);
+        }
+
+        await using var read = Fixture.CreateContext(tenantId);
+        var sub = await read.Set<Subscription>().SingleAsync(s => s.TenantId == tenantId);
+        Assert.Equal(PlanKeys.Pro, sub.PlanKey);
+        Assert.Equal(SubscriptionStatus.Active, sub.Status);
+        Assert.Null(sub.StripeSubscriptionId); // a comp, not a provider subscription
+        Assert.Null(sub.CurrentPeriodEnd);     // never lapses
+        Assert.True(await read.Set<AuditEvent>().AnyAsync(
+            e => e.Action == "admin.subscription.comped" && e.ActorUserId == staffId));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("free")]     // revert is DELETE, not PUT free
+    [InlineData("platinum")] // unknown plan must not silently comp Free
+    public async Task Staff_CompUnknownOrFreePlan_Returns400(string? planKey)
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Lambda", members: 1);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<BadRequestObjectResult>(await controller.SetSubscription(
+                tenantId, new AdminSetSubscriptionRequest { PlanKey = planKey }, default));
+    }
+
+    [Fact]
+    public async Task Staff_CompOrRevert_ProviderManagedSubscription_Returns409()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Mu", members: 1);
+        await SeedSubscriptionAsync(tenantId, stripeSubscriptionId: "sub_live_123"); // real Stripe sub
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            // Stripe is the source of truth for real money (ADR-006): staff must not clobber it.
+            Assert.IsType<ConflictObjectResult>(await controller.SetSubscription(
+                tenantId, new AdminSetSubscriptionRequest { PlanKey = PlanKeys.Pro }, default));
+            Assert.IsType<ConflictObjectResult>(await controller.RemoveSubscription(tenantId, default));
+        }
+
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.Equal("sub_live_123", (await read.Set<Subscription>().SingleAsync(s => s.TenantId == tenantId)).StripeSubscriptionId);
+    }
+
+    [Fact]
+    public async Task Staff_Revert_DeletesCompedProjection_AndAudits_ThenIdempotent()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("Nu", members: 1);
+        await SeedSubscriptionAsync(tenantId); // comp-style: no provider subscription id
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            Assert.IsType<NoContentResult>(await controller.RemoveSubscription(tenantId, default));
+            // Absence ⇒ Free already — a second revert is a harmless no-op.
+            Assert.IsType<NoContentResult>(await controller.RemoveSubscription(tenantId, default));
+        }
+
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.False(await read.Set<Subscription>().AnyAsync(s => s.TenantId == tenantId));
+        Assert.True(await read.Set<AuditEvent>().AnyAsync(
+            e => e.Action == "admin.subscription.reverted" && e.ActorUserId == staffId));
+    }
+
+    [Fact]
+    public async Task Staff_SetSubscription_UnknownTenant_Returns404()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<NotFoundObjectResult>(await controller.SetSubscription(
+                Guid.CreateVersion7(), new AdminSetSubscriptionRequest { PlanKey = PlanKeys.Pro }, default));
+    }
+
     // --- construction (shared tenant context between controller + DbContext) ---
 
     private (AdminController controller, AppDbContext db) BuildController(Guid callerId)
@@ -262,7 +452,7 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
             new EfRepository<Subscription>(db), new EfRepository<AuditEvent>(db),
             new UserRepository(db),
             new JwtTokenService(new TestJwtSettings(), TimeProvider.System, NullLogger<JwtTokenService>.Instance),
-            notifications, new EfUnitOfWork(db));
+            notifications, new EfOutbox(db, TimeProvider.System), new EfUnitOfWork(db), TimeProvider.System);
 
         var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, callerId.ToString())], "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
@@ -309,7 +499,7 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         return (userId, tenantId);
     }
 
-    private async Task SeedSubscriptionAsync(Guid tenantId)
+    private async Task SeedSubscriptionAsync(Guid tenantId, string? stripeSubscriptionId = null)
     {
         await using var db = Fixture.CreateContext(tenantId); // interceptor stamps TenantId
         db.Set<Subscription>().Add(new Subscription
@@ -317,6 +507,7 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
             PlanKey = PlanKeys.Pro,
             Status = SubscriptionStatus.Active,
             StripeCustomerId = "cus_x",
+            StripeSubscriptionId = stripeSubscriptionId,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
         });

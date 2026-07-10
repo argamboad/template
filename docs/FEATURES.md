@@ -122,7 +122,8 @@ Notes:
   `otpauth://…` provisioning URI to render as a QR + one-time recovery codes), confirm possession with
   a valid code to enable, and disable/regenerate recovery codes from Settings. Once enabled, every
   sign-in path (§§1–3) requires the step-up (`POST /api/auth/mfa/verify`). The secret is encrypted at
-  rest and never returned after enrollment; recovery codes are hashed + single-use.
+  rest and never returned after enrollment; recovery codes are hashed + single-use, and are short,
+  human-typeable `xxxxx-xxxxx` codes (unambiguous alphabet; entry is case/hyphen/space-insensitive).
 
 ---
 

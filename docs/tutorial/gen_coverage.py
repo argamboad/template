@@ -428,6 +428,7 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Api/Services/PlatformStaffService.cs", "7.5", ""),
     ("src/Api/Controllers/AdminApiControllerBase.cs", "7.5", ""),
     ("src/Api/Controllers/AdminController.cs", "7.5", "sanctioned QueryAllTenants + audited EnterTenant"),
+    ("src/Api/Services/AdminBroadcastOutboxHandler.cs", "7.5", "announce-all -> outbox fan-out to every user"),
     ("src/Api/Models/AdminModels.cs", "7.5", ""),
     ("src/Shared.Ui/Pages/AdminConsole.razor", "7.5", ""),
     ("tests/Api.Tests/Admin/*", "7.5", ""),

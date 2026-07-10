@@ -562,12 +562,13 @@
 - `tests/Api.Tests/Webhooks/WebhookSubscriptionServiceTests.cs`
 - `tests/Core.Tests/WebhookSignatureTests.cs`
 
-## 7.5 — Admin back-office & impersonation (9 files)
+## 7.5 — Admin back-office & impersonation (10 files)
 
 - `src/Api/Configuration/PlatformAdminSettings.cs`
 - `src/Api/Controllers/AdminApiControllerBase.cs`
 - `src/Api/Controllers/AdminController.cs` — sanctioned QueryAllTenants + audited EnterTenant
 - `src/Api/Models/AdminModels.cs`
+- `src/Api/Services/AdminBroadcastOutboxHandler.cs` — announce-all -> outbox fan-out to every user
 - `src/Api/Services/PlatformStaffService.cs`
 - `src/Shared.Ui/Pages/AdminConsole.razor`
 - `tests/Api.Tests/Admin/AdminControllerTests.cs`
@@ -766,7 +767,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (109 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (112 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -876,6 +877,9 @@
 - `docs/tutorial/lessons/8.2-container-and-staging.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/8.3-deploy-pipeline-and-release-readiness.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/8.4-rls-tenancy-backstop.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/9.1-rebrand-and-de-sample.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/A.1-maui-shells-and-parity.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 711 tracked files · 504 built in lessons · 207 bucketed · 0 unmapped
+**Totals:** 715 tracked files · 505 built in lessons · 210 bucketed · 0 unmapped

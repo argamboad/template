@@ -108,6 +108,14 @@ fan-out via the **outbox** (ADR-007) so a domain event can produce both an email
 notification through one reliable path.
 **Deps:** outbox (ADR-007) strongly preferred.
 
+**Remaining follow-up — retention sweep (known gap, 2026-07-09):** notifications are never
+auto-reclaimed — reading only stamps `ReadAt`, and the only deletion paths are the user-initiated
+delete/clear endpoints (QA-pass addition) and account erasure. A downstream app that notifies heavily
+grows the table without bound. Sketch: extend `ExpiredTokenCleanupJob` (or add a sibling scheduled
+job) to delete **read** notifications older than N days (config, e.g.
+`Notifications:ReadRetentionDays`, null ⇒ keep forever) and optionally cap rows per user. Cheap slice;
+slots into the existing scheduler (ADR-007).
+
 ## 6. Outbound webhooks (customer-facing) — `HOOKS` → **✅ HOOKS-1 DONE (ADR-016)**
 > **Shipped** (config-gated, default off) — `WebhookSubscription` (encrypted signing secret),
 > `IWebhookPublisher.PublishAsync` fan-out → one `"webhook"` **outbox** message per sub → HMAC-signed POST
@@ -143,7 +151,10 @@ the UI (BILLING-1/5). Rate-limit per key (extend [`RateLimiting`](../src/Api/Con
 > **Shipped** — config-gated platform-staff surface: cross-tenant inspection (`EnterTenant`, filter never
 > loosened) + short-lived, non-refreshable, audited impersonation. Design in **ADR-014**, slices in
 > `docs/stories/admin.md` (ADMIN-1/2, merged). The staff-only `/admin` **console UI shipped** (UI-4:
-> tenant list/detail + "Sign in as" with an impersonation banner). Sketch below retained for historical
+> tenant list/detail + "Sign in as" with an impersonation banner). **Extended 2026-07-09 (ADR-021)** —
+> enumerated, audited admin *writes*: targeted + platform-wide announcements (outbox fan-out) and
+> subscription comp/revert (409 when Stripe-backed). Known deferred gap: a platform-level cross-tenant
+> audit trail (the broadcast's record is its outbox message). Sketch below retained for historical
 > context.
 
 **What:** a super-admin surface (cross-tenant, **platform-staff only**) to inspect tenants and

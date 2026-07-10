@@ -73,6 +73,7 @@
   <data name="Login_ErrCodeIncorrect" xml:space="preserve"><value>Ese código es incorrecto o ha caducado.</value></data>
   <data name="Login_ErrTooManyAttempts" xml:space="preserve"><value>Demasiados intentos. Espera unos minutos y luego solicita un código nuevo.</value></data>
   <data name="Login_ErrVerificationFailed" xml:space="preserve"><value>La verificación falló. Inténtalo de nuevo.</value></data>
+  <data name="Login_ErrTooManyRequests" xml:space="preserve"><value>Demasiadas solicitudes. Espera un minuto y vuelve a intentarlo.</value></data>
   <data name="Login_ErrEnterCode" xml:space="preserve"><value>Introduce el código de tu correo.</value></data>
   <data name="Login_ErrOAuthCancelled" xml:space="preserve"><value>El inicio de sesión se canceló o no se completó. Inténtalo de nuevo.</value></data>
   <data name="Common_Loading" xml:space="preserve"><value>Cargando…</value></data>
@@ -102,6 +103,9 @@
   <data name="Mfa_ErrDisable" xml:space="preserve"><value>No se pudo desactivar la verificación en dos pasos. Inténtalo de nuevo.</value></data>
   <data name="Notif_Title" xml:space="preserve"><value>Notificaciones</value></data>
   <data name="Notif_MarkAllRead" xml:space="preserve"><value>Marcar todas como leídas</value></data>
+  <data name="Notif_ClearRead" xml:space="preserve"><value>Borrar leídas</value></data>
+  <data name="Notif_ClearAll" xml:space="preserve"><value>Borrar todas</value></data>
+  <data name="Notif_Delete" xml:space="preserve"><value>Eliminar notificación</value></data>
   <data name="Notif_Empty" xml:space="preserve"><value>Estás al día.</value></data>
   <data name="Notif_JustNow" xml:space="preserve"><value>ahora mismo</value></data>
   <data name="NotifPrefs_Title" xml:space="preserve"><value>Notificaciones</value></data>
@@ -137,6 +141,22 @@
   <data name="Admin_ConfirmAnnounce" xml:space="preserve"><value>¿Enviar este anuncio a todos los miembros de «{0}»?</value></data>
   <data name="Admin_AnnounceSent" xml:space="preserve"><value>Anuncio enviado a {0} miembro(s).</value></data>
   <data name="Admin_ErrAnnounce" xml:space="preserve"><value>No se pudo enviar el anuncio.</value></data>
+  <data name="Admin_SubscriptionTitle" xml:space="preserve"><value>Suscripción</value></data>
+  <data name="Admin_CompPro" xml:space="preserve"><value>Subir a Pro (cortesía)</value></data>
+  <data name="Admin_RevertFree" xml:space="preserve"><value>Revertir a Free</value></data>
+  <data name="Admin_ProviderManaged" xml:space="preserve"><value>Gestionada por el proveedor de facturación: cambia el plan allí.</value></data>
+  <data name="Admin_ConfirmComp" xml:space="preserve"><value>¿Poner «{0}» en el plan Pro sin cargo?</value></data>
+  <data name="Admin_ConfirmRevert" xml:space="preserve"><value>¿Revertir «{0}» al plan Free?</value></data>
+  <data name="Admin_SubscriptionUpdated" xml:space="preserve"><value>Suscripción actualizada.</value></data>
+  <data name="Admin_ErrSubscription" xml:space="preserve"><value>No se pudo actualizar la suscripción.</value></data>
+  <data name="Admin_AnnounceSendSelected" xml:space="preserve"><value>Enviar a {0} seleccionado(s)</value></data>
+  <data name="Admin_ConfirmAnnounceSelected" xml:space="preserve"><value>¿Enviar este anuncio a {0} miembro(s) seleccionado(s) de «{1}»?</value></data>
+  <data name="Admin_BroadcastTitle" xml:space="preserve"><value>Anunciar a todos</value></data>
+  <data name="Admin_BroadcastHint" xml:space="preserve"><value>Envía una notificación a todos los usuarios de todos los inquilinos de la plataforma. La entrega se pone en cola y se procesa en segundo plano.</value></data>
+  <data name="Admin_BroadcastSend" xml:space="preserve"><value>Enviar a todos</value></data>
+  <data name="Admin_ConfirmBroadcast" xml:space="preserve"><value>¿Enviar este anuncio a TODOS los usuarios de TODOS los inquilinos de la plataforma?</value></data>
+  <data name="Admin_BroadcastQueued" xml:space="preserve"><value>Difusión en cola para su entrega.</value></data>
+  <data name="Admin_ErrBroadcast" xml:space="preserve"><value>No se pudo poner en cola la difusión.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>

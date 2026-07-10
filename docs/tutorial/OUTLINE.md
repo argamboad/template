@@ -5,9 +5,11 @@
 > each file as it's created. Coverage is not asserted — it is **machine-checked**:
 > `gen_coverage.py` maps every tracked file to the lesson that builds it and fails on
 > any unmapped file. See `COVERAGE.md` for the full file→lesson manifest
-> (currently: 661 tracked files · 502 built in lessons · 159 explicitly bucketed as
-> generated/vendored/meta · **0 unmapped** — last reconciled 2026-07-08, pre-QA pass;
-> now includes the DevOps thread: CI born in lesson 1.6 and growing a job per part,
+> (currently: 715 tracked files · 505 built in lessons · 210 explicitly bucketed as
+> generated/vendored/meta · **0 unmapped** — last reconciled 2026-07-09, includes the
+> QA-pass findings/features: rate-limit split + 429 copy in 2.4, typeable recovery codes
+> in 6.5, notification delete/clear in 7.2, targeted/broadcast announce + plan comp in
+> 7.5; plus the DevOps thread: CI born in lesson 1.6 and growing a job per part,
 > deploy pipeline + release readiness in 8.3, the RLS backstop in 8.4).
 
 ## Pedagogical spine
@@ -125,20 +127,24 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
   download URLs; the pattern MFA/webhook secrets reuse.
 - **6.4 The SSRF seam.** `IOutboundUrlGuard`: block loopback/link-local/RFC-1918/metadata;
   HTTPS outside dev (R3). Placed here because Part 7 needs it.
-- **6.5 MFA / TOTP.** Encrypted secret, hashed recovery codes, anti-replay timesteps (R32);
-  step-up enforced on **every** sign-in path (ADR-012); QR enroll UI.
+- **6.5 MFA / TOTP.** Encrypted secret; hashed, **human-typeable** recovery codes
+  (`xxxxx-xxxxx`, canonicalized entry); anti-replay timesteps (R32); step-up enforced on
+  **every** sign-in path (ADR-012); QR enroll UI.
 
 ## Part 7 — Compliance & extensibility
 - **7.1 GDPR.** Contributor seam grows `ExportKey`/`ExportAsync`; per-user erasure via
   `IUserDataContributor` — the build fails without it (R12).
 - **7.2 In-app notifications.** Outbox fan-out; per-user prefs — the sanctioned
-  "per-user, not per-tenant" exception, examined (ADR-013).
+  "per-user, not per-tenant" exception, examined (ADR-013); caller-scoped delete/clear
+  (the API exposes the verbs clients need — no DB side-doors).
 - **7.3 Public API & API keys.** Config-gated default-OFF (R21); hash-only keys; key →
   tenant-scoped principal; per-key rate limits (ADR-015).
 - **7.4 Outbound webhooks.** Encrypted secrets (6.3), HMAC signatures, outbox delivery
   (4.1), SSRF guard (6.4) — four seams composing (ADR-016).
 - **7.5 Admin back-office.** Staff allowlist; sanctioned cross-tenant reads; short-lived
-  **audited** impersonation via `EnterTenant` (ADR-014).
+  **audited** impersonation via `EnterTenant` (ADR-014); targeted + platform-wide
+  announcements (the latter a 202 → outbox fan-out); plan comp/revert (409 when
+  Stripe-backed — the provider stays the source of truth).
 
 ## Part 8 — Ship it
 - **8.1 Single-origin hosting.** API serves the WASM bundle; why this kills the

@@ -251,7 +251,9 @@
             var res = await Http.PostAsJsonAsync("/api/auth/magic-link/send",
                 new { email = _email.Trim(), culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName });
             if (res.IsSuccessStatusCode) _mode = Mode.MagicLinkSent;
-            else _error = Localizer["Login_ErrCouldntSendLink"];
+            else _error = res.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                ? Localizer["Login_ErrTooManyRequests"]
+                : Localizer["Login_ErrCouldntSendLink"];
         }
         catch { _error = Localizer["Login_ErrCouldntSendLink"]; }
         finally { _busy = false; _pending = Mode.Idle; }
@@ -267,7 +269,9 @@
             var res = await Http.PostAsJsonAsync("/api/auth/otp/send",
                 new { email = _email.Trim(), culture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName });
             if (res.IsSuccessStatusCode) { _mode = Mode.OtpSent; _otpCode = string.Empty; }
-            else _error = Localizer["Login_ErrCouldntSendCode"];
+            else _error = res.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                ? Localizer["Login_ErrTooManyRequests"]
+                : Localizer["Login_ErrCouldntSendCode"];
         }
         catch { _error = Localizer["Login_ErrCouldntSendCode"]; }
         finally { _busy = false; _pending = Mode.Idle; }
@@ -326,9 +330,12 @@
             // requesting a fresh code won't help until the window elapses (CONF-5). Surfacing the
             // generic "incorrect or expired" here would wrongly imply a mistype. The server keeps
             // wrong-vs-no-active-code collapsed to invalid_code for enumeration safety (CONF-6).
-            _error = res.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                ? await OtpErrorAsync(res)
-                : Localizer["Login_ErrVerificationFailed"];
+            _error = res.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Unauthorized => await OtpErrorAsync(res),
+                System.Net.HttpStatusCode.TooManyRequests => Localizer["Login_ErrTooManyRequests"],
+                _ => Localizer["Login_ErrVerificationFailed"],
+            };
         }
         catch { _error = Localizer["Login_ErrVerificationFailed"]; }
         finally { _busy = false; }

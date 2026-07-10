@@ -9,7 +9,12 @@
 > (staff announcements → notification fan-out). **UI shipped**
 > (`feat/ui-4-admin`): a staff-only `/admin` console (`AdminConsole`) — tenant list/detail + **Sign in as**
 > with an impersonation banner + **Stop** — gated by a new non-gating probe `GET /api/admin/me`
-> (`{is_staff}`; allowlist stays config-only). EN/ES; QA-ADMIN-01..04.
+> (`{is_staff}`; allowlist stays config-only). EN/ES; QA-ADMIN-01..06.
+> **Extended 2026-07-09 (QA pass, ADR-021):** announcements gained an optional **`user_ids` subset**
+> (intersected with the roster) + a **platform-wide broadcast** (`POST /api/admin/announce-all`,
+> 202 → outbox fan-out via `AdminBroadcastOutboxHandler`), and staff can **comp/revert a tenant's plan**
+> (`PUT|DELETE /api/admin/tenants/{id}/subscription`; 409 when Stripe-backed). Console UI: member
+> checkboxes on the roster, an "Announce to everyone" card, plan badge + comp/revert buttons.
 
 **Epic key:** `ADMIN`
 
@@ -19,11 +24,14 @@
 - Reuses: audit (ADR-008 ✅), the audited escape hatch (ADR-003 ✅), JWT issuance, RBAC (ADR-009 ✅).
   No new packages.
 
-**Guardrails (ADR-014):** the global tenant filter is **never loosened** (scoped in-tenant reads/writes
-enter the target via `EnterTenant`, keeping the filter engaged); staff is **config-only** (never a tenant
-role / app toggle); impersonation is **short-lived + non-refreshable + audited**; admin is **read-only**
-over tenant data (the ADMIN-3 announcement is the one sanctioned write: it creates **per-user
-notifications** through the normal fan-out, never mutates tenant data, and is audited in-tenant).
+**Guardrails (ADR-014, amended by ADR-021):** the global tenant filter is **never loosened** (scoped
+in-tenant reads/writes enter the target via `EnterTenant`, keeping the filter engaged); staff is
+**config-only** (never a tenant role / app toggle); impersonation is **short-lived + non-refreshable +
+audited**; admin is **read-only by default** over tenant data, with an **enumerated list of audited
+writes** (ADR-021): announcements (per-tenant, optional member subset, and the platform-wide broadcast —
+per-user notification rows through the normal fan-out) and the subscription **comp/revert** (the one
+tenant-data mutation; refused 409 whenever a live provider subscription exists — Stripe stays the source
+of truth, ADR-006). Any further admin write requires a new ADR/amendment.
 
 ---
 
@@ -77,8 +85,11 @@ Scenario: The global filter is never loosened
   Then admin tenant-detail reads enter the target tenant via EnterTenant (filter engaged), not a disabled filter
 ```
 
-**Out of scope:** cross-tenant **writes** (admin is read-only; changes go through impersonation, ADMIN-2);
-a metrics/analytics dashboard; a staff-management UI (allowlist is config).
+**Out of scope:** cross-tenant **writes beyond the ADR-021 enumeration** (announce/broadcast +
+subscription comp/revert; anything else goes through impersonation, ADMIN-2, or a new ADR);
+a metrics/analytics dashboard; a staff-management UI (allowlist is config); a platform-level
+cross-tenant audit trail (the broadcast's known gap — deferred until a second cross-tenant action
+needs it).
 **Definition of done:** tests first; staff-gate allow/deny (403), list + detail via the hatch, config-only
 staff, audit on access; merged, app working; ADR-014 referenced.
 

@@ -48,6 +48,8 @@ public class RateLimitingTests
                    {
                        endpoints.MapPost("/otp/send", () => Results.Ok())
                                 .RequireRateLimiting(RateLimiting.PasswordlessPolicy);
+                       endpoints.MapPost("/otp/verify", () => Results.Ok())
+                                .RequireRateLimiting(RateLimiting.PasswordlessVerifyPolicy);
                        endpoints.MapGet("/pub", () => Results.Ok())
                                 .RequireRateLimiting(RateLimiting.PublicApiPolicy);
                    });
@@ -73,6 +75,29 @@ public class RateLimitingTests
         // ...the next one trips the limiter.
         var tripped = await client.PostAsync("/otp/send", content: null);
         Assert.Equal(HttpStatusCode.TooManyRequests, tripped.StatusCode);
+    }
+
+    [Fact]
+    public async Task OtpVerify_HasIndependentBudget_SizedAboveTheAttemptCap_SoTheLockoutIsReachable()
+    {
+        using var server = await StartHostAsync();
+        var client = server.CreateClient();
+
+        // Exhaust the whole SEND budget from this IP (the email-bomb guard).
+        for (var i = 0; i < RateLimiting.PermitLimit; i++)
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/otp/send", content: null)).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.PostAsync("/otp/send", content: null)).StatusCode);
+
+        // VERIFY must still have its own, untouched budget — sized above the OTP attempt cap so the
+        // server-side 401 too_many_attempts lockout returns BEFORE this throttle's 429 can mask it
+        // (the reported bug: after 5 attempts the UI showed the generic "Verification failed").
+        var verifyBudget = RateLimiting.VerifyPermitFor(RateLimiting.PermitLimit, otpMaxAttempts: 5);
+        Assert.True(verifyBudget > 5, "verify budget must exceed the OTP attempt cap so the lockout wins the race");
+        for (var i = 0; i < verifyBudget; i++)
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsync("/otp/verify", content: null)).StatusCode);
+
+        // ...and only past its own, larger budget does the verify throttle finally trip.
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await client.PostAsync("/otp/verify", content: null)).StatusCode);
     }
 
     [Fact]

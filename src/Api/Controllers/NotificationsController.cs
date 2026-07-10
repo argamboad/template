@@ -62,6 +62,30 @@ public class NotificationsController(INotificationService notifications) : Contr
         return NoContent();
     }
 
+    /// <summary>Deletes one of the caller's notifications.</summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        if (CurrentUserId is not { } userId)
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
+
+        return await notifications.DeleteAsync(userId, id, cancellationToken)
+            ? NoContent()
+            : NotFound(new ErrorResponse("notification_not_found", "Notification not found"));
+    }
+
+    /// <summary>Clears the caller's notifications: <c>?read=true</c> removes only the already-read ones,
+    /// otherwise all of them. Returns how many were cleared.</summary>
+    [HttpDelete]
+    public async Task<IActionResult> Clear([FromQuery] bool read, CancellationToken cancellationToken)
+    {
+        if (CurrentUserId is not { } userId)
+            return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
+
+        var cleared = await notifications.DeleteAllAsync(userId, onlyRead: read, cancellationToken);
+        return Ok(new NotificationsClearedResponse { Cleared = cleared });
+    }
+
     /// <summary>The caller's delivery preferences (defaults to both channels on).</summary>
     [HttpGet("preferences")]
     public async Task<IActionResult> GetPreferences(CancellationToken cancellationToken)

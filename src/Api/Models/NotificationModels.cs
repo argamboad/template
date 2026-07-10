@@ -31,6 +31,11 @@ public record UnreadCountResponse
     [JsonPropertyName("count")] public required int Count { get; init; }
 }
 
+public record NotificationsClearedResponse
+{
+    [JsonPropertyName("cleared")] public required int Cleared { get; init; }
+}
+
 public record NotificationPreferencesResponse
 {
     [JsonPropertyName("in_app")] public required bool InApp { get; init; }
