@@ -40,6 +40,14 @@
     color: #344054;
 }
 
+/* Dark theme: the provider buttons keep their shape but drop the hardcoded light surface. */
+[data-bs-theme="dark"] .btn-oauth,
+[data-bs-theme="dark"] .btn-oauth:hover {
+    background: var(--bs-body-bg);
+    border-color: var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+
 .oauth-icon {
     width: 18px;
     height: 18px;
@@ -61,4 +69,13 @@
     flex: 1;
     height: 1px;
     background: #E4E7EC;
+}
+
+[data-bs-theme="dark"] .divider-text {
+    color: var(--bs-secondary-color);
+}
+
+[data-bs-theme="dark"] .divider-text::before,
+[data-bs-theme="dark"] .divider-text::after {
+    background: var(--bs-border-color);
 }

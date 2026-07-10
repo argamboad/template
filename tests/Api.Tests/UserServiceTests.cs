@@ -89,4 +89,34 @@ public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtur
 
         Assert.Equal(a.Id, b.Id);
     }
+
+    [Fact]
+    public async Task UpdateTheme_SetsOverwritesAndClearsThePreference()
+    {
+        await using var db = Fixture.CreateContext();
+        var sut = new ServiceHarness(db).UserService();
+        var user = await sut.GetOrCreateByEmailAsync("theme@example.com");
+
+        await sut.UpdateThemeAsync(user.Id, "dark");
+        await using (var read = Fixture.CreateContext())
+            Assert.Equal("dark", (await read.Users.SingleAsync(u => u.Id == user.Id)).Theme);
+
+        await sut.UpdateThemeAsync(user.Id, "light");
+        await using (var read = Fixture.CreateContext())
+            Assert.Equal("light", (await read.Users.SingleAsync(u => u.Id == user.Id)).Theme);
+
+        // "system" is stored as null — no per-user preference, the device decides.
+        await sut.UpdateThemeAsync(user.Id, null);
+        await using (var read = Fixture.CreateContext())
+            Assert.Null((await read.Users.SingleAsync(u => u.Id == user.Id)).Theme);
+    }
+
+    [Fact]
+    public async Task UpdateTheme_UnknownUser_IsANoOp()
+    {
+        await using var db = Fixture.CreateContext();
+        var sut = new ServiceHarness(db).UserService();
+
+        await sut.UpdateThemeAsync(Guid.CreateVersion7(), "dark"); // must not throw
+    }
 }

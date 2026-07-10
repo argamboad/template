@@ -83,6 +83,12 @@ enroll/step-up, GDPR export/erasure, notification bell menu, admin console) all 
 **Open items:** HOOKS-3 (a Blazor webhook/API-key management UI) and API-key rotation. **Deferred:**
 CACHE (Redis — until multi-node).
 
+**`THEME` — per-user dark mode → ✅ COMPLETE (2026-07-10).** Light/Dark/System on Bootstrap 5.3's
+`data-bs-theme`, following the two preference playbooks: device-local pre-paint bootstrap
+(`theme.js` + `localStorage["app_theme"]`, the NATIVE-5 culture seam minus the Preferences half)
+and server sync (`User.Theme`, `PUT /api/auth/theme`, `theme` JWT claim, cold-start layout
+reconcile — the `locale` playbook). See `docs/stories/theme.md`.
+
 **`RLS` — Postgres row-level-security tenancy backstop → ✅ COMPLETE (decided + built 2026-07-06,
 ADR-020 + addendum).** DB-level second wall under the ADR-003 query filter: FORCEd fail-closed
 policies on every `ITenantScoped` table, `RlsSessionInterceptor` GUC propagation, tags/EnterTenant

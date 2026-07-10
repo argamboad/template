@@ -109,7 +109,7 @@ Notes:
 - An owner or admin can regenerate (new token; the old one dies) or revoke a pending invite.
 - A user is always in exactly one tenant — accepting **moves** them, never adds a second.
 
-### 6. Account settings (linked providers + language)
+### 6. Account settings (linked providers + language + theme)
 **Goal:** manage per-user account settings on `/settings`.
 
 - **Linked accounts:** `GET /api/auth/logins` lists linked providers;
@@ -118,6 +118,10 @@ Notes:
   you out).
 - **Language:** the switcher persists the user's locale via `PUT /api/auth/locale`; it lands in the
   JWT on the next refresh and localizes the UI and outgoing emails. See `docs/LOCALIZATION.md`.
+- **Theme (THEME-1):** a Light/Dark/System switcher in the header (and on the login page). Applies
+  live via Bootstrap's `data-bs-theme`; persists device-locally (`localStorage["app_theme"]`, applied
+  pre-paint by `theme.js`) and — signed in — server-side via `PUT /api/auth/theme` ("system" stores
+  null), reconciled on the next cold start like the locale. See `docs/stories/theme.md`.
 - **MFA (authenticator TOTP; ADR-012):** enroll via `POST /api/auth/mfa/enroll` (returns an
   `otpauth://…` provisioning URI to render as a QR + one-time recovery codes), confirm possession with
   a valid code to enable, and disable/regenerate recovery codes from Settings. Once enabled, every

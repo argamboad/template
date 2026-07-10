@@ -37,6 +37,9 @@ public interface IUserService
 
     /// <summary>Updates the user's preferred UI language (null clears it).</summary>
     Task UpdateLocaleAsync(Guid userId, string? locale, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates the user's preferred UI theme (null = follow the OS scheme).</summary>
+    Task UpdateThemeAsync(Guid userId, string? theme, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -210,6 +213,15 @@ public class UserService(
         var user = await repository.GetByIdAsync(userId, cancellationToken);
         if (user is null) return;
         user.Locale = locale;
+        user.UpdatedAt = clock.GetUtcNow();
+        await repository.UpdateAsync(user, cancellationToken);
+    }
+
+    public async Task UpdateThemeAsync(Guid userId, string? theme, CancellationToken cancellationToken = default)
+    {
+        var user = await repository.GetByIdAsync(userId, cancellationToken);
+        if (user is null) return;
+        user.Theme = theme;
         user.UpdatedAt = clock.GetUtcNow();
         await repository.UpdateAsync(user, cancellationToken);
     }

@@ -45,7 +45,7 @@ public class SessionService(
         var (tenantId, tenantName) = await ResolveTenantAsync(user.Id, cancellationToken);
 
         var accessToken = jwtTokenService.IssueAccessToken(
-            user.Id, user.Email, provider, user.DisplayName, tenantName, user.Locale, tenantId);
+            user.Id, user.Email, provider, user.DisplayName, tenantName, user.Locale, tenantId, user.Theme);
 
         var response = new TokenResponse
         {

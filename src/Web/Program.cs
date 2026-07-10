@@ -41,6 +41,7 @@ builder.Services.AddScoped(sp =>
 // Localization — IStringLocalizer<AppStrings> resolves the RCL's .resx resources.
 builder.Services.AddLocalization();
 builder.Services.AddSingleton<ICulturePersistence, LocalStorageCulturePersistence>();
+builder.Services.AddSingleton<IThemePersistence, LocalStorageThemePersistence>();
 builder.Services.AddSingleton<IFileDownloadLauncher, BrowserFileDownloadLauncher>();
 // Never notified on web — external flows return via a full redirect (fresh page load); the
 // registration only satisfies the shared pages' injection (see AppResumeNotifier).

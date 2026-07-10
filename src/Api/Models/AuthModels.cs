@@ -14,3 +14,6 @@ public record NativeExchangeRequest(
 
 public record LocaleRequest(
     [property: JsonPropertyName("locale")] string? Locale);
+
+public record ThemeRequest(
+    [property: JsonPropertyName("theme")] string? Theme);

@@ -61,6 +61,10 @@ public static class MauiProgram
 		builder.Services.AddLocalization();
 		builder.Services.AddSingleton<ICulturePersistence, PreferencesCulturePersistence>();
 
+		// Theme needs no Preferences bootstrap: it's pure DOM, and theme.js reads the
+		// WebView's own localStorage before first paint (THEME-1).
+		builder.Services.AddSingleton<IThemePersistence, LocalStorageThemePersistence>();
+
 		// Signed-URL downloads can't ride a WebView navigation — fetch + OS share sheet instead
 		// (NATIVE-3). Uses the default (Bearer) client registered below: the signed URL itself
 		// needs no auth, but absolute URLs bypass BaseAddress so the same client serves both.

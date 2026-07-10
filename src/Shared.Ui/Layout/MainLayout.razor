@@ -4,6 +4,8 @@
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject ICulturePersistence CulturePersistence
+@inject IThemePersistence ThemePersistence
+@inject IJSRuntime JS
 @inject IStringLocalizer<AppStrings> Localizer
 
 @if (!_initialized)
@@ -64,6 +66,23 @@ else
                 await CulturePersistence.PersistAsync(Auth.Locale);
             }
             catch (CultureNotFoundException) { /* unknown locale — keep the current culture */ }
+        }
+
+        // Same cross-device reconcile for the theme: a saved "light"/"dark" wins over the
+        // device value (a null server value means "system" — leave the device alone). The
+        // attribute applies live, so no reload is needed.
+        if (Auth.IsAuthenticated && Auth.Theme is { } savedTheme)
+        {
+            try
+            {
+                var local = await JS.InvokeAsync<string>("appTheme.current");
+                if (!string.Equals(savedTheme, local, StringComparison.OrdinalIgnoreCase))
+                {
+                    await JS.InvokeVoidAsync("appTheme.set", savedTheme);
+                    await ThemePersistence.PersistAsync(savedTheme);
+                }
+            }
+            catch { /* JS unavailable — the device default stands */ }
         }
 
         _initialized = true;
