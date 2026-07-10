@@ -24,6 +24,14 @@ Backstop after working through the list: `git grep -i perezosoft` and a search f
 - **Email sender name** — `Email:Smtp:FromName`. The committed runtime default lives in
   `src/Api/appsettings*.json` (currently "Perezosoft"); `Email__Smtp__FromName` in `.env` (dev) or
   env vars (prod) only *overrides* it. Update the appsettings default and any env override together.
+- **`src/Api/Services/MfaService.cs`** — the `Issuer` const ("Perezosoft"): what authenticator apps
+  display for enrolled accounts, and the letter-monogram they draw derives from it. Easy to miss —
+  users only ever see it inside Google Authenticator & co.
+- **`docs/postman/`** — the collection's `info.name` ("Perezosoft Platform API"), both environment
+  `name`s, and the `Perezosoft.*.json` **file names**. If you rename the files, update the hardcoded
+  collection path in `.github/workflows/postman-sync.yml` in the same commit; and since the sync
+  matches workspace items **by name**, delete the old-brand copies in the Postman workspace once
+  after the first post-rename sync.
 
 ## 2. Tagline — "Lazy reputation. Efficient engineering." → yours
 - `src/Shared.Ui/wwwroot/brand/lockup_light.svg` — the wordmark-lockup text
