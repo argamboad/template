@@ -14,6 +14,12 @@
 > `{mfa_required, challenge}` response on the OTP + OAuth-exchange paths (`AuthService.VerifyOtpAsync`/
 > `SignInWithOAuthAsync` return a `SignInResult`; `VerifyMfaAsync` completes it) and reuses the same
 > step-up prompt (QA-MFA-05). **MFA is now enforced on every sign-in path, web and native — no gaps.**
+> **Extended 2026-07-10 (ADR-021 addendum, `feat/admin-mfa-reset`):** a user who loses **both** the
+> authenticator and the recovery codes now has a recovery path — a **staff-only reset**
+> (`DELETE /api/admin/users/{userId}/mfa` → `IMfaService.ResetAsync`, no code required) after
+> out-of-band identity verification; audited in the target's tenant (`admin.mfa.reset`) + the user is
+> notified (in-app + email). Second factor only — primary auth untouched; re-enroll from Settings.
+> See `docs/stories/admin.md` + ADR-021 addendum. QA-ADMIN-07.
 
 **Epic key:** `MFA`
 
@@ -146,7 +152,8 @@ Scenario: A recovery code completes the challenge once
 ```
 
 **Out of scope:** "remember this device" / trusted devices; step-up for sensitive actions beyond login;
-admin-forced MFA reset.
+admin-forced MFA reset *(since shipped — ADR-021 addendum 2026-07-10, staff-only `DELETE
+/api/admin/users/{userId}/mfa`; see `docs/stories/admin.md`)*.
 **Definition of done:** tests first; challenge issued when MFA on, session withheld until verified,
 expired/tampered/wrong-code rejected, no-MFA path unchanged, recovery-code path consumes one; merged,
 app working; ADR-012 referenced.
@@ -166,5 +173,7 @@ Ordered, each a mergeable vertical slice. TDD throughout.
    magic-link) step-up needs the MFA client page.
 
 **Known sharp edges (from ADR-012):** the secret stays **encrypted at rest** (never re-returned/logged);
-recovery codes are **hashed + single-use**; **enable/disable require a valid code** (prove possession);
-the **step-up is server-enforced** (signed challenge required); MFA is **user PII** (wiped by erasure).
+recovery codes are **hashed + single-use**; **enable/disable require a valid code** (prove possession —
+the one exception is the **staff reset**, ADR-021 addendum: admin-path only, out-of-band identity check,
+audited + user notified); the **step-up is server-enforced** (signed challenge required); MFA is
+**user PII** (wiped by erasure).

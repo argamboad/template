@@ -32,6 +32,15 @@ public interface IMfaService
     /// <summary>Disables MFA (requires a valid code) and wipes the secret + recovery codes.</summary>
     Task<MfaDisableResult> DisableAsync(Guid userId, string code, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Staff recovery path (ADR-021 addendum): wipes the secret + recovery codes <b>without a code</b> —
+    /// the possession proof <see cref="DisableAsync"/> demands is exactly what a user who lost both the
+    /// authenticator and the codes cannot provide. Only the staff-gated admin endpoint may call this
+    /// (identity is verified out-of-band); never expose it on a user-facing path. False when there was
+    /// nothing to wipe.
+    /// </summary>
+    Task<bool> ResetAsync(Guid userId, CancellationToken cancellationToken = default);
+
     /// <summary>True if the code is a valid TOTP or an unused recovery code (which it then consumes).</summary>
     Task<bool> VerifyAsync(Guid userId, string code, CancellationToken cancellationToken = default);
 }
@@ -122,6 +131,13 @@ public sealed class MfaService(
         await recoveryCodes.Query().Where(c => c.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         await mfa.Query().Where(m => m.UserId == userId).ExecuteDeleteAsync(cancellationToken);
         return MfaDisableResult.Disabled;
+    }
+
+    public async Task<bool> ResetAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var codesWiped = await recoveryCodes.Query().Where(c => c.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+        var mfaWiped = await mfa.Query().Where(m => m.UserId == userId).ExecuteDeleteAsync(cancellationToken);
+        return codesWiped + mfaWiped > 0;
     }
 
     public async Task<bool> VerifyAsync(Guid userId, string code, CancellationToken cancellationToken = default)

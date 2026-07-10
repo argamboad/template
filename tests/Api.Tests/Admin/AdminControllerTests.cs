@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -434,7 +435,84 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
                 Guid.CreateVersion7(), new AdminSetSubscriptionRequest { PlanKey = PlanKeys.Pro }, default));
     }
 
+    // --- ADR-021 addendum: staff MFA reset (recovery when authenticator + codes are lost) ---
+
+    [Fact]
+    public async Task NonStaff_ResetMfa_Returns403_AndWipesNothing()
+    {
+        var callerId = await SeedUserAsync("normal4@corp.com");
+        var (targetId, _) = await SeedUserInTenantWithIdAsync();
+        await SeedMfaAsync(targetId);
+
+        var (controller, db) = BuildController(callerId);
+        await using (db)
+        {
+            var obj = Assert.IsType<ObjectResult>(await controller.ResetMfa(targetId, default));
+            Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+        }
+
+        await using var read = Fixture.CreateContext();
+        Assert.True(await read.Set<UserMfa>().AnyAsync(m => m.UserId == targetId && m.Enabled));
+        Assert.True(await read.Set<MfaRecoveryCode>().AnyAsync(c => c.UserId == targetId));
+    }
+
+    [Fact]
+    public async Task Staff_ResetMfa_WipesMfa_AuditsInTargetTenant_AndNotifies()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (targetId, tenantId) = await SeedUserInTenantWithIdAsync();
+        await SeedMfaAsync(targetId);
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<NoContentResult>(await controller.ResetMfa(targetId, default));
+
+        // The wipe: secret and recovery codes are gone (the user can re-enroll from scratch).
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.False(await read.Set<UserMfa>().AnyAsync(m => m.UserId == targetId));
+        Assert.False(await read.Set<MfaRecoveryCode>().AnyAsync(c => c.UserId == targetId));
+
+        // Loud, in-tenant audit — like impersonation, the tenant can see staff touched the account.
+        Assert.True(await read.Set<AuditEvent>().AnyAsync(e =>
+            e.Action == "admin.mfa.reset" && e.ActorUserId == staffId && e.EntityId == targetId.ToString()));
+
+        // The affected user is told through the normal fan-out: in-app row + email copy.
+        Assert.True(await read.Set<Notification>().AnyAsync(n =>
+            n.UserId == targetId && n.Kind == AdminMfaResetNotification.Kind));
+        Assert.Contains(_email.Sent, m => m.To == $"t-{targetId:N}@x.com");
+    }
+
+    [Fact]
+    public async Task Staff_ResetMfa_UnknownUser_Returns404()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<NotFoundObjectResult>(await controller.ResetMfa(Guid.CreateVersion7(), default));
+    }
+
+    [Fact]
+    public async Task Staff_ResetMfa_NoMfaState_IsNoOp_WithoutAuditOrNotification()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (targetId, tenantId) = await SeedUserInTenantWithIdAsync(); // never enrolled
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<NoContentResult>(await controller.ResetMfa(targetId, default)); // idempotent
+
+        // Nothing was reset, so nothing is audited and nobody is alarmed.
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.False(await read.Set<AuditEvent>().AnyAsync(e =>
+            e.Action == "admin.mfa.reset" && e.EntityId == targetId.ToString()));
+        Assert.False(await read.Set<Notification>().AnyAsync(n => n.UserId == targetId));
+        Assert.Empty(_email.Sent);
+    }
+
     // --- construction (shared tenant context between controller + DbContext) ---
+
+    // Captures the email copies NotifyAsync sends, so tests can assert delivery (e.g. the MFA reset).
+    private readonly CapturingEmailSender _email = new();
 
     private (AdminController controller, AppDbContext db) BuildController(Guid callerId)
     {
@@ -445,14 +523,17 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         var staff = new PlatformStaffService(new UserRepository(db), Options.Create(new PlatformAdminSettings { StaffEmails = [StaffEmail] }));
         var notifications = new NotificationService(
             new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db),
-            new UserRepository(db), new CapturingEmailSender(), TimeProvider.System);
+            new UserRepository(db), _email, TimeProvider.System);
+        var mfaService = new MfaService(
+            new EfRepository<UserMfa>(db), new EfRepository<MfaRecoveryCode>(db), new UserRepository(db),
+            new EphemeralDataProtectionProvider(), new TokenHasher(), TimeProvider.System);
         var controller = new AdminController(
             staff, new TenantRepository(db), ctx,
             new AuditLog(new EfRepository<AuditEvent>(db), TimeProvider.System),
             new EfRepository<Subscription>(db), new EfRepository<AuditEvent>(db),
             new UserRepository(db),
             new JwtTokenService(new TestJwtSettings(), TimeProvider.System, NullLogger<JwtTokenService>.Instance),
-            notifications, new EfOutbox(db, TimeProvider.System), new EfUnitOfWork(db), TimeProvider.System);
+            notifications, mfaService, new EfOutbox(db, TimeProvider.System), new EfUnitOfWork(db), TimeProvider.System);
 
         var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, callerId.ToString())], "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
@@ -497,6 +578,16 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         db.Set<TenantMembership>().Add(new TenantMembership { TenantId = tenantId, UserId = userId, Role = TenantRoles.Owner });
         await db.SaveChangesAsync();
         return (userId, tenantId);
+    }
+
+    /// <summary>Enabled MFA state for a user: one UserMfa row + a recovery code (reset never decrypts,
+    /// so placeholder ciphertext/hash are enough).</summary>
+    private async Task SeedMfaAsync(Guid userId)
+    {
+        await using var db = Fixture.CreateContext();
+        db.Set<UserMfa>().Add(new UserMfa { UserId = userId, EncryptedSecret = "enc", Enabled = true, EnrolledAt = DateTimeOffset.UtcNow });
+        db.Set<MfaRecoveryCode>().Add(new MfaRecoveryCode { UserId = userId, CodeHash = "hash" });
+        await db.SaveChangesAsync();
     }
 
     private async Task SeedSubscriptionAsync(Guid tenantId, string? stripeSubscriptionId = null)

@@ -1103,3 +1103,18 @@ boundary. So the read-only posture is **amended, not abandoned**: admin writes e
    ADR-007). It has **no in-tenant audit row** — `AuditEvent` is tenant-scoped and the action spans all
    tenants; the durable outbox message is the record. A platform-level (cross-tenant) audit trail is a
    known gap, deliberately deferred until a second cross-tenant action needs it.
+
+**Addendum (2026-07-10) — enumerated write (c): staff MFA reset.** MFA had **no recovery path**: the
+self-serve disable (`MfaService.DisableAsync`, ADR-012) requires a valid TOTP or recovery code — the
+possession proof a user who lost **both** the authenticator and the codes cannot provide — and every
+sign-in path steps up (MFA-2/3/4), so such a user was locked out permanently. The escape hatch is
+operator-mediated: **`DELETE /api/admin/users/{userId}/mfa`** (staff-gated) wipes the target's
+`UserMfa` + `MfaRecoveryCode` rows via a new **`IMfaService.ResetAsync`** that skips code verification —
+callable only from the admin path, never exposed on a user-facing endpoint. Preconditions and
+guardrails: **identity is verified out-of-band** (support process, not the app) before the reset; the
+action is **audited in the target's tenant** (`admin.mfa.reset`, like `admin.impersonation.started`);
+and the affected user is **notified through the normal fan-out** (in-app + email,
+`security.mfa_reset`), so a malicious or mistaken reset cannot be silent. The reset only removes the
+second factor — primary auth is untouched, and the user re-enrolls from Settings. No MFA state is an
+idempotent no-op 204 (no audit/notification noise). Console UI: a confirm-gated **Reset MFA** button
+on the tenant-detail member row. QA-ADMIN-07.

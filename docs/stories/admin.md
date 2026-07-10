@@ -15,6 +15,13 @@
 > 202 → outbox fan-out via `AdminBroadcastOutboxHandler`), and staff can **comp/revert a tenant's plan**
 > (`PUT|DELETE /api/admin/tenants/{id}/subscription`; 409 when Stripe-backed). Console UI: member
 > checkboxes on the roster, an "Announce to everyone" card, plan badge + comp/revert buttons.
+> **Extended 2026-07-10 (ADR-021 addendum, `feat/admin-mfa-reset`):** staff can **reset a user's MFA**
+> (`DELETE /api/admin/users/{userId}/mfa`) — the recovery path for a user who lost both the
+> authenticator and the recovery codes. Wipes `UserMfa` + `MfaRecoveryCode` via
+> `IMfaService.ResetAsync` (no code — admin-path only) after **out-of-band identity verification**;
+> audited in the target's tenant (`admin.mfa.reset`) and the user is notified through the fan-out
+> (in-app + email, `security.mfa_reset`). Console UI: confirm-gated **Reset MFA** button on the member
+> row. QA-ADMIN-07.
 
 **Epic key:** `ADMIN`
 
@@ -29,9 +36,11 @@ in-tenant reads/writes enter the target via `EnterTenant`, keeping the filter en
 **config-only** (never a tenant role / app toggle); impersonation is **short-lived + non-refreshable +
 audited**; admin is **read-only by default** over tenant data, with an **enumerated list of audited
 writes** (ADR-021): announcements (per-tenant, optional member subset, and the platform-wide broadcast —
-per-user notification rows through the normal fan-out) and the subscription **comp/revert** (the one
+per-user notification rows through the normal fan-out), the subscription **comp/revert** (the one
 tenant-data mutation; refused 409 whenever a live provider subscription exists — Stripe stays the source
-of truth, ADR-006). Any further admin write requires a new ADR/amendment.
+of truth, ADR-006), and the **staff MFA reset** (`DELETE /api/admin/users/{userId}/mfa` — per-user
+identity rows only, after out-of-band identity verification; audited in-tenant + user notified — ADR-021
+addendum 2026-07-10). Any further admin write requires a new ADR/amendment.
 
 ---
 
