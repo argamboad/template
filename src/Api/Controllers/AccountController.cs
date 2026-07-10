@@ -10,7 +10,7 @@ using Perezosoft.Core.Repositories;
 namespace Perezosoft.Api.Controllers;
 
 /// <summary>
-/// Signed-in account surface: profile, erasure, locale preference, and OAuth login links.
+/// Signed-in account surface: profile, erasure, locale/theme preferences, and OAuth login links.
 /// </summary>
 [ApiController]
 [Route("api/auth")]
@@ -23,6 +23,7 @@ public class AccountController(
     ILogger<AccountController> logger) : AuthControllerBase
 {
     private static readonly string[] SupportedLocales = ["en", "es", "fr", "de", "pt"];
+    private static readonly string[] SupportedThemes = ["light", "dark", "system"];
 
     /// <summary>
     /// Returns the signed-in user's display info for the client top bar.
@@ -88,6 +89,25 @@ public class AccountController(
             return BadRequest(new ErrorResponse("unsupported_locale", "Unsupported locale."));
 
         await userService.UpdateLocaleAsync(userId, locale, cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>
+    /// Saves the signed-in user's preferred UI theme so it follows them across devices.
+    /// "system" (follow the OS scheme) is stored as no preference. The new value lands
+    /// in the JWT on the next refresh.
+    /// </summary>
+    [HttpPut("theme")]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public async Task<IActionResult> SetTheme([FromBody] ThemeRequest req, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        var theme = req.Theme?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(theme) || !SupportedThemes.Contains(theme))
+            return BadRequest(new ErrorResponse("unsupported_theme", "Unsupported theme."));
+
+        await userService.UpdateThemeAsync(userId, theme == "system" ? null : theme, cancellationToken);
         return Ok();
     }
 

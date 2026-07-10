@@ -34,6 +34,7 @@
                     <span class="tenant-badge" data-testid="tenant-badge">@Auth.TenantName</span>
                     <span class="user-name text-white-50 small">@Auth.DisplayName</span>
                 </div>
+                <ThemeSwitcher />
                 <NotificationBell />
                 @if (_isStaff && !Auth.IsImpersonating)
                 {

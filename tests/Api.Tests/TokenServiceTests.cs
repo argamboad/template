@@ -34,7 +34,7 @@ public class JwtTokenServiceTests
         var userId = Guid.CreateVersion7();
         var tenantId = Guid.CreateVersion7();
 
-        var jwt = sut.IssueAccessToken(userId, "u@example.com", "google", "Display", "Acme", "es", tenantId);
+        var jwt = sut.IssueAccessToken(userId, "u@example.com", "google", "Display", "Acme", "es", tenantId, "dark");
         var principal = sut.ValidateToken(jwt);
 
         Assert.NotNull(principal);
@@ -45,6 +45,7 @@ public class JwtTokenServiceTests
         Assert.Equal("Acme", principal.FindFirst("tenant_name")?.Value);
         Assert.Equal("es", principal.FindFirst("locale")?.Value);
         Assert.Equal(tenantId.ToString(), principal.FindFirst(JwtTokenService.TenantIdClaim)?.Value);
+        Assert.Equal("dark", principal.FindFirst("theme")?.Value);
     }
 
     [Fact]

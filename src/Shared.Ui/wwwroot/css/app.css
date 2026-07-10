@@ -16,6 +16,41 @@
     --app-border: #DCE5DD;
 }
 
+/* Dark theme (THEME-1). data-bs-theme is set on <html> pre-paint by js/theme.js; Bootstrap 5.3
+   re-derives its own --bs-* tokens from the attribute, so only the app's surface tokens and the
+   few hardcoded light values below need dark counterparts. The brand greens stay. */
+[data-bs-theme="dark"] {
+    --app-bg: #171c19;              /* sage-tinted dark surface */
+    --app-border: #2e3a33;
+    --bs-link-color: #9bb6a1;
+    --bs-link-hover-color: #c3d5c8;
+}
+
+[data-bs-theme="dark"] a,
+[data-bs-theme="dark"] .btn-link {
+    color: var(--brand-accent-light);
+}
+
+/* The wordmark lockups are dark-on-transparent; swap in the light-on-transparent variant
+   wherever they render on a dark surface (login card, welcome card). */
+[data-bs-theme="dark"] .login-lockup,
+[data-bs-theme="dark"] .welcome-lockup {
+    content: url("../brand/lockup_dark_1520.png");
+}
+
+[data-bs-theme="dark"] .not-found {
+    color: var(--bs-secondary-color);
+}
+
+[data-bs-theme="dark"] .loading-progress circle {
+    stroke: #3a453e;
+}
+
+/* Compact enough to sit inline in the header next to the buttons. */
+.theme-switcher {
+    width: auto;
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     background-color: var(--app-bg);
@@ -46,7 +81,8 @@ a, .btn-link {
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.35);
+    /* --bs-body-bg is #fff in light — identical to the old hardcoded white halo. */
+    box-shadow: 0 0 0 0.1rem var(--bs-body-bg), 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.35);
 }
 
 .not-found {

@@ -16,7 +16,7 @@ public interface IJwtTokenService
     /// name becomes a 'name' claim and the tenant name becomes a tenant_name claim
     /// (both surfaced in the client top bar).
     /// </summary>
-    string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null);
+    string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null, string? theme = null);
 
     /// <summary>
     /// Issues a <b>short-lived</b> access token for <paramref name="targetUserId"/> carrying an
@@ -35,7 +35,7 @@ public class JwtTokenService(IJwtSettings settings, TimeProvider clock, ILogger<
     /// <summary>Alias for <see cref="JwtClaims.TenantId"/>, kept for call-site readability.</summary>
     public const string TenantIdClaim = JwtClaims.TenantId;
 
-    public string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null)
+    public string IssueAccessToken(Guid userId, string email, string provider, string? displayName = null, string? tenantName = null, string? locale = null, Guid? tenantId = null, string? theme = null)
     {
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email cannot be empty", nameof(email));
@@ -59,6 +59,8 @@ public class JwtTokenService(IJwtSettings settings, TimeProvider clock, ILogger<
             claims.Add(new Claim(JwtClaims.TenantName, tenantName));
         if (!string.IsNullOrWhiteSpace(locale))
             claims.Add(new Claim(JwtClaims.Locale, locale));
+        if (!string.IsNullOrWhiteSpace(theme))
+            claims.Add(new Claim(JwtClaims.Theme, theme));
         if (tenantId is { } tid)
             claims.Add(new Claim(JwtClaims.TenantId, tid.ToString()));
 

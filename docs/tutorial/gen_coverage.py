@@ -479,6 +479,13 @@ RULES: list[tuple[str, str, str]] = [
     ("tests/E2E.Tests/NativeSmokeTests.cs", "A.1", "NATIVE-7 emulator/WebView2 smoke"),
     ("tests/native-smoke-android/*", "A.1", "Android playwright-core smoke harness"),
 
+    # ---- drift absorbed 2026-07-10 (THEME-1 dark mode) ----
+    ("src/Shared.Ui/wwwroot/js/theme.js", "3.4", "THEME-1 pre-paint dark-mode bootstrap (data-bs-theme)"),
+    ("src/Shared.Ui/IThemePersistence.cs", "3.4", "theme persistence seam (THEME-1) — one localStorage impl serves web + MAUI"),
+    ("src/Shared.Ui/LocalStorageThemePersistence.cs", "3.4", ""),
+    ("src/Shared.Ui/Components/ThemeSwitcher.razor", "3.4", ""),
+    ("tests/E2E.Tests/ThemeJourneyTests.cs", "3.4", "dark-mode journey (live flip, reload persist, cross-device reconcile)"),
+
     # ---- drift absorbed 2026-07-07 (RLS tenancy backstop, ADR-020 / PR #124) ----
     ("src/Infrastructure/Persistence/RlsDdl.cs", "8.4", "policy DDL — source of the RlsMigrationGateTests parity gate"),
     ("src/Infrastructure/Persistence/RlsSessionInterceptor.cs", "8.4", "sets the tenant GUC per connection"),

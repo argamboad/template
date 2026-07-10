@@ -200,6 +200,17 @@
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"2xx\", () => pm.expect(pm.response.code).to.be.below(300));"], "type": "text/javascript" } }]
         },
         {
+          "name": "Set theme",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"theme\": \"dark\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/theme", "host": ["{{baseUrl}}"], "path": ["api", "auth", "theme"] },
+            "description": "light / dark / system (THEME-1). \"system\" stores no preference — the device's OS scheme decides. Lands in the JWT on the next refresh. Anything else → 400 unsupported_theme."
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"2xx\", () => pm.expect(pm.response.code).to.be.below(300));"], "type": "text/javascript" } }]
+        },
+        {
           "name": "Linked logins",
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/auth/logins", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logins"] } },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"200\", () => pm.response.to.have.status(200));"], "type": "text/javascript" } }]

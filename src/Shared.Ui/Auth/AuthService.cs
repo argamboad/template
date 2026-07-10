@@ -399,6 +399,9 @@ public class AuthService(
     /// <summary>The user's saved UI locale from the JWT (e.g. "es"), or null if unset.</summary>
     public string? Locale => Claim(AppClaims.Locale);
 
+    /// <summary>The user's saved UI theme from the JWT ("light"/"dark"), or null when the OS decides.</summary>
+    public string? Theme => Claim(AppClaims.Theme);
+
     private string? Claim(string type)
     {
         if (string.IsNullOrEmpty(_accessToken) || IsTokenExpired(_accessToken))

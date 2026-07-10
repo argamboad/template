@@ -762,6 +762,24 @@ Then my account and personal data are deleted and I'm signed out
 4. **Sole owner:** a second confirm warns it also **dissolves the household**; on confirm, the account +
    household are deleted.
 
+### QA-SET-08 — Theme: dark mode applies, persists, and follows the user 🟠 (Web) ⚙️ Automated in CI
+**Gherkin**
+```gherkin
+Given I am signed in
+When I pick "Dark" in the header theme switcher
+Then the app restyles dark immediately without a reload
+And a reload first-paints dark (no light flash)
+And signing in on a fresh browser profile renders dark after its next reload
+```
+**Walkthrough**
+1. Signed in, pick **Dark** in the header switcher (login page has the same control).
+   **Expected:** the page flips dark instantly — background, cards, buttons, and the brand
+   lockup swaps to its dark variant; no reload.
+2. Reload. **Expected:** the very first paint is dark — no white flash.
+3. Sign in as the same user in a fresh browser profile (or private window) and reload once.
+   **Expected:** dark — the choice is stored per user server-side.
+4. Pick **Auto**. **Expected:** the app follows the OS scheme live (flip the OS setting to check).
+
 ### QA-MFA-01 — Enable two-factor (authenticator TOTP) 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** signed in; an authenticator app (Google Authenticator, 1Password, Authy, …) to hand.
 **Gherkin**
@@ -1284,6 +1302,13 @@ QA-ADMIN-04 — lands in the native bell too; spot-check when staff is configure
 appears in the nav; the console lists tenants; opening a detail works. Impersonate a user →
 **Expected:** banner appears; **Stop** restores your staff session in-app (native refresh path).
 
+### QA-DSK-15 — Theme: dark mode survives an app restart 🟢 (Desktop)
+**Walkthrough:** pick **Dark** in the header switcher → **Expected:** the WebView restyles dark
+immediately. Quit the app fully and relaunch → **Expected:** it boots dark with no light flash
+(the theme bootstrap reads the WebView's own localStorage pre-paint — verifies WebView storage
+persists across restarts on this platform). Pick **Auto** → **Expected:** follows the OS
+light/dark setting live.
+
 ---
 
 ## 13. Android — MAUI 🟠
@@ -1396,6 +1421,11 @@ Then no control is hidden under the status bar or gesture areas
 bottom-of-screen buttons (Settings danger zone) in both orientations. **Expected:** nothing sits
 under the status bar or the gesture-nav pill; everything tappable. *(Flagged 🔍 by the parity audit —
 if this fails, it becomes a small safe-area fix slice.)*
+
+### QA-AND-14 — Theme: dark mode survives an app restart 🟢 (Android)
+**Walkthrough:** as QA-DSK-15 on Android — pick **Dark** (hamburger → header controls), force-stop
+the app (or swipe it away) and relaunch. **Expected:** boots dark, no light flash (Android WebView
+localStorage persists). **Auto** follows the system dark theme toggle live.
 
 ---
 
@@ -1634,6 +1664,7 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | Join / accept | INV-02/03/04/05, **DSK-08 / AND-08** (paste invite code — NATIVE-4b; web variant ⚙️ E2E) | `POST /api/household/invitations/accept` |
 | Linked accounts | SET-01..06, DSK-05 | `GET /api/auth/logins`, `POST /api/auth/link/{provider}`, `DELETE /api/auth/logins/{provider}` |
 | Localization | I18N-01..04, **DSK-09 / AND-09** (native restart persistence — NATIVE-5) | `PUT /api/auth/locale` (+ resx) |
+| Theme / dark mode (THEME-1) | **SET-08** (⚙️ E2E `ThemeJourneyTests`) + **DSK-15 / AND-14** (native restart persistence) | `PUT /api/auth/theme` ("system" stores null; `theme` JWT claim; pre-paint `theme.js` → `data-bs-theme`) |
 | Emails / branding | MAIL-01..04, I18N-04 | (SMTP via Mailpit) |
 | Tenant isolation / auth guards | SEC-01..05 | (all `[Authorize]` endpoints; write-stamping + reuse detection are automated) |
 | Platform health / readiness | SMK-07 | `GET /health`, `GET /health/ready` |
@@ -1653,8 +1684,8 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | In-app notifications | **NOTIF-01..04**, **DSK-13** (header bell: list/unread-count/mark-read/delete/clear; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, `DELETE /{id}`, `DELETE /api/notifications` (+ `?read=true` for read-only clear), and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
 | Admin back-office | **ADMIN-01..06**, **DSK-14** (native spot) (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop; targeted/broadcast announce; plan comp/revert) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}` — returns `plan_key` + `provider_managed`), `POST /api/admin/impersonate/{userId}`, `POST /api/admin/tenants/{id}/announce` (optional `user_ids[]` subset, intersected with membership), `POST /api/admin/announce-all` (202; outbox fan-out to **every** user), `PUT|DELETE /api/admin/tenants/{id}/subscription` (comp/revert; 409 when Stripe-backed) — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
-**Per-client coverage:** Web = full (all suites). Desktop = DSK-01..14 (auth + per-feature parity).
-Android = AND-01..13 (auth + per-feature parity incl. hardware back + share sheet). iOS = IOS-01..04
+**Per-client coverage:** Web = full (all suites). Desktop = DSK-01..15 (auth + per-feature parity).
+Android = AND-01..14 (auth + per-feature parity incl. hardware back + share sheet). iOS = IOS-01..04
 and macCatalyst = MAC-01..03 (first-run smoke — never run before; needs a Mac). Magic link is
 **web-only** by design; the §13c checklist is the per-release native subset.
 
@@ -1670,6 +1701,7 @@ Postgres + Mailpit + API + Web stack — so they are continuously regression-gua
 | QA-MFA-01 (enable TOTP) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` (enroll leg) |
 | QA-MFA-02 (step-up enforced at sign-in) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` + `StepUp_WithWrongCode_DoesNotSignIn` |
 | QA-I18N-01 (switch language on login) | `I18nTests.Switching_Language_ReRendersTheUi` |
+| QA-SET-08 (dark mode applies/persists/follows) | `ThemeJourneyTests.ThemeChoice_AppliesLive_PersistsLocally_AndFollowsTheUser` |
 | QA-DSK-01 (desktop OTP sign-in) | `NativeSmokeTests` — the `native-smoke-windows` job boots the REAL Windows exe and drives it over WebView2 CDP (OTP + household load) |
 | QA-AND-01 (Android OTP sign-in) | `tests/native-smoke-android/smoke.js` — the `native-smoke-android` job boots a real emulator and drives the app via playwright-core's `_android` module |
 
@@ -1927,3 +1959,9 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   **QA-ADMIN-05**). (5) **Staff plan comp** — `PUT|DELETE /api/admin/tenants/{id}/subscription` +
   console buttons simulate a completed checkout (Pro) and revert to Free; refused 409 for Stripe-backed
   subs (new **QA-ADMIN-06**). Suite 117 → **120** cases.
+- **Updated 2026-07-10** — **THEME-1 (dark mode)**: per-user Light/Dark/System theme on Bootstrap's
+  `data-bs-theme` — header + login switcher, pre-paint `theme.js` bootstrap (no flash), device
+  persistence (`localStorage["app_theme"]`), server sync (`PUT /api/auth/theme`, `theme` JWT claim,
+  cold-start reconcile like locale). New **QA-SET-08** (web, ⚙️ `ThemeJourneyTests`) + **QA-DSK-15** /
+  **QA-AND-14** (native restart persistence — also verifies WebView localStorage survives a restart
+  per platform). Suite 120 → **123** cases.
