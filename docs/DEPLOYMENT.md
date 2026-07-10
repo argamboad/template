@@ -155,6 +155,10 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 4. **Prod** (when you have a prod service): create a **`production`** GitHub Environment (repo Settings →
    Environments) with a **required reviewer**, and add secret **`RENDER_DEPLOY_HOOK_PROD`**. A push to
    `main` then waits for your approval before deploying — keeping `main` deploy-only and deliberate.
+5. **Postman workspace mirror** (optional, same graceful-skip pattern): secret **`POSTMAN_API_KEY`**
+   (Postman → Settings → API keys) + variable **`POSTMAN_WORKSPACE_ID`** let the `postman-sync`
+   workflow push `docs/postman/**` to the Postman workspace on every `develop` change — see
+   `docs/postman/README.md`.
 
 ---
 
