@@ -161,6 +161,10 @@
   <data name="Admin_ConfirmBroadcast" xml:space="preserve"><value>¿Enviar este anuncio a TODOS los usuarios de TODOS los inquilinos de la plataforma?</value></data>
   <data name="Admin_BroadcastQueued" xml:space="preserve"><value>Difusión en cola para su entrega.</value></data>
   <data name="Admin_ErrBroadcast" xml:space="preserve"><value>No se pudo poner en cola la difusión.</value></data>
+  <data name="Admin_ResetMfa" xml:space="preserve"><value>Restablecer MFA</value></data>
+  <data name="Admin_ConfirmResetMfa" xml:space="preserve"><value>¿Restablecer la autenticación en dos pasos de {0}? Su aplicación de autenticación y sus códigos de recuperación dejarán de funcionar de inmediato y recibirá una notificación. Hazlo solo tras verificar su identidad por otro medio.</value></data>
+  <data name="Admin_MfaWasReset" xml:space="preserve"><value>Se restableció la autenticación en dos pasos de {0}.</value></data>
+  <data name="Admin_ErrResetMfa" xml:space="preserve"><value>No se pudo restablecer la autenticación en dos pasos.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Inicio</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Hogar</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Ajustes</value></data>

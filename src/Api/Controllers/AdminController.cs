@@ -28,6 +28,7 @@ public class AdminController(
     IUserRepository users,
     IJwtTokenService jwt,
     INotificationService notifications,
+    IMfaService mfaService,
     IOutbox outbox,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : AdminApiControllerBase(staff)
@@ -318,4 +319,59 @@ public class AdminController(
             ExpiresIn = (int)ImpersonationLifetime.TotalSeconds,
         });
     }
+
+    /// <summary>
+    /// Staff MFA reset (ADR-021 addendum): the recovery path for a user who lost BOTH the authenticator
+    /// and the recovery codes — the possession proof the self-serve disable demands is exactly what they
+    /// can no longer provide. Identity is verified <b>out-of-band</b> before calling this; the endpoint
+    /// wipes the secret + recovery codes (the user re-enrolls from scratch) and makes the action loud:
+    /// audited in the target's tenant (<c>admin.mfa.reset</c>, like impersonation) and the user is told
+    /// through the normal notification fan-out (in-app + email), so a malicious reset cannot be silent.
+    /// Idempotent — no MFA state is a no-op 204 with no audit/notification noise.
+    /// </summary>
+    [HttpDelete("users/{userId:guid}/mfa")]
+    public async Task<IActionResult> ResetMfa(Guid userId, CancellationToken cancellationToken)
+    {
+        var (staffUserId, denied) = await RequireStaffAsync(cancellationToken);
+        if (denied is not null)
+            return denied;
+
+        var target = await users.GetByIdAsync(userId, cancellationToken);
+        if (target is null)
+            return NotFound(new ErrorResponse("user_not_found", "User not found"));
+
+        // Wipe, notification, and the in-tenant audit commit atomically.
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        if (!await mfaService.ResetAsync(userId, cancellationToken))
+            return NoContent(); // nothing enrolled — idempotent no-op
+
+        await notifications.NotifyAsync(userId, AdminMfaResetNotification.Kind,
+            AdminMfaResetNotification.Title, AdminMfaResetNotification.Body,
+            new { url = "/settings" }, cancellationToken);
+
+        // Loud, in-tenant audit so the target tenant can see a platform admin touched this account
+        // (a user without a tenant still gets the wipe + notification, like impersonation).
+        var membership = await tenants.GetMembershipAsync(userId, cancellationToken);
+        if (membership?.TenantId is { } tenantId)
+            using (tenantContext.EnterTenant(tenantId))
+            {
+                await audit.RecordAsync("admin.mfa.reset", staffUserId, nameof(User), userId.ToString(), null, cancellationToken);
+                await auditEvents.SaveChangesAsync(cancellationToken); // inside EnterTenant: the audit row stamps into the target tenant
+            }
+        else
+            await auditEvents.SaveChangesAsync(cancellationToken); // flush the staged notification
+
+        await scope.CommitAsync(cancellationToken);
+        return NoContent();
+    }
+}
+
+/// <summary>Copy for the MFA-reset notification (server-side strings, like <see cref="BillingNotifications"/>).</summary>
+public static class AdminMfaResetNotification
+{
+    public const string Kind = "security.mfa_reset";
+    public const string Title = "Two-factor authentication was reset";
+    public const string Body = "Platform support reset the two-factor authentication on your account "
+        + "after verifying your identity. MFA is now disabled — re-enable it from Settings as soon as "
+        + "possible. If you did not request this, contact support immediately.";
 }

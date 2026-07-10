@@ -143,6 +143,10 @@
                             }
 
                             <h3 class="h6 fw-semibold mb-2">@Localizer["Admin_Members"] <span class="text-muted">(@_detail.Members.Count)</span></h3>
+                            @if (!string.IsNullOrEmpty(_mfaResetMsg))
+                            {
+                                <div class="alert alert-success py-2" data-testid="admin-mfa-reset-status">@_mfaResetMsg</div>
+                            }
                             <div class="table-responsive">
                                 <table class="table table-sm align-middle mb-0">
                                     <thead>
@@ -171,10 +175,16 @@
                                                     }
                                                 </td>
                                                 <td><span class="badge bg-light text-dark border">@m.Role</span></td>
-                                                <td class="text-end">
+                                                <td class="text-end text-nowrap">
                                                     <button class="btn btn-outline-warning btn-sm" disabled="@_busy"
                                                             @onclick="() => Impersonate(m)">
                                                         @Localizer["Admin_Impersonate"]
+                                                    </button>
+                                                    @* Staff recovery for a locked-out user (ADR-021 addendum): wipes their
+                                                       authenticator + recovery codes after out-of-band identity verification. *@
+                                                    <button class="btn btn-outline-danger btn-sm ms-1" disabled="@_busy"
+                                                            data-testid="admin-mfa-reset" @onclick="() => ResetMfa(m)">
+                                                        @Localizer["Admin_ResetMfa"]
                                                     </button>
                                                 </td>
                                             </tr>
@@ -252,6 +262,7 @@
         _error = null;
         _announceStatus = null;
         _subscriptionMsg = null;
+        _mfaResetMsg = null;
         _selectedMembers.Clear();
         try
         {
@@ -292,6 +303,23 @@
     private string _announceBody = "";
     private string? _announceStatus;
     private string? _subscriptionMsg;
+    private string? _mfaResetMsg;
+
+    private async Task ResetMfa(MemberDto m)
+    {
+        var name = string.IsNullOrEmpty(m.DisplayName) ? m.Email : m.DisplayName;
+        if (!await JS.ConfirmAsync(Localizer["Admin_ConfirmResetMfa", name])) return;
+
+        _busy = true; _mfaResetMsg = null; _error = null;
+        try
+        {
+            var res = await Http.DeleteAsync($"/api/admin/users/{m.UserId}/mfa");
+            if (res.IsSuccessStatusCode) _mfaResetMsg = Localizer["Admin_MfaWasReset", name];
+            else _error = Localizer["Admin_ErrResetMfa"];
+        }
+        catch { _error = Localizer["Admin_ErrResetMfa"]; }
+        finally { _busy = false; }
+    }
 
     private async Task CompPro()
     {

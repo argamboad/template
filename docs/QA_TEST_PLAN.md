@@ -156,8 +156,8 @@ disable in Settings and the sign-in step-up on Login — covered by QA-MFA-01..0
 notification center now has a web UI** (UI-3) — the header bell (list, unread count, mark-read,
 delete/clear) and Settings delivery-preference switches — covered by QA-NOTIF-01..04. The
 **platform-staff admin surface now has a web UI** (UI-4) — a staff-only `/admin` console (tenant
-list/detail + impersonation + targeted/broadcast announcements + plan comp/revert) — covered
-by QA-ADMIN-01..06. The **public API (PUBAPI)** and **outbound webhooks (HOOKS)** are intentionally
+list/detail + impersonation + targeted/broadcast announcements + plan comp/revert + MFA reset) — covered
+by QA-ADMIN-01..07. The **public API (PUBAPI)** and **outbound webhooks (HOOKS)** are intentionally
 UI-less (they're for machines) and **config-gated off** — they have **manual curl/Postman cases in §14b**
 (QA-API-01..06), in addition to automated tests.
 
@@ -1082,6 +1082,31 @@ And a provider-managed (Stripe-backed) subscription refuses the override
    section shows "Managed by the billing provider — change the plan there." and **no** comp/revert
    buttons; the API refuses with 409 (Stripe stays the source of truth — ADR-006).
 
+### QA-ADMIN-07 — Reset a locked-out user's MFA 🟢 (Web)
+**Gherkin**
+```gherkin
+Given a user has MFA enabled but lost both their authenticator and recovery codes
+When staff clicks "Reset MFA" on that user's row in the tenant detail and confirms
+Then the user's MFA secret and recovery codes are wiped and they can sign in with primary auth alone
+And the reset is audited in the user's tenant and the user is notified in-app and by email
+```
+**Walkthrough**
+1. As a member user, enable MFA in Settings (QA-MFA-01), then pretend the authenticator and codes are
+   lost — do **not** disable it. Sign out. Confirm sign-in now demands the code you "lost" (QA-MFA-02).
+2. As staff on `/admin`, open the tenant's detail. Each member row now shows a red **Reset MFA**
+   button next to **Sign in as**. Click it for the locked-out user. **Expected:** the confirm spells
+   out the blast radius (authenticator + recovery codes stop working immediately, the user is
+   notified) and reminds you to verify identity **out-of-band** first. Confirm.
+3. **Expected:** "Two-factor authentication was reset for …" above the member table.
+4. As the affected user, sign in again. **Expected:** primary auth alone signs you in — **no MFA
+   step-up** (the second factor is gone; primary credentials are untouched). Settings shows MFA off;
+   re-enrolling from scratch works (fresh QR + fresh recovery codes).
+5. **Visibility:** the user's bell shows "Two-factor authentication was reset" and the email copy
+   arrives in Mailpit; the tenant's audit trail (owner data export, QA-HH-13) contains an
+   `admin.mfa.reset` event naming the staff actor.
+6. **No silent no-op noise:** clicking **Reset MFA** for a member who never enrolled still reports
+   success (idempotent) but writes **no** audit event and sends **no** notification.
+
 ---
 
 ## 10c. Web — Billing page 🟠
@@ -1965,3 +1990,10 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   cold-start reconcile like locale). New **QA-SET-08** (web, ⚙️ `ThemeJourneyTests`) + **QA-DSK-15** /
   **QA-AND-14** (native restart persistence — also verifies WebView localStorage survives a restart
   per platform). Suite 120 → **123** cases.
+- **Updated 2026-07-10** — **staff MFA reset (ADR-021 addendum, `feat/admin-mfa-reset`)**: a user who
+  loses both the authenticator and the recovery codes was locked out permanently (self-serve disable
+  demands a valid code; every sign-in path steps up). New staff-gated
+  `DELETE /api/admin/users/{userId}/mfa` wipes `UserMfa` + recovery codes (no code required —
+  out-of-band identity verification first), audited in the target's tenant (`admin.mfa.reset`) with
+  the user notified in-app + email (`security.mfa_reset`); confirm-gated **Reset MFA** button on the
+  admin member row (new **QA-ADMIN-07**). Suite 123 → **124** cases.

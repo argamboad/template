@@ -161,6 +161,10 @@
   <data name="Admin_ConfirmBroadcast" xml:space="preserve"><value>Send this announcement to EVERY user of EVERY tenant on the platform?</value></data>
   <data name="Admin_BroadcastQueued" xml:space="preserve"><value>Broadcast queued for delivery.</value></data>
   <data name="Admin_ErrBroadcast" xml:space="preserve"><value>Couldn't queue the broadcast.</value></data>
+  <data name="Admin_ResetMfa" xml:space="preserve"><value>Reset MFA</value></data>
+  <data name="Admin_ConfirmResetMfa" xml:space="preserve"><value>Reset two-factor authentication for {0}? Their authenticator and recovery codes stop working immediately and they will be notified. Only do this after verifying their identity out-of-band.</value></data>
+  <data name="Admin_MfaWasReset" xml:space="preserve"><value>Two-factor authentication was reset for {0}.</value></data>
+  <data name="Admin_ErrResetMfa" xml:space="preserve"><value>Couldn't reset two-factor authentication.</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_Household" xml:space="preserve"><value>Household</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>

@@ -170,6 +170,36 @@ public class MfaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture
         Assert.Null(await NewService(db).BeginEnrollmentAsync(Guid.CreateVersion7()));
     }
 
+    // --- staff reset (ADR-021 addendum): the recovery path when both factors are lost ---
+
+    [Fact]
+    public async Task Reset_WithoutAnyCode_WipesEverything_ReturnsTrue()
+    {
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        var userId = await SeedUserAsync(db);
+        var secret = (await service.BeginEnrollmentAsync(userId))!.Secret;
+        await service.ConfirmEnrollmentAsync(userId, CurrentCode(secret));
+
+        // No code required — that's the point: the user lost both the authenticator and the codes.
+        Assert.True(await service.ResetAsync(userId));
+        Assert.False(await service.IsEnabledAsync(userId));
+
+        await using var read = Fixture.CreateContext();
+        Assert.False(await read.Set<UserMfa>().AnyAsync(m => m.UserId == userId));
+        Assert.False(await read.Set<MfaRecoveryCode>().AnyAsync(c => c.UserId == userId));
+    }
+
+    [Fact]
+    public async Task Reset_WithNothingEnrolled_ReturnsFalse()
+    {
+        await using var db = Fixture.CreateContext();
+        var service = NewService(db);
+        var userId = await SeedUserAsync(db);
+
+        Assert.False(await service.ResetAsync(userId)); // nothing to wipe — caller can no-op
+    }
+
     // --- helpers ---
 
     private static MfaService NewService(AppDbContext db) =>
