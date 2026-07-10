@@ -589,8 +589,9 @@
 - `docs/DEPLOYMENT.md` — the runbook is a taught artifact — the learner writes their own
 - `render.yaml` — Render blueprint (ADR-017)
 
-## 8.3 — The deploy pipeline & CI gates (2 files)
+## 8.3 — The deploy pipeline & CI gates (3 files)
 
+- `.github/workflows/postman-sync.yml`
 - `docs/QA_TEST_PLAN.md` — release readiness: manual QA plan beside the automated gates
 - `tests/Api.Tests/Integration/VersionEndpointTests.cs` — version-gated deploy smoke
 
@@ -767,7 +768,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (112 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (116 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -807,6 +808,10 @@
 - `docs/check_qa_artifacts.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_guide.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_runlog.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/postman/Perezosoft.local.postman_environment.json` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/postman/Perezosoft.postman_collection.json` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/postman/Perezosoft.staging.postman_environment.json` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/postman/README.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/_EXAMPLE_epic.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/admin.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/apple-signin.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -882,4 +887,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 715 tracked files · 505 built in lessons · 210 bucketed · 0 unmapped
+**Totals:** 720 tracked files · 506 built in lessons · 214 bucketed · 0 unmapped
