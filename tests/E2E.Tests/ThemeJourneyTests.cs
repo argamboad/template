@@ -23,8 +23,12 @@ public class ThemeJourneyTests : E2ETestBase
         // Default is the OS scheme; the Playwright browser emulates light.
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-bs-theme", "light");
 
-        // Flip to dark from the header: applies live, no reload.
-        await Page.GetByTestId("theme-switcher").SelectOptionAsync("dark");
+        // Flip to dark from the header: applies live, no reload. The switcher saves the
+        // choice server-side with a best-effort background PUT; wait for it so the reload
+        // below can't abort it in flight (the "follows the user" leg depends on it).
+        await Page.RunAndWaitForResponseAsync(
+            () => Page.GetByTestId("theme-switcher").SelectOptionAsync("dark"),
+            r => r.Url.EndsWith("/api/auth/theme") && r.Request.Method == "PUT");
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-bs-theme", "dark");
 
         // Survives a reload: theme.js re-applies from localStorage before first paint.
