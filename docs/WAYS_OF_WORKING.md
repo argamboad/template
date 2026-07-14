@@ -150,6 +150,30 @@ ID: `feat/INV-3-availability-toggle`.
 PR title = a Conventional Commit line, ideally referencing the story:
 `feat(inventory): availability toggle (INV-3)`.
 
+### Merge discipline (CI before merge)
+- **Never merge before the branch CI finishes green.** Two real incidents drove this rule:
+  PR #137/#138 were merged while their branch runs were still executing and a flaky theme E2E
+  slipped onto develop (fixed in #139), and the 2026-07-14 toolchain drift (#142/#143) was
+  diagnosed slower because merges had outpaced their runs.
+- **Branch-green is necessary, not sufficient — develop can still fail after a green branch run:**
+  1. **Toolchain drift** — CI floats on `dotnet-version: 10.0.x` and the GitHub runner images
+     rotate weekly; an SDK/Xcode rollout can land *between* the branch run and the merge
+     (2026-07-14: NU1004 locked-mode restore + an Xcode/workload mismatch, from one SDK patch).
+     The fix playbook lives in `CLAUDE.md` → Tech stack.
+  2. **Develop-only jobs** — the Apple builds/smokes run only on develop pushes (the
+     `native-paths` gate; macOS bills 10×), so an Apple-affecting change is first *proven* by the
+     post-merge run. Watch that run to completion; don't stack the next merge onto an unverified
+     one.
+- **Recommended repo setting:** GitHub branch protection on `develop` requiring the `build-test`
+  and `e2e` status checks (Settings → Branches → Add rule, or
+  `gh api repos/{owner}/{repo}/branches/develop/protection`). This makes "merge before CI
+  finishes" impossible at the platform level instead of relying on habit. (Not enabled by
+  default in this template — it needs repo admin and blocks solo-maintainer hotfix pushes to
+  develop, so opt in per deployment.)
+- After merging, `deploy-staging` only runs off a fully green develop run — a red develop
+  silently **freezes staging** at the last good commit, so a broken develop is not a
+  "fix it later" state.
+
 ### PR template
 Stored at `.github/pull_request_template.md` (auto-loaded by GitHub). Contents:
 
