@@ -222,10 +222,11 @@ jobs:
         include:
           - tfm: net10.0-ios
           - tfm: net10.0-maccatalyst
-    # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode —
-    # 26.5 as of SDK 10.0.301 — and macos-26 is the GA image whose default Xcode is 26.5. The
-    # macos-latest label still resolves to an older image (Xcode 16.4) on some rollouts, which fails
-    # with "requires Xcode 26.5". Revisit the pin when bumping the .NET SDK.
+    # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode
+    # and macos-latest can lag several Xcode versions behind (fails with "requires Xcode NN").
+    # macos-26 carries the recent Xcodes; the select step below picks the newest installed one,
+    # because the workload floats with the SDK ("10.0.x") while the image's DEFAULT Xcode lags —
+    # SDK 10.0.302's iOS workload requires Xcode 26.6, the image default is 26.5 (2026-07-14).
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -234,6 +235,9 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
+
+      - name: Select the newest installed Xcode (the workload floats with the SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -n1)/Contents/Developer" && xcodebuild -version
 
       # See the native-build note: restore installs ALL workloads this host's TFM list needs (on macOS
       # that's ios + maccatalyst + android — the android TFM restores here too, even building -f ios).
@@ -261,8 +265,8 @@ jobs:
   native-smoke-apple:
     needs: native-paths
     if: needs.native-paths.outputs.changed == 'true'
-    # Same Xcode-pin reasoning as native-build-apple: macos-26 is the image whose default Xcode
-    # (26.5) matches the .NET-for-iOS/macCatalyst workloads; macos-latest can lag behind.
+    # Same Xcode reasoning as native-build-apple: pinned image + select the newest installed
+    # Xcode, because the workload floats with the SDK while the image default lags.
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -271,6 +275,9 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
+
+      - name: Select the newest installed Xcode (the workload floats with the SDK)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -n1)/Contents/Developer" && xcodebuild -version
 
       - name: Install the MAUI workloads (host-aware)
         run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
