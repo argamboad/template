@@ -224,9 +224,11 @@ jobs:
           - tfm: net10.0-maccatalyst
     # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode
     # and macos-latest can lag several Xcode versions behind (fails with "requires Xcode NN").
-    # macos-26 carries the recent Xcodes; the select step below picks the newest installed one,
-    # because the workload floats with the SDK ("10.0.x") while the image's DEFAULT Xcode lags —
-    # SDK 10.0.302's iOS workload requires Xcode 26.6, the image default is 26.5 (2026-07-14).
+    # The workload restore below pins the WORKLOAD SET to the release matching the image's
+    # DEFAULT Xcode: the SDK floats ("10.0.x") and its newest workloads may demand a newer Xcode
+    # than the image default (10.0.302 → Xcode 26.6), but selecting a non-default Xcode is NOT
+    # safe — those installs can be incomplete on the images (26.6 lacks MacOSX.sdk;
+    # actions/runner-images#13743/#11348). Bump the pin when the image's default Xcode moves.
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -236,13 +238,14 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Select the newest installed Xcode (the workload floats with the SDK)
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -n1)/Contents/Developer" && xcodebuild -version
-
       # See the native-build note: restore installs ALL workloads this host's TFM list needs (on macOS
       # that's ios + maccatalyst + android — the android TFM restores here too, even building -f ios).
-      - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
+      # --version pins the workload set (10.0.301 ships the iOS/macCatalyst workloads matched to
+      # Xcode 26.5, macos-26's default) — same feature band as the floating SDK, so it applies fine.
+      - name: Install the MAUI workloads (host-aware, workload set pinned to the image's Xcode)
+        run: |
+          xcodebuild -version
+          dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Perezosoft.Maui.csproj -f ${{ matrix.tfm }} -c Debug
@@ -265,8 +268,8 @@ jobs:
   native-smoke-apple:
     needs: native-paths
     if: needs.native-paths.outputs.changed == 'true'
-    # Same Xcode reasoning as native-build-apple: pinned image + select the newest installed
-    # Xcode, because the workload floats with the SDK while the image default lags.
+    # Same Xcode reasoning as native-build-apple: pinned image + workload set pinned to the
+    # release matching the image's default Xcode (non-default Xcodes can be incomplete).
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -276,11 +279,10 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Select the newest installed Xcode (the workload floats with the SDK)
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -n1)/Contents/Developer" && xcodebuild -version
-
-      - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
+      - name: Install the MAUI workloads (host-aware, workload set pinned to the image's Xcode)
+        run: |
+          xcodebuild -version
+          dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
 
       - name: Build the apps (Catalyst + iOS simulator) + API
         run: |

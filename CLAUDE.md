@@ -61,7 +61,7 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 _TODO_
 
 ## Tech stack (see `docs/TECH_STACK.md`)
-- **Versions:** latest stable on the current .NET line — **re-verified 2026-07-14: .NET SDK 10.0.302 (WASM/ILLink SDK assets 10.0.10), ASP.NET Core / EF Core packages 10.0.9, Npgsql.EF 10.0.2, PostgreSQL 17.** CI floats on `dotnet-version: 10.0.x`, so an SDK patch can outrun the committed `packages.lock.json` (NU1004 in locked-mode restore) — fix = regenerate with the new SDK (`dotnet restore --force-evaluate`), and re-check the Apple legs' Xcode requirement while at it (the iOS/macCatalyst workload floats with the SDK; ci.yml selects the newest installed Xcode).
+- **Versions:** latest stable on the current .NET line — **re-verified 2026-07-14: .NET SDK 10.0.302 (WASM/ILLink SDK assets 10.0.10), ASP.NET Core / EF Core packages 10.0.9, Npgsql.EF 10.0.2, PostgreSQL 17.** CI floats on `dotnet-version: 10.0.x`, so an SDK patch can outrun the committed `packages.lock.json` (NU1004 in locked-mode restore) — fix = regenerate with the new SDK (`dotnet restore --force-evaluate`), and re-check the Apple legs' Xcode requirement while at it (the iOS/macCatalyst workload floats with the SDK; ci.yml pins the WORKLOAD SET to the image's default Xcode — non-default Xcodes on the runner images can be incomplete, so bump that pin only together with the image's default Xcode).
 - **Backend:** ASP.NET Core Web API behind a clean API boundary.
 - **Web frontend:** Blazor WebAssembly; UI components in a shared **RCL** (hard rule).
 - **DB:** PostgreSQL via **EF Core (Npgsql)**; schema/migrations generated from `docs/DATA_MODEL.md`.
