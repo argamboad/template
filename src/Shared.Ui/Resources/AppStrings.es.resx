@@ -204,6 +204,8 @@
   <data name="Join_CodePlaceholder" xml:space="preserve"><value>Código de invitación</value></data>
   <data name="Join_SubmitCode" xml:space="preserve"><value>Unirse</value></data>
   <data name="Join_ErrorTitle" xml:space="preserve"><value>No se pudo unir</value></data>
+  <data name="Join_FullTitle" xml:space="preserve"><value>Este hogar está completo</value></data>
+  <data name="Join_FullBody" xml:space="preserve"><value>Ha alcanzado el límite de miembros de su plan. Pide al propietario que mejore su plan y vuelve a usar tu invitación.</value></data>
   <data name="Join_BackToHousehold" xml:space="preserve"><value>Volver al hogar</value></data>
   <data name="Join_DefaultError" xml:space="preserve"><value>La invitación no es válida o ha caducado.</value></data>
   <data name="Settings_Preferences" xml:space="preserve"><value>Preferencias</value></data>

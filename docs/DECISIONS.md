@@ -372,6 +372,22 @@ The test stack as built is `FakeBillingProvider` (unit) + Stripe test-mode/CLI f
 **not** in the test stack — it was deferred in BILLING-2 over Testcontainers friction (see the note in
 `docs/ROADMAP.md` under "Test & hardening debt"). The rest of point 7 holds.
 
+*Addendum (BILLING-9, 2026-07-14) — the seat quota is re-checked when an invitation is accepted.*
+BILLING-5 enforced seats only at invitation **creation** (pending invites reserve seats), which holds
+while the plan is stable — but nothing sweeps pending invites on a **downgrade** (dunning lapse,
+cancellation, or an ADR-021 comp revert), and `AcceptAsync` never re-checked, so invites issued on a
+bigger plan could each still join and actively grow the tenant past its new cap (Pro→invite 7→Free
+left a 3-seat tenant able to reach 8 members). `AcceptAsync` now refuses when the tenant is **already
+over its limit** (`CanAdd(0)` — the accept itself is seat-neutral because the joiner consumes the seat
+their invite reserved, so accepts at exactly the cap stay allowed), returning 402 `seat_limit_reached`
+(same shape as the create-path gate) rendered on `/join` as a "household is full" state. The check runs
+inside `EnterTenant(invitation.TenantId)` (the quota must count the invitation's tenant, not the
+caller's old one — same trusted contract as the accept's conditional flip). Deliberately NOT done:
+sweeping/revoking pending invites on downgrade (destroys owner-created state; the refused token stays
+pending and **self-heals** when the tenant upgrades again) and evicting members (over-cap tenants are
+frozen for growth, never shrunk). Tests: `AcceptSeatQuotaTests` (over-cap / at-cap / self-heal) +
+the E2E webhook-downgrade journey in `SeatQuotaJourneyTests`.
+
 **ADR-007 — Reliable async work: transactional outbox + inbox + background dispatcher + scheduled jobs. Implementation DEFERRED. (2026-06-25)**
 Side effects that must not be lost (email, billing webhooks, future integrations) move off the
 request thread through a **transactional outbox**: an **`OutboxMessage`** is written in the **same EF

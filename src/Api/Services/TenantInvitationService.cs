@@ -16,7 +16,7 @@ public enum InviteRegenerateStatus { Regenerated, NotFound, NotPending }
 public record InviteRegenerateResult(InviteRegenerateStatus Status, TenantInvitation? Invitation = null, string? RawToken = null);
 
 /// <summary>Outcome of accepting an invitation.</summary>
-public enum AcceptStatus { Joined, InvalidToken, NoHousehold, AlreadyMember, MustTransferFirst, WouldAbandonData }
+public enum AcceptStatus { Joined, InvalidToken, NoHousehold, AlreadyMember, MustTransferFirst, WouldAbandonData, SeatLimitReached }
 
 /// <summary>
 /// Tenant-invitation flow. Uses result objects (not exceptions) for expected
@@ -206,6 +206,21 @@ public class TenantInvitationService(
             if (await TenantHasDataAsync(oldTenantId, cancellationToken))
                 return AcceptStatus.WouldAbandonData;
             dissolveOld = true; // empty solo tenant-of-one is dissolved on join
+        }
+
+        // Seat re-check (BILLING-9, ADR-006 addendum): a downgrade (dunning lapse, cancel, admin
+        // comp revert) can leave more reserved seats — members + pending invites — than the new
+        // plan allows, and nothing sweeps the invites. The accept itself is seat-neutral (the
+        // joiner consumes the seat their pending invite reserved), so the rule is "already over
+        // the limit" (CanAdd(0)), NOT "can add one more" — accepts at exactly the cap stay
+        // allowed, and a refused token stays pending and self-heals when the tenant upgrades.
+        // EnterTenant: the caller's JWT still carries their old tenant; the quota must count the
+        // INVITATION's tenant (the token was verified above — the same trusted-scoping contract
+        // as the conditional flip below).
+        using (tenantContext.EnterTenant(invitation.TenantId))
+        {
+            if (!await quota.CanAddSeatsAsync(0, cancellationToken))
+                return AcceptStatus.SeatLimitReached;
         }
 
         // Move membership + consume token + dissolve old solo tenant atomically.

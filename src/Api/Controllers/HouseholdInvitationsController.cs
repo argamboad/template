@@ -109,6 +109,11 @@ public class HouseholdInvitationsController(
                 new ErrorResponse("already_member", "You are already a member of this household")),
             AcceptStatus.MustTransferFirst => BadRequest(
                 new ErrorResponse("must_transfer_first", "Transfer ownership before joining another household")),
+            // Seat re-check at accept (BILLING-9): the tenant downgraded below its reserved seats —
+            // same code/status as the create-path gate so clients handle one shape.
+            AcceptStatus.SeatLimitReached => StatusCode(StatusCodes.Status402PaymentRequired,
+                new ErrorResponse("seat_limit_reached",
+                    "This household has reached its plan's member limit — the owner must upgrade before you can join.")),
             AcceptStatus.WouldAbandonData => BadRequest(
                 new ErrorResponse("would_abandon_data", "Your household has data — transfer or remove it before joining another")),
             AcceptStatus.NoHousehold => BadRequest(

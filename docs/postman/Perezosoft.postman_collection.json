@@ -349,7 +349,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{invitationToken}}\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/household/invitations/accept", "host": ["{{baseUrl}}"], "path": ["api", "household", "invitations", "accept"] },
-            "description": "Sign in as the invitee first (re-run folder 1 with the invitee email) — accept joins the CALLER to the inviting household."
+            "description": "Sign in as the invitee first (re-run folder 1 with the invitee email) — accept joins the CALLER to the inviting household. Errors: 400 invitation_invalid/must_transfer_first/would_abandon_data, 409 already_member, 402 seat_limit_reached when the household downgraded below its reserved seats (BILLING-9 — the token stays pending and works again after an upgrade)."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"outcome\", () => pm.expect(pm.response.code).to.be.below(500));"], "type": "text/javascript" } }]
         },

@@ -164,7 +164,8 @@ UI-less (they're for machines) and **config-gated off** — they have **manual c
 **Automated in CI (Web):** a Playwright/NUnit E2E suite (`tests/E2E.Tests`) now runs the core auth,
 MFA, and i18n journeys against the real booted stack on every push — the `e2e` job in
 `.github/workflows/ci.yml`. The cases it covers are marked **⚙️ Automated in CI** (QA-SMK-01,
-QA-SMK-03, QA-AUTH-09, QA-MFA-01, QA-MFA-02, QA-I18N-01, QA-I18N-02, QA-SET-08; see the §15 note). Human QA can spot-check
+QA-SMK-03, QA-AUTH-09, QA-MFA-01, QA-MFA-02, QA-I18N-01, QA-I18N-02, QA-SET-08, QA-INV-10; see the
+§15 note). Human QA can spot-check
 those on Web and focus effort on the un-automated cases and the Desktop/Android clients, which the CI
 job does not exercise.
 
@@ -678,6 +679,28 @@ leaves the pending list; opening its old link gives the error state.
 **Walkthrough:** click **Copy** on a revealed token; paste elsewhere. **Expected:** the token is on
 the clipboard. (If the browser blocks clipboard access, the token is still visible to copy manually —
 no error shown.)
+
+### QA-INV-10 — Accepting an invite after a downgrade is refused (seat re-check) 🟠 (Web) ⚙️ Automated in CI
+**Precondition:** a way to change the tenant's plan — staff comp/revert (QA-ADMIN-06) or the fake
+provider webhook (E2E does the latter).
+**Gherkin**
+```gherkin
+Given a household on Pro invited more members than the Free plan allows
+And the subscription has since lapsed or been reverted to Free
+When an invitee opens a still-valid invitation link
+Then joining is refused with a "This household is full" message
+And the invitation stays pending (it works again if the owner re-upgrades)
+```
+**Walkthrough**
+1. Comp the household to Pro (QA-ADMIN-06); as the owner, invite members until members + pending
+   exceeds the Free limit (currently 3).
+2. Revert the household to Free.
+3. Sign in as an invitee (fresh browser) and open the invite link / paste the code on `/join`.
+4. **Expected:** the join page shows **"This household is full"** (402 `seat_limit_reached`) — the
+   invitee does not join and no membership changes. Existing members are untouched; new invites are
+   also blocked (QA-HH-14).
+5. Comp back to Pro and retry the same link. **Expected:** it joins — the refused token self-heals
+   (BILLING-9, ADR-006 addendum).
 
 ---
 
@@ -1691,7 +1714,7 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | Household view/rename | HH-01/02 | `GET /api/household`, `PUT /api/household` |
 | Members (remove/leave/transfer/dissolve) | HH-03..08 | `DELETE /api/household/members/{id}`, `POST /api/household/leave`, `POST /api/household/transfer-ownership` |
 | Invitations | INV-01/06/07/08, MAIL-03 | `POST /api/household/invitations`, `GET /api/household/invitations`, `POST …/{id}/regenerate`, `DELETE …/{id}` |
-| Join / accept | INV-02/03/04/05, **DSK-08 / AND-08** (paste invite code — NATIVE-4b; web variant ⚙️ E2E) | `POST /api/household/invitations/accept` |
+| Join / accept | INV-02/03/04/05, **INV-10** (seat re-check after downgrade — BILLING-9, ⚙️ E2E), **DSK-08 / AND-08** (paste invite code — NATIVE-4b; web variant ⚙️ E2E) | `POST /api/household/invitations/accept` (402 `seat_limit_reached` when the tenant is over its downgraded cap) |
 | Linked accounts | SET-01..06, DSK-05 | `GET /api/auth/logins`, `POST /api/auth/link/{provider}`, `DELETE /api/auth/logins/{provider}` |
 | Localization | I18N-01..04, **DSK-09 / AND-09** (native restart persistence — NATIVE-5) | `PUT /api/auth/locale` (+ resx) |
 | Theme / dark mode (THEME-1 + PREFS-1) | **SET-08** (⚙️ E2E `ThemeJourneyTests`) + **DSK-15 / AND-14** (native restart persistence) | `PUT /api/auth/theme` ("system" stored verbatim, null = never chose — ADR-022; `theme` JWT claim; pre-paint `theme.js` → `data-bs-theme`; sign-in reconcile + device adoption) |
@@ -1733,6 +1756,7 @@ Postgres + Mailpit + API + Web stack — so they are continuously regression-gua
 | QA-I18N-01 (switch language on login) | `I18nTests.Switching_Language_ReRendersTheUi` |
 | QA-I18N-02 (language follows the user across browsers) | `I18nTests.LocaleChoice_FollowsTheUser_AcrossBrowsers` |
 | QA-SET-08 (dark mode applies/persists/follows, incl. Auto propagation) | `ThemeJourneyTests.ThemeChoice_AppliesLive_PersistsLocally_AndFollowsTheUser` |
+| QA-INV-10 (accept refused after a downgrade — seat re-check) | `SeatQuotaJourneyTests.Accepting_An_Invite_After_A_Downgrade_Shows_The_HouseholdFull_State` |
 | QA-DSK-01 (desktop OTP sign-in) | `NativeSmokeTests` — the `native-smoke-windows` job boots the REAL Windows exe and drives it over WebView2 CDP (OTP + household load) |
 | QA-AND-01 (Android OTP sign-in) | `tests/native-smoke-android/smoke.js` — the `native-smoke-android` job boots a real emulator and drives the app via playwright-core's `_android` module |
 
@@ -2012,3 +2036,11 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   assemblies); **"system" is stored verbatim** so Auto propagates across devices. QA-I18N-02 is now
   ⚙️ automated (`I18nTests.LocaleChoice_FollowsTheUser_AcrossBrowsers`); QA-SET-08 updated (no
   workaround reload; Auto-propagation leg added). No new manual cases — suite stays **124**.
+- **Updated 2026-07-14** — **BILLING-9 (ADR-006 addendum, seat re-check at accept)**: a downgrade
+  (dunning lapse, cancel, or an ADR-021 comp revert) left pending invitations that could each still
+  join — BILLING-5 checked seats only at invitation *creation*, so a Pro→Free tenant could grow past
+  its cap by redeeming stale invites. `AcceptAsync` now refuses when the tenant is already over its
+  limit (402 `seat_limit_reached`; accepts at exactly the cap stay allowed — the joiner consumes the
+  seat their invite reserved) and `/join` shows a "This household is full" state (EN/ES); the token
+  stays pending and self-heals on re-upgrade. New **QA-INV-10** (⚙️ automated —
+  `SeatQuotaJourneyTests`, fake-provider webhook downgrade). Suite 124 → **125** cases.

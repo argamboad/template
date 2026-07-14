@@ -1,5 +1,3 @@
-using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Perezosoft.E2E.Tests.Pages;
@@ -48,27 +46,7 @@ public class BillingJourneyTests : E2ETestBase
         Assert.That(tenantId, Is.Not.Empty);
 
         // Simulate the provider's "subscription active" callback — the same POST Stripe would make.
-        using var api = NewApiClient();
-        // BillingWebhookEvent is deserialized with DEFAULT System.Text.Json options (PascalCase,
-        // case-sensitive) — so serialize with the defaults too, NOT JsonContent's camelCase web defaults.
-        var payload = JsonSerializer.Serialize(new
-        {
-            EventId = $"evt_e2e_{Guid.NewGuid():N}",
-            TenantId = tenantId,
-            PlanKey = "pro",
-            Status = "active",
-            StripeCustomerId = "cus_e2e",
-            StripeSubscriptionId = "sub_e2e",
-            CurrentPeriodEnd = DateTimeOffset.UtcNow.AddDays(30),
-            OccurredAt = DateTimeOffset.UtcNow,
-        });
-        var webhook = new HttpRequestMessage(HttpMethod.Post, "/api/billing/webhook")
-        {
-            Content = new StringContent(payload, Encoding.UTF8, "application/json"),
-        };
-        webhook.Headers.Add("Stripe-Signature", "valid"); // FakeBillingProvider.ValidSignature
-        var response = await api.SendAsync(webhook);
-        Assert.That(response.IsSuccessStatusCode, Is.True, $"webhook returned {(int)response.StatusCode}");
+        await PostBillingWebhookAsync(tenantId, status: "active");
 
         // Back on the billing page: the projection made the tenant pro (10 seats, portal available).
         await billing.GotoAsync();

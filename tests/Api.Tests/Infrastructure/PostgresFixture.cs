@@ -67,11 +67,20 @@ public sealed class PostgresFixture : IAsyncLifetime
     /// <c>TestWidgets</c>; existing tests use it as an <see cref="AppDbContext"/> transparently.
     /// </summary>
     public TestAppDbContext CreateTestContext(Guid? tenantId = null)
+        => CreateTestContext(new TestCurrentTenant { TenantId = tenantId });
+
+    /// <summary>
+    /// A fresh context whose global query filter follows the GIVEN ambient-tenant instance — share it
+    /// with a <see cref="ServiceHarness"/> so a service's <c>EnterTenant</c> scope drives the context's
+    /// filter too, exactly like the one scoped <c>HttpCurrentTenant</c> does in production (needed by
+    /// flows that enter another tenant mid-call, e.g. the invitation accept's seat re-check).
+    /// </summary>
+    public TestAppDbContext CreateTestContext(ICurrentTenant currentTenant)
     {
         var options = new DbContextOptionsBuilder<TestAppDbContext>()
             .UseNpgsql(ConnectionString)
             .Options;
-        return new TestAppDbContext(options, new TestCurrentTenant { TenantId = tenantId });
+        return new TestAppDbContext(options, currentTenant);
     }
 
     /// <summary>
