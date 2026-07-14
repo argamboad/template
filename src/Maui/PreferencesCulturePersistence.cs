@@ -16,4 +16,7 @@ public class PreferencesCulturePersistence : ICulturePersistence
         Preferences.Default.Set(PreferenceKey, cultureCode);
         return Task.CompletedTask;
     }
+
+    public Task<string?> GetAsync() =>
+        Task.FromResult(Preferences.Default.Get<string?>(PreferenceKey, null));
 }

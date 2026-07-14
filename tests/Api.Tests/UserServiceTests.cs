@@ -105,7 +105,7 @@ public class UserServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtur
         await using (var read = Fixture.CreateContext())
             Assert.Equal("light", (await read.Users.SingleAsync(u => u.Id == user.Id)).Theme);
 
-        // "system" is stored as null — no per-user preference, the device decides.
+        // null = "never chose" (PREFS-1: "system" is stored verbatim by the controller).
         await sut.UpdateThemeAsync(user.Id, null);
         await using (var read = Fixture.CreateContext())
             Assert.Null((await read.Users.SingleAsync(u => u.Id == user.Id)).Theme);

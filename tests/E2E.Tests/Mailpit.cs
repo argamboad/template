@@ -63,6 +63,10 @@ public static class Mailpit
         return match.Success ? System.Net.WebUtility.HtmlDecode(match.Value) : null;
     }
 
+    // OTP emails are localized to the requester's UI language (QA-I18N-04), so accept every
+    // shipped translation of the subject ("Your verification code").
+    private static readonly string[] OtpSubjects = ["verification code", "código de verificación"];
+
     private static async Task<string?> TryGetLatestCodeAsync(string toEmail)
     {
         var list = await Http.GetFromJsonAsync<MessageList>("/api/v1/messages?limit=50");
@@ -71,7 +75,7 @@ public static class Mailpit
         var summary = list?.Messages?
             .FirstOrDefault(m =>
                 m.To.Any(a => string.Equals(a.Address, toEmail, StringComparison.OrdinalIgnoreCase))
-                && (m.Subject?.Contains("verification code", StringComparison.OrdinalIgnoreCase) ?? false));
+                && OtpSubjects.Any(s => m.Subject?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false));
         if (summary is null) return null;
 
         var detail = await Http.GetFromJsonAsync<MessageDetail>($"/api/v1/message/{summary.ID}");

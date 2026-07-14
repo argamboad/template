@@ -89,6 +89,13 @@ CACHE (Redis — until multi-node).
 and server sync (`User.Theme`, `PUT /api/auth/theme`, `theme` JWT claim, cold-start layout
 reconcile — the `locale` playbook). See `docs/stories/theme.md`.
 
+**`PREFS` — per-user preference sync → ✅ COMPLETE (2026-07-14).** Fixed the QA-I18N-02 failure
+(locale was never persisted server-side — the only switcher lived on the anonymous login page) and
+the theme-only-after-reload instability: Settings → Preferences card (signed-in home for both
+switchers), reconcile on every sign-in via the `AuthService.SignedIn` event, device-choice adoption
+when the server value was never set, one-reload locale apply (WASM satellite assemblies), and
+"system" stored verbatim so Auto propagates. ADR-022; see `docs/stories/prefs.md`.
+
 **`RLS` — Postgres row-level-security tenancy backstop → ✅ COMPLETE (decided + built 2026-07-06,
 ADR-020 + addendum).** DB-level second wall under the ADR-003 query filter: FORCEd fail-closed
 policies on every `ITenantScoped` table, `RlsSessionInterceptor` GUC propagation, tags/EnterTenant

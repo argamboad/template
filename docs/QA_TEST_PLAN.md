@@ -164,7 +164,7 @@ UI-less (they're for machines) and **config-gated off** — they have **manual c
 **Automated in CI (Web):** a Playwright/NUnit E2E suite (`tests/E2E.Tests`) now runs the core auth,
 MFA, and i18n journeys against the real booted stack on every push — the `e2e` job in
 `.github/workflows/ci.yml`. The cases it covers are marked **⚙️ Automated in CI** (QA-SMK-01,
-QA-SMK-03, QA-AUTH-09, QA-MFA-01, QA-MFA-02, QA-I18N-01; see the §15 note). Human QA can spot-check
+QA-SMK-03, QA-AUTH-09, QA-MFA-01, QA-MFA-02, QA-I18N-01, QA-I18N-02, QA-SET-08; see the §15 note). Human QA can spot-check
 those on Web and focus effort on the un-automated cases and the Desktop/Android clients, which the CI
 job does not exercise.
 
@@ -769,16 +769,19 @@ Given I am signed in
 When I pick "Dark" in the header theme switcher
 Then the app restyles dark immediately without a reload
 And a reload first-paints dark (no light flash)
-And signing in on a fresh browser profile renders dark after its next reload
+And signing in on a fresh browser profile renders dark as part of the sign-in
 ```
 **Walkthrough**
-1. Signed in, pick **Dark** in the header switcher (login page has the same control).
-   **Expected:** the page flips dark instantly — background, cards, buttons, and the brand
-   lockup swaps to its dark variant; no reload.
+1. Signed in, pick **Dark** in the header switcher (login page and **Settings → Preferences**
+   have the same control). **Expected:** the page flips dark instantly — background, cards,
+   buttons, and the brand lockup swaps to its dark variant; no reload.
 2. Reload. **Expected:** the very first paint is dark — no white flash.
-3. Sign in as the same user in a fresh browser profile (or private window) and reload once.
-   **Expected:** dark — the choice is stored per user server-side.
-4. Pick **Auto**. **Expected:** the app follows the OS scheme live (flip the OS setting to check).
+3. Sign in as the same user in a fresh browser profile (or private window).
+   **Expected:** dark applies as part of signing in, no reload needed — the choice is stored
+   per user server-side (PREFS-1, ADR-022).
+4. Pick **Auto**. **Expected:** the app follows the OS scheme live (flip the OS setting to
+   check). Auto is stored per user too: a second browser showing Dark returns to the OS scheme
+   on its next sign-in/reload.
 
 ### QA-MFA-01 — Enable two-factor (authenticator TOTP) 🟠 (Web) ⚙️ Automated in CI
 **Precondition:** signed in; an authenticator app (Google Authenticator, 1Password, Authy, …) to hand.
@@ -940,7 +943,7 @@ Then the page text renders in Spanish
 **Walkthrough:** on `/login`, use the language switcher (bottom of the card) → **Español**.
 **Expected:** titles, button labels, and prompts switch to Spanish; the choice persists on reload.
 
-### QA-I18N-02 — Language persists per user across sessions 🟠 (Web)
+### QA-I18N-02 — Language persists per user across sessions 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
 ```gherkin
 Given I am signed in and set my language to Spanish
@@ -948,10 +951,12 @@ When I sign out and sign back in (even in a fresh browser)
 Then the app loads in Spanish
 ```
 **Walkthrough**
-1. Signed in, switch to **Español**. (This saves the locale to your user record via `PUT
-   /api/auth/locale` and into the JWT.)
-2. Sign out; sign back in.
-3. **Expected:** app comes up in Spanish — the preference followed the *user*, not just the browser.
+1. Signed in, switch to **Español** in **Settings → Preferences**. (This saves the locale to
+   your user record via `PUT /api/auth/locale` and into the JWT. A pre-auth pick on the login
+   page also works: it's adopted into your user record when you sign in — PREFS-1, ADR-022.)
+2. Sign out; sign back in (a fresh browser/private window is the stronger check).
+3. **Expected:** app comes up in Spanish — the preference followed the *user*, not just the
+   browser. On a mismatch the app persists the saved locale and reloads once.
 
 ### QA-I18N-03 — In-app UI is fully translated (no English leaks) 🟢 (Web)
 **Walkthrough:** in Spanish, walk Home → Household → Settings → invite flow. **Expected:** all
@@ -1689,7 +1694,7 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | Join / accept | INV-02/03/04/05, **DSK-08 / AND-08** (paste invite code — NATIVE-4b; web variant ⚙️ E2E) | `POST /api/household/invitations/accept` |
 | Linked accounts | SET-01..06, DSK-05 | `GET /api/auth/logins`, `POST /api/auth/link/{provider}`, `DELETE /api/auth/logins/{provider}` |
 | Localization | I18N-01..04, **DSK-09 / AND-09** (native restart persistence — NATIVE-5) | `PUT /api/auth/locale` (+ resx) |
-| Theme / dark mode (THEME-1) | **SET-08** (⚙️ E2E `ThemeJourneyTests`) + **DSK-15 / AND-14** (native restart persistence) | `PUT /api/auth/theme` ("system" stores null; `theme` JWT claim; pre-paint `theme.js` → `data-bs-theme`) |
+| Theme / dark mode (THEME-1 + PREFS-1) | **SET-08** (⚙️ E2E `ThemeJourneyTests`) + **DSK-15 / AND-14** (native restart persistence) | `PUT /api/auth/theme` ("system" stored verbatim, null = never chose — ADR-022; `theme` JWT claim; pre-paint `theme.js` → `data-bs-theme`; sign-in reconcile + device adoption) |
 | Emails / branding | MAIL-01..04, I18N-04 | (SMTP via Mailpit) |
 | Tenant isolation / auth guards | SEC-01..05 | (all `[Authorize]` endpoints; write-stamping + reuse detection are automated) |
 | Platform health / readiness | SMK-07 | `GET /health`, `GET /health/ready` |
@@ -1726,7 +1731,8 @@ Postgres + Mailpit + API + Web stack — so they are continuously regression-gua
 | QA-MFA-01 (enable TOTP) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` (enroll leg) |
 | QA-MFA-02 (step-up enforced at sign-in) | `MfaJourneyTests.Enroll_ThenStepUp_OnNextSignIn` + `StepUp_WithWrongCode_DoesNotSignIn` |
 | QA-I18N-01 (switch language on login) | `I18nTests.Switching_Language_ReRendersTheUi` |
-| QA-SET-08 (dark mode applies/persists/follows) | `ThemeJourneyTests.ThemeChoice_AppliesLive_PersistsLocally_AndFollowsTheUser` |
+| QA-I18N-02 (language follows the user across browsers) | `I18nTests.LocaleChoice_FollowsTheUser_AcrossBrowsers` |
+| QA-SET-08 (dark mode applies/persists/follows, incl. Auto propagation) | `ThemeJourneyTests.ThemeChoice_AppliesLive_PersistsLocally_AndFollowsTheUser` |
 | QA-DSK-01 (desktop OTP sign-in) | `NativeSmokeTests` — the `native-smoke-windows` job boots the REAL Windows exe and drives it over WebView2 CDP (OTP + household load) |
 | QA-AND-01 (Android OTP sign-in) | `tests/native-smoke-android/smoke.js` — the `native-smoke-android` job boots a real emulator and drives the app via playwright-core's `_android` module |
 
@@ -1997,3 +2003,12 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   out-of-band identity verification first), audited in the target's tenant (`admin.mfa.reset`) with
   the user notified in-app + email (`security.mfa_reset`); confirm-gated **Reset MFA** button on the
   admin member row (new **QA-ADMIN-07**). Suite 123 → **124** cases.
+- **Updated 2026-07-14** — **PREFS-1 (ADR-022, per-user preference sync)**: fixed the QA-I18N-02
+  failure (locale was never persisted server-side — the only switcher lived on the anonymous login
+  page) and the "theme applies only after a manual reload" instability (the reconcile ran only on
+  cold starts, missing OTP/MFA soft-navigation sign-ins). Language + theme now live in a
+  **Settings → Preferences** card; sign-in reconciles both ways (server value wins; a never-set
+  server value adopts the device choice); a locale mismatch persists + reloads once (WASM satellite
+  assemblies); **"system" is stored verbatim** so Auto propagates across devices. QA-I18N-02 is now
+  ⚙️ automated (`I18nTests.LocaleChoice_FollowsTheUser_AcrossBrowsers`); QA-SET-08 updated (no
+  workaround reload; Auto-propagation leg added). No new manual cases — suite stays **124**.

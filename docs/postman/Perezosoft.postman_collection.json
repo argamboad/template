@@ -195,7 +195,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"locale\": \"es\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/auth/locale", "host": ["{{baseUrl}}"], "path": ["api", "auth", "locale"] },
-            "description": "en / es shipped. Drives UI + email language."
+            "description": "en / es shipped. Drives UI + email language. Follows the user across devices: applied (with one reload on mismatch) on every sign-in, and a device-local login-page choice is adopted here automatically on sign-in when unset (PREFS-1, ADR-022)."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"2xx\", () => pm.expect(pm.response.code).to.be.below(300));"], "type": "text/javascript" } }]
         },
@@ -206,7 +206,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"theme\": \"dark\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/auth/theme", "host": ["{{baseUrl}}"], "path": ["api", "auth", "theme"] },
-            "description": "light / dark / system (THEME-1). \"system\" stores no preference — the device's OS scheme decides. Lands in the JWT on the next refresh. Anything else → 400 unsupported_theme."
+            "description": "light / dark / system (THEME-1 + PREFS-1, ADR-022). All three are stored verbatim and follow the user across devices — \"system\" means follow the OS scheme; null in the DB means \"never chose\" (lets sign-in adopt a device-local choice). Lands in the JWT on the next refresh. Anything else → 400 unsupported_theme."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"2xx\", () => pm.expect(pm.response.code).to.be.below(300));"], "type": "text/javascript" } }]
         },

@@ -13,4 +13,10 @@ public class LocalStorageThemePersistence(IJSRuntime js) : IThemePersistence
         try { await js.InvokeVoidAsync("localStorage.setItem", StorageKey, theme); }
         catch { /* best-effort — the in-process theme set by the caller still applies */ }
     }
+
+    public async Task<string?> GetAsync()
+    {
+        try { return await js.InvokeAsync<string?>("localStorage.getItem", StorageKey); }
+        catch { return null; /* storage unavailable — treat as "never chose" */ }
+    }
 }

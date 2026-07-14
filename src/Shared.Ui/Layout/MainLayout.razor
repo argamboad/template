@@ -1,8 +1,11 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @using System.Globalization
+@using System.Net.Http.Json
 @using Perezosoft.Shared.Ui.Auth
 @inject AuthService Auth
 @inject NavigationManager Nav
+@inject HttpClient Http
 @inject ICulturePersistence CulturePersistence
 @inject IThemePersistence ThemePersistence
 @inject IJSRuntime JS
@@ -52,28 +55,52 @@ else
         // before @Body renders. No page triggers its own refresh → no rotation race.
         await Auth.InitializeAsync();
 
-        // First load on a new device: if the user's saved locale differs from the active UI
-        // culture, apply it IN-PROCESS (and persist for the next cold start) before @Body renders —
-        // the layout then renders in the new culture with no full-page reload (MITI-5).
-        if (Auth.IsAuthenticated && !string.IsNullOrEmpty(Auth.Locale) &&
-            !string.Equals(Auth.Locale, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var culture = new CultureInfo(Auth.Locale);
-                CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = culture;
-                CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = culture;
-                await CulturePersistence.PersistAsync(Auth.Locale);
-            }
-            catch (CultureNotFoundException) { /* unknown locale — keep the current culture */ }
-        }
+        // Cross-device preference sync, awaited before @Body renders (PREFS-1, ADR-022).
+        await ReconcilePreferencesAsync();
 
-        // Same cross-device reconcile for the theme: a saved "light"/"dark" wins over the
-        // device value (a null server value means "system" — leave the device alone). The
-        // attribute applies live, so no reload is needed.
-        if (Auth.IsAuthenticated && Auth.Theme is { } savedTheme)
+        _initialized = true;
+
+        // Interactive sign-ins (OTP/MFA/native OAuth) are soft navigations — this layout
+        // instance stays alive and OnInitializedAsync never re-runs — so reconcile again
+        // whenever a sign-in lands. Subscribed AFTER the cold-start reconcile above so the
+        // startup refresh doesn't trigger a second pass.
+        Auth.SignedIn += OnSignedIn;
+
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        var isAnonymous = AnonymousPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+        if (!Auth.IsAuthenticated && !isAnonymous)
+            Nav.NavigateTo("/login", replace: true);
+    }
+
+    public void Dispose() => Auth.SignedIn -= OnSignedIn;
+
+    private async void OnSignedIn()
+    {
+        try
         {
-            try
+            await InvokeAsync(async () =>
+            {
+                await ReconcilePreferencesAsync();
+                StateHasChanged();
+            });
+        }
+        catch { /* best-effort — the device defaults stand */ }
+    }
+
+    // Two-way preference sync between the user record (via the JWT claims) and the device:
+    //  - server value set → it wins; apply + cache on this device.
+    //  - server value never set → adopt an explicit device choice into the user record, so a
+    //    pre-auth login-page pick becomes the account preference (never while impersonating —
+    //    an admin's device must not rewrite the impersonated user's preferences).
+    // Idempotent: everything is compare-then-act, so re-running is a no-op when in sync.
+    private async Task ReconcilePreferencesAsync()
+    {
+        if (!Auth.IsAuthenticated) return;
+
+        // Theme first — it applies live (data-bs-theme), no reload involved.
+        try
+        {
+            if (Auth.Theme is { } savedTheme)
             {
                 var local = await JS.InvokeAsync<string>("appTheme.current");
                 if (!string.Equals(savedTheme, local, StringComparison.OrdinalIgnoreCase))
@@ -82,15 +109,41 @@ else
                     await ThemePersistence.PersistAsync(savedTheme);
                 }
             }
-            catch { /* JS unavailable — the device default stands */ }
+            else if (!Auth.IsImpersonating && await ThemePersistence.GetAsync() is { Length: > 0 } deviceTheme)
+            {
+                await Http.PutAsJsonAsync("/api/auth/theme", new { theme = deviceTheme });
+            }
         }
+        catch { /* JS/HTTP unavailable — the device default stands */ }
 
-        _initialized = true;
+        // Locale last — a mismatch ends in ONE full reload: WASM fetches satellite resource
+        // assemblies for the boot culture only, so an in-process switch alone would leave the
+        // strings untranslated (reverts B7-3's no-reload approach; the reload happens only on
+        // an actual mismatch, so there is still no guaranteed double load).
+        try
+        {
+            if (Auth.Locale is { } savedLocale)
+            {
+                if (!string.Equals(savedLocale, CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // In-process for MAUI (the WebView reload doesn't re-run MauiProgram);
+                    // persisted for the web (its reload re-boots from localStorage).
+                    var culture = new CultureInfo(savedLocale);
+                    CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = culture;
+                    await CulturePersistence.PersistAsync(savedLocale);
 
-        var path = new Uri(Nav.Uri).AbsolutePath;
-        var isAnonymous = AnonymousPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
-        if (!Auth.IsAuthenticated && !isAnonymous)
-            Nav.NavigateTo("/login", replace: true);
+                    var path = new Uri(Nav.Uri).AbsolutePath;
+                    var isAnonymous = AnonymousPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+                    Nav.NavigateTo(isAnonymous ? "/" : Nav.Uri, forceLoad: true);
+                }
+            }
+            else if (!Auth.IsImpersonating && await CulturePersistence.GetAsync() is { Length: > 0 } deviceLocale)
+            {
+                await Http.PutAsJsonAsync("/api/auth/locale", new { locale = deviceLocale });
+            }
+        }
+        catch (CultureNotFoundException) { /* unknown saved locale — keep the current culture */ }
+        catch { /* best-effort — the device default stands */ }
     }
 
     // Leave the impersonated session and reload as the staff user (restored from the refresh cookie).
