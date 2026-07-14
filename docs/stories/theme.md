@@ -27,13 +27,15 @@ strings. Tests: `UserServiceTests` (set/overwrite/clear, unknown-user no-op),
 **I want** to choose Light, Dark, or follow my OS scheme — and have the choice stick everywhere
 **So that** the app is comfortable to use in dark environments on every device I sign in to
 
-**Context / notes:** "System" is the default and is stored server-side as **null** (no
-preference — the device decides); only `"light"`/`"dark"` are persisted on `User.Theme`
-(`User` is not `ITenantScoped`, so no RLS policy is involved). The claim lands in the JWT on
-the next refresh, and the layout reconciles it on the next cold start — the same semantics as
-`locale` (MITI-5). The pre-paint bootstrap reads `localStorage["app_theme"]` inside the
-(web)view, so no native `Preferences` store is needed (unlike culture, nothing must be read
-C#-side before the WebView exists).
+**Context / notes:** ~~"System" is the default and is stored server-side as **null**~~
+**Amended by PREFS-1 (ADR-022, 2026-07-14):** `"system"` is now stored **verbatim** on
+`User.Theme` like the other two values, so switching back to System propagates across devices;
+null means "never chose" and lets sign-in adopt a device-local choice. The reconcile also runs
+on **every sign-in** (the `AuthService.SignedIn` event), not just cold starts — see
+`docs/stories/prefs.md`. (`User` is not `ITenantScoped`, so no RLS policy is involved.) The
+claim lands in the JWT on the next refresh. The pre-paint bootstrap reads
+`localStorage["app_theme"]` inside the (web)view, so no native `Preferences` store is needed
+(unlike culture, nothing must be read C#-side before the WebView exists).
 
 **Acceptance criteria**
 

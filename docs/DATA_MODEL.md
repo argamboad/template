@@ -34,7 +34,8 @@ A person (identity). A user belongs to exactly one tenant **via `TenantMembershi
 - `email_verified` — true only when a provider asserts a verified email (fail-closed default; this
   guards the credential-attachment takeover)
 - `locale` (nullable) — per-user UI language preference
-- `theme` (nullable) — per-user UI theme ("light"/"dark"; null = follow the OS scheme)
+- `theme` (nullable) — per-user UI theme ("light"/"dark"/"system", stored verbatim; null = never
+  chose, which lets sign-in adopt a device-local choice — PREFS-1, ADR-022)
 - `logins` — navigation to `UserLogin`
 
 ### UserLogin

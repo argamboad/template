@@ -18,8 +18,9 @@ public class User
     public string? Locale { get; set; }
 
     /// <summary>
-    /// Preferred UI theme ("light" or "dark"), or null to follow the OS color scheme
-    /// ("system"). A per-user preference that follows the user across devices.
+    /// Preferred UI theme ("light", "dark" or "system"), or null when the user never chose
+    /// one (which lets sign-in adopt a device-local choice — PREFS-1, ADR-022). A per-user
+    /// preference that follows the user across devices.
     /// </summary>
     public string? Theme { get; set; }
 

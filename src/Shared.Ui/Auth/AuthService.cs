@@ -38,6 +38,16 @@ public class AuthService(
     private string? _accessToken;
     private Task<bool>? _refreshInFlight;
 
+    /// <summary>
+    /// Raised when the service transitions from unauthenticated to holding a valid access
+    /// token — every sign-in path lands here (OTP/MFA/native OAuth via the body flow, and
+    /// the cookie flow's silent refresh), so MainLayout can reconcile per-user preferences
+    /// on interactive sign-ins too, not just cold starts (PREFS-1, ADR-022). NOT raised on
+    /// mid-session token rotation (still signed in) or impersonation (deliberate — an admin
+    /// session must not adopt/apply the impersonated user's preferences as its own).
+    /// </summary>
+    public event Action? SignedIn;
+
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && !IsTokenExpired(_accessToken);
 
     /// <summary>
@@ -364,10 +374,14 @@ public class AuthService(
     /// <summary>Sets the in-memory access token and persists the rotated refresh token (native).</summary>
     private async Task AcceptTokensAsync(TokenResponse payload)
     {
+        var wasAuthenticated = IsAuthenticated;
         _accessToken = payload.AccessToken;
         _isStaff = null; // identity may have changed; re-probe on demand
         if (sessionStore.UsesBodyTransport && !string.IsNullOrEmpty(payload.RefreshToken))
             await sessionStore.SaveRefreshTokenAsync(payload.RefreshToken);
+
+        if (!wasAuthenticated && IsAuthenticated)
+            SignedIn?.Invoke();
     }
 
     private async Task ClearSessionAsync()
@@ -399,7 +413,7 @@ public class AuthService(
     /// <summary>The user's saved UI locale from the JWT (e.g. "es"), or null if unset.</summary>
     public string? Locale => Claim(AppClaims.Locale);
 
-    /// <summary>The user's saved UI theme from the JWT ("light"/"dark"), or null when the OS decides.</summary>
+    /// <summary>The user's saved UI theme from the JWT ("light"/"dark"/"system"), or null when never chosen.</summary>
     public string? Theme => Claim(AppClaims.Theme);
 
     private string? Claim(string type)

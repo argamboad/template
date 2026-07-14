@@ -1118,3 +1118,37 @@ and the affected user is **notified through the normal fan-out** (in-app + email
 second factor — primary auth is untouched, and the user re-enrolls from Settings. No MFA state is an
 idempotent no-op 204 (no audit/notification noise). Console UI: a confirm-gated **Reset MFA** button
 on the tenant-detail member row. QA-ADMIN-07.
+
+**ADR-022 — Per-user preference sync: adopt-on-sign-in, reconcile on every sign-in path, "system" stored explicitly (PREFS-1; amends THEME-1's null-mapping and B7-3's no-reload reconcile). (2026-07-14)**
+The 2026-07 QA pass failed QA-I18N-02: locale/theme didn't follow the user across browsers. Root
+causes: (a) the only `LanguageSwitcher` lived on the login page where the user is always anonymous,
+so `PUT /api/auth/locale` was unreachable from the UI and `User.Locale` was never written; (b) the
+server→device reconcile ran only in `MainLayout.OnInitializedAsync`, so soft-navigation sign-ins
+(OTP/MFA/native) applied nothing until a manual reload; (c) the B7-3 in-process culture switch never
+loads WASM satellite resource assemblies (fetched per boot culture), so even a reconcile that ran
+left the strings in English; (d) theme "system" was stored as null, indistinguishable from "never
+chose", so returning to System on one device never propagated. A centralized preferences table/
+endpoint was **considered and declined** (2026-07-14): storage stays per-column on `Users`
+(ADR-C2 carve-out), because locale/theme must be readable at token-issue time (JWT claims) and
+pre-paint, and the columns already serve that; only the sync behavior changes.
+
+**Decision:**
+1. **Preferences get a signed-in home**: a Preferences card on `/settings` hosts the existing
+   `LanguageSwitcher`/`ThemeSwitcher` (which already PUT when authenticated). The login-page
+   switchers remain as pre-auth, device-local conveniences.
+2. **Reconcile runs on every sign-in, not just cold starts**: `AuthService` raises `SignedIn` on
+   the unauthenticated→authenticated transition (all body-flow and cookie-refresh paths; NOT on
+   mid-session rotation or impersonation), and `MainLayout` re-runs its idempotent
+   `ReconcilePreferencesAsync` on it.
+3. **Two-way sync**: a set server value wins (apply + cache on device); a never-set server value
+   adopts an explicit device choice via the normal PUTs — so a pre-auth login-page pick becomes
+   the account preference on sign-in. Never adopts while impersonating (an admin's device must not
+   rewrite the impersonated user's preferences).
+4. **Locale mismatch = one full reload** (persist first; in-process culture set for the MAUI
+   WebView, whose reload doesn't re-run `MauiProgram`). This deliberately reverts B7-3's in-process
+   no-reload approach — it couldn't work on WASM (satellite assemblies) — while keeping its actual
+   goal: the reload happens only on a real mismatch, never as a guaranteed double load. Theme
+   applies live (`data-bs-theme`), no reload.
+5. **"system" is stored verbatim** (amends THEME-1): `User.Theme` null now means "never chose",
+   which is what makes adoption (3) well-defined and lets System propagate across devices like the
+   other two values. No schema change — same nullable column, same endpoints.

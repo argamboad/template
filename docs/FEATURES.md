@@ -116,12 +116,18 @@ Notes:
   `POST /api/auth/link/{provider}` links another (refused if that identity belongs to someone else);
   `DELETE /api/auth/logins/{provider}` unlinks (email sign-in always remains, so this can't lock
   you out).
-- **Language:** the switcher persists the user's locale via `PUT /api/auth/locale`; it lands in the
-  JWT on the next refresh and localizes the UI and outgoing emails. See `docs/LOCALIZATION.md`.
-- **Theme (THEME-1):** a Light/Dark/System switcher in the header (and on the login page). Applies
-  live via Bootstrap's `data-bs-theme`; persists device-locally (`localStorage["app_theme"]`, applied
-  pre-paint by `theme.js`) and — signed in — server-side via `PUT /api/auth/theme` ("system" stores
-  null), reconciled on the next cold start like the locale. See `docs/stories/theme.md`.
+- **Language:** the switcher (Settings → Preferences card; also on the login page for pre-auth
+  picks) persists the user's locale via `PUT /api/auth/locale`; it lands in the JWT on the next
+  refresh and localizes the UI and outgoing emails. See `docs/LOCALIZATION.md`.
+- **Theme (THEME-1 + PREFS-1):** a Light/Dark/System switcher in the header, Settings →
+  Preferences, and the login page. Applies live via Bootstrap's `data-bs-theme`; persists
+  device-locally (`localStorage["app_theme"]`, applied pre-paint by `theme.js`) and — signed in —
+  server-side via `PUT /api/auth/theme` ("system" stored verbatim — ADR-022). See
+  `docs/stories/theme.md`.
+- **Preference sync (PREFS-1, ADR-022):** both preferences follow the *user*: reconciled on every
+  sign-in (server value wins — theme applies live, a locale mismatch reloads once), and a
+  device-local choice made before signing in is adopted into the user record when the account has
+  none. See `docs/stories/prefs.md`.
 - **MFA (authenticator TOTP; ADR-012):** enroll via `POST /api/auth/mfa/enroll` (returns an
   `otpauth://…` provisioning URI to render as a QR + one-time recovery codes), confirm possession with
   a valid code to enable, and disable/regenerate recovery codes from Settings. Once enabled, every

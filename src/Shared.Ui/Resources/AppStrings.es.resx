@@ -206,6 +206,8 @@
   <data name="Join_ErrorTitle" xml:space="preserve"><value>No se pudo unir</value></data>
   <data name="Join_BackToHousehold" xml:space="preserve"><value>Volver al hogar</value></data>
   <data name="Join_DefaultError" xml:space="preserve"><value>La invitación no es válida o ha caducado.</value></data>
+  <data name="Settings_Preferences" xml:space="preserve"><value>Preferencias</value></data>
+  <data name="Settings_PreferencesHint" xml:space="preserve"><value>Tu idioma y tema se guardan en tu cuenta y te siguen en todos tus dispositivos.</value></data>
   <data name="Settings_Title" xml:space="preserve"><value>Configuración de la cuenta</value></data>
   <data name="Settings_Subtitle" xml:space="preserve"><value>Vincula proveedores de inicio de sesión a esta cuenta. Todos te conectan al mismo hogar.</value></data>
   <data name="Settings_Connected" xml:space="preserve"><value>Conectado</value></data>

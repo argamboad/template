@@ -94,8 +94,9 @@ public class AccountController(
 
     /// <summary>
     /// Saves the signed-in user's preferred UI theme so it follows them across devices.
-    /// "system" (follow the OS scheme) is stored as no preference. The new value lands
-    /// in the JWT on the next refresh.
+    /// "system" (follow the OS scheme) is a stored preference like the others — null means
+    /// "never chose", which lets sign-in adopt a device-local choice (PREFS-1, ADR-022).
+    /// The new value lands in the JWT on the next refresh.
     /// </summary>
     [HttpPut("theme")]
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -107,7 +108,7 @@ public class AccountController(
         if (string.IsNullOrEmpty(theme) || !SupportedThemes.Contains(theme))
             return BadRequest(new ErrorResponse("unsupported_theme", "Unsupported theme."));
 
-        await userService.UpdateThemeAsync(userId, theme == "system" ? null : theme, cancellationToken);
+        await userService.UpdateThemeAsync(userId, theme, cancellationToken);
         return Ok();
     }
 
