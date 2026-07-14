@@ -11,6 +11,7 @@ public class JoinPage(IPage page) : BasePage(page)
     public ILocator GoToHousehold => Page.GetByTestId("join-go-household");
     public ILocator NeedsSignIn => Page.GetByTestId("join-needs-signin");
     public ILocator Error => Page.GetByTestId("join-error");
+    public ILocator HouseholdFull => Page.GetByTestId("join-household-full");
 
     public ILocator CodeInput => Page.GetByTestId("join-code-input");
     public ILocator CodeSubmit => Page.GetByTestId("join-code-submit");

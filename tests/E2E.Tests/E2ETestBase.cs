@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using Microsoft.Playwright;
 using Microsoft.Playwright.NUnit;
 using NUnit.Framework;
@@ -36,6 +38,38 @@ public abstract class E2ETestBase : PageTest
         ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
     })
     { BaseAddress = new Uri(ApiBaseUrl) };
+
+    /// <summary>
+    /// POSTs the billing-provider webhook exactly as Stripe would, accepted by the
+    /// FakeBillingProvider (the E2E API runs without a Stripe key — README): PascalCase body
+    /// (BillingWebhookEvent uses DEFAULT System.Text.Json options, so don't serialize camelCase)
+    /// + the fake's always-valid signature. Lets tests drive plan changes — upgrades AND
+    /// downgrades — with no Stripe. Pass a strictly-later <paramref name="occurredAt"/> for a
+    /// follow-up event: the projection applies only newer events (R29).
+    /// </summary>
+    protected static async Task PostBillingWebhookAsync(string tenantId, string status, string planKey = "pro",
+        DateTimeOffset? occurredAt = null)
+    {
+        using var api = NewApiClient();
+        var payload = JsonSerializer.Serialize(new
+        {
+            EventId = $"evt_e2e_{Guid.NewGuid():N}",
+            TenantId = tenantId,
+            PlanKey = planKey,
+            Status = status,
+            StripeCustomerId = "cus_e2e",
+            StripeSubscriptionId = "sub_e2e",
+            CurrentPeriodEnd = DateTimeOffset.UtcNow.AddDays(30),
+            OccurredAt = occurredAt ?? DateTimeOffset.UtcNow,
+        });
+        var webhook = new HttpRequestMessage(HttpMethod.Post, "/api/billing/webhook")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+        };
+        webhook.Headers.Add("Stripe-Signature", "valid"); // FakeBillingProvider.ValidSignature
+        var response = await api.SendAsync(webhook);
+        Assert.That(response.IsSuccessStatusCode, Is.True, $"webhook returned {(int)response.StatusCode}");
+    }
 
     // Dev runs on a self-signed cert, so ignore HTTPS errors for the test browser.
     public override BrowserNewContextOptions ContextOptions() => new()

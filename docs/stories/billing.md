@@ -402,3 +402,52 @@ mandatory — needs JOBS-2); never grant access on the Checkout redirect, only o
 is a **projection**, Stripe is the source of truth for money; entitlement checks are server-side and
 fail-closed; quotas ≠ rate limits. Budget for Stripe dashboard setup (products/prices/webhook
 endpoint), not just code.
+
+---
+
+### BILLING-9 — Seat quota re-checked when an invitation is accepted
+
+**As a** platform operator
+**I want** invitation acceptance to respect the tenant's *current* seat limit
+**So that** a downgrade (dunning lapse, cancellation, admin comp revert) can't be bypassed by
+accepting invitations issued while the tenant was on a bigger plan
+
+**Context / notes:** BILLING-5 enforces seats only at invitation **creation** (pending invites
+reserve seats, so the cap holds while the plan is stable). But nothing sweeps pending invites on a
+downgrade and `AcceptAsync` never re-checked — so Pro (10 seats) → invite 7 → drop to Free (3)
+left 7 valid invites that could each still join, actively growing the tenant past its cap
+(found 2026-07-14 while reasoning about the ADR-021 comp/revert writes; applies equally to real
+Stripe downgrades). The accept itself is **seat-neutral** — the joiner consumes the seat their
+pending invite reserved — so the rule is "already over the limit" (`CanAdd(0)`), NOT "can add one
+more": accepts at exactly the cap stay allowed, and the check only bites after a downgrade.
+Existing members are never evicted (over-cap tenants are merely frozen for growth, matching the
+invite-path behavior). The check runs inside `EnterTenant(invitation.TenantId)` — the caller's JWT
+still carries their old tenant, and the quota must count the invitation's tenant (same trusted
+contract as the accept's conditional token flip; ADR-020-compatible). ADR-006 addendum.
+
+**Acceptance criteria**
+
+Scenario: accept blocked when the tenant is over its downgraded cap
+  Given a tenant that was Pro and invited past the Free seat limit
+  And the subscription has since lapsed or been reverted to Free
+  When an invitee redeems a still-valid invitation token
+  Then the accept is refused with 402 "seat_limit_reached"
+  And the join page shows a "household is full" message (EN/ES)
+  And no membership was moved and the invitation stays pending
+
+Scenario: accept at exactly the cap still works (seat-neutral swap)
+  Given a Free tenant with 2 members and 1 pending invitation (3/3 seats used)
+  When the invitee redeems the token
+  Then they join and the tenant has 3 members
+
+Scenario: the blocked invite self-heals on upgrade
+  Given an accept was refused with seat_limit_reached
+  When the tenant upgrades back to a plan with room
+  Then redeeming the same (unexpired) token succeeds
+
+**Out of scope:** revoking/sweeping pending invites on downgrade (destroys owner-created state and
+re-upgrading would force re-inviting — the accept-time check self-heals instead); evicting members
+from over-cap tenants; notifying the owner when an accept is refused (candidate follow-up via NOTIFY).
+**Definition of done:** tests first (service-level over-cap/at-cap/heal on the Postgres harness; E2E
+webhook-downgrade journey on the fake provider); 402 mapped and rendered on /join; QA plan + Postman
+updated in the same PR; merged, app working.

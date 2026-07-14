@@ -96,6 +96,12 @@ switchers), reconcile on every sign-in via the `AuthService.SignedIn` event, dev
 when the server value was never set, one-reload locale apply (WASM satellite assemblies), and
 "system" stored verbatim so Auto propagates. ADR-022; see `docs/stories/prefs.md`.
 
+**`BILLING-9` — seat re-check at invitation accept → ✅ COMPLETE (2026-07-14).** Closed the quota gap
+where a downgrade (dunning lapse, cancel, ADR-021 comp revert) left pending invitations that could
+each still join and grow the tenant past its new cap: `AcceptAsync` now refuses over-cap tenants
+(402 `seat_limit_reached`, "household full" state on `/join`; accepts at exactly the cap stay
+allowed and a refused token self-heals on re-upgrade). ADR-006 addendum; see `docs/stories/billing.md`.
+
 **`RLS` — Postgres row-level-security tenancy backstop → ✅ COMPLETE (decided + built 2026-07-06,
 ADR-020 + addendum).** DB-level second wall under the ADR-003 query filter: FORCEd fail-closed
 policies on every `ITenantScoped` table, `RlsSessionInterceptor` GUC propagation, tags/EnterTenant

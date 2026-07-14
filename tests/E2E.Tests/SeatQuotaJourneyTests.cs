@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Perezosoft.E2E.Tests.Pages;
 
@@ -54,6 +55,55 @@ public class SeatQuotaJourneyTests : E2ETestBase
         var token = await household.InviteAsync(replacementEmail);
         Assert.That(token, Is.Not.Empty);
         await Expect(household.PendingRow(replacementEmail)).ToBeVisibleAsync(Slow);
+    }
+
+    /// <summary>
+    /// BILLING-9: the seat quota is re-checked at ACCEPT. Upgrade to Pro via the fake provider,
+    /// invite past the Free cap (legal on Pro), downgrade via a "canceled" webhook (the dunning/
+    /// comp-revert equivalent), then redeem a still-valid token — the join page shows the
+    /// household-full state instead of joining. Maps to QA-INV-10.
+    /// </summary>
+    [Test]
+    public async Task Accepting_An_Invite_After_A_Downgrade_Shows_The_HouseholdFull_State()
+    {
+        await Mailpit.ClearAsync();
+        var household = await SignInToHouseholdAsync(Page, UniqueEmail("owner"));
+
+        // Upgrade to Pro exactly like the billing journey: stubbed checkout redirect carries the
+        // tenant id; the webhook flips the projection.
+        var billing = new BillingPage(Page);
+        await billing.GotoAsync();
+        await Page.RouteAsync("https://billing.test/**", route => route.FulfillAsync(new()
+        {
+            Status = 200,
+            ContentType = "text/html",
+            Body = "<html><body>Fake checkout</body></html>",
+        }));
+        await billing.Upgrade.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex(@"billing\.test/checkout/.+/pro"), new() { Timeout = 30_000 });
+        var tenantId = Regex.Match(Page.Url, @"checkout/([0-9a-fA-F-]+)/pro").Groups[1].Value;
+        await PostBillingWebhookAsync(tenantId, status: "active", occurredAt: DateTimeOffset.UtcNow.AddMinutes(-1));
+
+        // On Pro (10 seats), reserve more seats than Free allows: owner + 3 pending = 4 > 3.
+        await household.GotoAsync();
+        var lateToken = "";
+        for (var i = 1; i <= FreePlanSeatLimit; i++)
+            lateToken = await household.InviteAsync(UniqueEmail($"pro-invitee{i}"));
+
+        // The provider cancels (strictly-newer event) → the plan resolves Free again.
+        await PostBillingWebhookAsync(tenantId, status: "canceled");
+
+        // A fresh user redeems the still-valid token: refused with the household-full state —
+        // nothing joined, and the token stays pending (self-heals if the owner re-upgrades).
+        await Mailpit.ClearAsync();
+        await using var inviteeCtx = await Browser.NewContextAsync(ContextOptions());
+        var inviteePage = await inviteeCtx.NewPageAsync();
+        await SignInAsync(inviteePage, UniqueEmail("late-joiner"));
+
+        var join = new JoinPage(inviteePage);
+        await join.GotoWithTokenAsync(lateToken);
+        await Expect(join.HouseholdFull).ToBeVisibleAsync(Slow);
+        await Expect(join.Success).Not.ToBeVisibleAsync();
     }
 
     /// <summary>Invites until members + pending == the seat limit; returns the invited emails.</summary>
