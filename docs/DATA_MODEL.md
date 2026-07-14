@@ -8,9 +8,15 @@
 - `id` primary key on every entity unless noted. UUIDv7 (`Guid.CreateVersion7()`) used — time-ordered,
   supported in .NET 9+ and already active in base entities.
 - Timestamps (`created_at`, `updated_at`) assumed on all entities; omitted below for brevity.
-- **Tenant scoping:** every app entity that holds tenant data carries a `tenant_id` and must be
-  filtered by it on every query. Never leak across tenants.
-- "Tenant" is the code term for the household/org/team. _App label: TODO._
+- **Tenant scoping:** every app entity that holds tenant data implements `ITenantScoped`
+  (a `TenantId`) and is filtered automatically by a global EF query filter (see ADR-003) — you
+  can't forget to scope a read. Genuinely cross-tenant/pre-auth reads use the sanctioned escape
+  hatch **`IRepository<T>.QueryAllTenants()`** (audited; used by dissolve contributors), and a
+  signature-/system-authenticated tenant-scoped write enters its tenant via
+  **`ITenantContext.EnterTenant(tenantId)`** — `IgnoreQueryFilters()` is **banned in
+  `src/Api/Features/**`** (a build-time test enforces it). Never leak across tenants.
+- "Tenant" is the code term for the household/org/team. The reference implementation labels it
+  **Household**; rename per app.
 
 ## Base entities (constant — multi-tenant foundation)
 
@@ -20,28 +26,82 @@ The household/org/team. Owns all tenant-scoped data.
 - `name`
 - _TODO: tenant-level fields specific to this app_
 
-### User (`AppUser`)
-A person belonging to a tenant. Many users → one tenant.
-- `id` (UUIDv7, from `IdentityUser<Guid>`)
-- `tenant_id` (FK → Tenant, required)
-- `email`, `username`, `password_hash`, `security_stamp` — managed by ASP.NET Core Identity
-- External logins stored in Identity's `AspNetUserLogins` table (one row per OAuth provider)
-- _per-user preferences only — TODO: which preferences does this app need?_
+### User
+A person (identity). A user belongs to exactly one tenant **via `TenantMembership`** — there is
+**no `tenant_id` on User**. Passwordless-capable; no password is stored.
+- `id` (UUIDv7) — a plain POCO, **not** `IdentityUser`
+- `email` (unique, normalized lower-case), `display_name` (nullable, refreshed from the provider)
+- `email_verified` — true only when a provider asserts a verified email (fail-closed default; this
+  guards the credential-attachment takeover)
+- `locale` (nullable) — per-user UI language preference
+- `theme` (nullable) — per-user UI theme ("light"/"dark"/"system", stored verbatim; null = never
+  chose, which lets sign-in adopt a device-local choice — PREFS-1, ADR-022)
+- `logins` — navigation to `UserLogin`
 
-### TenantInvitation *(constant — auth foundation)*
-An email invitation for a person to join a tenant. One invitation per email per tenant.
-- `id` (UUIDv7)
-- `tenant_id` (FK → Tenant)
-- `email` — the invited address
-- `token` — unique, URL-safe token (generated via Identity token provider)
-- `invited_by_user_id` (FK → User, loose — stored as Guid)
-- `expires_at`
-- `accepted_at` (nullable)
+### UserLogin
+One OAuth identity linked to a `User` (a user may link several providers).
+- `id` (UUIDv7), `user_id` (FK → User)
+- `provider` ("google", "microsoft", …), `provider_user_id`
+- unique on (`provider`, `provider_user_id`)
+
+### TenantMembership *(the user→tenant link — source of truth for tenancy)*
+- `id` (UUIDv7), `tenant_id` (FK → Tenant), `user_id` (FK → User)
+- **unique on `user_id`** — a user is in exactly one tenant at a time
+- `role` — `owner` | `admin` | `member` (exactly one owner per tenant; `admin` is a delegated-management
+  tier — ADR-009), `joined_at`. Capabilities per role are defined in `RolePermissions`, not ad-hoc checks.
+
+### RefreshToken
+A rotating, hashed refresh token backing a session — only the **hash** is stored, so a DB leak
+can't forge sessions.
+- `id` (UUIDv7), `user_id`, `token_hash` (SHA-256), `provider`
+- `issued_at`, `expires_at`, `is_revoked`, `issued_from_ip`
+
+### LoginToken *(passwordless: magic link + email OTP)*
+A single-use, hashed, time-limited credential. The account is resolved/created at redemption, so a
+typo'd or probed email leaves no account behind.
+- `id` (UUIDv7), `email`, `code_hash` (SHA-256), `purpose` (`magic-link` | `otp`)
+- `created_at`, `expires_at`, `consumed_at` (nullable), `attempt_count` (OTP lockout)
+- **Derived (computed, never stored):** `is_expired`, `is_consumed`, `is_valid`
+
+### UserMfa *(MFA — authenticator TOTP; ADR-012)*
+A user's TOTP second-factor state (one per user). User-scoped identity data (wiped by account erasure).
+- `id` (UUIDv7), `user_id` (unique) — one MFA row per user
+- `encrypted_secret` — the TOTP secret **encrypted at rest** (Data Protection); never plaintext, never
+  returned after enrollment
+- `enabled` (true only after a valid code confirms possession), `enrolled_at`
+- `last_verified_time_step` (nullable) — the TOTP time-step accepted by the most recent successful
+  **login** step-up; a code whose step is ≤ this is rejected as a replay (RFC-6238 anti-replay; v2
+  audit LOGIC-S1). Null until the first login step-up; enrollment-confirm deliberately does not set it.
+
+### MfaRecoveryCode *(MFA — ADR-012)*
+Single-use recovery codes, stored **only as hashes** (SHA-256); the raw codes are shown once at
+enrollment. User-scoped (wiped by account erasure).
+- `id` (UUIDv7), `user_id`, `code_hash`, `used_at` (nullable — consumed when set)
+
+### Notification *(in-app notifications — ADR-013)*
+A per-user notification. **Keyed by `user_id` — NOT tenant-scoped** (the ADR-C2 per-user carve-out); a
+user only ever sees their own. User PII (wiped by account erasure).
+- `id` (UUIDv7), `user_id`, `kind` (stable verb), `title`, `body`
+- `metadata` (jsonb, nullable — identifiers only, no secrets), `read_at` (nullable), `created_at`
+- indexed on `(user_id, created_at)` for the newest-first feed + unread counts
+
+### NotificationPreference *(in-app notifications — ADR-013)*
+Per-user delivery preferences (the ADR-C2 per-user carve-out, like `User.Locale`). One row per user;
+absence ⇒ both channels on. User PII (wiped by account erasure).
+- `id` (UUIDv7), `user_id` (unique), `in_app_enabled`, `email_enabled` (both default true)
+
+### TenantInvitation *(constant — auth foundation)* — implements `ITenantScoped`
+An email invitation to join a tenant. The raw token is revealed once at creation; only its hash is
+stored.
+- `id` (UUIDv7), `tenant_id` (FK → Tenant)
+- `invited_email` — normalized lower-case
+- `token_hash` (SHA-256) — **no raw token column**
+- `invited_by_user_id` (Guid), `status` (`pending` | `accepted` | `revoked` | `expired`)
+- `created_at`, `expires_at`
 
 **Derived rules (computed, never stored):**
 - `is_expired` → `now > expires_at`
-- `is_accepted` → `accepted_at IS NOT NULL`
-- `is_valid` → `!is_expired AND !is_accepted`
+- `is_valid` → `status == pending AND !is_expired`
 
 ## App entities
 <!-- Design fresh per app. For each entity: fields, relationships, and tenant_id where it holds
@@ -49,14 +109,83 @@ An email invitation for a person to join a tenant. One invitation per email per 
 _TODO_
 
 ## Relationship summary
-- Tenant 1 — N User *(constant)*
+- Tenant 1 — N TenantMembership N — 1 User *(constant; unique on `user_id` = one tenant per user)*
+- User 1 — N UserLogin *(constant)*
+- User 1 — N RefreshToken *(constant)*
 - Tenant 1 — N TenantInvitation *(constant)*
+- LoginToken is keyed by email (no FK — the account is resolved at redemption) *(constant)*
 - _TODO: app-specific relationships_
 
 ## Derived rules (computed, never stored)
 <!-- The domain logic specific to this app. TenantInvitation rules are defined above. -->
 _TODO_
 
+## Platform entities (built — ADRs 006–016)
+
+> These are the tenant-/platform-scoped tables the platform epics added. All have EF Core migrations.
+> New app/domain tables you add should implement `ITenantScoped` (so the global tenant filter covers
+> them) and register an **`ITenantDataContributor`** (with `ExportKey` + `ExportAsync` **and**
+> `HasDataAsync`/`WipeAsync`) so they participate in tenant export + dissolve — there is **no** central
+> `HasDataAsync`/`WipeDataAsync` method to edit (adding a feature never means touching central code).
+
+- **`Subscription`** *(ADR-006 / `docs/stories/billing.md`)* — ✅ **BUILT (BILLING-1..7)**:
+  `src/Core/Entities/Subscription.cs`, migration `AddSubscription`. `ITenantScoped`, **unique per
+  tenant**; `plan_key`, `status`, `stripe_customer_id`/`stripe_subscription_id`, `current_period_end`,
+  `lapse_notified_at` (nullable — set by the BILLING-6 lapse sweep so it nudges once per lapse),
+  `last_event_at` (nullable — the timestamp of the most recently *applied* webhook event; the handler
+  applies an incoming event only if strictly newer, so a redelivered/out-of-order older event can't
+  clobber newer state — v2 audit LOGIC-B1). A **projection** of Stripe state (Stripe is the source of
+  truth for money); absent ⇒ Free tier (fail-closed), as is any non-active/lapsed status. Plan catalog
+  is code (`src/Core/Billing/PlanCatalog.cs`), not a table. Participates in dissolve via
+  `BillingDataContributor` (cancels the provider sub + wipes the projection).
+- **`UsageCounter`** *(ADR-006 / `docs/stories/billing.md`)* — ✅ **BUILT (BILLING-5)**:
+  `src/Core/Entities/UsageCounter.cs`. `ITenantScoped`. A per-tenant, per-period metered-usage counter:
+  `key` (the metered action, e.g. "export"), `period` (a calendar month `yyyy-MM`, UTC), `count`,
+  `updated_at`. One row per (tenant, key, period) — the month-keyed period makes it **self-resetting
+  with no reset job**. `IQuotaService.TryConsumeAsync` increments it and denies once the plan's monthly
+  limit is reached.
+- **`ApiKey`** *(ADR-015 / `docs/stories/pubapi.md`)* — ✅ **BUILT (PUBAPI-1)**:
+  `src/Core/Entities/ApiKey.cs`. `ITenantScoped`. A tenant-scoped API key for programmatic access — only
+  the **hash** is stored: `name`, `key_hash` (deterministic hash for O(1) lookup), `prefix` (short
+  non-secret display prefix), `scopes` (comma-separated), `created_by_user_id`, `created_at`,
+  `last_used_at`, `expires_at` (nullable), `revoked_at` (nullable). The raw key is shown once at
+  creation. A presented key authenticates as its tenant (mints a `tenant_id`-claim principal).
+- **`WebhookSubscription`** *(ADR-016 / `docs/stories/hooks.md`)* — ✅ **BUILT (HOOKS-1)**:
+  `src/Core/Entities/WebhookSubscription.cs`. `ITenantScoped`. A tenant's outbound webhook subscription:
+  `url`, `event_types` (comma-separated), `encrypted_secret` (the HMAC signing secret **encrypted** at
+  rest via Data Protection — needed in plaintext to sign, so it can't be hashed; revealed once),
+  `created_by_user_id`, `created_at`, `disabled_at` (nullable). Delivery goes through the outbox
+  (ADR-007), so it's durable + retried.
+- **`WebhookDelivery`** *(ADR-016 / `docs/stories/hooks.md`)* — ✅ **BUILT (HOOKS-2)**:
+  `src/Core/Entities/WebhookDelivery.cs`. **NOT `ITenantScoped`** — like `OutboxMessage` it's written
+  from the tenant-less outbox dispatcher, so `tenant_id` is a **plain filter column** the read side
+  filters on, not a global-filter scoping key. A per-attempt delivery record (retries add rows):
+  `subscription_id`, `event_type`, `event_id`, `body` (the exact JSON sent — retained so a delivery can
+  be **replayed**), `success`, `status_code` (nullable), `error` (nullable), `created_at`.
+- **`OutboxMessage`**, **`InboxMessage`**, **`AuditEvent`** — see below.
+
+## Platform infra entities (built — not `ITenantScoped`)
+- **`OutboxMessage`** *(ADR-007 / `docs/stories/async-jobs.md`)* — ✅ **BUILT (JOBS-1)**:
+  `src/Core/Entities/OutboxMessage.cs`, migration `AddOutbox`. **NOT** `ITenantScoped` (platform infra;
+  carries an optional `TenantId` for context). `type`, `payload` (text/JSON), `status`,
+  `attempt_count`, `next_attempt_at`, `processed_at`, `last_error`. Written in the **same transaction**
+  as the business change (atomic effects).
+- **`InboxMessage`** *(ADR-007 / `docs/stories/async-jobs.md`)* — ✅ **BUILT (JOBS-2)**:
+  `src/Core/Entities/InboxMessage.cs`, migration `AddInbox`. **NOT** `ITenantScoped`. Dedup ledger for
+  idempotent inbound (webhook) deliveries: `id`, `source`, `idempotency_key`, `received_at`; **unique on
+  `(source, idempotency_key)`**. `IInbox.TryClaimAsync` claims via `INSERT … ON CONFLICT DO NOTHING`
+  inside the caller's transaction (claim + work commit together). Built as a separate ledger rather than
+  an outbox `direction` column — see the ADR-007 amendment.
+- **`AuditEvent`** *(ADR-008 / `docs/stories/observability.md`)* — ✅ **BUILT (OBS-4)**:
+  `src/Core/Entities/AuditEvent.cs`, migration `AddAuditEvent`. `ITenantScoped`, **append-only**;
+  `actor_user_id`, `action`, `entity_type`, `entity_id`, `metadata` (jsonb), `created_at`. Written via
+  explicit `IAuditLog.RecordAsync` (stages on the caller's unit of work); append-only enforced by
+  `AuditAppendOnlyInterceptor` (throws on tracked update/delete). `AuditDataContributor` purges on
+  dissolve (set-based delete bypasses the guard). No secrets/PII in `metadata`. Dissolve vs retention:
+  export-then-wipe if legal-hold is required (GDPR backlog).
 ## Pinned model extensions (future, not built)
-- SMS/phone field on User — needed when mobile OTP via phone is implemented.
+- SMS/phone field on User — needed when phone-based OTP is implemented.
+- New app/domain tables — implement `ITenantScoped` so the global tenant filter covers them, and
+  register an `ITenantDataContributor` (`ExportKey` + `ExportAsync` + `HasDataAsync`/`WipeAsync`) so
+  they participate in tenant export + dissolve (there is no central wipe method to edit).
 - _TODO_

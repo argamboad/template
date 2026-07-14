@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 public record RenameTenantRequest
 {
@@ -17,6 +17,18 @@ public record TransferOwnershipRequest
 public record LeaveTenantRequest
 {
     [JsonPropertyName("confirm_dissolve")] public bool ConfirmDissolve { get; init; }
+}
+
+public record ChangeMemberRoleRequest
+{
+    /// <summary>The target role — <c>admin</c> or <c>member</c> only (owner is conferred via transfer).</summary>
+    [JsonPropertyName("role")] public string? Role { get; init; }
+}
+
+public record TenantExportResponse
+{
+    /// <summary>Signed, time-limited URL to download the export bundle.</summary>
+    [JsonPropertyName("download_url")] public required string DownloadUrl { get; init; }
 }
 
 public record TenantMemberResponse

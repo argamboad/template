@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Template.Core.Repositories;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Repositories;
+namespace Perezosoft.Infrastructure.Repositories;
 
 /// <summary>
 /// EF Core implementation of <see cref="IUnitOfWork"/>. Wraps a real
@@ -31,6 +31,7 @@ public class EfUnitOfWork(AppDbContext db) : IUnitOfWork
             // Nested call inside an already-open transaction: use a savepoint so
             // the inner unit can roll back independently without aborting the outer
             // transaction (Postgres aborts the whole tx on any error otherwise).
+            // Opaque unique savepoint name (not a DB key) — random Guid, not UUIDv7.
             var name = $"sp_{Guid.NewGuid():N}";
             await existing.CreateSavepointAsync(name, cancellationToken);
             return new SavepointScope(existing, db, name);

@@ -1,15 +1,21 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Template.Shared.Ui;
-using Template.Shared.Ui.Auth;
-using Template.Web.Http;
+using Microsoft.JSInterop;
+using Perezosoft.Shared.Ui;
+using Perezosoft.Shared.Ui.Auth;
+using Perezosoft.Web.Http;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-var apiBase = builder.Configuration["ApiBaseUrl"]
-    ?? throw new InvalidOperationException("ApiBaseUrl not configured in wwwroot/appsettings.json.");
+// Same-origin by default (DEPLOY-1, ADR-017): when the API serves this bundle (single-origin
+// deployment), the API lives on this app's own origin, so fall back to the host base address. An
+// explicit ApiBaseUrl (local dev's wwwroot/appsettings.json, the e2e CI override) still takes precedence.
+var apiBase = builder.Configuration["ApiBaseUrl"] is { Length: > 0 } configured
+    ? configured
+    : builder.HostEnvironment.BaseAddress;
 
 // Delegating handlers:
 //  - CookieHandler includes browser credentials (the HttpOnly refresh cookie).
@@ -32,6 +38,15 @@ builder.Services.AddHttpClient("ApiAuth", client => client.BaseAddress = new Uri
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
+// Localization — IStringLocalizer<AppStrings> resolves the RCL's .resx resources.
+builder.Services.AddLocalization();
+builder.Services.AddSingleton<ICulturePersistence, LocalStorageCulturePersistence>();
+builder.Services.AddSingleton<IThemePersistence, LocalStorageThemePersistence>();
+builder.Services.AddSingleton<IFileDownloadLauncher, BrowserFileDownloadLauncher>();
+// Never notified on web — external flows return via a full redirect (fresh page load); the
+// registration only satisfies the shared pages' injection (see AppResumeNotifier).
+builder.Services.AddSingleton<AppResumeNotifier>();
+
 // Web session store: the browser owns the HttpOnly refresh cookie, so this is a no-op.
 builder.Services.AddSingleton<ISessionStore, CookieSessionStore>();
 
@@ -44,4 +59,17 @@ builder.Services.AddSingleton(sp => new AuthService(
     sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AuthService>>(),
     sp.GetRequiredService<ISessionStore>()));
 
-await builder.Build().RunAsync();
+var host = builder.Build();
+
+// Apply the user's saved UI culture before the app renders, falling back to English.
+// Signed-in users are further reconciled to their server-side locale by MainLayout.
+var js = host.Services.GetRequiredService<IJSRuntime>();
+var stored = await js.InvokeAsync<string?>("localStorage.getItem", LocalStorageCulturePersistence.StorageKey);
+try
+{
+    var culture = string.IsNullOrWhiteSpace(stored) ? "en" : stored;
+    CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(culture);
+}
+catch (CultureNotFoundException) { /* corrupt stored value — keep the default culture */ }
+
+await host.RunAsync();

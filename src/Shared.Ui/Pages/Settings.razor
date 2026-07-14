@@ -1,33 +1,39 @@
 @page "/settings"
+@using System.Net
 @using System.Net.Http.Json
-@using Template.Shared.Ui.Auth
+@using Perezosoft.Shared.Ui.Auth
 @inject AuthService Auth
 @inject HttpClient Http
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Settings</PageTitle>
+<PageTitle>@Localizer["Nav_Settings"]</PageTitle>
 
 <div class="settings-wrapper">
-    <h1 class="h4 fw-bold mb-1">Account settings</h1>
-    <p class="text-muted mb-4">Link sign-in providers to this account. They all sign you into the same household.</p>
+    <h1 class="h4 fw-bold mb-1">@Localizer["Settings_Title"]</h1>
+    <p class="text-muted mb-4">@Localizer["Settings_Subtitle"]</p>
 
     @if (_banner is not null)
     {
         <div class="alert @(_banner.Value.Ok ? "alert-success" : "alert-danger")">@_banner.Value.Text</div>
     }
 
+    @* Linked external accounts — only when the server has OAuth providers configured (else nothing to link). *@
+    @if (_loading || _enabledProviders.Count > 0)
+    {
     <div class="card shadow-sm">
         <div class="card-body p-0">
             @if (_loading)
             {
                 <div class="p-4 text-center text-muted">
-                    <span class="spinner-border spinner-border-sm me-2"></span> Loading…
+                    <span class="spinner-border spinner-border-sm me-2"></span> @Localizer["Common_Loading"]
                 </div>
             }
             else
             {
                 <ul class="list-group list-group-flush">
-                    @foreach (var p in Providers)
+                    @foreach (var p in Providers.Where(p => _enabledProviders.Contains(p.Key)))
                     {
                         var linked = _linked.Contains(p.Key);
                         <li class="list-group-item d-flex align-items-center justify-content-between py-3">
@@ -35,15 +41,15 @@
                             @if (linked)
                             {
                                 <span class="d-flex align-items-center gap-3">
-                                    <span class="badge bg-success-subtle text-success-emphasis">Connected</span>
+                                    <span class="badge bg-success-subtle text-success-emphasis">@Localizer["Settings_Connected"]</span>
                                     <button class="btn btn-outline-danger btn-sm" disabled="@_busy"
-                                            @onclick="() => Unlink(p.Key)">Unlink</button>
+                                            @onclick="() => Unlink(p.Key)">@Localizer["Settings_Unlink"]</button>
                                 </span>
                             }
                             else
                             {
                                 <button class="btn btn-outline-primary btn-sm" disabled="@_busy"
-                                        @onclick="() => Link(p.Key)">Link</button>
+                                        @onclick="() => Link(p.Key)">@Localizer["Settings_Link"]</button>
                             }
                         </li>
                     }
@@ -51,11 +57,48 @@
             }
         </div>
     </div>
+    }
 
     @if (!string.IsNullOrEmpty(_error))
     {
         <div class="alert alert-danger mt-3 py-2">@_error</div>
     }
+
+    @* ── Preferences: language + theme (PREFS-1, ADR-022) — the switchers persist the
+         choice server-side when signed in, so it follows the user across devices. ── *@
+    <div class="card shadow-sm mt-4" data-testid="preferences-card">
+        <div class="card-body">
+            <h2 class="h6 fw-bold mb-1">@Localizer["Settings_Preferences"]</h2>
+            <p class="small text-muted mb-3">@Localizer["Settings_PreferencesHint"]</p>
+            <div class="row g-3">
+                <div class="col-12 col-sm-6">
+                    <label class="form-label small fw-medium mb-1">@Localizer["Language"]</label>
+                    <LanguageSwitcher />
+                </div>
+                <div class="col-12 col-sm-6">
+                    <label class="form-label small fw-medium mb-1">@Localizer["Theme_Label"]</label>
+                    <ThemeSwitcher />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Notification preferences (NOTIFY-2, ADR-013) ── *@
+    <NotificationPrefsCard />
+
+    @* ── Two-factor authentication (MFA-1, ADR-012) ── *@
+    <MfaCard />
+
+    @* ── Danger zone: delete account (GDPR / ADR-011) ── *@
+    <div class="card shadow-sm border-danger-subtle mt-4">
+        <div class="card-body">
+            <h2 class="h6 fw-bold text-danger mb-2">@Localizer["Settings_DangerZone"]</h2>
+            <p class="small text-muted mb-3">@Localizer["Settings_DeleteAccountWarning"]</p>
+            <button class="btn btn-outline-danger" disabled="@_busy" data-testid="delete-account" @onclick="DeleteAccount">
+                @Localizer["Settings_DeleteAccount"]
+            </button>
+        </div>
+    </div>
 </div>
 
 @code {
@@ -69,6 +112,8 @@
     ];
 
     private HashSet<string> _linked = new();
+    // OAuth providers the server configured — the list is filtered to these (no dead link buttons).
+    private HashSet<string> _enabledProviders = new(StringComparer.OrdinalIgnoreCase);
     private bool _loading = true;
     private bool _busy;
     private string? _error;
@@ -83,17 +128,18 @@
         }
 
         SetBannerFromQuery();
+        _enabledProviders = new HashSet<string>(await Auth.GetEnabledProvidersAsync(), StringComparer.OrdinalIgnoreCase);
         await LoadLogins();
     }
 
     private void SetBannerFromQuery()
     {
         if (!string.IsNullOrEmpty(Linked))
-            _banner = ($"{Label(Linked)} linked successfully.", true);
+            _banner = (Localizer["Settings_LinkedSuccess", Label(Linked)], true);
         else if (LinkError == "in_use")
-            _banner = ("That provider account is already linked to a different user.", false);
+            _banner = (Localizer["Settings_LinkErrInUse"], false);
         else if (LinkError == "expired")
-            _banner = ("The link request expired — please try again.", false);
+            _banner = (Localizer["Settings_LinkErrExpired"], false);
     }
 
     private async Task LoadLogins()
@@ -108,7 +154,7 @@
         }
         catch
         {
-            _error = "Couldn't load linked accounts.";
+            _error = Localizer["Settings_ErrLoad"];
         }
         _loading = false;
     }
@@ -121,7 +167,7 @@
             var res = await Http.PostAsync($"/api/auth/link/{key}", null);
             if (!res.IsSuccessStatusCode)
             {
-                _error = "Couldn't start linking. Please try again.";
+                _error = Localizer["Settings_ErrStartLinking"];
                 return;
             }
             var payload = await res.Content.ReadFromJsonAsync<LinkStart>();
@@ -132,19 +178,19 @@
                 // in the app (a full-page navigation would leave the BlazorWebView).
                 if (string.IsNullOrEmpty(payload?.Token))
                 {
-                    _error = "Couldn't start linking. Please try again.";
+                    _error = Localizer["Settings_ErrStartLinking"];
                     return;
                 }
                 var err = await Auth.LinkProviderAsync(key, payload.Token);
                 _banner = err is null
-                    ? ($"{Label(key)} linked successfully.", true)
-                    : (err switch
+                    ? (Localizer["Settings_LinkedSuccess", Label(key)], true)
+                    : ((string)(err switch
                     {
-                        "in_use" => "That provider account is already linked to a different user.",
-                        "expired" => "The link request expired — please try again.",
-                        "cancelled" => "Linking was cancelled.",
-                        _ => "Couldn't link that provider. Please try again."
-                    }, false);
+                        "in_use" => Localizer["Settings_LinkErrInUse"],
+                        "expired" => Localizer["Settings_LinkErrExpired"],
+                        "cancelled" => Localizer["Settings_LinkCancelled"],
+                        _ => Localizer["Settings_LinkFailed"]
+                    }), false);
                 if (err is null) await LoadLogins();
                 return;
             }
@@ -155,23 +201,60 @@
                 Nav.NavigateTo(payload.Url, forceLoad: true);
                 return;
             }
-            _error = "Couldn't start linking. Please try again.";
+            _error = Localizer["Settings_ErrStartLinking"];
         }
-        catch { _error = "Couldn't start linking. Please try again."; }
+        catch { _error = Localizer["Settings_ErrStartLinking"]; }
         finally { _busy = false; }
     }
 
     private async Task Unlink(string key)
     {
+        // Destructive: confirm first, failing closed if the browser dialog can't run.
+        if (!await JS.ConfirmAsync(Localizer["Settings_ConfirmUnlink"])) return;
+
         _error = null; _busy = true;
         try
         {
             var res = await Http.DeleteAsync($"/api/auth/logins/{key}");
             if (res.IsSuccessStatusCode) await LoadLogins();
-            else _error = "Couldn't unlink. Please try again.";
+            else _error = Localizer["Settings_ErrUnlink"];
         }
-        catch { _error = "Couldn't unlink. Please try again."; }
+        catch { _error = Localizer["Settings_ErrUnlink"]; }
         finally { _busy = false; }
+    }
+
+    private async Task DeleteAccount()
+    {
+        if (!await JS.ConfirmAsync(Localizer["Settings_ConfirmDelete"])) return;
+
+        _error = null; _busy = true;
+        try
+        {
+            var res = await Http.DeleteAsync("/api/auth/me");
+            if (res.IsSuccessStatusCode) { await FinishDeletion(); return; }
+
+            if (res.StatusCode == HttpStatusCode.Conflict)
+            {
+                // Solo owner: erasing dissolves the household + its data — require a stronger confirm.
+                if (!await JS.ConfirmAsync(Localizer["Settings_ConfirmDissolve"])) return;
+                var confirmed = await Http.DeleteAsync("/api/auth/me?confirm_dissolve=true");
+                if (confirmed.IsSuccessStatusCode) { await FinishDeletion(); return; }
+                _error = Localizer["Settings_ErrDelete"];
+                return;
+            }
+
+            _error = res.StatusCode == HttpStatusCode.BadRequest
+                ? Localizer["Settings_ErrDeleteTransferFirst"]
+                : Localizer["Settings_ErrDelete"];
+        }
+        catch { _error = Localizer["Settings_ErrDelete"]; }
+        finally { _busy = false; }
+    }
+
+    private async Task FinishDeletion()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
     }
 
     private static string Label(string key) =>

@@ -1,13 +1,28 @@
 using System.Security.Cryptography;
-using Template.Api.Configuration;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
 
 public enum OtpStatus { Success, Invalid, Expired, TooManyAttempts }
 
 public record OtpResult(OtpStatus Status, User? User);
+
+/// <summary>
+/// Maps the internal <see cref="OtpStatus"/> to the client-facing error code for OTP verify.
+/// "No active code" (<see cref="OtpStatus.Expired"/>) and "wrong code"
+/// (<see cref="OtpStatus.Invalid"/>) collapse to the SAME <c>invalid_code</c> so a caller can't
+/// probe whether an address has an outstanding OTP (CONF-6); the full status stays server-side.
+/// </summary>
+public static class OtpErrors
+{
+    public static string ClientCode(OtpStatus status) => status switch
+    {
+        OtpStatus.TooManyAttempts => "too_many_attempts",
+        _ => "invalid_code", // Invalid AND Expired (no active code) are indistinguishable to the client
+    };
+}
 
 /// <summary>
 /// Issues and redeems passwordless credentials: magic-link tokens (long random
@@ -19,16 +34,16 @@ public record OtpResult(OtpStatus Status, User? User);
 public interface IPasswordlessService
 {
     /// <summary>Creates a magic-link token for the email and returns the raw value for the URL.</summary>
-    Task<string> IssueMagicLinkTokenAsync(string email);
+    Task<string> IssueMagicLinkTokenAsync(string email, CancellationToken cancellationToken = default);
 
     /// <summary>Validates and consumes a magic-link token, returning the account, or null if invalid.</summary>
-    Task<User?> RedeemMagicLinkAsync(string email, string token);
+    Task<User?> RedeemMagicLinkAsync(string email, string token, CancellationToken cancellationToken = default);
 
     /// <summary>Creates an OTP code for the email and returns the raw code to be emailed.</summary>
-    Task<string> IssueOtpAsync(string email);
+    Task<string> IssueOtpAsync(string email, CancellationToken cancellationToken = default);
 
     /// <summary>Validates and consumes an OTP code, tracking attempts and locking out on abuse.</summary>
-    Task<OtpResult> RedeemOtpAsync(string email, string code);
+    Task<OtpResult> RedeemOtpAsync(string email, string code, CancellationToken cancellationToken = default);
 }
 
 public class PasswordlessService(
@@ -36,74 +51,85 @@ public class PasswordlessService(
     IUserService userService,
     ITokenGenerator tokenGenerator,
     ITokenHasher tokenHasher,
-    IPasswordlessSettings settings) : IPasswordlessService
+    IPasswordlessSettings settings,
+    TimeProvider clock) : IPasswordlessService
 {
-    public async Task<string> IssueMagicLinkTokenAsync(string email)
+    public async Task<string> IssueMagicLinkTokenAsync(string email, CancellationToken cancellationToken = default)
     {
         email = Normalize(email);
-        await repository.InvalidateActiveAsync(email, LoginTokenPurpose.MagicLink);
+        await repository.InvalidateActiveAsync(email, LoginTokenPurpose.MagicLink, cancellationToken);
 
         var raw = tokenGenerator.GenerateToken();
-        await repository.AddAsync(NewToken(email, LoginTokenPurpose.MagicLink, raw, settings.MagicLinkLifespanMinutes));
+        await repository.AddAsync(NewToken(email, LoginTokenPurpose.MagicLink, raw, settings.MagicLinkLifespanMinutes), cancellationToken);
         return raw;
     }
 
-    public async Task<User?> RedeemMagicLinkAsync(string email, string token)
+    public async Task<User?> RedeemMagicLinkAsync(string email, string token, CancellationToken cancellationToken = default)
     {
         email = Normalize(email);
         if (string.IsNullOrWhiteSpace(token))
             return null;
 
         var hash = tokenHasher.HashToken(token);
-        var record = await repository.GetActiveByHashAsync(email, LoginTokenPurpose.MagicLink, hash);
+        var record = await repository.GetActiveByHashAsync(email, LoginTokenPurpose.MagicLink, hash, cancellationToken);
         if (record is null)
             return null;
 
-        record.ConsumedAt = DateTimeOffset.UtcNow;
-        await repository.UpdateAsync(record);
+        record.ConsumedAt = clock.GetUtcNow();
+        await repository.UpdateAsync(record, cancellationToken);
 
-        return await userService.GetOrCreateByEmailAsync(email);
+        return await userService.GetOrCreateByEmailAsync(email, cancellationToken: cancellationToken);
     }
 
-    public async Task<string> IssueOtpAsync(string email)
+    public async Task<string> IssueOtpAsync(string email, CancellationToken cancellationToken = default)
     {
         email = Normalize(email);
-        await repository.InvalidateActiveAsync(email, LoginTokenPurpose.Otp);
+        await repository.InvalidateActiveAsync(email, LoginTokenPurpose.Otp, cancellationToken);
 
         var code = GenerateNumericCode(settings.OtpLength);
-        await repository.AddAsync(NewToken(email, LoginTokenPurpose.Otp, code, settings.OtpLifespanMinutes));
+        await repository.AddAsync(NewToken(email, LoginTokenPurpose.Otp, code, settings.OtpLifespanMinutes), cancellationToken);
         return code;
     }
 
-    public async Task<OtpResult> RedeemOtpAsync(string email, string code)
+    public async Task<OtpResult> RedeemOtpAsync(string email, string code, CancellationToken cancellationToken = default)
     {
         email = Normalize(email);
         if (string.IsNullOrWhiteSpace(code))
             return new OtpResult(OtpStatus.Invalid, null);
 
-        var record = await repository.GetLatestActiveAsync(email, LoginTokenPurpose.Otp);
+        // Cumulative, resend-proof lockout: count failed attempts across EVERY code issued to this
+        // email in the window, not just the current one. Issuing a fresh code (AttemptCount=0) can't
+        // hand the attacker another budget, and the lock holds even against the correct code until
+        // the window elapses (CONF-5).
+        var windowStart = clock.GetUtcNow().AddMinutes(-settings.OtpLockoutWindowMinutes);
+        var failuresInWindow = await repository.CountFailedAttemptsSinceAsync(email, LoginTokenPurpose.Otp, windowStart, cancellationToken);
+        if (failuresInWindow >= settings.OtpMaxAttempts)
+            return new OtpResult(OtpStatus.TooManyAttempts, null);
+
+        var record = await repository.GetLatestActiveAsync(email, LoginTokenPurpose.Otp, cancellationToken);
         if (record is null)
             return new OtpResult(OtpStatus.Expired, null); // none active → expired or never issued
 
-        // Constant-time-ish comparison via hash equality.
-        if (tokenHasher.HashToken(code) == record.CodeHash)
+        // Timing-safe comparison — the OTP code is low-entropy, so don't leak it via
+        // early-exit string equality.
+        if (tokenHasher.Verify(code, record.CodeHash))
         {
-            record.ConsumedAt = DateTimeOffset.UtcNow;
-            await repository.UpdateAsync(record);
-            var user = await userService.GetOrCreateByEmailAsync(email);
+            record.ConsumedAt = clock.GetUtcNow();
+            await repository.UpdateAsync(record, cancellationToken);
+            var user = await userService.GetOrCreateByEmailAsync(email, cancellationToken: cancellationToken);
             return new OtpResult(OtpStatus.Success, user);
         }
 
-        // Wrong code — count the attempt and lock the code out after the limit.
+        // Wrong code — count the attempt. Lock out once the cumulative window total hits the cap.
         record.AttemptCount++;
-        if (record.AttemptCount >= settings.OtpMaxAttempts)
+        if (failuresInWindow + 1 >= settings.OtpMaxAttempts)
         {
-            record.ConsumedAt = DateTimeOffset.UtcNow;
-            await repository.UpdateAsync(record);
+            record.ConsumedAt = clock.GetUtcNow();
+            await repository.UpdateAsync(record, cancellationToken);
             return new OtpResult(OtpStatus.TooManyAttempts, null);
         }
 
-        await repository.UpdateAsync(record);
+        await repository.UpdateAsync(record, cancellationToken);
         return new OtpResult(OtpStatus.Invalid, null);
     }
 
@@ -113,8 +139,8 @@ public class PasswordlessService(
         Email = email,
         CodeHash = tokenHasher.HashToken(raw),
         Purpose = purpose,
-        ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(lifespanMinutes),
-        CreatedAt = DateTimeOffset.UtcNow
+        ExpiresAt = clock.GetUtcNow().AddMinutes(lifespanMinutes),
+        CreatedAt = clock.GetUtcNow()
     };
 
     private static string Normalize(string email) => (email ?? string.Empty).Trim().ToLowerInvariant();

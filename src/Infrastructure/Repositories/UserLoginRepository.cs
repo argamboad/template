@@ -1,29 +1,29 @@
 using Microsoft.EntityFrameworkCore;
-using Template.Core.Entities;
-using Template.Core.Repositories;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Persistence;
 
-namespace Template.Infrastructure.Repositories;
+namespace Perezosoft.Infrastructure.Repositories;
 
 public class UserLoginRepository(AppDbContext db) : IUserLoginRepository
 {
-    public async Task<List<UserLogin>> GetForUserAsync(Guid userId)
+    public async Task<List<UserLogin>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await db.UserLogins
             .Where(l => l.UserId == userId)
             .OrderBy(l => l.CreatedAt)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<UserLogin?> GetByProviderForUserAsync(Guid userId, string provider)
+    public async Task<UserLogin?> GetByProviderForUserAsync(Guid userId, string provider, CancellationToken cancellationToken = default)
     {
         return await db.UserLogins
-            .FirstOrDefaultAsync(l => l.UserId == userId && l.Provider == provider);
+            .FirstOrDefaultAsync(l => l.UserId == userId && l.Provider == provider, cancellationToken);
     }
 
-    public async Task DeleteAsync(UserLogin login)
+    public async Task DeleteAsync(UserLogin login, CancellationToken cancellationToken = default)
     {
         db.UserLogins.Remove(login);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

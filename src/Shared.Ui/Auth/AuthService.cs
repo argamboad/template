@@ -3,7 +3,23 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 
-namespace Template.Shared.Ui.Auth;
+namespace Perezosoft.Shared.Ui.Auth;
+
+/// <summary>Outcome of a native primary-auth attempt: signed in, failed, or owes an MFA step-up.</summary>
+public enum SignInStatus { Success, Failed, MfaRequired }
+
+/// <summary>
+/// A native sign-in result; carries the MFA challenge when <see cref="SignInStatus.MfaRequired"/>,
+/// and on failure the server's error code (e.g. <c>too_many_attempts</c>) so the UI can pick the
+/// right copy instead of a blanket "incorrect or expired".
+/// </summary>
+public sealed record SignInResult(SignInStatus Status, string? Challenge = null, string? Error = null)
+{
+    public static readonly SignInResult Failed = new(SignInStatus.Failed);
+    public static readonly SignInResult Success = new(SignInStatus.Success);
+    public static SignInResult FailedWith(string? error) => new(SignInStatus.Failed, Error: error);
+    public static SignInResult Mfa(string challenge) => new(SignInStatus.MfaRequired, challenge);
+}
 
 /// <summary>
 /// Client-side authentication with refresh-token support.
@@ -21,6 +37,16 @@ public class AuthService(
 {
     private string? _accessToken;
     private Task<bool>? _refreshInFlight;
+
+    /// <summary>
+    /// Raised when the service transitions from unauthenticated to holding a valid access
+    /// token — every sign-in path lands here (OTP/MFA/native OAuth via the body flow, and
+    /// the cookie flow's silent refresh), so MainLayout can reconcile per-user preferences
+    /// on interactive sign-ins too, not just cold starts (PREFS-1, ADR-022). NOT raised on
+    /// mid-session token rotation (still signed in) or impersonation (deliberate — an admin
+    /// session must not adopt/apply the impersonated user's preferences as its own).
+    /// </summary>
+    public event Action? SignedIn;
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && !IsTokenExpired(_accessToken);
 
@@ -124,38 +150,28 @@ public class AuthService(
     /// one-time code for tokens, and stores them. Returns true on success. Web hosts
     /// sign in by full-page navigation and never call this.
     /// </summary>
-    public async Task<bool> SignInWithOAuthAsync(string provider)
+    public async Task<SignInResult> SignInWithOAuthAsync(string provider)
     {
         if (oauth is null)
         {
             logger.LogError("SignInWithOAuthAsync called with no IOAuthInitiator registered");
-            return false;
+            return SignInResult.Failed;
         }
         try
         {
             var result = await oauth.RunBrowserFlowAsync(provider);
             var code = result is not null && result.TryGetValue("code", out var c) ? c : null;
             if (string.IsNullOrEmpty(code))
-                return false;
+                return SignInResult.Failed;
 
+            // The exchange returns tokens — or, if the user has MFA on, an {mfa_required, challenge}.
             var response = await httpClient.PostAsJsonAsync("/api/auth/native/exchange", new { code });
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogWarning("Native OAuth exchange failed: {StatusCode}", response.StatusCode);
-                return false;
-            }
-
-            var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
-            if (string.IsNullOrEmpty(payload?.AccessToken))
-                return false;
-
-            await AcceptTokensAsync(payload);
-            return true;
+            return await CompleteFromResponseAsync(response);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Native OAuth sign-in failed for {Provider}", provider);
-            return false;
+            return SignInResult.Failed;
         }
     }
 
@@ -189,27 +205,148 @@ public class AuthService(
     /// Verifies an OTP code and establishes the session from the tokens in the response
     /// body. Used by native hosts (the web Login page keeps its cookie + callback flow).
     /// </summary>
-    public async Task<bool> VerifyOtpAsync(string email, string code)
+    public async Task<SignInResult> VerifyOtpAsync(string email, string code)
     {
         try
         {
+            // Returns tokens — or, if the user has MFA on, an {mfa_required, challenge} to step up.
             var response = await httpClient.PostAsJsonAsync("/api/auth/otp/verify",
                 new { email, code });
-            if (!response.IsSuccessStatusCode)
-                return false;
-
-            var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
-            if (string.IsNullOrEmpty(payload?.AccessToken))
-                return false;
-
-            await AcceptTokensAsync(payload);
-            return true;
+            return await CompleteFromResponseAsync(response);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "OTP verification failed");
+            return SignInResult.Failed;
+        }
+    }
+
+    /// <summary>
+    /// Completes a native MFA step-up: posts the challenge from a prior login + a TOTP/recovery code and
+    /// stores the tokens the API returns in the body. Returns true on success. Web hosts complete the
+    /// step-up via the cookie flow (Login page) and don't call this.
+    /// </summary>
+    public async Task<bool> VerifyMfaAsync(string challenge, string code)
+    {
+        try
+        {
+            var response = await httpClient.PostAsJsonAsync("/api/auth/mfa/verify", new { challenge, code });
+            var result = await CompleteFromResponseAsync(response);
+            return result.Status == SignInStatus.Success;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "MFA verification failed");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Reads a native auth response: an <c>{mfa_required, challenge}</c> body means step up; otherwise the
+    /// tokens are accepted and stored. Shared by the OTP, OAuth-exchange and MFA-verify paths.
+    /// </summary>
+    private async Task<SignInResult> CompleteFromResponseAsync(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("Native auth call failed: {StatusCode}", response.StatusCode);
+            // Surface the server's error code (e.g. too_many_attempts) so the caller can distinguish
+            // a lockout from a plain wrong/expired code. Body may be absent/unreadable → null.
+            string? error = null;
+            try { error = (await response.Content.ReadFromJsonAsync<NativeAuthResponse>())?.Error; }
+            catch { /* no/unreadable body → generic failure */ }
+            return SignInResult.FailedWith(error);
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<NativeAuthResponse>();
+        if (payload is null)
+            return SignInResult.Failed;
+
+        if (payload.MfaRequired && !string.IsNullOrEmpty(payload.Challenge))
+            return SignInResult.Mfa(payload.Challenge);
+
+        if (string.IsNullOrEmpty(payload.AccessToken))
+            return SignInResult.Failed;
+
+        await AcceptTokensAsync(new TokenResponse { AccessToken = payload.AccessToken, RefreshToken = payload.RefreshToken });
+        return SignInResult.Success;
+    }
+
+    // ── Platform-staff admin surface (ADR-014) ──────────────────────────────
+
+    // Cache the staff probe for the session so nav rendering doesn't re-hit the API.
+    // Reset whenever the identity changes (impersonate/stop/logout).
+    private bool? _isStaff;
+
+    /// <summary>
+    /// Whether the signed-in user is platform staff — drives the admin nav link + page gate.
+    /// Cheap probe of <c>GET /api/admin/me</c> (200 with <c>is_staff</c> for any authenticated user);
+    /// cached per identity. False when signed out, on any error, or while impersonating.
+    /// </summary>
+    public async Task<bool> IsStaffAsync()
+    {
+        if (_isStaff is { } cached) return cached;
+        if (!IsAuthenticated || IsImpersonating) return (_isStaff = false).Value;
+        try
+        {
+            // This service's HttpClient deliberately has NO Bearer handler (it would be a DI cycle —
+            // see Program.cs), so attach the in-memory token explicitly for this authenticated probe.
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/admin/me");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
+            using var response = await httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                return false; // don't cache transient failures
+            var res = await response.Content.ReadFromJsonAsync<StaffStatus>();
+            return (_isStaff = res?.IsStaff ?? false).Value;
+        }
+        catch
+        {
+            return false; // don't cache transient failures
+        }
+    }
+
+    /// <summary>
+    /// The OAuth providers the server has actually configured (lowercase, e.g. "google"). Anonymous
+    /// probe of <c>GET /api/auth/providers</c> — the login + settings pages render only these, so an
+    /// unconfigured provider shows no dead button (challenging it 500s). Empty on any error (fail closed
+    /// to no OAuth rather than a broken button).
+    /// </summary>
+    public async Task<IReadOnlyList<string>> GetEnabledProvidersAsync()
+    {
+        try
+        {
+            var res = await httpClient.GetFromJsonAsync<ProvidersResponse>("/api/auth/providers");
+            return res?.Providers ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    /// <summary>True when the current access token is an admin "sign in as" token.</summary>
+    public bool IsImpersonating => Claim(AppClaims.ImpersonatedBy) is not null;
+
+    /// <summary>
+    /// Enters an impersonated session using a short-lived admin token (no refresh token — it's
+    /// non-refreshable by design). Held in memory only; a reload or expiry returns the staff user to
+    /// their own identity via the untouched refresh cookie.
+    /// </summary>
+    public void BeginImpersonation(string accessToken)
+    {
+        _accessToken = accessToken;
+        _isStaff = null;
+    }
+
+    /// <summary>
+    /// Leaves an impersonated session and restores the staff user from their refresh cookie/store.
+    /// Returns true when the original identity was restored.
+    /// </summary>
+    public async Task<bool> StopImpersonationAsync()
+    {
+        _accessToken = null;
+        _isStaff = null;
+        return await TryRefreshAsync();
     }
 
     public async Task LogoutAsync()
@@ -237,14 +374,20 @@ public class AuthService(
     /// <summary>Sets the in-memory access token and persists the rotated refresh token (native).</summary>
     private async Task AcceptTokensAsync(TokenResponse payload)
     {
+        var wasAuthenticated = IsAuthenticated;
         _accessToken = payload.AccessToken;
+        _isStaff = null; // identity may have changed; re-probe on demand
         if (sessionStore.UsesBodyTransport && !string.IsNullOrEmpty(payload.RefreshToken))
             await sessionStore.SaveRefreshTokenAsync(payload.RefreshToken);
+
+        if (!wasAuthenticated && IsAuthenticated)
+            SignedIn?.Invoke();
     }
 
     private async Task ClearSessionAsync()
     {
         _accessToken = null;
+        _isStaff = null;
         if (sessionStore.UsesBodyTransport)
             await sessionStore.ClearAsync();
     }
@@ -266,6 +409,12 @@ public class AuthService(
 
     /// <summary>Tenant ("household") name from the JWT.</summary>
     public string? TenantName => Claim(AppClaims.TenantName);
+
+    /// <summary>The user's saved UI locale from the JWT (e.g. "es"), or null if unset.</summary>
+    public string? Locale => Claim(AppClaims.Locale);
+
+    /// <summary>The user's saved UI theme from the JWT ("light"/"dark"/"system"), or null when never chosen.</summary>
+    public string? Theme => Claim(AppClaims.Theme);
 
     private string? Claim(string type)
     {
@@ -293,6 +442,40 @@ public class AuthService(
         {
             return true;
         }
+    }
+
+    // GET /api/admin/me — is the caller platform staff?
+    private sealed record StaffStatus
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("is_staff")]
+        public bool IsStaff { get; init; }
+    }
+
+    // GET /api/auth/providers — the OAuth providers this deployment configured.
+    private sealed record ProvidersResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("providers")]
+        public IReadOnlyList<string>? Providers { get; init; }
+    }
+
+    // A native primary-auth response: either tokens, or an MFA challenge to step up (mfa_required).
+    private sealed record NativeAuthResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("access_token")]
+        public string? AccessToken { get; init; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("refresh_token")]
+        public string? RefreshToken { get; init; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("mfa_required")]
+        public bool MfaRequired { get; init; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("challenge")]
+        public string? Challenge { get; init; }
+
+        // Present only on a failure body (ErrorResponse); e.g. too_many_attempts on OTP lockout.
+        [System.Text.Json.Serialization.JsonPropertyName("error")]
+        public string? Error { get; init; }
     }
 
     // Mirrors the API's TokenResponse (snake_case JSON).

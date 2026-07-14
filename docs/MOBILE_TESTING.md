@@ -26,7 +26,12 @@ An Android emulator (AVD) running, or a physical device with USB debugging enabl
 
 ## 2. Bridge the device to the host
 
-Run this **every time** the emulator/device (re)starts — it does not persist:
+**Usually automatic:** the csproj's `AndroidReverseDevApiPort` target re-runs the bridge on
+**every Debug build/deploy** — CLI installs *and* VS F5 (the project disables VS's fast
+up-to-date check in Debug so the hook can't be skipped). So after an emulator reboot, just
+build/F5 again and the bridge is back.
+
+To set it by hand (it does not persist across emulator/device restarts):
 
 ```bash
 adb reverse tcp:5238 tcp:5238
@@ -41,7 +46,7 @@ From Visual Studio: select the Android target + your emulator, F5. Or CLI (emula
 running):
 
 ```bash
-dotnet build src/Maui/Template.Maui.csproj -t:Run -f net10.0-android
+dotnet build src/Maui/Perezosoft.Maui.csproj -t:Run -f net10.0-android
 ```
 
 ## 4. Test email OTP (no extra setup)
@@ -86,4 +91,19 @@ the Android Keystore and silently exchanged on startup).
 - **Cleartext blocked** → the app talks HTTP to `localhost`, permitted by
   `Platforms/Android/Resources/xml/network_security_config.xml`. If you change the host,
   add it there.
+- **VS breaks on `TypeError: Failed to execute 'query' on 'Permissions': Illegal invocation`
+  during Google sign-in** (any F5 run — web or Windows shell) → not an app bug. It's Google's
+  own obfuscated anti-abuse script (an eval'd `VM…` blob) probing `navigator.permissions.query`;
+  the throw is expected and handled by Google's code, but the debugger VS attaches to the
+  browser/WebView (on web via the Blazor WASM debug proxy — the `inspectUri` in
+  `src/Web/Properties/launchSettings.json`; the "Enable JavaScript debugging for ASP.NET"
+  option does **not** control this) can't see the handler and reports it "unhandled".
+  Continue (F5) and sign-in proceeds. `inspectUri` was removed from the Web launch profiles
+  (2026-07-08) precisely because of this, so on web VS no longer attaches to the browser at
+  all — the trade-off is no C# breakpoints inside the WASM client (browser F12 still works).
+  If you re-add `inspectUri` to debug WASM C#, silence the break via Debug → Windows →
+  Exception Settings (Ctrl+Alt+E) → uncheck the **JavaScript Exceptions** category.
 - **Physical device** → `adb reverse` works over USB too; no other change needed.
+- **Pointing the app somewhere else** → set `PEREZOSOFT_API_BASE_URL` before launching (any
+  platform): overrides the compiled per-platform API base — e.g. a LAN address for a device that
+  can't use `adb reverse`, or plain HTTP for the CI native smoke (`native-smoke-windows`).

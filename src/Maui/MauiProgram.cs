@@ -1,8 +1,10 @@
-﻿using Microsoft.Extensions.Logging;
-using Template.Maui.Auth;
-using Template.Shared.Ui.Auth;
+﻿using System.Globalization;
+using Microsoft.Extensions.Logging;
+using Perezosoft.Maui.Auth;
+using Perezosoft.Shared.Ui;
+using Perezosoft.Shared.Ui.Auth;
 
-namespace Template.Maui;
+namespace Perezosoft.Maui;
 
 public static class MauiProgram
 {
@@ -13,7 +15,11 @@ public static class MauiProgram
 	//    OAuth work: Google/Microsoft accept localhost as a redirect host but reject raw IPs,
 	//    so the provider redirect_uri http://localhost:5238/signin-google is valid (and is
 	//    the same one already registered for the desktop/web flow). See docs/MOBILE_TESTING.md.
+	//  - PEREZOSOFT_API_BASE_URL overrides both (dev builds): the CI native smoke (NATIVE-7)
+	//    points the app at its plain-HTTP stack, and a physical device can target a LAN API
+	//    without recompiling.
 	private static string ApiBaseUrl =>
+		Environment.GetEnvironmentVariable("PEREZOSOFT_API_BASE_URL") is { Length: > 0 } o ? o :
 #if ANDROID
 		"http://localhost:5238";
 #else
@@ -36,19 +42,61 @@ public static class MauiProgram
 
 		builder.Services.AddMauiBlazorWebView();
 
+		// Localization — IStringLocalizer<AppStrings> resolves the RCL's .resx resources.
+		// Apply the device-local saved culture before the first render (NATIVE-5, parity with
+		// Web/Program.cs's localStorage bootstrap): the LanguageSwitcher persists the choice to
+		// OS Preferences on native, the only store readable this early — the WebView (and its
+		// localStorage) doesn't exist yet. No saved value → OS culture, the documented default
+		// (docs/LOCALIZATION.md). Signed-in users are further reconciled to their server-side
+		// locale by MainLayout.
+		var savedCulture = Preferences.Default.Get<string?>(PreferencesCulturePersistence.PreferenceKey, null);
+		if (!string.IsNullOrWhiteSpace(savedCulture))
+		{
+			try
+			{
+				CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo(savedCulture);
+			}
+			catch (CultureNotFoundException) { /* corrupt stored value — keep the OS culture */ }
+		}
+		builder.Services.AddLocalization();
+		builder.Services.AddSingleton<ICulturePersistence, PreferencesCulturePersistence>();
+
+		// Theme needs no Preferences bootstrap: it's pure DOM, and theme.js reads the
+		// WebView's own localStorage before first paint (THEME-1).
+		builder.Services.AddSingleton<IThemePersistence, LocalStorageThemePersistence>();
+
+		// Signed-URL downloads can't ride a WebView navigation — fetch + OS share sheet instead
+		// (NATIVE-3). Uses the default (Bearer) client registered below: the signed URL itself
+		// needs no auth, but absolute URLs bypass BaseAddress so the same client serves both.
+		builder.Services.AddSingleton<IFileDownloadLauncher>(sp =>
+			new ShareFileDownloadLauncher(sp.GetRequiredService<HttpClient>()));
+
+		// Fired by the window's Resumed lifecycle event (App.CreateWindow) so pages can refresh
+		// after an external round-trip returns to the app (NATIVE-4, G2).
+		builder.Services.AddSingleton<AppResumeNotifier>();
+
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
 #endif
 
 		// Refresh token lives in the OS secure store (the native equivalent of the web's
-		// HttpOnly cookie). OAuth is platform-specific: desktop captures the callback via a
-		// loopback HTTP listener; Android via a custom-scheme WebAuthenticator. Both sit
-		// behind IOAuthInitiator so AuthService and the Login page stay platform-agnostic.
+		// HttpOnly cookie). OAuth is platform-specific: Windows captures the callback via a
+		// loopback HTTP listener; Android/iOS/macCatalyst via a custom-scheme WebAuthenticator.
+		// Both sit behind IOAuthInitiator so AuthService and the Login page stay
+		// platform-agnostic. EVERY target platform must register one — the AuthService factory
+		// below resolves it with GetRequiredService, so a missing branch here crashes the app at
+		// first resolve (exactly how iOS/macCatalyst were dead-on-arrival before G7).
+#if MACCATALYST && DEBUG
+		// Ad-hoc-signed local builds can't reach the data-protection keychain (restricted
+		// entitlement) — see DebugFileSessionStore. Signed builds use the secure store below.
+		builder.Services.AddSingleton<ISessionStore, DebugFileSessionStore>();
+#else
 		builder.Services.AddSingleton<ISessionStore, SecureStorageSessionStore>();
-#if ANDROID
+#endif
+#if ANDROID || IOS || MACCATALYST
 		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
-			new AndroidOAuthInitiator(ApiBaseUrl, CallbackScheme, sp.GetRequiredService<ILogger<AndroidOAuthInitiator>>()));
+			new WebAuthenticatorOAuthInitiator(ApiBaseUrl, CallbackScheme, sp.GetRequiredService<ILogger<WebAuthenticatorOAuthInitiator>>()));
 #elif WINDOWS
 		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
 			new LoopbackOAuthInitiator(ApiBaseUrl, sp.GetRequiredService<ILogger<LoopbackOAuthInitiator>>()));

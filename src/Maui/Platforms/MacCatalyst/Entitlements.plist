@@ -9,6 +9,14 @@
         <!-- When App Sandbox is enabled, this value is required to open outgoing network connections. -->
         <key>com.apple.security.network.client</key>
         <true/>
+        <!-- SecureStorage (the refresh-token store) uses the Keychain, which a sandboxed
+             Mac Catalyst app can only reach with an access group; without this every
+             sign-in fails at the save step (errSecMissingEntitlement). iOS grants keychain
+             access implicitly — this is Catalyst-only. -->
+        <key>keychain-access-groups</key>
+        <array>
+            <string>$(AppIdentifierPrefix)com.perezosoft.platform</string>
+        </array>
     </dict>
 </plist>
 

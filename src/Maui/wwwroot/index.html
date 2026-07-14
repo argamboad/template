@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Perezosoft</title>
     <base href="/" />
-    <!-- Shared non-scoped styles copied from src/Web/wwwroot (bootstrap + app.css, blue theme).
-         TODO: these (and lib/bootstrap) could later be hoisted into the RCL to dedupe across Web + MAUI. -->
+    <!-- bootstrap is still a vendored copy per host (kept in sync with src/Web/wwwroot/lib);
+         app.css (brand tokens + shared styles) is single-sourced from the RCL. -->
+    <!-- Theme bootstrap BEFORE the stylesheets: applies the saved data-bs-theme pre-paint (no flash). -->
+    <script src="_content/Perezosoft.Shared.Ui/js/theme.js"></script>
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="_content/Perezosoft.Shared.Ui/css/app.css" />
     <!-- Auto-aggregated bundle of the RCL's scoped component CSS. -->
-    <link rel="stylesheet" href="Template.Maui.styles.css" />
+    <link rel="stylesheet" href="Perezosoft.Maui.styles.css" />
     <link rel="icon" href="data:,">
 </head>
 
@@ -26,6 +28,9 @@
         <span class="dismiss">🗙</span>
     </div>
 
+    <!-- MFA enrollment QR (vendored qrcode-generator, MIT) — client-side only -->
+    <script src="_content/Perezosoft.Shared.Ui/js/qrcode-generator.min.js"></script>
+    <script src="_content/Perezosoft.Shared.Ui/js/mfa-qr.js"></script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 
 </body>

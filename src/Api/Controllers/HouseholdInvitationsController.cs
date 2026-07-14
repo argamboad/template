@@ -1,144 +1,125 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using Template.Api.Models;
-using Template.Api.Services;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Models;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Authorization;
+using Perezosoft.Core.Repositories;
 
-namespace Template.Api.Controllers;
+namespace Perezosoft.Api.Controllers;
 
 /// <summary>
-/// Tenant ("household") invitations. Owners invite by email, list, regenerate and
-/// revoke pending invites; any authenticated user accepts with a token to join.
+/// Tenant ("household") invitations. Owners or admins (Permission.ManageMembers) invite by email,
+/// list, regenerate and revoke pending invites; any authenticated user accepts with a token to join.
 /// The raw token is surfaced once on create/regenerate (also emailed to the
 /// invitee); the list never returns tokens.
 /// </summary>
 [ApiController]
 [Route("api/household/invitations")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class HouseholdInvitationsController(
     ITenantInvitationService service,
-    ITenantRepository tenants,
-    IErrorResponseFactory errorFactory) : ControllerBase
+    ITenantRepository tenants) : TenantApiControllerBase(tenants)
 {
-    private bool TryGetUserId(out Guid userId) =>
-        Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out userId);
-
-    private async Task<TenantMembership?> GetMembershipAsync() =>
-        TryGetUserId(out var uid) ? await tenants.GetMembershipAsync(uid) : null;
-
-    /// <summary>Creates an invitation (owner only). Returns the raw token once and emails it.</summary>
+    /// <summary>Creates an invitation (owner or admin). Returns the raw token once and emails it.</summary>
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateInvitationRequest request)
+    [RequireTenantPermission(Permission.ManageMembers, "Only the household owner or admin can invite members")]
+    public async Task<IActionResult> Create([FromBody] CreateInvitationRequest request, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can invite members");
+            return InvalidToken();
 
-        try
+        var result = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "", cancellationToken);
+        return result.Status switch
         {
-            var (invitation, rawToken) = await service.CreateAsync(membership.TenantId, membership.UserId, request.Email ?? "");
-            return Created($"/api/household/invitations/{invitation.Id}", CreateInvitationResponse.From(invitation, rawToken));
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+            InviteCreateStatus.Created => Created(
+                $"/api/household/invitations/{result.Invitation!.Id}",
+                CreateInvitationResponse.From(result.Invitation, result.RawToken!)),
+            InviteCreateStatus.AlreadyMember => Conflict(
+                new ErrorResponse("already_member", "That email is already a member of this household")),
+            // Seat quota hit (BILLING-5): 402 with an upgrade pointer, mirroring the entitlement gate.
+            InviteCreateStatus.SeatLimitReached => StatusCode(StatusCodes.Status402PaymentRequired,
+                new ErrorResponse("seat_limit_reached",
+                    "Your plan's seat limit is reached — upgrade to invite more members.")),
+            _ => BadRequest(new ErrorResponse("invalid_request", "A valid email is required")),
+        };
     }
 
-    /// <summary>Lists the tenant's pending invitations (owner only). Token is not returned.</summary>
+    /// <summary>Lists the tenant's pending invitations (owner or admin). Token is not returned.</summary>
     [HttpGet]
-    public async Task<IActionResult> GetPending()
+    [RequireTenantPermission(Permission.ManageMembers, "Only the household owner or admin can view invitations")]
+    public async Task<IActionResult> GetPending(CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can view invitations");
+            return InvalidToken();
 
-        var pending = await service.GetPendingAsync(membership.TenantId);
+        var pending = await service.GetPendingAsync(membership.TenantId, cancellationToken);
         return Ok((IReadOnlyList<InvitationResponse>)pending.Select(InvitationResponse.From).ToList());
     }
 
-    /// <summary>Regenerates the token for a pending invitation (owner only). Issues a new raw token once.</summary>
+    /// <summary>Regenerates the token for a pending invitation (owner or admin). Issues a new raw token once.</summary>
     [HttpPost("{id:guid}/regenerate")]
-    public async Task<IActionResult> Regenerate(Guid id)
+    [RequireTenantPermission(Permission.ManageMembers, "Only the household owner or admin can regenerate invitation tokens")]
+    public async Task<IActionResult> Regenerate(Guid id, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can regenerate invitation tokens");
+            return InvalidToken();
 
-        try
+        var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId, cancellationToken);
+        return result.Status switch
         {
-            var result = await service.RegenerateAsync(membership.TenantId, id, membership.UserId);
-            if (result is null)
-                return NotFound(errorFactory.CreateError("invitation_not_found", "Invitation not found"));
-            var (invitation, rawToken) = result.Value;
-            return Ok(CreateInvitationResponse.From(invitation, rawToken));
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+            InviteRegenerateStatus.Regenerated => Ok(
+                CreateInvitationResponse.From(result.Invitation!, result.RawToken!)),
+            InviteRegenerateStatus.NotFound => NotFound(
+                new ErrorResponse("invitation_not_found", "Invitation not found")),
+            _ => BadRequest(
+                new ErrorResponse("invitation_not_pending", "Only pending invitations can be regenerated")),
+        };
     }
 
-    /// <summary>Revokes a pending invitation (owner only).</summary>
+    /// <summary>Revokes a pending invitation (owner or admin).</summary>
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Revoke(Guid id)
+    [RequireTenantPermission(Permission.ManageMembers, "Only the household owner or admin can revoke invitations")]
+    public async Task<IActionResult> Revoke(Guid id, CancellationToken cancellationToken)
     {
-        var membership = await GetMembershipAsync();
+        var membership = await GetMembershipAsync(cancellationToken);
         if (membership == null)
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
-        if (!IsOwner(membership))
-            return Forbid403("Only the household owner can revoke invitations");
+            return InvalidToken();
 
-        try
-        {
-            var found = await service.RevokeAsync(membership.TenantId, id);
-            return found
-                ? NoContent()
-                : NotFound(errorFactory.CreateError("invitation_not_found", "Invitation not found"));
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+        var found = await service.RevokeAsync(membership.TenantId, id, cancellationToken);
+        return found
+            ? NoContent()
+            : NotFound(new ErrorResponse("invitation_not_found", "Invitation not found"));
     }
 
     /// <summary>Accepts an invitation by token, joining the tenant (any member).</summary>
     [HttpPost("accept")]
-    public async Task<IActionResult> Accept([FromBody] AcceptInvitationRequest request)
+    public async Task<IActionResult> Accept([FromBody] AcceptInvitationRequest request, CancellationToken cancellationToken)
     {
-        if (!TryGetUserId(out var userId))
-            return Unauthorized(errorFactory.CreateError("invalid_token", "Invalid user identity"));
+        if (CurrentUserId is not { } userId)
+            return InvalidToken();
 
-        try
+        var status = await service.AcceptAsync(userId, request.Token ?? "", cancellationToken);
+        return status switch
         {
-            await service.AcceptAsync(userId, request.Token ?? "");
-            return NoContent();
-        }
-        catch (InvitationException ex)
-        {
-            return MapError(ex);
-        }
+            AcceptStatus.Joined => NoContent(),
+            AcceptStatus.AlreadyMember => Conflict(
+                new ErrorResponse("already_member", "You are already a member of this household")),
+            AcceptStatus.MustTransferFirst => BadRequest(
+                new ErrorResponse("must_transfer_first", "Transfer ownership before joining another household")),
+            // Seat re-check at accept (BILLING-9): the tenant downgraded below its reserved seats —
+            // same code/status as the create-path gate so clients handle one shape.
+            AcceptStatus.SeatLimitReached => StatusCode(StatusCodes.Status402PaymentRequired,
+                new ErrorResponse("seat_limit_reached",
+                    "This household has reached its plan's member limit — the owner must upgrade before you can join.")),
+            AcceptStatus.WouldAbandonData => BadRequest(
+                new ErrorResponse("would_abandon_data", "Your household has data — transfer or remove it before joining another")),
+            AcceptStatus.NoHousehold => BadRequest(
+                new ErrorResponse("invalid_request", "Caller has no household")),
+            _ => BadRequest(
+                new ErrorResponse("invitation_invalid", "Invitation is invalid or has expired")),
+        };
     }
-
-    private static bool IsOwner(TenantMembership m) =>
-        string.Equals(m.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase);
-
-    private IActionResult Forbid403(string message) =>
-        StatusCode(StatusCodes.Status403Forbidden, errorFactory.CreateError("forbidden", message));
-
-    private IActionResult MapError(InvitationException ex) =>
-        ex.Error == "forbidden"
-            ? Forbid403(ex.Message)
-            : ex.Conflict
-                ? Conflict(errorFactory.CreateError(ex.Error, ex.Message))
-                : BadRequest(errorFactory.CreateError(ex.Error, ex.Message));
 }

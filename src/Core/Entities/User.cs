@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 public class User
 {
@@ -10,6 +10,19 @@ public class User
 
     /// <summary>True only when the provider asserts a verified email claim.</summary>
     public bool EmailVerified { get; set; }
+
+    /// <summary>
+    /// Preferred UI language (e.g. "en", "es"), or null to fall back to the browser/OS
+    /// culture. A per-user preference that follows the user across devices.
+    /// </summary>
+    public string? Locale { get; set; }
+
+    /// <summary>
+    /// Preferred UI theme ("light", "dark" or "system"), or null when the user never chose
+    /// one (which lets sign-in adopt a device-local choice — PREFS-1, ADR-022). A per-user
+    /// preference that follows the user across devices.
+    /// </summary>
+    public string? Theme { get; set; }
 
     // Tenant membership is the source of truth for which tenant a user belongs to;
     // resolve it via TenantMembership (one tenant per user). See ITenantRepository.

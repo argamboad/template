@@ -4,9 +4,9 @@ using System.Net.Sockets;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.ApplicationModel;
-using Template.Shared.Ui.Auth;
+using Perezosoft.Shared.Ui.Auth;
 
-namespace Template.Maui.Auth;
+namespace Perezosoft.Maui.Auth;
 
 /// <summary>
 /// Desktop OAuth via the loopback-redirect pattern for native apps (RFC 8252 §7.3):

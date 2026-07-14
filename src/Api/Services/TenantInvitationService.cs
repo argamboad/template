@@ -1,44 +1,56 @@
 using System.Net.Mail;
-using Template.Api.Configuration;
-using Template.Core.Abstractions;
-using Template.Core.Entities;
-using Template.Core.Repositories;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Email;
 
-namespace Template.Api.Services;
+namespace Perezosoft.Api.Services;
+
+public enum InviteCreateStatus { Created, InvalidEmail, AlreadyMember, SeatLimitReached }
+
+public record InviteCreateResult(InviteCreateStatus Status, TenantInvitation? Invitation = null, string? RawToken = null);
+
+public enum InviteRegenerateStatus { Regenerated, NotFound, NotPending }
+
+public record InviteRegenerateResult(InviteRegenerateStatus Status, TenantInvitation? Invitation = null, string? RawToken = null);
+
+/// <summary>Outcome of accepting an invitation.</summary>
+public enum AcceptStatus { Joined, InvalidToken, NoHousehold, AlreadyMember, MustTransferFirst, WouldAbandonData, SeatLimitReached }
 
 /// <summary>
-/// A validation/flow failure in the invitation pipeline. <see cref="Error"/> is
-/// the snake_case error code the API surfaces; <see cref="Conflict"/> picks 409
-/// over the default 400.
+/// Tenant-invitation flow. Uses result objects (not exceptions) for expected
+/// validation/flow outcomes — consistent with <see cref="ITenantService"/>; the
+/// controller maps each result to an HTTP status.
 /// </summary>
-public class InvitationException(string error, string message, bool conflict = false) : Exception(message)
-{
-    public string Error { get; } = error;
-    public bool Conflict { get; } = conflict;
-}
-
 public interface ITenantInvitationService
 {
-    /// <summary>Creates (or refreshes an existing pending) invitation. Caller has
-    /// already been verified as the tenant's owner. Emails the invite and returns
-    /// the saved invitation plus the raw token (one-time reveal — not stored).</summary>
-    Task<(TenantInvitation Invitation, string RawToken)> CreateAsync(Guid tenantId, Guid inviterUserId, string email);
+    /// <summary>Creates (or refreshes an existing pending) invitation. The caller has
+    /// already been verified as the tenant's owner. Emails the invite and returns the
+    /// saved invitation plus the raw token (one-time reveal — not stored).</summary>
+    Task<InviteCreateResult> CreateAsync(Guid tenantId, Guid inviterUserId, string email, CancellationToken cancellationToken = default);
 
-    Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId);
+    Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
     /// <summary>Revokes the old hash and issues a fresh token for an existing pending invite.
-    /// Returns null if the invitation was not found for this tenant. Emails the new invite
-    /// and returns the saved invitation plus the new raw token (one-time reveal).</summary>
-    Task<(TenantInvitation Invitation, string RawToken)?> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId);
+    /// Emails the new invite and returns the saved invitation plus the new raw token.</summary>
+    Task<InviteRegenerateResult> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId, CancellationToken cancellationToken = default);
 
-    /// <summary>Revokes a pending invite owned by the tenant. False = not found for
-    /// this tenant (controller → 404).</summary>
-    Task<bool> RevokeAsync(Guid tenantId, Guid invitationId);
+    /// <summary>Revokes a pending invite owned by the tenant. False = not found for this
+    /// tenant (controller → 404).</summary>
+    Task<bool> RevokeAsync(Guid tenantId, Guid invitationId, CancellationToken cancellationToken = default);
 
-    /// <summary>Redeems a token for the signed-in user, moving their membership to
-    /// the inviting tenant. Throws <see cref="InvitationException"/> on any
-    /// validation/flow failure.</summary>
-    Task AcceptAsync(Guid userId, string token);
+    /// <summary>
+    /// Redeems a token for the signed-in user, moving their membership to the inviting tenant.
+    /// <para>
+    /// By design this is a <b>bearer capability</b> (D4 / LOGIC-S3, "leave bearer"): whoever holds a
+    /// valid, unexpired token can accept — acceptance is NOT bound to the invited email address, so the
+    /// signed-in user need not match <c>InvitedEmail</c>. This is intentional (email-binding was
+    /// deferred); the token is single-use, hashed, and time-limited, which is the security boundary.
+    /// Don't "fix" this to require an email match without revisiting D4.
+    /// </para>
+    /// </summary>
+    Task<AcceptStatus> AcceptAsync(Guid userId, string token, CancellationToken cancellationToken = default);
 }
 
 public class TenantInvitationService(
@@ -48,30 +60,34 @@ public class TenantInvitationService(
     ITokenHasher tokenHasher,
     IUnitOfWork unitOfWork,
     IEmailSender emailSender,
+    IUserService userService,
     IApplicationSettings appSettings,
     IInvitationSettings invitationSettings,
+    IEnumerable<ITenantDataContributor> dataContributors,
+    IQuotaService quota,
+    ITenantContext tenantContext,
     TimeProvider clock,
     ILogger<TenantInvitationService> logger) : ITenantInvitationService
 {
     private TimeSpan InvitationTtl => TimeSpan.FromDays(invitationSettings.LifespanDays);
 
-    public async Task<(TenantInvitation Invitation, string RawToken)> CreateAsync(Guid tenantId, Guid inviterUserId, string email)
+    public async Task<InviteCreateResult> CreateAsync(Guid tenantId, Guid inviterUserId, string email, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(email) || !MailAddress.TryCreate(email.Trim(), out _))
-            throw new InvitationException("invalid_request", "A valid email is required");
+            return new InviteCreateResult(InviteCreateStatus.InvalidEmail);
 
         var normalized = email.Trim().ToLowerInvariant();
 
         // Can't invite someone who's already a member of this tenant.
-        if (await tenants.IsEmailMemberAsync(tenantId, normalized))
-            throw new InvitationException("already_member", "That email is already a member of this household", conflict: true);
+        if (await tenants.IsEmailMemberAsync(tenantId, normalized, cancellationToken))
+            return new InviteCreateResult(InviteCreateStatus.AlreadyMember);
 
         var now = clock.GetUtcNow();
         var rawToken = tokenGenerator.GenerateToken();
         var tokenHash = tokenHasher.HashToken(rawToken);
 
         // A pending invite for the same (tenant, email) is refreshed, not duplicated.
-        var existing = await invitations.GetPendingByEmailAsync(tenantId, normalized);
+        var existing = await invitations.GetPendingByEmailAsync(tenantId, normalized, cancellationToken);
         TenantInvitation invitation;
         if (existing != null)
         {
@@ -79,12 +95,20 @@ public class TenantInvitationService(
             existing.InvitedByUserId = inviterUserId;
             existing.CreatedAt = now;
             existing.ExpiresAt = now + InvitationTtl;
-            await invitations.UpdateAsync(existing);
+            await invitations.UpdateAsync(existing, cancellationToken);
             logger.LogInformation("Refreshed pending invitation {Id} for tenant {TenantId}", existing.Id, tenantId);
             invitation = existing;
         }
         else
         {
+            // A brand-new invite claims a seat (members + pending) — enforce the plan's seat quota
+            // (BILLING-5). Refreshing an existing pending invite (above) reuses its seat, so it's exempt.
+            if (!await quota.CanAddSeatsAsync(1, cancellationToken))
+            {
+                logger.LogInformation("Invite to tenant {TenantId} blocked: seat limit reached", tenantId);
+                return new InviteCreateResult(InviteCreateStatus.SeatLimitReached);
+            }
+
             invitation = await invitations.CreateAsync(new TenantInvitation
             {
                 Id = Guid.CreateVersion7(),
@@ -95,21 +119,22 @@ public class TenantInvitationService(
                 TokenHash = tokenHash,
                 CreatedAt = now,
                 ExpiresAt = now + InvitationTtl
-            });
+            }, cancellationToken);
             logger.LogInformation("Created invitation {Id} for tenant {TenantId}", invitation.Id, tenantId);
         }
 
-        await SendInvitationEmailAsync(normalized, rawToken);
-        return (invitation, rawToken);
+        await SendInvitationEmailAsync(normalized, rawToken, inviterUserId, cancellationToken);
+        return new InviteCreateResult(InviteCreateStatus.Created, invitation, rawToken);
     }
 
-    public async Task<(TenantInvitation Invitation, string RawToken)?> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId)
+    public async Task<InviteRegenerateResult> RegenerateAsync(Guid tenantId, Guid invitationId, Guid userId, CancellationToken cancellationToken = default)
     {
-        var invitation = await invitations.GetByIdUnscopedAsync(invitationId);
+        var invitation = await invitations.GetByIdUnscopedAsync(invitationId, cancellationToken);
         // Cross-tenant treated as not-found — no existence oracle on opaque IDs.
-        if (invitation == null || invitation.TenantId != tenantId) return null;
+        if (invitation == null || invitation.TenantId != tenantId)
+            return new InviteRegenerateResult(InviteRegenerateStatus.NotFound);
         if (invitation.Status != InvitationStatuses.Pending)
-            throw new InvitationException("invitation_not_pending", "Only pending invitations can be regenerated");
+            return new InviteRegenerateResult(InviteRegenerateStatus.NotPending);
 
         var now = clock.GetUtcNow();
         var rawToken = tokenGenerator.GenerateToken();
@@ -117,108 +142,138 @@ public class TenantInvitationService(
         invitation.InvitedByUserId = userId;
         invitation.CreatedAt = now;
         invitation.ExpiresAt = now + InvitationTtl;
-        await invitations.UpdateAsync(invitation);
+        await invitations.UpdateAsync(invitation, cancellationToken);
         logger.LogInformation("Regenerated token for invitation {Id} (tenant {TenantId})", invitation.Id, tenantId);
 
-        await SendInvitationEmailAsync(invitation.InvitedEmail, rawToken);
-        return (invitation, rawToken);
+        await SendInvitationEmailAsync(invitation.InvitedEmail, rawToken, userId, cancellationToken);
+        return new InviteRegenerateResult(InviteRegenerateStatus.Regenerated, invitation, rawToken);
     }
 
-    public Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId) =>
-        invitations.GetPendingForTenantAsync(tenantId);
+    public Task<List<TenantInvitation>> GetPendingAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
+        invitations.GetPendingForTenantAsync(tenantId, cancellationToken);
 
-    public async Task<bool> RevokeAsync(Guid tenantId, Guid invitationId)
+    public async Task<bool> RevokeAsync(Guid tenantId, Guid invitationId, CancellationToken cancellationToken = default)
     {
-        var invitation = await invitations.GetByIdUnscopedAsync(invitationId);
+        var invitation = await invitations.GetByIdUnscopedAsync(invitationId, cancellationToken);
         // Cross-tenant treated as not-found — no existence oracle on opaque IDs.
         if (invitation == null || invitation.TenantId != tenantId) return false;
 
         if (invitation.Status == InvitationStatuses.Pending)
         {
             invitation.Status = InvitationStatuses.Revoked;
-            await invitations.UpdateAsync(invitation);
+            await invitations.UpdateAsync(invitation, cancellationToken);
             logger.LogInformation("Revoked invitation {Id}", invitationId);
         }
         return true;
     }
 
-    public async Task AcceptAsync(Guid userId, string token)
+    public async Task<AcceptStatus> AcceptAsync(Guid userId, string token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token))
-            throw new InvitationException("invitation_invalid", "Invitation is invalid");
+            return AcceptStatus.InvalidToken;
 
         // Hash the presented token before lookup; never compare raw values.
         var tokenHash = tokenHasher.HashToken(token);
-        var invitation = await invitations.GetByTokenHashAsync(tokenHash);
+        var invitation = await invitations.GetByTokenHashAsync(tokenHash, cancellationToken);
         var now = clock.GetUtcNow();
 
         // Unknown / revoked / accepted / past-expiry → invalid (don't leak which).
         if (invitation == null
             || invitation.Status != InvitationStatuses.Pending
             || invitation.ExpiresAt <= now)
-            throw new InvitationException("invitation_invalid", "Invitation is invalid or has expired");
+            return AcceptStatus.InvalidToken;
 
-        var membership = await tenants.GetMembershipAsync(userId)
-            ?? throw new InvitationException("invalid_request", "Caller has no household");
+        var membership = await tenants.GetMembershipAsync(userId, cancellationToken);
+        if (membership is null)
+            return AcceptStatus.NoHousehold;
 
         if (membership.TenantId == invitation.TenantId)
-            throw new InvitationException("already_member", "You are already a member of this household", conflict: true);
+            return AcceptStatus.AlreadyMember;
 
         var oldTenantId = membership.TenantId;
-        var members = await tenants.GetMembersAsync(oldTenantId);
+        var members = await tenants.GetMembersAsync(oldTenantId, cancellationToken);
         var isOwner = string.Equals(membership.Role, TenantRoles.Owner, StringComparison.OrdinalIgnoreCase);
         var soloOwner = isOwner && members.Count == 1;
 
         // An owner of a multi-member tenant must hand off first.
         if (isOwner && members.Count > 1)
-            throw new InvitationException("must_transfer_first",
-                "Transfer ownership before joining another household");
+            return AcceptStatus.MustTransferFirst;
 
         // A solo owner carrying real data can't silently abandon it.
         var dissolveOld = false;
         if (soloOwner)
         {
-            if (await tenants.HasDataAsync(oldTenantId))
-                throw new InvitationException("would_abandon_data",
-                    "Your household has data — transfer or remove it before joining another");
+            if (await TenantHasDataAsync(oldTenantId, cancellationToken))
+                return AcceptStatus.WouldAbandonData;
             dissolveOld = true; // empty solo tenant-of-one is dissolved on join
         }
 
+        // Seat re-check (BILLING-9, ADR-006 addendum): a downgrade (dunning lapse, cancel, admin
+        // comp revert) can leave more reserved seats — members + pending invites — than the new
+        // plan allows, and nothing sweeps the invites. The accept itself is seat-neutral (the
+        // joiner consumes the seat their pending invite reserved), so the rule is "already over
+        // the limit" (CanAdd(0)), NOT "can add one more" — accepts at exactly the cap stay
+        // allowed, and a refused token stays pending and self-heals when the tenant upgrades.
+        // EnterTenant: the caller's JWT still carries their old tenant; the quota must count the
+        // INVITATION's tenant (the token was verified above — the same trusted-scoping contract
+        // as the conditional flip below).
+        using (tenantContext.EnterTenant(invitation.TenantId))
+        {
+            if (!await quota.CanAddSeatsAsync(0, cancellationToken))
+                return AcceptStatus.SeatLimitReached;
+        }
+
         // Move membership + consume token + dissolve old solo tenant atomically.
-        await using var scope = await unitOfWork.BeginTransactionAsync();
+        await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
 
         membership.TenantId = invitation.TenantId;
         membership.Role = TenantRoles.Member;
         membership.JoinedAt = now;
-        await tenants.UpdateMemberAsync(membership);
+        await tenants.UpdateMemberAsync(membership, cancellationToken);
 
         // Conditional flip — only one concurrent accept can update the row. If another
         // accept already won the race, the scope disposes without CommitAsync and the
         // membership move rolls back.
-        if (!await invitations.TryAcceptAsync(invitation.Id))
-            throw new InvitationException("invitation_invalid", "Invitation is invalid or has expired");
+        //
+        // EnterTenant: the flip updates the INVITATION's tenant's row while the caller's JWT still
+        // carries their old tenant. The RLS backstop (ADR-020) scopes set-based writes to the
+        // current tenant (query tags don't render in the ExecuteUpdate pipeline), so the accept
+        // enters the invitation's tenant for this one write — the token was verified above, which
+        // is exactly the trusted-scoping contract of ITenantContext (same as the billing webhook).
+        using (tenantContext.EnterTenant(invitation.TenantId))
+        {
+            if (!await invitations.TryAcceptAsync(invitation.Id, cancellationToken))
+                return AcceptStatus.InvalidToken;
+        }
 
         if (dissolveOld)
-            await tenants.DeleteTenantAsync(oldTenantId);
+            await tenants.DeleteTenantAsync(oldTenantId, cancellationToken);
 
-        await scope.CommitAsync();
+        await scope.CommitAsync(cancellationToken);
 
         logger.LogInformation("User {UserId} accepted invitation {Id} -> tenant {TenantId}",
             userId, invitation.Id, invitation.TenantId);
+        return AcceptStatus.Joined;
     }
 
-    private async Task SendInvitationEmailAsync(string email, string rawToken)
+    // Any feature contributor holding data for the tenant blocks a silent abandon.
+    private async Task<bool> TenantHasDataAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        foreach (var contributor in dataContributors)
+            if (await contributor.HasDataAsync(tenantId, cancellationToken))
+                return true;
+        return false;
+    }
+
+    private async Task SendInvitationEmailAsync(string email, string rawToken, Guid inviterUserId, CancellationToken cancellationToken = default)
     {
         var joinUrl = $"{appSettings.ClientUrl}/join?token={Uri.EscapeDataString(rawToken)}";
         try
         {
-            await emailSender.SendAsync(email, "You've been invited to a household",
-                $"""
-                 <p>You've been invited to join a household.</p>
-                 <p><a href="{joinUrl}">Accept the invitation</a></p>
-                 <p>Or use this token to join: <code>{rawToken}</code></p>
-                 <p>If you didn't expect this, you can safely ignore this email.</p>
-                 """);
+            // Invites go out in the inviter's saved language (the recipient may have no account).
+            var inviter = await userService.GetUserByIdAsync(inviterUserId, cancellationToken);
+            var emailBody = BrandedEmail.Invitation(joinUrl, rawToken, BrandedEmail.ResolveCulture(inviter?.Locale));
+            await emailSender.SendAsync(email, emailBody.Subject, emailBody.Html, emailBody.InlineImages, cancellationToken);
         }
         catch (Exception ex)
         {

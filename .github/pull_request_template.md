@@ -23,6 +23,8 @@
 - [ ] No direct UI→DB access (goes through the API)
 - [ ] Latest stable deps; no preview packages
 - [ ] Docs updated (FEATURES / DATA_MODEL / DECISIONS) if behavior or decisions changed
+- [ ] Postman collection (`docs/postman/`) updated if API endpoints changed (route, verb,
+      params, request/response shape, auth, or error codes)
 
 ## Notes
 <!-- anything reviewers/future-you should know -->

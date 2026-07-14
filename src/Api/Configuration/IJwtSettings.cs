@@ -1,4 +1,4 @@
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// JWT token configuration settings.
@@ -43,7 +43,15 @@ public interface IPasswordlessSettings
     int MagicLinkLifespanMinutes { get; }
     int OtpLifespanMinutes { get; }
     int OtpLength { get; }
+
+    /// <summary>
+    /// Maximum failed OTP guesses allowed per email within <see cref="OtpLockoutWindowMinutes"/>.
+    /// Counted CUMULATIVELY across codes, so requesting a fresh code does not reset the budget.
+    /// </summary>
     int OtpMaxAttempts { get; }
+
+    /// <summary>Sliding lockout window (minutes) over which failed OTP attempts are summed per email.</summary>
+    int OtpLockoutWindowMinutes { get; }
 }
 
 /// <summary>

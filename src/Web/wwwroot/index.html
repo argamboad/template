@@ -7,16 +7,19 @@
     <title>Perezosoft</title>
     <base href="/" />
     <link rel="preload" id="webassembly" />
+    <!-- Theme bootstrap BEFORE the stylesheets: applies the saved data-bs-theme pre-paint (no flash). -->
+    <script src="_content/Perezosoft.Shared.Ui/js/theme.js"></script>
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="_content/Perezosoft.Shared.Ui/css/app.css" />
     <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple_touch_180.png" />
     <!-- Social/Open Graph preview -->
     <meta property="og:title" content="Perezosoft" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="og_image_1200x630.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link href="Template.Web.styles.css" rel="stylesheet" />
+    <link href="Perezosoft.Web.styles.css" rel="stylesheet" />
     <script type="importmap"></script>
 </head>
 
@@ -34,6 +37,9 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <!-- MFA enrollment QR (vendored qrcode-generator, MIT) — client-side only -->
+    <script src="_content/Perezosoft.Shared.Ui/js/qrcode-generator.min.js"></script>
+    <script src="_content/Perezosoft.Shared.Ui/js/mfa-qr.js"></script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

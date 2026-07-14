@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 /// <summary>
 /// Refresh token for session persistence and token rotation.
@@ -9,8 +9,8 @@ public class RefreshToken
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid UserId { get; set; }
     public required string TokenHash { get; set; }
-    public DateTime IssuedAt { get; set; }
-    public DateTime ExpiresAt { get; set; }
+    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
     public bool IsRevoked { get; set; }
     public required string IssuedFromIp { get; set; }
 

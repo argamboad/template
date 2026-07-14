@@ -5,13 +5,24 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Template.Core.Abstractions;
-using Template.Core.Repositories;
-using Template.Infrastructure.Email;
-using Template.Infrastructure.Persistence;
-using Template.Infrastructure.Repositories;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Core.Repositories;
+using Perezosoft.Infrastructure.Audit;
+using Perezosoft.Infrastructure.Billing;
+using Perezosoft.Infrastructure.Email;
+using Perezosoft.Infrastructure.Files;
+using Perezosoft.Infrastructure.Http;
+using Perezosoft.Infrastructure.Inbox;
+using Perezosoft.Infrastructure.Outbox;
+using Perezosoft.Infrastructure.Scheduling;
+using Perezosoft.Infrastructure.Persistence;
+using Perezosoft.Infrastructure.Repositories;
+using Perezosoft.Infrastructure.Webhooks;
 
-namespace Template.Infrastructure;
+namespace Perezosoft.Infrastructure;
 
 public static class ServiceCollectionExtensions
 {
@@ -25,7 +36,8 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         // Persistence
         services.AddDbContext<AppDbContext>(options =>
@@ -33,13 +45,96 @@ public static class ServiceCollectionExtensions
 
         // Data Protection — keys stored in DB so the OAuth correlation/nonce cookies
         // survive server restarts/redeploys.
+        // The application name is part of key derivation (like the CreateProtector purpose
+        // strings): renaming it makes everything already protected — MFA secrets, webhook
+        // secrets, in-flight tokens — undecryptable. Kept through the Perezosoft rename;
+        // change only alongside a deliberate re-encryption migration.
         services.AddDataProtection()
             .PersistKeysToDbContext<AppDbContext>()
             .SetApplicationName("template");
 
         // Email — dev: points to Mailpit via appsettings.Development.json
         services.Configure<SmtpSettings>(configuration.GetSection("Email:Smtp"));
-        services.AddTransient<IEmailSender, SmtpEmailSender>();
+        // The real SMTP sender, registered KEYED so the outbox handler can resolve it without
+        // getting the outbox decorator (the default IEmailSender) back.
+        services.AddKeyedTransient<IEmailSender, SmtpEmailSender>("smtp");
+        // App-facing IEmailSender enqueues onto the outbox instead of sending inline (ADR-007);
+        // the dispatcher performs the real send out-of-band, with retry. Existing call sites
+        // (passwordless, invitations) are unchanged — they still depend on IEmailSender.
+        services.AddScoped<IEmailSender, OutboxEmailSender>();
+
+        // Transactional outbox + background dispatcher (ADR-007). OutboxMessage is staged in the
+        // same transaction as the business change; the dispatcher drains it via typed handlers.
+        services.AddSingleton(new OutboxOptions());
+        services.AddScoped<IOutbox, EfOutbox>();
+        services.AddScoped<OutboxProcessor>();
+        services.AddScoped<IOutboxHandler>(sp =>
+            new EmailOutboxHandler(sp.GetRequiredKeyedService<IEmailSender>("smtp")));
+        services.AddHostedService<OutboxDispatcher>();
+
+        // Outbound webhook delivery (HOOKS, ADR-016): the "webhook" outbox handler signs + POSTs each
+        // delivery (retry/backoff via the outbox). Always registered — dormant until webhooks are enabled
+        // and a subscription exists; the management routes are the config-gated part (Program.cs).
+        services.AddScoped<IWebhookSecretProtector, WebhookSecretProtector>();
+        services.AddSingleton<IOutboundUrlGuard, OutboundUrlGuard>(); // SSRF guard for tenant-supplied webhook URLs (GAP-2)
+        services.AddHttpClient<IWebhookSender, WebhookSender>(c => c.Timeout = TimeSpan.FromSeconds(10));
+        services.AddScoped<IOutboxHandler, WebhookOutboxHandler>();
+
+        // Cancel a provider subscription out-of-band when a tenant is dissolved (BILLING-7).
+        services.AddScoped<IOutboxHandler, Billing.BillingCancelOutboxHandler>();
+
+        // Inbox dedup gate — idempotent inbound (webhook) deliveries (ADR-007). Used inline by the
+        // receiving endpoint inside its unit of work; no background service.
+        services.AddScoped<IInbox, EfInbox>();
+
+        // Append-only tenant audit log (ADR-008) + its dissolve hook.
+        services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<ITenantDataContributor, AuditDataContributor>();
+
+        // Scheduled/recurring jobs (ADR-007). The host ticks and runs each IScheduledJob on its own
+        // interval; add a job by registering IScheduledJob (no host edits). Jobs are scoped so they
+        // get a fresh DbContext per run.
+        services.AddSingleton(new ScheduledJobsOptions());
+        services.AddScoped<IScheduledJob, ExpiredTokenCleanupJob>();
+        services.AddHostedService<ScheduledJobsHost>();
+
+        // Billing provider (ADR-006, amended by the v2 audit / GAP-1). Stripe when a secret key is
+        // configured; otherwise the in-memory fake — but ONLY in Development. The fake trusts a literal
+        // webhook signature (FakeBillingProvider), and the webhook endpoint is anonymous, so registering
+        // it outside Development would accept forged, unauthenticated cross-tenant billing writes. Fail
+        // fast at startup instead, so a misconfigured production deploy cannot boot with the fake.
+        services.Configure<StripeSettings>(configuration.GetSection("Billing:Stripe"));
+        if (!string.IsNullOrEmpty(configuration["Billing:Stripe:SecretKey"]))
+            services.AddScoped<IBillingProvider, StripeBillingProvider>();
+        else if (environment.IsDevelopment())
+            services.AddScoped<IBillingProvider, FakeBillingProvider>();
+        else
+            throw new InvalidOperationException(
+                "No Billing:Stripe:SecretKey is configured and the environment is not Development. The " +
+                "in-memory FakeBillingProvider trusts a literal webhook signature and must never run " +
+                "outside Development (it would accept forged, unauthenticated cross-tenant billing " +
+                "writes). Configure a real Stripe secret key for this environment.");
+
+        // File/blob storage (ADR-010). An S3-compatible backend (AWS/MinIO/R2/B2) is selected when a
+        // bucket is configured; otherwise local disk — the dev/test default with zero setup. Same
+        // config-presence switch as the billing provider. Keys are tenant-scoped and validated
+        // server-side by the impl. The download tokenizer backs the local-disk /api/files endpoint.
+        services.Configure<LocalFileStorageSettings>(configuration.GetSection("Storage:Local"));
+        services.Configure<S3StorageSettings>(configuration.GetSection("Storage:S3"));
+        services.AddSingleton<IFileDownloadTokenizer, FileDownloadTokenizer>();
+        if (!string.IsNullOrEmpty(configuration["Storage:S3:Bucket"]))
+        {
+            services.AddSingleton(sp => S3FileStorage.CreateClient(sp.GetRequiredService<IOptions<S3StorageSettings>>().Value));
+            services.AddScoped<IFileStorage, S3FileStorage>();
+        }
+        else
+        {
+            services.AddScoped<IFileStorage, LocalDiskFileStorage>();
+        }
+
+        // Clock — repositories/services depend on TimeProvider for testable time. The host
+        // (API) also registers it; TryAdd keeps Infrastructure self-contained without conflict.
+        services.TryAddSingleton(TimeProvider.System);
 
         // Repositories + unit of work
         services.AddScoped<IUserRepository, UserRepository>();
@@ -50,8 +145,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITenantInvitationRepository, TenantInvitationRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
+        // Generic repository for feature/domain entities (vertical slices). Platform/auth
+        // entities use their dedicated repositories above.
+        services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
+
         // External OAuth — to add a new provider, append .AddXxx(...) below.
-        // Credentials come from config; use user-secrets in dev (never commit secrets).
+        // Credentials come from config; set them in .env for dev (never commit secrets).
         var auth = services.AddAuthentication();
 
         // Temporary carrier cookie for the external principal during the OAuth round-trip.
@@ -76,7 +175,7 @@ public static class ServiceCollectionExtensions
         }
 
         // Only register an OAuth provider when credentials are present.
-        // Configure via user-secrets in dev; environment variables in production.
+        // Configure via .env in dev; environment variables in production.
         if (!string.IsNullOrEmpty(configuration["Authentication:Google:ClientId"]))
             auth.AddGoogle(google =>
             {

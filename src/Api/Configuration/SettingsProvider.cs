@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace Template.Api.Configuration;
+namespace Perezosoft.Api.Configuration;
 
 /// <summary>
 /// Provides typed configuration settings from IConfiguration.
@@ -15,8 +15,8 @@ public class JwtSettings : IJwtSettings
     public JwtSettings(IConfiguration config)
     {
         SecretKey = config["Jwt:Secret"]
-            ?? throw new InvalidOperationException("Jwt:Secret not configured (set it via user-secrets in dev)");
-        Issuer = config["Jwt:Issuer"] ?? "Template";
+            ?? throw new InvalidOperationException("Jwt:Secret not configured (set Jwt__Secret in .env for dev)");
+        Issuer = config["Jwt:Issuer"] ?? "Perezosoft";
         ExpiryMinutes = config.GetValue("Jwt:ExpiryMinutes", 60);
 
         const int MinSecretKeyLength = 32;
@@ -55,6 +55,7 @@ public class PasswordlessSettings : IPasswordlessSettings
     public int OtpLifespanMinutes { get; }
     public int OtpLength { get; }
     public int OtpMaxAttempts { get; }
+    public int OtpLockoutWindowMinutes { get; }
 
     public PasswordlessSettings(IConfiguration config)
     {
@@ -62,6 +63,7 @@ public class PasswordlessSettings : IPasswordlessSettings
         OtpLifespanMinutes = config.GetValue("Auth:Otp:CodeLifespanMinutes", 10);
         OtpLength = config.GetValue("Auth:Otp:Length", 6);
         OtpMaxAttempts = config.GetValue("Auth:Otp:MaxAttempts", 5);
+        OtpLockoutWindowMinutes = config.GetValue("Auth:Otp:LockoutWindowMinutes", 15);
     }
 }
 

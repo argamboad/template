@@ -1,0 +1,88 @@
+# Rebranding checklist
+
+When you stand up a new app from this platform, replace every Perezosoft brand touchpoint
+below.
+
+> **Don't stop at the UI.** The transactional **email templates** carry their own copy of the
+> name, logo, colours, and tagline — they're inline (email HTML can't share the app's CSS or
+> static assets), so they're the most commonly missed spot. Every rebranding task **must**
+> include the `Infrastructure/Email/` items flagged below.
+
+Backstop after working through the list: `git grep -i perezosoft` and a search for the tagline
+`Lazy reputation. Efficient engineering.` should both return nothing (outside this doc).
+
+## 1. Name & wordmark — "Perezosoft" → your brand
+- `src/Shared.Ui/Components/AppHeader.razor` — header wordmark
+- `src/Shared.Ui/Pages/Login.razor`, `Home.razor` — logo alt text + headings
+- `src/Web/wwwroot/index.html` — `<title>` + `og:title`
+- `src/Maui/wwwroot/index.html` — `<title>`
+- `src/Maui/Auth/LoopbackOAuthInitiator.cs` — the "you can close this tab" page title
+- **`src/Infrastructure/Email/BrandedEmail.cs`** — email footer wordmark + tagline (brand, not localized)
+- **Localization resources (every language!)** — the brand name + product copy live in
+  `src/Shared.Ui/Resources/AppStrings.*.resx` and `src/Infrastructure/Email/EmailStrings.*.resx`.
+  Update "Perezosoft" in each `.resx` you have (en, es, …). See `docs/LOCALIZATION.md`.
+- **Email sender name** — `Email:Smtp:FromName`. The committed runtime default lives in
+  `src/Api/appsettings*.json` (currently "Perezosoft"); `Email__Smtp__FromName` in `.env` (dev) or
+  env vars (prod) only *overrides* it. Update the appsettings default and any env override together.
+- **`src/Api/Services/MfaService.cs`** — the `Issuer` const ("Perezosoft"): what authenticator apps
+  display for enrolled accounts, and the letter-monogram they draw derives from it. Easy to miss —
+  users only ever see it inside Google Authenticator & co.
+- **`docs/postman/`** — the collection's `info.name` ("Perezosoft Platform API"), both environment
+  `name`s, and the `Perezosoft.*.json` **file names**. If you rename the files, update the hardcoded
+  collection path in `.github/workflows/postman-sync.yml` in the same commit; and since the sync
+  matches workspace items **by name**, delete the old-brand copies in the Postman workspace once
+  after the first post-rename sync.
+
+## 2. Tagline — "Lazy reputation. Efficient engineering." → yours
+- `src/Shared.Ui/wwwroot/brand/lockup_light.svg` — the wordmark-lockup text
+- **`src/Infrastructure/Email/BrandedEmail.cs`** — email footer tagline
+
+## 3. Logos & images — replace the files (keep the filenames to avoid touching references)
+In-app UI (shared RCL — used by web + desktop + mobile):
+- `src/Shared.Ui/wwwroot/brand/{icon_light.svg, icon_light_1024.png, lockup_light.svg, lockup_light_1520.png, lockup_dark.svg, lockup_dark_1520.png}`
+- **The UI references the PNG lockups, not the SVGs.** Webfonts don't load inside an `<img>`-embedded
+  SVG, so an SVG lockup's wordmark silently falls back to Helvetica/Arial. Keep the SVGs as the
+  editable source, render the PNGs from them, and point `Login.razor`/`Home.razor` at the PNGs.
+
+**Email logo (CID-embedded — shown in every transactional email):**
+- **`src/Infrastructure/Email/Assets/logo.png`** — keep it a **PNG** (email clients strip SVG and block data-URIs); a ~128px square is plenty.
+
+Web host chrome:
+- `src/Web/wwwroot/{favicon.ico, favicon.svg, favicon.png, apple_touch_180.png, og_image_1200x630.png}`
+- PWA icon set (ready for a future manifest): `src/Web/wwwroot/{icon-192.png, icon-512.png, icon-maskable-512.png}`
+
+Native launcher icon + splash (MAUI):
+- `src/Maui/Resources/AppIcon/{appicon.svg, appiconfg.svg}` — background layer + foreground mark
+  (foreground sized to the Android adaptive-icon safe zone, ~61% of canvas)
+- `src/Maui/Resources/Splash/splash.svg` + the `Color` attrs on `MauiIcon`/`MauiSplashScreen` in
+  `src/Maui/Perezosoft.Maui.csproj` (brand background colour behind icon + splash)
+
+Marketing & store submission (not shipped in the app):
+- `docs/brand/{linkedin_banner_1128x191.png, linkedin_logo_300.png}`
+- `docs/brand/{app_store_icon_1024.png, play_store_icon_512.png, android_adaptive_foreground_432.png}` — NATIVE-8..11 store assets
+
+## 4. Colour palette — derive from your logo
+The palette is semantic tokens, single-sourced for web **and** all native shells:
+- **`src/Shared.Ui/wwwroot/css/app.css`** — the `:root` vars (`--bs-primary`/`--bs-primary-rgb`,
+  `--brand-accent`, `--brand-dark`, `--brand-accent-light`, `--bs-link-color`/`--bs-link-hover-color`,
+  `--app-bg`, `--app-border`). One file; both hosts load it via
+  `_content/Perezosoft.Shared.Ui/css/app.css`. Typical derivation from a logo: primary = the logo's
+  dominant mid tone, dark = its darkest shade (hover/active), accent(-light) = supporting tones,
+  bg/border = a near-white and a soft border tinted toward the primary. Check WCAG contrast for
+  white text on `--bs-primary`.
+- **`src/Infrastructure/Email/BrandedEmail.cs`** — the colour constants at the top (`Green`,
+  `GreenDark`, `Sage`, `SageLight`, `Surface`, `Border`, `Ink`, `Muted`) — rename them to match
+  your palette while you're there. They're hard-coded because email HTML can't use CSS variables.
+
+## 5. App identifier & OAuth callback scheme — "perezosoft" / app id
+These must all match each other **and** your OAuth provider registration:
+- `src/Maui/MauiProgram.cs` — `CallbackScheme`
+- `src/Maui/Platforms/Android/WebAuthenticatorCallbackActivity.cs` — `CallbackScheme` const + intent-filter `DataScheme`
+- `src/Maui/Platforms/iOS/Info.plist` + `src/Maui/Platforms/MacCatalyst/Info.plist` — `CFBundleURLSchemes` entry
+- `src/Api/appsettings.json` — `Auth:Native:CallbackScheme`
+- `src/Maui/Perezosoft.Maui.csproj` — `ApplicationId` (`com.perezosoft.…`)
+- Provider consoles — register `{scheme}://auth` and your `signin-*` redirect URIs
+
+## Verify the rebrand
+- `git grep -i perezosoft` and a tagline search both return nothing (outside this doc).
+- Web and desktop show the new brand, **and** a test email (trigger an OTP or invite) arrives with the new logo, colours, name, and tagline.

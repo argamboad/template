@@ -2,7 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 
-namespace Template.Maui.Platforms.Android;
+namespace Perezosoft.Maui.Platforms.Android;
 
 /// <summary>
 /// Receives the OAuth callback redirect (<c>perezosoft://auth?…</c>) and hands it to

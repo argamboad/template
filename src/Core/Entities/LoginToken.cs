@@ -1,4 +1,4 @@
-namespace Template.Core.Entities;
+namespace Perezosoft.Core.Entities;
 
 /// <summary>
 /// A single-use, time-limited credential for passwordless sign-in — either a
@@ -28,10 +28,15 @@ public class LoginToken
 
     public DateTimeOffset CreatedAt { get; set; }
 
-    // Derived, never stored.
+    // Derived, never stored. The *At(now) overloads are the deterministic core (testable with an
+    // explicit clock); the parameterless properties are ambient-time conveniences that delegate to
+    // them. Production reads filter in SQL, so these are for in-memory checks/tests only.
     public bool IsConsumed => ConsumedAt.HasValue;
-    public bool IsExpired => DateTimeOffset.UtcNow >= ExpiresAt;
-    public bool IsValid => !IsConsumed && !IsExpired;
+    public bool IsExpiredAt(DateTimeOffset now) => now >= ExpiresAt;
+    public bool IsValidAt(DateTimeOffset now) => !IsConsumed && !IsExpiredAt(now);
+
+    public bool IsExpired => IsExpiredAt(DateTimeOffset.UtcNow);
+    public bool IsValid => IsValidAt(DateTimeOffset.UtcNow);
 }
 
 /// <summary>Discriminates the kind of one-time credential.</summary>

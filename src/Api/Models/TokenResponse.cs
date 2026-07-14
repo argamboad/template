@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Template.Api.Models;
+namespace Perezosoft.Api.Models;
 
 /// <summary>
 /// OAuth-style token response returned by the token and refresh endpoints.

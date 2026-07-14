@@ -12,6 +12,6 @@
     </LaunchOptions>
   </Playwright>
   <TestRunParameters>
-    <Parameter name="PLAYWRIGHT_BASE_URL" value="https://localhost:5001" />
+    <Parameter name="PLAYWRIGHT_BASE_URL" value="https://localhost:7008" />
   </TestRunParameters>
 </RunSettings>

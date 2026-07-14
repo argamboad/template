@@ -1,13 +1,13 @@
-using Template.Core.Entities;
+using Perezosoft.Core.Entities;
 
-namespace Template.Core.Repositories;
+namespace Perezosoft.Core.Repositories;
 
 /// <summary>
 /// Reads/removes the OAuth identities linked to an account.
 /// </summary>
 public interface IUserLoginRepository
 {
-    Task<List<UserLogin>> GetForUserAsync(Guid userId);
-    Task<UserLogin?> GetByProviderForUserAsync(Guid userId, string provider);
-    Task DeleteAsync(UserLogin login);
+    Task<List<UserLogin>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UserLogin?> GetByProviderForUserAsync(Guid userId, string provider, CancellationToken cancellationToken = default);
+    Task DeleteAsync(UserLogin login, CancellationToken cancellationToken = default);
 }

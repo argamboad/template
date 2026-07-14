@@ -16,3 +16,9 @@ obj/
 # OS
 .DS_Store
 Thumbs.db
+
+# Node (the Android native smoke in tests/native-smoke-android)
+node_modules/
+
+# MAUI lockfile — excluded by design (NATIVE-1): platform-conditional restore makes it churn
+src/Maui/packages.lock.json

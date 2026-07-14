@@ -1,7 +1,7 @@
 # Ways of Working
 
 > The process layer: how work is sliced, how user stories and PRs are written, and naming
-> conventions. This is constant across projects from this template; project-specific examples are
+> conventions. This is constant across projects from this platform; project-specific examples are
 > marked. Referenced by `CLAUDE.md` so Claude Code follows it.
 
 ## Slices (the unit of build work)
@@ -24,12 +24,61 @@ horizontal layer in isolation.
   epic (not all upfront).
 
 **Slice lifecycle**
-1. Pick the next slice (from `ROADMAP.md` once it exists).
+1. Pick the next slice (from the project roadmap / backlog, if one exists).
 2. Write/refine the user story/stories for it (see template below) under `docs/stories/`.
 3. **Write the tests first (TDD).** Unit tests for Core logic; E2E tests for the user-facing flow.
 4. Branch, implement until all tests are green; refactor.
 5. Open a PR using the PR template; self-review against acceptance criteria.
 6. Merge; app remains in a working state. Add ADRs to `DECISIONS.md` for any decisions made.
+
+## Code organization — clean platform + vertical feature slices
+
+Two senses of "vertical" apply, and they're complementary:
+
+- **Delivery-vertical slices (above):** the *unit of build work* — each increment cuts through the
+  layers it needs and leaves the app working.
+- **Organization-vertical feature folders:** *where the code lives*. The reusable **platform** stays
+  horizontal / clean-layered (Core, Infrastructure, and the auth/tenancy controllers), while each
+  **app feature** lives in one self-contained folder: `src/Api/Features/<Feature>/`.
+
+This hybrid is pinned in **ADR-004**. The platform is the durable chassis (JWT auth, membership
+tenancy, the global tenant query filter, email, persistence); features bolt on and *reuse* it.
+
+**A feature slice** (`src/Api/Features/<Feature>/`) typically contains:
+- `<Feature>Endpoints.cs` — a minimal-API group registered via
+  **`app.MapTenantFeatureGroup("/api/<feature>")`** (NOT a raw
+  `MapGroup(...).RequireAuthorization(...)` — the helper applies the shared `AuthPolicies.TenantApi`
+  policy so a slice can't forget auth), called from `app.Map<Feature>()` in `Program.cs`. Gate
+  individual endpoints with the **`.RequirePermission(Permission.X)`** (→ 403; ADR-009) and
+  **`.RequireEntitlement(...)`** (→ 402; ADR-006) endpoint filters as needed. Features are minimal-API
+  groups; the platform stays controllers.
+- `<Feature>Handler.cs` — the orchestration/logic; injects `IRepository<T>` (whose `Query()` is
+  already tenant-filtered), `ICurrentTenant`, `IUnitOfWork`, and platform services as needed.
+- `<Feature>Models.cs` — request/response DTOs + validation, co-located.
+- `<Feature>DataContributor.cs` — an `ITenantDataContributor` so the feature's data participates in
+  tenant export **and** dissolve (registered in DI; no central wipe method to edit). It **requires
+  four members**: `HasDataAsync`, `WipeAsync`, **`ExportKey`** (the section name in a tenant export),
+  and **`ExportAsync`** (GDPR-1, ADR-011). A slice built from the old two-method recipe won't compile.
+- The **entity** lives in `src/Core/Entities/` (it's the EF model + migration source) and implements
+  **`ITenantScoped`** so the global query filter scopes it automatically.
+
+**A feature must NOT** reach into another feature's folder, edit a central "has data / wipe data"
+method, author a bespoke per-entity repository (use `IRepository<T>`), use `IgnoreQueryFilters()`
+(banned in `src/Api/Features/**` — use `IRepository<T>.QueryAllTenants()`), or inline UI in the Web
+app (UI components go in the Shared.Ui RCL).
+
+**Add-a-slice mechanical checklist:**
+1. **Entity** → `src/Core/Entities/<Entity>.cs`, implementing `ITenantScoped`.
+2. **DbSet + config** → add the `DbSet<>` to `AppDbContext` and any `IEntityTypeConfiguration`.
+3. **Migration** → `dotnet ef migrations add Add<Entity>` (in `src/Infrastructure/Persistence/Migrations/`).
+4. **DI wiring** → register the handler/services (`Add*`) and map the group (`app.Map<Feature>()`) in
+   `Program.cs`.
+5. **Contributor** → register the `ITenantDataContributor` (all four members) in DI.
+6. **Fixture reset** → add the new table(s) to the test fixture's reset/truncate list.
+7. **UI** → nav entry + component in the Shared.Ui RCL, and add the resx (`.resx`) strings (EN/ES).
+
+**Reference:** `src/Api/Features/Notes` is a complete, working example (marked "🗑️ DELETE-ME").
+Copy its shape; delete it when you ship your first real feature.
 
 ## User stories
 
@@ -101,6 +150,30 @@ ID: `feat/INV-3-availability-toggle`.
 PR title = a Conventional Commit line, ideally referencing the story:
 `feat(inventory): availability toggle (INV-3)`.
 
+### Merge discipline (CI before merge)
+- **Never merge before the branch CI finishes green.** Two real incidents drove this rule:
+  PR #137/#138 were merged while their branch runs were still executing and a flaky theme E2E
+  slipped onto develop (fixed in #139), and the 2026-07-14 toolchain drift (#142/#143) was
+  diagnosed slower because merges had outpaced their runs.
+- **Branch-green is necessary, not sufficient — develop can still fail after a green branch run:**
+  1. **Toolchain drift** — CI floats on `dotnet-version: 10.0.x` and the GitHub runner images
+     rotate weekly; an SDK/Xcode rollout can land *between* the branch run and the merge
+     (2026-07-14: NU1004 locked-mode restore + an Xcode/workload mismatch, from one SDK patch).
+     The fix playbook lives in `CLAUDE.md` → Tech stack.
+  2. **Develop-only jobs** — the Apple builds/smokes run only on develop pushes (the
+     `native-paths` gate; macOS bills 10×), so an Apple-affecting change is first *proven* by the
+     post-merge run. Watch that run to completion; don't stack the next merge onto an unverified
+     one.
+- **Recommended repo setting:** GitHub branch protection on `develop` requiring the `build-test`
+  and `e2e` status checks (Settings → Branches → Add rule, or
+  `gh api repos/{owner}/{repo}/branches/develop/protection`). This makes "merge before CI
+  finishes" impossible at the platform level instead of relying on habit. (Not enabled by
+  default in this template — it needs repo admin and blocks solo-maintainer hotfix pushes to
+  develop, so opt in per deployment.)
+- After merging, `deploy-staging` only runs off a fully green develop run — a red develop
+  silently **freezes staging** at the last good commit, so a broken develop is not a
+  "fix it later" state.
+
 ### PR template
 Stored at `.github/pull_request_template.md` (auto-loaded by GitHub). Contents:
 
@@ -151,20 +224,25 @@ without a test that drove it.
 | Layer | Project | Framework | What it covers |
 |-------|---------|-----------|----------------|
 | Unit | `tests/Core.Tests` | xUnit | Domain logic, derived rules, entity invariants |
-| Unit | `tests/Api.Tests` | xUnit | API endpoints, request/response shape, auth guards |
+| Unit / Integration | `tests/Api.Tests` | xUnit (+ Postgres Testcontainer) | Services, repositories, feature slices, tenancy invariants |
 | E2E | `tests/E2E.Tests` | Playwright (NUnit) | Critical user flows through a real browser |
 
 ### Unit tests (`Core.Tests`, `Api.Tests` — xUnit)
 - One test class per production class; file mirrors the source tree.
 - Cover every derived rule, happy path, unhappy path, and tenant-scoping boundary.
-- No real database in unit tests — use in-memory EF or mocks at the repository boundary.
+- Tests that exercise relational behavior (EF global query filters, `ExecuteUpdate`/`ExecuteDelete`,
+  transactions/savepoints) run against a real **PostgreSQL Testcontainer** — see
+  `tests/Api.Tests/Infrastructure/PostgresFixture.cs` and `ServiceHarness.cs`. The EF in-memory
+  provider can't model these, so don't use it. Pure logic with no DB needs no container.
 
 ### E2E tests (`E2E.Tests` — Playwright/NUnit)
 - One test file per epic, mirroring `docs/stories/`.
 - Tests inherit from Playwright's `PageTest`; use Page Object Model (`tests/E2E.Tests/Pages/`).
 - Cover the Gherkin happy path + key unhappy paths through the real running UI.
-- Run against the full stack: `docker compose up -d`, then start API and Web before running.
-- Base URL configured via `PLAYWRIGHT_BASE_URL` env var or `playwright.runsettings`.
+- Run against the full stack: `docker compose up -d`, then start the API and Web. OTP-based
+  tests read codes from **Mailpit**, so the API must send to Mailpit (the dev default) — see
+  **`tests/E2E.Tests/README.md`** for the exact commands (incl. overriding a real-SMTP `.env`).
+- Base URL defaults to `https://localhost:7008`; override with `PLAYWRIGHT_BASE_URL`.
 
 ### First-time Playwright setup
 ```sh
@@ -175,9 +253,9 @@ pwsh tests/E2E.Tests/bin/Debug/net10.0/playwright.ps1 install
 ### Running tests
 ```sh
 dotnet test tests/Core.Tests
-dotnet test tests/Api.Tests
-# E2E — requires docker compose + servers running
-dotnet test tests/E2E.Tests -- RunSettings=tests/E2E.Tests/playwright.runsettings
+dotnet test tests/Api.Tests   # spins up a Postgres Testcontainer; Docker must be running
+# E2E — requires docker compose + the API & Web running (see tests/E2E.Tests/README.md)
+dotnet test tests/E2E.Tests
 ```
 
 ## How Claude Code should use this

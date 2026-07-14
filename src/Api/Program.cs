@@ -1,13 +1,33 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Extensions;
 using Microsoft.OpenApi.Models;
-using Template.Api.Configuration;
-using Template.Api.Services;
-using Template.Infrastructure;
-using Template.Infrastructure.Persistence;
+using Perezosoft.Api.Authentication;
+using Perezosoft.Api.Configuration;
+using Perezosoft.Api.Endpoints;
+using Perezosoft.Api.Features.Notes;
+using Perezosoft.Api.Observability;
+using Perezosoft.Api.Services;
+using Perezosoft.Core.Abstractions;
+using Perezosoft.Infrastructure;
+using Perezosoft.Infrastructure.Persistence;
+
+// Local dev: load secrets/config from the repo-root .env (the single local source of truth —
+// see docs/DECISIONS.md). TraversePath walks up to find it regardless of the working dir; the
+// try/catch makes it a no-op when there's no .env (e.g. production, which uses real env vars).
+try { DotNetEnv.Env.TraversePath().Load(); } catch { /* no .env present */ }
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Structured logging with per-request scopes (OBS-1, ADR-008): readable single-line console in dev,
+// JSON in prod so a log aggregator can index the tenant_id/user_id scope. Swap in Serilog/OTel-logs
+// later without touching call sites.
+builder.Logging.ClearProviders();
+if (builder.Environment.IsDevelopment())
+    builder.Logging.AddSimpleConsole(o => { o.IncludeScopes = true; o.SingleLine = true; });
+else
+    builder.Logging.AddJsonConsole(o => { o.IncludeScopes = true; o.UseUtcTimestamp = true; });
 
 builder.Services.AddControllers();
 
@@ -16,7 +36,20 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o =>
 {
-    o.SwaggerDoc("v1", new OpenApiInfo { Title = "Template API", Version = "v1" });
+    o.SwaggerDoc("v1", new OpenApiInfo { Title = "Perezosoft API", Version = "v1" });
+    // A curated "public" document with ONLY the /api/public routes (PUBAPI-2) — the customer-facing
+    // contract, served leak-free at /api/public/openapi.json when PUBAPI is enabled (see below).
+    o.SwaggerDoc("public", new OpenApiInfo
+    {
+        Title = "Public API",
+        Version = "v1",
+        Description = "Programmatic API authenticated with a tenant API key sent in the X-Api-Key header.",
+    });
+    o.DocInclusionPredicate((docName, api) =>
+    {
+        var isPublic = api.RelativePath?.StartsWith("api/public", StringComparison.OrdinalIgnoreCase) == true;
+        return docName == "public" ? isPublic : true; // "public" = only /api/public; "v1" = everything
+    });
     o.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -40,35 +73,37 @@ builder.Services.AddSwaggerGen(o =>
 
 // Infrastructure: DbContext, Data Protection, email, repositories, and the
 // External cookie + OAuth provider schemes.
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
-// Typed settings (read configuration once at startup).
-builder.Services.AddSingleton<IJwtSettings>(new JwtSettings(builder.Configuration));
-builder.Services.AddSingleton<IRefreshTokenSettings>(new RefreshTokenSettings(builder.Configuration));
-builder.Services.AddSingleton<IApplicationSettings>(new ApplicationSettings(builder.Configuration));
-builder.Services.AddSingleton<IPasswordlessSettings>(new PasswordlessSettings(builder.Configuration));
-builder.Services.AddSingleton<IInvitationSettings>(new InvitationSettings(builder.Configuration));
+// OpenTelemetry traces + metrics (OBS-2). Exporter is config-gated (OTLP when configured); see
+// TelemetryExtensions. Spans are tagged with tenant_id/user_id.
+builder.Services.AddAppTelemetry(builder.Configuration);
+
+// Health checks (OBS-3). /health = liveness (process up); /health/ready = readiness (DB reachable).
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+
+// Typed settings (read configuration once at startup). Returns the single IJwtSettings instance so
+// the JWT-bearer handler below reuses it (no duplicate construction — DEBT-1).
+var jwtSettings = builder.Services.AddAppSettings(builder.Configuration);
 
 // Clock — injected so services are testable.
 builder.Services.AddSingleton(TimeProvider.System);
 
-// Auth services.
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
-builder.Services.AddScoped<IClaimsExtractor, ClaimsExtractor>();
-builder.Services.AddScoped<IPasswordlessService, PasswordlessService>();
-builder.Services.AddScoped<ICookieService, CookieService>();
-builder.Services.AddScoped<IErrorResponseFactory, ErrorResponseFactory>();
-builder.Services.AddScoped<ITokenGenerator, TokenGenerator>();
-builder.Services.AddScoped<ITokenHasher, TokenHasher>();
-builder.Services.AddSingleton<ILinkTokenService, LinkTokenService>();
-builder.Services.AddSingleton<INativeAuthCodeService, NativeAuthCodeService>();
+// Per-epic service registrations — the DI wiring, grouped by concern (see ServiceRegistrationExtensions).
+builder.Services.AddAuthServices();
+builder.Services.AddTenantServices();
+builder.Services.AddMfaServices();
+builder.Services.AddNotificationServices();
+builder.Services.AddPlatformAdminServices(builder.Configuration);
+builder.Services.AddRbacServices();
+builder.Services.AddBillingServices();
 
-// Tenant ("household") management services.
-builder.Services.AddScoped<ITenantContext, TenantContext>();
-builder.Services.AddScoped<ITenantService, TenantService>();
-builder.Services.AddScoped<ITenantInvitationService, TenantInvitationService>();
+// 🗑️ DELETE-ME: sample feature slice (Features/Notes) — the reference for how a vertical
+// slice wires up: a handler + a tenant-data contributor, with endpoints mapped below. Kept inline
+// here (not in ServiceRegistrationExtensions) because only Program.cs may reference Features.* (R8).
+builder.Services.AddScoped<NotesHandler>();
+builder.Services.AddScoped<ITenantDataContributor, NotesDataContributor>();
 
 // Caches + session (LinkTokenService uses IMemoryCache; session backed by distributed cache).
 builder.Services.AddMemoryCache();
@@ -85,25 +120,42 @@ builder.Services.AddSession(options =>
 });
 
 // JWT Bearer — authenticates /api/* endpoints with the app-issued access token.
-// Validation mirrors JwtTokenService (issuer = audience = Jwt:Issuer).
-var jwtSettings = new JwtSettings(builder.Configuration);
-builder.Services.AddAuthentication()
+// Validation mirrors JwtTokenService (issuer = audience = Jwt:Issuer). Reuses the SAME
+// IJwtSettings instance registered as the DI singleton above (AddAppSettings) — one source of truth.
+var authBuilder = builder.Services.AddAuthentication()
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
-            ValidateIssuer = true,
-            ValidIssuer = jwtSettings.Issuer,
-            ValidateAudience = true,
-            ValidAudience = jwtSettings.Issuer,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
+        // Single validation definition shared with JwtTokenService — see JwtValidation.
+        options.TokenValidationParameters = jwtSettings.CreateParameters();
     });
 
-builder.Services.AddAuthorization();
+// PUBAPI (ADR-015): the public API + API keys. Default OFF — a deployment opts in via PublicApi:Enabled.
+// Strong gating: the API-key scheme is only added, and the routes only mapped (below), when enabled.
+var publicApiSettings = new PublicApiSettings();
+builder.Configuration.GetSection(PublicApiSettings.SectionName).Bind(publicApiSettings);
+builder.Services.AddSingleton(publicApiSettings);
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+if (publicApiSettings.Enabled)
+    authBuilder.AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationHandler.SchemeName, _ => { });
+
+// HOOKS (ADR-016): outbound webhooks. Default OFF — a deployment opts in via Webhooks:Enabled. The
+// delivery machinery is always registered (dormant); only the management routes (below) are gated.
+var webhooksSettings = new WebhooksSettings();
+builder.Configuration.GetSection(WebhooksSettings.SectionName).Bind(webhooksSettings);
+builder.Services.AddSingleton(webhooksSettings);
+builder.Services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
+builder.Services.AddScoped<IWebhookPublisher, WebhookPublisher>();
+
+// Single tenant-API authorization policy, shared by the platform controllers and feature groups.
+builder.Services.AddTenantApiAuthorization();
+
+// Throttle the unauthenticated passwordless endpoints (email-bomb / brute-force surface) — CONF-5.
+builder.Services.AddApiRateLimiters(builder.Configuration);
+
+// Reverse-proxy correctness (DEPLOY-1, ADR-017), config-gated off. Behind Render/nginx, honor the
+// proxy's X-Forwarded-For/-Proto so the rate limiter sees the real client IP and OAuth URIs use https.
+builder.Services.AddProxyForwarding(builder.Configuration);
 
 // CORS — allow the Blazor WASM client to send credentialed requests (cookies).
 var allowedOrigins = builder.Configuration
@@ -121,12 +173,63 @@ if (allowedOrigins.Length > 0)
 
 var app = builder.Build();
 
+// Apply EF migrations on startup so a freshly-created database (e.g. after a
+// `docker compose down -v && up`) gets its schema with no manual `dotnet ef database update`.
+// QA_TEST_PLAN documents "re-apply migrations by starting the API" — this is what does it.
+// Migrate() is idempotent (a no-op when already current); the relational guard keeps
+// non-relational test providers unaffected. AppDbContext needs ICurrentTenant, which resolves
+// to a null tenant outside a request — fine, migrating doesn't use the tenant filter.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (db.Database.IsRelational())
+    {
+        // Two-role topology (ADR-020): when the app runs as the RLS-subject runtime role, DDL —
+        // including EF's own history-table bootstrap — needs the owner/migrator connection.
+        // ConnectionStrings:Migrations is optional; absent (single-role setups: local dev, current
+        // staging) migrations run over the default connection as before. The override only affects
+        // this scoped context, which exists solely to migrate.
+        var migrationsConnection = app.Configuration.GetConnectionString("Migrations");
+        if (!string.IsNullOrEmpty(migrationsConnection))
+            db.Database.SetConnectionString(migrationsConnection);
+        db.Database.Migrate();
+    }
+}
+
+// RLS posture guard (ADR-020, config-gated; prod activation enables it): refuse to start if the
+// runtime connection would silently bypass row-level security. Fresh scope — the migrate scope's
+// context may have been repointed at the migrator connection above.
+if (builder.Configuration.GetValue<bool>(RlsPostureGuard.EnforceConfigKey))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (db.Database.IsRelational())
+        await RlsPostureGuard.EnsureRuntimeRoleIsNotPrivilegedAsync(db);
+}
+
+// Forwarded headers must run FIRST — before HTTPS redirect, auth, or the rate limiter read the
+// IP/scheme. No-op unless Proxy:Enabled (see AddProxyForwarding).
+app.UseProxyForwarding(app.Configuration);
+
+// Single-origin hosting (DEPLOY-1, ADR-017), config-gated off. When enabled, the API also serves the
+// published Blazor WASM client so the whole app is one origin (first-party refresh cookie, no CORS).
+// Default off — local dev uses the separate `src/Web` dev server; the deployed container sets this true
+// and ships the published wwwroot alongside the API. Static assets are served before auth.
+var serveWebClient = app.Configuration.GetValue("Hosting:ServeWebClient", false);
+if (serveWebClient)
+{
+    app.UseBlazorFrameworkFiles();
+    app.UseStaticFiles();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Template API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Perezosoft API v1");
+        if (publicApiSettings.Enabled)
+            c.SwaggerEndpoint("/swagger/public/swagger.json", "Public API"); // PUBAPI-2
         c.RoutePrefix = string.Empty; // serve the UI at the API root (/)
     });
 }
@@ -144,6 +247,59 @@ if (allowedOrigins.Length > 0)
 app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
+// Enrich every log line with tenant_id/user_id once the principal is resolved (OBS-1).
+app.UseRequestLoggingScope();
+app.UseRateLimiter();
 app.MapControllers();
+
+// Health/readiness (OBS-3). Unauthenticated, status-only (the default writer emits just the status,
+// so no internals leak). Liveness runs no checks; readiness runs the "ready"-tagged DB check.
+app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+
+// Deployed build identity (DEPLOY-3). Anonymous; returns the commit this instance is running, from the
+// platform's env (Render sets RENDER_GIT_COMMIT) or an explicit APP_BUILD_COMMIT, else "unknown". The
+// post-deploy smoke polls this to wait for the NEW build to actually be live before asserting — the old
+// instance keeps serving during a build, so health alone can't tell old from new.
+app.MapGet("/api/version", () => Results.Ok(new
+{
+    commit = Environment.GetEnvironmentVariable("APP_BUILD_COMMIT")
+             ?? Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT")
+             ?? "unknown",
+})).AllowAnonymous().WithTags("Platform");
+
+// 🗑️ DELETE-ME: sample feature slice endpoints (remove with Features/Notes).
+app.MapNotes();
+// Billing is a platform controller (BillingController) — auto-mapped by MapControllers above.
+
+// PUBAPI (ADR-015): map key management + the public routes only when enabled — off ⇒ they don't exist.
+if (publicApiSettings.Enabled)
+{
+    app.MapApiKeyManagement();
+    app.MapPublicApi();
+
+    // The customer-facing OpenAPI contract (PUBAPI-2): emit ONLY the curated "public" document, so the
+    // internal "v1" surface is never exposed in production. Anonymous (a published contract), any env.
+    app.MapGet("/api/public/openapi.json", (Swashbuckle.AspNetCore.Swagger.ISwaggerProvider swagger) =>
+    {
+        var document = swagger.GetSwagger("public");
+        using var writer = new StringWriter();
+        document.SerializeAsV3(new Microsoft.OpenApi.Writers.OpenApiJsonWriter(writer));
+        return Results.Text(writer.ToString(), "application/json");
+    }).AllowAnonymous().WithTags("Public API");
+}
+
+// HOOKS (ADR-016): map webhook management only when enabled — off ⇒ the routes don't exist.
+if (webhooksSettings.Enabled)
+    app.MapWebhookManagement();
+
+// Single-origin SPA fallback (DEPLOY-1). An unmatched /api/* must be a real API-shaped 404 — never the
+// SPA shell (the more specific fallback out-precedences the catch-all file fallback for /api paths).
+// Everything else (client-side routes) falls back to index.html so deep links load the WASM app.
+if (serveWebClient)
+{
+    app.MapFallback("/api/{**rest}", () => Results.NotFound());
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();
