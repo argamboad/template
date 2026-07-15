@@ -12,4 +12,17 @@ public static class ClaimsPrincipalExtensions
     /// <summary>The authenticated user id from the <see cref="ClaimTypes.NameIdentifier"/> claim, or null if absent/unparseable.</summary>
     public static Guid? GetUserId(this ClaimsPrincipal principal) =>
         Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+
+    /// <summary>
+    /// The staff user driving this request via an impersonation token (the <c>impersonated_by</c> claim,
+    /// ADMIN-2/ADR-014), or null on a normal token. Fail-closed on an unparseable value: a present-but-
+    /// mangled claim still reads as "impersonating" for gating purposes via <see cref="IsImpersonation"/>.
+    /// </summary>
+    public static Guid? GetImpersonatedBy(this ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirstValue(Services.JwtClaims.ImpersonatedBy), out var id) ? id : null;
+
+    /// <summary>True when the principal carries the <c>impersonated_by</c> claim at all — the gate check
+    /// for surfaces impersonation must never reach (staff endpoints, account-preference writes).</summary>
+    public static bool IsImpersonation(this ClaimsPrincipal principal) =>
+        principal.FindFirst(Services.JwtClaims.ImpersonatedBy) is not null;
 }

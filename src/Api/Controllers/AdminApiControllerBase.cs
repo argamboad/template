@@ -21,19 +21,27 @@ public abstract class AdminApiControllerBase(IPlatformStaffService staff) : Cont
     /// <summary>
     /// Non-gating staff check: true when the current caller is platform staff. Unlike
     /// <see cref="RequireStaffAsync"/> this never produces a 403 — for the status probe the client uses to
-    /// decide whether to show the admin UI.
+    /// decide whether to show the admin UI. False under an impersonation token, matching the gate (and the
+    /// client, which already hides the admin UI while impersonating).
     /// </summary>
     protected async Task<bool> IsCurrentUserStaffAsync(CancellationToken cancellationToken)
-        => CurrentUserId is { } userId && await staff.IsStaffAsync(userId, cancellationToken);
+        => !User.IsImpersonation()
+           && CurrentUserId is { } userId && await staff.IsStaffAsync(userId, cancellationToken);
 
     /// <summary>
     /// Gate for admin actions: returns the staff user id when the caller is platform staff, otherwise a
-    /// ready-to-return 401 (no identity) / 403 (not staff).
+    /// ready-to-return 401 (no identity) / 403 (not staff). <b>Impersonation tokens are rejected outright</b>
+    /// (v3 audit ADM-2): staff powers never transit a "sign in as" session — otherwise staff A impersonating
+    /// staff B could act on this surface with every audit row attributing B.
     /// </summary>
     protected async Task<(Guid StaffUserId, IActionResult? Denied)> RequireStaffAsync(CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
             return (default, Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity")));
+
+        if (User.IsImpersonation())
+            return (default, StatusCode(StatusCodes.Status403Forbidden,
+                new ErrorResponse("impersonation_not_allowed", "Staff actions are not available from an impersonation session")));
 
         if (!await staff.IsStaffAsync(userId, cancellationToken))
             return (default, StatusCode(StatusCodes.Status403Forbidden,

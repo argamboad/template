@@ -42,6 +42,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<HttpCurrentTenant>();
         services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<HttpCurrentTenant>());
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpCurrentTenant>());
+        // Ambient impersonation attribution (LB-ADM-1): the audit log stamps AuditEvent.ImpersonatedBy from
+        // the impersonated_by JWT claim on every event — per-request, null for jobs/system contexts.
+        services.AddScoped<ICurrentImpersonation, HttpCurrentImpersonation>();
         services.AddScoped<ITenantService, TenantService>();
         services.AddScoped<ITenantInvitationService, TenantInvitationService>();
         // Shared tenant-dissolve sequence (DEBT-7): contributors first, then core WipeDataAsync. Used by

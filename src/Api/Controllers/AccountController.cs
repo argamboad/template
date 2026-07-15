@@ -83,6 +83,7 @@ public class AccountController(
     public async Task<IActionResult> SetLocale([FromBody] LocaleRequest req, CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
+        if (ImpersonatedPrefWrite() is { } denied) return denied;
 
         var locale = req.Locale?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(locale) || !SupportedLocales.Contains(locale))
@@ -103,6 +104,7 @@ public class AccountController(
     public async Task<IActionResult> SetTheme([FromBody] ThemeRequest req, CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
+        if (ImpersonatedPrefWrite() is { } denied) return denied;
 
         var theme = req.Theme?.Trim().ToLowerInvariant();
         if (string.IsNullOrEmpty(theme) || !SupportedThemes.Contains(theme))
@@ -111,6 +113,17 @@ public class AccountController(
         await userService.UpdateThemeAsync(userId, theme, cancellationToken);
         return Ok();
     }
+
+    /// <summary>
+    /// Server-side half of the no-pref-writes-while-impersonating guard (ADR-022 / v3 audit ADM-8): an
+    /// impersonation token must not mutate the target's account preferences — previously only the Blazor
+    /// client enforced this, one client bug away from failing. Returns the ready-made 403, or null to proceed.
+    /// </summary>
+    private IActionResult? ImpersonatedPrefWrite() =>
+        User.IsImpersonation()
+            ? StatusCode(StatusCodes.Status403Forbidden, new ErrorResponse(
+                "impersonation_not_allowed", "Preferences cannot be changed from an impersonation session"))
+            : null;
 
     // ── Account linking ──────────────────────────────────────────────────────
 

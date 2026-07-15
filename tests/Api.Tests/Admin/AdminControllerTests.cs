@@ -46,6 +46,38 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task ImpersonationToken_AtStaffGate_Returns403_EvenWhenTargetIsStaff()
+    {
+        // v3 ADM-2: staff A impersonating staff B (both allowlisted) must NOT reach the staff surface —
+        // otherwise every audited action attributes B. The caller IS staff by allowlist; the
+        // impersonated_by claim alone must trip the gate.
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId, impersonatedBy: Guid.CreateVersion7());
+        await using (db)
+        {
+            var result = await controller.ListTenants(default);
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
+            Assert.Equal("impersonation_not_allowed", Assert.IsType<ErrorResponse>(obj.Value).Error);
+        }
+    }
+
+    [Fact]
+    public async Task ImpersonationToken_StaffProbe_ReportsNotStaff()
+    {
+        // The Me probe mirrors the gate: an impersonation session never advertises staff powers (the
+        // client already hides the admin UI while impersonating — the server now agrees).
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId, impersonatedBy: Guid.CreateVersion7());
+        await using (db)
+        {
+            var result = await controller.Me(default);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.False(Assert.IsType<AdminStatusResponse>(ok.Value).IsStaff);
+        }
+    }
+
+    [Fact]
     public async Task Staff_ListTenants_ReturnsAllTenantsWithCounts()
     {
         var staffId = await SeedUserAsync(StaffEmail);
@@ -514,7 +546,7 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
     // Captures the email copies NotifyAsync sends, so tests can assert delivery (e.g. the MFA reset).
     private readonly CapturingEmailSender _email = new();
 
-    private (AdminController controller, AppDbContext db) BuildController(Guid callerId)
+    private (AdminController controller, AppDbContext db) BuildController(Guid callerId, Guid? impersonatedBy = null)
     {
         var ctx = new HttpCurrentTenant(new HttpContextAccessor { HttpContext = new DefaultHttpContext() });
         var options = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(Fixture.ConnectionString).Options;
@@ -535,7 +567,10 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
             new JwtTokenService(new TestJwtSettings(), TimeProvider.System, NullLogger<JwtTokenService>.Instance),
             notifications, mfaService, new EfOutbox(db, TimeProvider.System), new EfUnitOfWork(db), TimeProvider.System);
 
-        var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, callerId.ToString())], "test"));
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, callerId.ToString()) };
+        if (impersonatedBy is { } staffId)
+            claims.Add(new Claim(JwtClaims.ImpersonatedBy, staffId.ToString())); // an impersonation session
+        var user = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
         return (controller, db);
     }

@@ -19,6 +19,14 @@ public class AuditEvent : ITenantScoped
     /// <summary>The user who performed the action, if any (a system action has none).</summary>
     public Guid? ActorUserId { get; set; }
 
+    /// <summary>
+    /// When the action was performed during an admin impersonation session ("sign in as", ADR-014), the
+    /// staff user actually driving it — <see cref="ActorUserId"/> stays the impersonated user so tenant
+    /// history reads naturally, and this marks the real hands on the keyboard (v3 audit LB-ADM-1). Null
+    /// for a normal action. Stamped ambiently by the audit log from the <c>impersonated_by</c> JWT claim.
+    /// </summary>
+    public Guid? ImpersonatedBy { get; set; }
+
     /// <summary>What happened, e.g. <c>"member.role_changed"</c>. Stable, greppable verbs.</summary>
     public required string Action { get; set; }
 

@@ -167,6 +167,24 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", IssueAccessToken(user));
         return client;
     }
+
+    /// <summary>
+    /// An HttpClient carrying a REAL impersonation token — <paramref name="staff"/> "signed in as"
+    /// <paramref name="target"/>, minted by the app's own token service exactly like ADMIN-2 does. For
+    /// the impersonation gate/attribution tests (v3 ADM-2 / LB-ADM-1).
+    /// </summary>
+    public HttpClient CreateImpersonatingClientFor(SeededUser staff, SeededUser target)
+    {
+        using var scope = Services.CreateScope();
+        var tokens = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+        var token = tokens.IssueImpersonationToken(
+            target.UserId, target.Email, staff.UserId, TimeSpan.FromMinutes(15),
+            displayName: "Impersonated", tenantName: "Test Household", tenantId: target.TenantId);
+
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
 }
 
 /// <summary>Identifiers for a seeded user, enough to mint a token and assert tenant scoping.</summary>
