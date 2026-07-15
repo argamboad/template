@@ -64,7 +64,10 @@ public sealed class IntegrationTestFactory : WebApplicationFactory<Program>, IAs
             .Options;
         await using var db = new AppDbContext(superuserOptions, new TestCurrentTenant());
         await db.Database.MigrateAsync();
-        await Rls.RlsTestSetup.ProvisionAsync(db);
+        // Role + grants ONLY — never the model-derived RLS policies. The migrations just applied the real
+        // policies; back-filling them from the model here would make the RLS parity gate tautological
+        // (v3 audit RLS-1). See RlsTestSetup.ProvisionRuntimeRoleAsync.
+        await Rls.RlsTestSetup.ProvisionRuntimeRoleAsync(db);
     }
 
     /// <summary>Connection string the app under test uses: the RLS-subject runtime role.</summary>

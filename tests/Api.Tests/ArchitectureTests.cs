@@ -370,6 +370,21 @@ public class ArchitectureTests
             $"Each source file must declare a type matching its name (or be a *Models aggregation): {string.Join(", ", offenders)}");
     }
 
+    [Fact]
+    public void IntegrationFactory_DoesNotBackfillRlsPolicies()
+    {
+        // v3 audit RLS-1: the migration-parity gate (RlsMigrationGateTests) is only honest if the database
+        // it inspects gets its RLS policies from MIGRATIONS, not back-filled from the model. So the
+        // migration-based harness must provision the runtime ROLE only — never RlsDdl.StatementsFor, and
+        // never the policy-applying RlsTestSetup.ProvisionAsync. If it did, a slice could ship an
+        // ITenantScoped table with no RLS migration and still pass CI, reaching production unprotected.
+        var factory = Path.Combine(RepoRoot(), "tests", "Api.Tests", "Infrastructure", "IntegrationTestFactory.cs");
+        var text = File.ReadAllText(factory);
+
+        Assert.DoesNotContain("RlsDdl.StatementsFor", text);
+        Assert.DoesNotContain("RlsTestSetup.ProvisionAsync", text);
+    }
+
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>
         !Directory.Exists(dir)
             ? []
