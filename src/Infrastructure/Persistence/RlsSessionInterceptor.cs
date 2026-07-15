@@ -128,6 +128,20 @@ public sealed class RlsSessionInterceptor : DbCommandInterceptor, IDbConnectionI
         return Task.CompletedTask;
     }
 
+    // A FAILED commit/rollback aborts the transaction, which reverts the session-level set_config GUCs
+    // (they are transactional even at session level) — so our per-connection cache must forget them, or the
+    // next command on this pooled connection skips re-asserting and runs with the backstop silently off /
+    // a stale tenant (RLS-5). Mirrors the rollback handlers above.
+    void IDbTransactionInterceptor.TransactionFailed(DbTransaction transaction, TransactionErrorEventData eventData) =>
+        InvalidateContextConnection(eventData);
+
+    Task IDbTransactionInterceptor.TransactionFailedAsync(
+        DbTransaction transaction, TransactionErrorEventData eventData, CancellationToken cancellationToken)
+    {
+        InvalidateContextConnection(eventData);
+        return Task.CompletedTask;
+    }
+
     private static void Invalidate(DbConnection connection)
     {
         if (States.TryGetValue(connection, out var state))
@@ -151,8 +165,27 @@ public sealed class RlsSessionInterceptor : DbCommandInterceptor, IDbConnectionI
             return null;
 
         var tenantId = db.RlsTenantId;
-        var bypass = tenantId is null || command.CommandText.Contains(TagComment, StringComparison.Ordinal);
+        var bypass = tenantId is null || HasLeadingCrossTenantTag(command.CommandText);
         return (tenantId?.ToString() ?? string.Empty, bypass);
+    }
+
+    /// <summary>
+    /// True when the command carries the cross-tenant sanction tag (<see cref="RlsTags.CrossTenant"/>) as
+    /// one of EF's <b>leading</b> query-tag comment lines. Anchored to the leading comment block — not a
+    /// substring match anywhere in the SQL — so a marker embedded elsewhere (a string literal, an echoed
+    /// value, a non-sanctioned multi-tag) cannot disarm the backstop (RLS-7); and matched as an <b>exact</b>
+    /// line, so only the sanctioned tag counts (not <c>-- rls:cross-tenant &lt;anything&gt;</c>).
+    /// </summary>
+    public static bool HasLeadingCrossTenantTag(string commandText)
+    {
+        foreach (var raw in commandText.Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0) continue;                                     // blank line between tags/SQL
+            if (!line.StartsWith("--", StringComparison.Ordinal)) return false; // reached the SQL body
+            if (line == TagComment) return true;                                // exact leading tag line
+        }
+        return false;
     }
 
     private static DbCommand CreateGucCommand(DbCommand command, string tenant, bool bypass)
