@@ -131,7 +131,7 @@ deferred items without an explicit decision.
 | `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
-| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (123 cases: smoke + regression + §13c native release checklist) |
+| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (149 cases: smoke + regression + §14a v3-audit adversarial/tenant-isolation + §13c native release checklist) |
 | `docs/ROADMAP.md` | Sequenced plan — pillars done (JOBS/BILLING/OBS) + the next waves (RBAC, files, GDPR, MFA, …) |
 | `docs/STATUS.md` | 2026-07-04 status snapshot + operator guides — native QA pass, Apple first-run smoke (MacBook walkthrough), prod activation; SaaS-readiness assessment |
 | `docs/PLATFORM_BACKLOG.md` | Per-item design sketches for the future foundation slices (the detail behind ROADMAP) |
