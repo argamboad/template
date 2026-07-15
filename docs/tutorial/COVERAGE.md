@@ -311,7 +311,7 @@
 - `src/Web/wwwroot/og_image_1200x630.png`
 - `tests/E2E.Tests/ThemeJourneyTests.cs` — dark-mode journey (live flip, reload persist, cross-device reconcile)
 
-## 3.5 — Localization (EN/ES) (8 files)
+## 3.5 — Localization (EN/ES) (9 files)
 
 - `src/Infrastructure/Email/EmailStrings.es.resx`
 - `src/Shared.Ui/Components/LanguageSwitcher.razor`
@@ -320,6 +320,7 @@
 - `src/Shared.Ui/Resources/AppStrings.cs`
 - `src/Shared.Ui/Resources/AppStrings.es.resx`
 - `src/Shared.Ui/Resources/AppStrings.resx`
+- `tests/Api.Tests/AccountControllerTests.cs` — PREFS-1/ADR-022: theme+locale preference-endpoint storage rules
 - `tests/E2E.Tests/I18nTests.cs`
 
 ## 3.6 — The E2E harness (Playwright) (12 files)
@@ -427,7 +428,7 @@
 - `tests/Api.Tests/Billing/BillingWebhookHandlerTests.cs`
 - `tests/Api.Tests/Billing/StripeBillingProviderTests.cs`
 
-## 5.3 — Quotas, dunning & billing dissolve (12 files)
+## 5.3 — Quotas, dunning & billing dissolve (13 files)
 
 - `src/Api/Services/BillingDataContributor.cs`
 - `src/Api/Services/BillingNotifier.cs`
@@ -437,6 +438,7 @@
 - `src/Core/Entities/UsageCounter.cs`
 - `src/Infrastructure/Billing/BillingCancelOutboxHandler.cs`
 - `src/Infrastructure/Persistence/Configurations/UsageCounterConfiguration.cs`
+- `tests/Api.Tests/Billing/AcceptSeatQuotaTests.cs` — BILLING-9: seat quota re-checked at invitation ACCEPT (402 seat_limit_reached)
 - `tests/Api.Tests/Billing/BillingDissolveTests.cs`
 - `tests/Api.Tests/Billing/QuotaServiceTests.cs`
 - `tests/Api.Tests/Billing/SubscriptionLapseSweepJobTests.cs`
@@ -775,7 +777,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (117 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (118 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -833,6 +835,7 @@
 - `docs/stories/native.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/notify.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/observability.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/stories/prefs.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/pubapi.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/rbac.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/theme.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -895,4 +898,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 728 tracked files · 511 built in lessons · 217 bucketed · 0 unmapped
+**Totals:** 731 tracked files · 513 built in lessons · 218 bucketed · 0 unmapped

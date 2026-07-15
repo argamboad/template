@@ -13,6 +13,11 @@ _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
   fail-closed normalization, atomic quotas, per-user erasure, injected clocks, slice boundaries) as
   machine-enforced arch tests + CI gates. Comply; if a task seems to require violating a rule, stop and
   surface it. The frozen quality bar lives in `CONTRIBUTING.md`.
+- **Hardening the template (or a clone) → follow `docs/audits/AUDIT_SUITE.md`.** The single repeatable
+  super-audit (5 diagnostic/gate phases + QA-paranoia + docs/course currency) that produced the `audits/v*`
+  runs. It's **triggered, not routine** — run it on a structural core change, a new wave of epics, a major
+  dependency bump, or before generating a production app (at minimum re-run its Phase 4 adversarial slice
+  pass). Between triggers, keep the gates green instead of re-auditing.
 - Touching the schema or entities → read **`docs/DATA_MODEL.md`** first.
 - Implementing a screen or flow → read **`docs/FEATURES.md`** first.
 - Starting a build slice → read **`docs/WAYS_OF_WORKING.md`** (slices, story format, PR/commit
@@ -128,10 +133,11 @@ deferred items without an explicit decision.
 | `docs/TECH_STACK.md` | Stack choices + rationale |
 | `docs/DECISIONS.md` | ADR log (the "why") |
 | `docs/WAYS_OF_WORKING.md` | Slices, story format, commit/PR conventions |
+| `docs/audits/AUDIT_SUITE.md` | **The repeatable super-audit** — 5 diagnostic/gate phases + QA-paranoia + docs/course currency; triggered, not routine; `audits/v1..v3` are its worked runs |
 | `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
-| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (123 cases: smoke + regression + §13c native release checklist) |
+| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (149 cases: smoke + regression + §14a v3-audit adversarial/tenant-isolation + §13c native release checklist) |
 | `docs/ROADMAP.md` | Sequenced plan — pillars done (JOBS/BILLING/OBS) + the next waves (RBAC, files, GDPR, MFA, …) |
 | `docs/STATUS.md` | 2026-07-04 status snapshot + operator guides — native QA pass, Apple first-run smoke (MacBook walkthrough), prod activation; SaaS-readiness assessment |
 | `docs/PLATFORM_BACKLOG.md` | Per-item design sketches for the future foundation slices (the detail behind ROADMAP) |

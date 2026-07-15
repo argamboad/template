@@ -486,6 +486,10 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Shared.Ui/Components/ThemeSwitcher.razor", "3.4", ""),
     ("tests/E2E.Tests/ThemeJourneyTests.cs", "3.4", "dark-mode journey (live flip, reload persist, cross-device reconcile)"),
 
+    # ---- drift absorbed 2026-07-14 (PREFS-1 / ADR-022 + BILLING-9) ----
+    ("tests/Api.Tests/Billing/AcceptSeatQuotaTests.cs", "5.3", "BILLING-9: seat quota re-checked at invitation ACCEPT (402 seat_limit_reached)"),
+    ("tests/Api.Tests/AccountControllerTests.cs", "3.5", "PREFS-1/ADR-022: theme+locale preference-endpoint storage rules"),
+
     # ---- drift absorbed 2026-07-07 (RLS tenancy backstop, ADR-020 / PR #124) ----
     ("src/Infrastructure/Persistence/RlsDdl.cs", "8.4", "policy DDL — source of the RlsMigrationGateTests parity gate"),
     ("src/Infrastructure/Persistence/RlsSessionInterceptor.cs", "8.4", "sets the tenant GUC per connection"),
