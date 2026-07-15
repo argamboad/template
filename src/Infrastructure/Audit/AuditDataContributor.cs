@@ -31,6 +31,6 @@ public sealed class AuditDataContributor(IRepository<AuditEvent> events) : ITena
         await events.QueryAllTenants()
             .Where(e => e.TenantId == tenantId)
             .OrderBy(e => e.CreatedAt)
-            .Select(e => new { e.Action, e.ActorUserId, e.EntityType, e.EntityId, e.Metadata, e.CreatedAt })
+            .Select(e => new { e.Action, e.ActorUserId, e.ImpersonatedBy, e.EntityType, e.EntityId, e.Metadata, e.CreatedAt })
             .ToListAsync(cancellationToken);
 }

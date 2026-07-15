@@ -114,6 +114,16 @@ token** (can't be extended), and records `admin.impersonation.started` **in the 
 `EnterTenant`). Unknown target → 404. Tests `AdminControllerTests` (non-staff→403; token carries
 target + `impersonated_by` + `tenant_id`, 900s; audited in target's tenant; unknown→404).
 
+> **2026-07-15 — hardening (v3 audit ADM-2 / ADM-8 / LB-ADM-1).** (1) The staff gate now **rejects
+> impersonation tokens** (403 `impersonation_not_allowed`; the `/me` probe reports not-staff) — staff A
+> impersonating staff B could previously act on the whole admin surface attributed to B. (2) The
+> no-pref-writes-while-impersonating guard (ADR-022) is now **server-enforced** on `PUT /api/auth/theme|locale`
+> (was client-only). (3) Every audit row now carries **`AuditEvent.ImpersonatedBy`** (nullable, migration
+> `AuditEventImpersonatedBy`), stamped ambiently by `AuditLog` from the JWT claim via the new
+> `ICurrentImpersonation` seam — so writes made during an impersonation window are durably attributable to
+> the real actor (previously only the session *start* was recorded); the tenant export includes it. Tests:
+> `ImpersonationGuardTests` (integration, real tokens) + `AdminControllerTests` gate/probe cases.
+
 **As a** platform staff member
 **I want** a short-lived "sign in as" for a user
 **So that** I can reproduce and fix an issue from their point of view
