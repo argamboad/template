@@ -145,6 +145,19 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void TenantDissolution_EntersTheTargetTenant()
+    {
+        // RLS-2/R83: DissolveAsync runs set-based deletes that the Postgres RLS backstop (ADR-020) scopes to
+        // the AMBIENT tenant. To stay correct when a caller dissolves a tenant other than its ambient one
+        // (account erasure of a solo tenant that isn't the JWT-current tenant, admin paths), the service must
+        // enter the target so every delete is scoped to it — instead of relying on the CrossTenant-tag bypass
+        // (which renders for ExecuteDelete but not ExecuteUpdate) and the Tenants FK cascade. Pin that it does.
+        var file = Path.Combine(RepoRoot(), "src", "Api", "Services", "TenantDissolutionService.cs");
+        var text = File.ReadAllText(file);
+        Assert.Contains("EnterTenant(", text);
+    }
+
+    [Fact]
     public void WebApp_HasNoInlineBlazorComponents()
     {
         // The web app may only carry bootstrap markup; all UI components live in Shared.Ui (RCL).

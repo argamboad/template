@@ -209,7 +209,7 @@ public class MemberRoleManagementTests(PostgresFixture fixture) : PostgresTestBa
     {
         var tenants = new TenantRepository(db);
         var audit = new AuditLog(new EfRepository<AuditEvent>(db), TimeProvider.System);
-        var dissolution = new TenantDissolutionService([], tenants);
+        var dissolution = new TenantDissolutionService([], tenants, new TestCurrentTenant());
         var service = new TenantService(tenants, new EfUnitOfWork(db), dissolution, TimeProvider.System,
             NullLogger<TenantService>.Instance, audit);
 
