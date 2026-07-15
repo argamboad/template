@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Perezosoft.Core.Abstractions;
 using Perezosoft.Core.Entities;
 using Perezosoft.Core.Repositories;
 
@@ -31,6 +32,7 @@ public sealed class ApiKeyService(
     IRepository<ApiKey> keys,
     ITokenGenerator tokenGenerator,
     ITokenHasher tokenHasher,
+    ITenantContext tenantContext,
     TimeProvider clock) : IApiKeyService
 {
     private const string RawPrefix = "pk_";
@@ -88,9 +90,16 @@ public sealed class ApiKeyService(
         if (key is null || !key.IsActive(now))
             return null;
 
-        // Best-effort last-used stamp via a direct UPDATE (no change-tracking / tenant interceptor needed).
-        await keys.QueryAllTenants().Where(k => k.Id == key.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(k => k.LastUsedAt, now), cancellationToken);
+        // Best-effort last-used stamp. Enter the key's tenant so the write is scoped by the RLS policy
+        // (ADR-020) to it, instead of relying on auth running tenantless (RLS-8). A tracked update on the
+        // already-loaded key (not a QueryAllTenants()+ExecuteUpdate composition, which is banned — RLS-4 —
+        // because the tag can't sanction a set-based write) — the stamp is scoped by the entered tenant.
+        using (tenantContext.EnterTenant(key.TenantId))
+        {
+            key.LastUsedAt = now;
+            keys.Update(key);
+            await keys.SaveChangesAsync(cancellationToken);
+        }
 
         return new ApiKeyAuthResult(key.Id, key.TenantId, key.Name, ApiScopes.Parse(key.Scopes));
     }

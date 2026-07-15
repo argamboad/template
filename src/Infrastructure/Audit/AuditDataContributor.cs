@@ -18,7 +18,9 @@ public sealed class AuditDataContributor(IRepository<AuditEvent> events) : ITena
         events.QueryAllTenants().AnyAsync(e => e.TenantId == tenantId, cancellationToken);
 
     public async Task WipeAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-        await events.QueryAllTenants()
+        // Query() (not QueryAllTenants): the dissolve enters the target tenant (RLS-2/T6), so the filter
+        // scopes this to it; composing QueryAllTenants() with a set-based write is banned (RLS-4/T7).
+        await events.Query()
             .Where(e => e.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
 

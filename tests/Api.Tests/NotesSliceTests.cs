@@ -67,8 +67,10 @@ public class NotesSliceTests(PostgresFixture fixture) : PostgresTestBase(fixture
         await using (var db = Fixture.CreateContext(tenant))
             await Handler(db, tenant).CreateAsync(new CreateNoteRequest("keep", null), default);
 
-        // The contributor runs for arbitrary tenants (dissolve), so it ignores the filter.
-        await using (var db = Fixture.CreateContext())
+        // The contributor's Wipe runs inside the dissolve's EnterTenant(target) scope (RLS-2/T6), so the
+        // filter scopes the set-based delete to the target — the context is that tenant here. HasData reads
+        // cross-tenant (QueryAllTenants) so it sees the row regardless.
+        await using (var db = Fixture.CreateContext(tenant))
         {
             var contributor = new NotesDataContributor(new EfRepository<Note>(db));
             Assert.True(await contributor.HasDataAsync(tenant));

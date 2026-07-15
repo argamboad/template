@@ -80,7 +80,9 @@ public class AuditLogTests(PostgresFixture fixture) : PostgresTestBase(fixture)
         var tenant = Guid.CreateVersion7();
         await RecordAsync(tenant, "x.event");
 
-        await using var db = Fixture.CreateContext();
+        // Wipe runs inside the dissolve's EnterTenant(target) scope (RLS-2/T6), so the filter scopes the
+        // set-based delete to the target — the context is that tenant here (HasData reads cross-tenant).
+        await using var db = Fixture.CreateContext(tenant);
         var contributor = new AuditDataContributor(new EfRepository<AuditEvent>(db));
         Assert.True(await contributor.HasDataAsync(tenant));
 

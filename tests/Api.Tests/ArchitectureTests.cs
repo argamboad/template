@@ -38,6 +38,23 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void QueryAllTenants_IsNotComposedWithSetBasedWrites()
+    {
+        // R39/RLS-4/RLS-8: QueryAllTenants()'s cross-tenant sanction is a query tag, which EF does not
+        // reliably render into ExecuteUpdate/ExecuteDelete (renders for Delete, NOT Update — see
+        // RlsBackstopTests — and either can change). Composing them reads as sanctioned but silently affects
+        // the wrong rows under the DB RLS policy. Set-based writes must EnterTenant(target) and use Query()/
+        // IgnoreQueryFilters instead. Cross-tenant READS via QueryAllTenants() are fine.
+        var sources = SourceFiles(Path.Combine(RepoRoot(), "src", "Api"))
+            .Concat(SourceFiles(Path.Combine(RepoRoot(), "src", "Infrastructure")))
+            .Select(f => (f, File.ReadAllText(f)));
+
+        var offenders = Architecture.CrossTenantWriteGuard.FindOffenders(sources);
+        Assert.True(offenders.Count == 0,
+            $"QueryAllTenants() must not be composed with a set-based write:\n - {string.Join("\n - ", offenders)}");
+    }
+
+    [Fact]
     public void EveryTenantScopedEntity_HasAGlobalQueryFilter()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

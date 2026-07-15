@@ -26,13 +26,14 @@ public sealed class WebhookDataContributor(
 
     public async Task WipeAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        // Cross-tenant by design (dissolve runs for a tenant other than the current) — the audited hatch,
-        // re-constrained to the target. WebhookDelivery is not ITenantScoped, so its QueryAllTenants() is
-        // already unfiltered; the TenantId predicate scopes it to the target either way.
-        await deliveries.QueryAllTenants()
+        // Query() (not QueryAllTenants): the dissolve enters the target tenant (RLS-2/T6), so the
+        // subscription filter scopes this to it; the explicit TenantId predicate also scopes the
+        // non-ITenantScoped delivery rows and is fail-safe if ever called un-entered. Composing
+        // QueryAllTenants() with a set-based write is banned (RLS-4/T7) — the tag can't sanction it.
+        await deliveries.Query()
             .Where(d => d.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
-        await subscriptions.QueryAllTenants()
+        await subscriptions.Query()
             .Where(s => s.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
     }
