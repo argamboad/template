@@ -24,6 +24,7 @@ public static class SettingsRegistration
         services.AddSingleton<IRefreshTokenSettings>(new RefreshTokenSettings(config));
         services.AddSingleton<IApplicationSettings>(new ApplicationSettings(config));
         services.AddSingleton<IPasswordlessSettings>(new PasswordlessSettings(config));
+        services.AddSingleton<IMfaSettings>(new MfaSettings(config));
         services.AddSingleton<IInvitationSettings>(new InvitationSettings(config));
 
         return jwtSettings;

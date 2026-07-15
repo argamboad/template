@@ -208,6 +208,7 @@ public class MfaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture
             new UserRepository(db),
             new EphemeralDataProtectionProvider(),
             new TokenHasher(),
+            new TestMfaSettings(),
             TimeProvider.System);
 
     private static string CurrentCode(string base32Secret) =>

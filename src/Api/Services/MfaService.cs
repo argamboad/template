@@ -51,6 +51,7 @@ public sealed class MfaService(
     IUserRepository users,
     IDataProtectionProvider dataProtection,
     ITokenHasher hasher,
+    Configuration.IMfaSettings mfaSettings,
     TimeProvider clock) : IMfaService
 {
     private const string Issuer = "Perezosoft"; // rebrandable — appears in the authenticator app
@@ -149,15 +150,23 @@ public sealed class MfaService(
         if (record is null)
             return false;
 
-        if (TryVerifyTotp(record, code, out var timeStep))
-        {
-            // Anti-replay (v2 audit LOGIC-S1): a TOTP is valid for a ~90s window (±1 step), so the same
-            // code must not mint more than one session. Reject a step already accepted (or an older one),
-            // and record the accepted step so the next replay within the window fails.
-            if (record.LastVerifiedTimeStep is { } last && timeStep <= last)
-                return false;
+        var now = clock.GetUtcNow();
+        // ADM-3 brute-force cap: while locked out, reject WITHOUT consuming an attempt (so a legitimate user
+        // isn't held locked indefinitely by an attacker's continued spraying) and without leaking that the
+        // account is locked — the endpoint returns the same generic failure as any wrong code (no oracle).
+        if (record.LockedUntil is { } until && until > now)
+            return false;
 
+        if (TryVerifyTotp(record, code, out var timeStep)
+            // Anti-replay (v2 audit LOGIC-S1): a TOTP is valid for a ~90s window (±1 step), so the same
+            // code must not mint more than one session. Reject a step already accepted (or an older one).
+            && !(record.LastVerifiedTimeStep is { } last && timeStep <= last))
+        {
+            // The record is tracked (loaded above), so the anti-replay step + the lockout reset persist
+            // together in one SaveChanges.
             record.LastVerifiedTimeStep = timeStep;
+            record.FailedAttemptCount = 0;
+            record.LockedUntil = null;
             mfa.Update(record);
             await mfa.SaveChangesAsync(cancellationToken);
             return true;
@@ -168,13 +177,45 @@ public sealed class MfaService(
         var recovery = await recoveryCodes.Query()
             .FirstOrDefaultAsync(c => c.UserId == userId && c.CodeHash == hash && c.UsedAt == null, cancellationToken);
         if (recovery is null)
+        {
+            await RegisterFailedAttemptAsync(userId, now, cancellationToken); // both TOTP and recovery-code miss
             return false;
+        }
 
-        recovery.UsedAt = clock.GetUtcNow();
+        recovery.UsedAt = now;
         recoveryCodes.Update(recovery);
         await recoveryCodes.SaveChangesAsync(cancellationToken);
+        await ResetLockoutAsync(userId, cancellationToken); // a correct recovery code clears the cap too
         return true;
     }
+
+    /// <summary>
+    /// Atomically records a failed step-up and arms a lockout once the configured cap is reached (ADM-3).
+    /// A single conditional UPDATE so concurrent sprays can't slip past a read-modify-write race, and the
+    /// cap is evaluated on the persisted post-increment value.
+    /// </summary>
+    private async Task RegisterFailedAttemptAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var lockUntil = now.AddMinutes(mfaSettings.LockoutWindowMinutes);
+        var max = mfaSettings.MaxAttempts;
+        await mfa.Query()
+            .Where(m => m.UserId == userId && m.Enabled)
+            .ExecuteUpdateAsync(s => s
+                // Hitting the cap arms the lockout and resets the counter to 0 (fresh budget after it lifts);
+                // otherwise just increment.
+                .SetProperty(m => m.LockedUntil, m => m.FailedAttemptCount + 1 >= max ? lockUntil : m.LockedUntil)
+                .SetProperty(m => m.FailedAttemptCount, m => m.FailedAttemptCount + 1 >= max ? 0 : m.FailedAttemptCount + 1),
+                cancellationToken);
+    }
+
+    /// <summary>Clears the failure counter + any lockout for a user after a successful verification.</summary>
+    private Task ResetLockoutAsync(Guid userId, CancellationToken cancellationToken) =>
+        mfa.Query()
+            .Where(m => m.UserId == userId && (m.FailedAttemptCount != 0 || m.LockedUntil != null))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.FailedAttemptCount, 0)
+                .SetProperty(m => m.LockedUntil, (DateTimeOffset?)null),
+                cancellationToken);
 
     /// <summary>True if <paramref name="code"/> is a valid TOTP; <paramref name="timeStep"/> is the matched step.</summary>
     private bool TryVerifyTotp(UserMfa record, string code, out long timeStep)

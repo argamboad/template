@@ -25,4 +25,20 @@ public class UserMfa
     /// Null until the first login step-up; enrollment-confirm deliberately does not set it.
     /// </summary>
     public long? LastVerifiedTimeStep { get; set; }
+
+    /// <summary>
+    /// Consecutive failed step-up verifications since the last success or lockout (v3 audit ADM-3). The
+    /// TOTP verify path has no per-code record to count against (unlike OTP), so the brute-force cap is
+    /// tracked here, per user — an attacker holding factor 1 can otherwise mint a fresh challenge per try
+    /// and spray codes across IPs, defeating the per-IP limiter. Incremented atomically on failure; reset
+    /// to 0 on success and when a lockout is armed.
+    /// </summary>
+    public int FailedAttemptCount { get; set; }
+
+    /// <summary>
+    /// When set and in the future, step-up verification is locked out (fails without consuming an attempt)
+    /// — armed once <see cref="FailedAttemptCount"/> reaches the configured cap (v3 audit ADM-3). Null when
+    /// not locked.
+    /// </summary>
+    public DateTimeOffset? LockedUntil { get; set; }
 }

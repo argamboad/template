@@ -67,6 +67,18 @@ public class PasswordlessSettings : IPasswordlessSettings
     }
 }
 
+public class MfaSettings : IMfaSettings
+{
+    public int MaxAttempts { get; }
+    public int LockoutWindowMinutes { get; }
+
+    public MfaSettings(IConfiguration config)
+    {
+        MaxAttempts = config.GetValue("Auth:Mfa:MaxAttempts", 5);
+        LockoutWindowMinutes = config.GetValue("Auth:Mfa:LockoutWindowMinutes", 15);
+    }
+}
+
 public class InvitationSettings : IInvitationSettings
 {
     public int LifespanDays { get; }
