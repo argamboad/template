@@ -123,6 +123,9 @@ public static class ServiceRegistrationExtensions
         // Billing participates in tenant dissolve (BILLING-7): wipe the Subscription projection + cancel the
         // provider subscription (via the outbox) so a dissolved tenant stops being billed.
         services.AddScoped<ITenantDataContributor, BillingDataContributor>();
+        // Metered-usage counters (BILLING-5) participate in dissolve + export (LB-TEN-1) so a dissolved
+        // tenant's usage rows don't orphan and the export doesn't silently omit them.
+        services.AddScoped<ITenantDataContributor, UsageCounterDataContributor>();
         return services;
     }
 }

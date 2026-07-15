@@ -103,6 +103,48 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void EveryTenantOwnedEntity_IsWiredIntoTenantDissolution()
+    {
+        // The tenant-axis mirror of EveryUserKeyedEntity_IsWiredIntoAccountErasure (R82/R86, v3 LB-TEN-1):
+        // every entity carrying a tenant-owned key ("TenantId") must be torn down when a tenant is dissolved
+        // — by an ITenantDataContributor's WipeAsync, or the platform's core teardown
+        // (ITenantRepository.WipeDataAsync). ITenantScoped entities have no FK to Tenants (ADR-003 plain-Guid
+        // tenancy) so NOTHING cascades; this canary fails when a NEW tenant-owned entity appears, forcing its
+        // author to wire the teardown (and, for GDPR-1, the export) and list it here — so a downstream slice
+        // can't silently orphan a tenant's rows the way ApiKey/UsageCounter/WebhookSubscription/WebhookDelivery
+        // did before LB-TEN-1 was fixed. Covers TenantId-carrying non-ITenantScoped entities too (WebhookDelivery).
+        var handled = new HashSet<string>
+        {
+            nameof(Note),                                   // NotesDataContributor
+            nameof(AuditEvent),                             // AuditDataContributor
+            nameof(Subscription),                           // BillingDataContributor
+            nameof(ApiKey),                                 // ApiKeyDataContributor
+            nameof(UsageCounter),                           // UsageCounterDataContributor
+            nameof(WebhookSubscription), nameof(WebhookDelivery), // WebhookDataContributor
+            nameof(TenantInvitation), nameof(TenantMembership),   // core teardown (WipeDataAsync)
+        };
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql("Host=localhost;Database=arch-check") // model-only; never connects
+            .Options;
+        using var ctx = new AppDbContext(options, new TestCurrentTenant());
+
+        // Only a NON-NULLABLE Guid TenantId denotes single-tenant ownership. A nullable Guid? TenantId is
+        // optional handler context on drained infrastructure — OutboxMessage carries one (and holds the
+        // billing-cancel message the dissolve itself enqueues), so it must NOT be torn down. Excluding it by
+        // the key's nullability is principled: an owned row always knows its tenant.
+        var uncovered = ctx.Model.GetEntityTypes()
+            .Where(e => e.ClrType.GetProperty("TenantId")?.PropertyType == typeof(Guid))
+            .Select(e => e.ClrType.Name)
+            .Where(name => !handled.Contains(name))
+            .ToList();
+
+        Assert.True(uncovered.Count == 0,
+            "Tenant-owned entities not wired into tenant dissolution — add an ITenantDataContributor (or "
+            + $"core teardown) and list it here (they will otherwise orphan on dissolve): {string.Join(", ", uncovered)}");
+    }
+
+    [Fact]
     public void WebApp_HasNoInlineBlazorComponents()
     {
         // The web app may only carry bootstrap markup; all UI components live in Shared.Ui (RCL).

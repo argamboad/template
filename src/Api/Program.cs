@@ -135,6 +135,9 @@ var publicApiSettings = new PublicApiSettings();
 builder.Configuration.GetSection(PublicApiSettings.SectionName).Bind(publicApiSettings);
 builder.Services.AddSingleton(publicApiSettings);
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+// API keys participate in tenant dissolve + export (LB-TEN-1) regardless of the PublicApi toggle — keys may
+// linger from when it was enabled, so a dissolved tenant must never orphan hashed key credentials.
+builder.Services.AddScoped<ITenantDataContributor, ApiKeyDataContributor>();
 if (publicApiSettings.Enabled)
     authBuilder.AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
         ApiKeyAuthenticationHandler.SchemeName, _ => { });
@@ -146,6 +149,9 @@ builder.Configuration.GetSection(WebhooksSettings.SectionName).Bind(webhooksSett
 builder.Services.AddSingleton(webhooksSettings);
 builder.Services.AddScoped<IWebhookSubscriptionService, WebhookSubscriptionService>();
 builder.Services.AddScoped<IWebhookPublisher, WebhookPublisher>();
+// Webhooks participate in tenant dissolve + export (LB-TEN-1) regardless of the Webhooks toggle — a
+// dissolved tenant must never orphan its encrypted signing secret or delivery logs.
+builder.Services.AddScoped<ITenantDataContributor, WebhookDataContributor>();
 
 // Single tenant-API authorization policy, shared by the platform controllers and feature groups.
 builder.Services.AddTenantApiAuthorization();
