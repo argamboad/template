@@ -21,36 +21,20 @@ public class ArchitectureTests
     [Fact]
     public void FeatureSlices_DoNotBypassTheTenantFilter()
     {
-        var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
+        // R5/R38/S0-G2/RLS-6: request-path tenant-scoped code — feature slices AND the config-gated
+        // platform surfaces under Endpoints/ (PUBAPI/HOOKS: /api/webhooks, /api/apikeys, /api/public) —
+        // must not reach past the tenant filter / RLS backstop. The guard bans IgnoreQueryFilters and the
+        // RLS bypass tag (both the RlsTags identifier AND the raw "rls:cross-tenant" literal — RLS-6)
+        // outright, and QueryAllTenants except in a *DataContributor.cs (dissolve/export). QueryAllTenants
+        // internally applies the tag; writing either directly self-sanctions to the DB-level backstop.
+        var sources = SourceFiles(Path.Combine(RepoRoot(), "src", "Api", "Features"))
+            .Concat(SourceFiles(Path.Combine(RepoRoot(), "src", "Api", "Endpoints")))
+            .Select(f => (f, File.ReadAllText(f)));
 
-        // IgnoreQueryFilters is never allowed in feature code — even contributors go through QueryAllTenants().
-        var ignoreOffenders = SourceFiles(featuresDir)
-            .Where(f => File.ReadAllText(f).Contains("IgnoreQueryFilters"))
-            .Select(Path.GetFileName)
-            .ToList();
-        Assert.True(ignoreOffenders.Count == 0,
-            $"Feature code must not call IgnoreQueryFilters — use IRepository<T>.QueryAllTenants(). Offenders: {string.Join(", ", ignoreOffenders)}");
-
-        // QueryAllTenants is the sanctioned cross-tenant hatch, but ONLY inside *DataContributor.cs
-        // (dissolve/export). In request-path slice code it bypasses tenancy identically to
-        // IgnoreQueryFilters, so it is banned there too (v2 audit ADV-2).
-        var queryAllOffenders = SourceFiles(featuresDir)
-            .Where(f => !Path.GetFileName(f)!.EndsWith("DataContributor.cs", StringComparison.Ordinal))
-            .Where(f => File.ReadAllText(f).Contains("QueryAllTenants"))
-            .Select(Path.GetFileName)
-            .ToList();
-        Assert.True(queryAllOffenders.Count == 0,
-            $"Request-path feature code must not call QueryAllTenants (allowed only in *DataContributor.cs). Offenders: {string.Join(", ", queryAllOffenders)}");
-
-        // The RLS bypass tag (ADR-020) self-sanctions a query to the DB-level backstop — feature
-        // code must never apply it directly; the only sanctioned uses are QueryAllTenants() and the
-        // enumerated Infrastructure escape hatches.
-        var rlsTagOffenders = SourceFiles(featuresDir)
-            .Where(f => File.ReadAllText(f).Contains("RlsTags"))
-            .Select(Path.GetFileName)
-            .ToList();
-        Assert.True(rlsTagOffenders.Count == 0,
-            $"Feature code must not use RlsTags — go through IRepository<T>.QueryAllTenants(). Offenders: {string.Join(", ", rlsTagOffenders)}");
+        var offenders = Architecture.TenantHatchGuard.FindOffenders(sources);
+        Assert.True(offenders.Count == 0,
+            "Request-path code (Features/ + Endpoints/) must not bypass the tenant filter — use "
+            + $"IRepository<T>.QueryAllTenants() only in a *DataContributor:\n - {string.Join("\n - ", offenders)}");
     }
 
     [Fact]
