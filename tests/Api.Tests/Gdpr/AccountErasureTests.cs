@@ -110,7 +110,7 @@ public class AccountErasureTests(PostgresFixture fixture) : PostgresTestBase(fix
                 new TestWidgetDataContributor(new EfRepository<TestWidget>(db)),
                 new AuditDataContributor(new EfRepository<AuditEvent>(db)),
             },
-            tenants);
+            tenants, new TestCurrentTenant());
         return new(tenants,
             new EfUnitOfWork(db),
             dissolution,

@@ -25,13 +25,25 @@ public interface ITenantDissolutionService
 
 public sealed class TenantDissolutionService(
     IEnumerable<ITenantDataContributor> dataContributors,
-    ITenantRepository tenants) : ITenantDissolutionService
+    ITenantRepository tenants,
+    ITenantContext tenantContext) : ITenantDissolutionService
 {
     public async Task DissolveAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
-        // Each feature wipes its domain data first (its contributor), then the platform's core teardown.
-        foreach (var contributor in dataContributors)
-            await contributor.WipeAsync(tenantId, cancellationToken);
-        await tenants.WipeDataAsync(tenantId, cancellationToken);
+        // RLS-2: the teardown below is set-based deletes (each contributor's ExecuteDelete, then the core
+        // WipeDataAsync). Under the Postgres RLS backstop (ADR-020) those deletes are gated by the policy on
+        // the AMBIENT tenant, and QueryAllTenants() lifts only the EF filter, not the DB wall. So if a caller
+        // dissolves a tenant OTHER than its ambient one (e.g. erasing a solo tenant that isn't the caller's
+        // JWT-current tenant), every RLS'd delete would silently match zero rows while the non-RLS'd core
+        // teardown still succeeds — orphaning the tenant's data (a split-brain). Enter the target tenant so
+        // the GUC scopes every delete to it (ADR-003). Scoped to the dissolve only — callers do their own
+        // post-dissolve work (re-home, identity-core deletes) in their normal context.
+        using (tenantContext.EnterTenant(tenantId))
+        {
+            // Each feature wipes its domain data first (its contributor), then the platform's core teardown.
+            foreach (var contributor in dataContributors)
+                await contributor.WipeAsync(tenantId, cancellationToken);
+            await tenants.WipeDataAsync(tenantId, cancellationToken);
+        }
     }
 }
