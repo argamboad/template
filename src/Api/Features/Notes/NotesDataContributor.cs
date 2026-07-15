@@ -18,7 +18,9 @@ public class NotesDataContributor(IRepository<Note> notes) : ITenantDataContribu
         notes.QueryAllTenants().AnyAsync(n => n.TenantId == tenantId, cancellationToken);
 
     public async Task WipeAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-        await notes.QueryAllTenants()
+        // Query() (not QueryAllTenants): the dissolve enters the target tenant (RLS-2/T6), so the filter
+        // scopes this to it; composing QueryAllTenants() with a set-based write is banned (RLS-4/T7).
+        await notes.Query()
             .Where(n => n.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
 

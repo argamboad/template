@@ -21,9 +21,10 @@ public sealed class UsageCounterDataContributor(IRepository<UsageCounter> counte
         Task.FromResult(false);
 
     public async Task WipeAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
-        // Cross-tenant by design (dissolve runs for a tenant other than the current) — the audited hatch,
-        // re-constrained to the target tenant.
-        await counters.QueryAllTenants()
+        // Query() (not QueryAllTenants): the dissolve enters the target tenant (RLS-2/T6), so the filter
+        // scopes this to it; the explicit predicate is fail-safe. Composing QueryAllTenants() with a
+        // set-based write is banned (RLS-4/T7) — the tag can't sanction it.
+        await counters.Query()
             .Where(c => c.TenantId == tenantId)
             .ExecuteDeleteAsync(cancellationToken);
 
