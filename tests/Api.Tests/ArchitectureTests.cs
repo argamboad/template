@@ -251,28 +251,22 @@ public class ArchitectureTests
     [Fact]
     public void RouteGroupPrefixes_AreUnique()
     {
-        // R35 (route half)/ADV-4: no two slices claim the same /api/<x> prefix. Collect controller [Route]
-        // templates and minimal-API MapGroup("…") literals; assert the full route strings are distinct.
+        // R35 (route half)/R36/ADV-P4-1: no two slices claim the same /api/<x> prefix. Collect controller
+        // [Route] templates and minimal-API group literals; assert the full route strings are distinct.
+        // The collector matches BOTH raw MapGroup("…") (the platform Endpoints/ surfaces) and the mandated
+        // MapTenantFeatureGroup("…") (feature slices) — the old gate matched only the raw form, so feature
+        // prefixes were invisible and two slices could share a prefix green (v3 ADV-P4-1). It now scans
+        // Endpoints/ as well as Features/, closing Step-0 gap S0-G1.
         var controllersDir = Path.Combine(RepoRoot(), "src", "Api", "Controllers");
         var featuresDir = Path.Combine(RepoRoot(), "src", "Api", "Features");
+        var endpointsDir = Path.Combine(RepoRoot(), "src", "Api", "Endpoints");
 
-        // A single logical surface may be split across several focused controllers that share one [Route]
-        // prefix (e.g. the /api/auth family, B9-1/SOLID-2) — that's SRP, not a collision. Distinct the
-        // controller prefixes so a shared prefix counts once; the guard still catches a feature-group
-        // MapGroup colliding with a controller prefix, or two feature groups sharing a prefix.
-        var controllerRoutes = SourceFiles(controllersDir)
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"\[Route\(""([^""]+)""\)\]").Select(m => m.Groups[1].Value))
-            .Select(r => "/" + r.Trim('/').ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal);
-        var groupRoutes = SourceFiles(featuresDir)
-            .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"MapGroup\(""([^""]+)""\)").Select(m => m.Groups[1].Value))
-            .Select(r => "/" + r.Trim('/').ToLowerInvariant());
+        var controllerSources = SourceFiles(controllersDir).Select(File.ReadAllText);
+        var groupSources = SourceFiles(endpointsDir).Concat(SourceFiles(featuresDir)).Select(File.ReadAllText);
 
-        var all = controllerRoutes.Concat(groupRoutes)
-            .ToList();
-
-        var dupes = all.GroupBy(r => r, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
-        Assert.True(dupes.Count == 0, $"Route prefixes must be unique across controllers and feature groups: {string.Join(", ", dupes)}");
+        var dupes = Architecture.RoutePrefixInspector.FindDuplicatePrefixes(controllerSources, groupSources);
+        Assert.True(dupes.Count == 0,
+            $"Route prefixes must be unique across controllers, feature groups, and endpoint groups: {string.Join(", ", dupes)}");
     }
 
     [Fact]
