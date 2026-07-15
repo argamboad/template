@@ -32,6 +32,15 @@ for non-owner). **API-only** (no UI button yet). Tests `tests/Api.Tests/Gdpr/Ten
 (bundle assembly + secret-exclusion + tenant-scoping via a capturing `IFileStorage`, owner 200 /
 non-owner 403, audit) + matrix (`RolePermissionsTests`).
 
+> **2026-07-15 — completeness fix (v3 audit LB-TEN-1).** Three `ITenantScoped` tables were wired into
+> neither dissolve nor export — `ApiKey`, `UsageCounter`, `WebhookSubscription` — plus `WebhookDelivery`
+> (a plain-`TenantId` table). With no FK to `Tenants` (ADR-003) nothing cascaded, so a dissolved tenant
+> orphaned hashed key credentials + encrypted webhook secrets, and the export silently omitted them. Fixed
+> by three new contributors (`ApiKeyDataContributor`, `WebhookDataContributor`, `UsageCounterDataContributor`,
+> secret-free export) + a tenant-axis canary `EveryTenantOwnedEntity_IsWiredIntoTenantDissolution` (the
+> mirror of the user-keyed erasure canary) so a new tenant-owned entity can't silently orphan again. Tests:
+> `tests/Api.Tests/Gdpr/TenantTeardownContributorTests.cs`.
+
 **As a** tenant owner
 **I want** to download an export of my tenant's data
 **So that** I can take it elsewhere or satisfy a data-portability request
