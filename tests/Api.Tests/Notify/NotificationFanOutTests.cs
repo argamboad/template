@@ -65,6 +65,41 @@ public class NotificationFanOutTests(PostgresFixture fixture) : PostgresTestBase
     }
 
     [Fact]
+    public async Task SecurityKind_WithBothChannelsOff_StillWritesInApp_AndSendsEmail()
+    {
+        // v3 ADM-1: a user must not be able to silence a security event (e.g. a staff MFA reset). Both
+        // channels off must NOT suppress a security.* notification.
+        await using var db = Fixture.CreateContext();
+        var email = new CapturingEmailSender();
+        var service = NewService(db, email);
+        var userId = await SeedUserAsync(db);
+        await service.SetPreferencesAsync(userId, inApp: false, email: false);
+
+        await service.NotifyAsync(userId, "security.mfa_reset", "2FA reset", "b");
+        await db.SaveChangesAsync();
+
+        Assert.Equal(1, await db.Set<Notification>().CountAsync(n => n.UserId == userId)); // in-app forced
+        Assert.Single(email.Sent);                                                          // email forced
+    }
+
+    [Fact]
+    public async Task NonSecurityKind_WithBothChannelsOff_IsFullySuppressed()
+    {
+        // The bypass is scoped to security.* only — ordinary kinds still honor the user's prefs.
+        await using var db = Fixture.CreateContext();
+        var email = new CapturingEmailSender();
+        var service = NewService(db, email);
+        var userId = await SeedUserAsync(db);
+        await service.SetPreferencesAsync(userId, inApp: false, email: false);
+
+        await service.NotifyAsync(userId, "billing.past_due", "t", "b");
+        await db.SaveChangesAsync();
+
+        Assert.Equal(0, await db.Set<Notification>().CountAsync(n => n.UserId == userId));
+        Assert.Empty(email.Sent);
+    }
+
+    [Fact]
     public async Task Preferences_DefaultOn_WhenNeverSet()
     {
         await using var db = Fixture.CreateContext();

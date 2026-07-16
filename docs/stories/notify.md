@@ -89,6 +89,15 @@ hard-coded. `GetPreferencesAsync` (defaults on) + `SetPreferencesAsync` (upsert)
 `tests/Api.Tests/Notify/NotificationFanOutTests.cs` (default→both channels, email-off→in-app-only,
 in-app-off→email-only, defaults-on, upsert) via a capturing email sender.
 
+> **2026-07-15 — non-suppressible security alerts (v3 audit ADM-1).** `NotifyAsync` used to let a user
+> silence ANY notification via prefs — including a staff **MFA reset** (`security.mfa_reset`), an
+> account-takeover primitive, so "a malicious reset cannot be silent" was false. Kinds in the
+> **`security.`** namespace (`NotificationKinds.IsSecurity`) now **bypass prefs** and force BOTH channels —
+> the out-of-band email is the point (an attacker inside the account can't turn it off). Everything else
+> still honors prefs. Self-extending: any future `security.*` (password/email change, new-device sign-in)
+> inherits it. Tests: `NotificationFanOutTests` (`SecurityKind_WithBothChannelsOff…`,
+> `NonSecurityKind_WithBothChannelsOff_IsFullySuppressed`).
+
 **As a** user
 **I want** to choose whether I'm notified in-app and/or by email
 **So that** I control how I'm reached
