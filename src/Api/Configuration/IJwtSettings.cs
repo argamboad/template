@@ -55,6 +55,19 @@ public interface IPasswordlessSettings
 }
 
 /// <summary>
+/// Multi-factor step-up brute-force configuration (MFA-2 / v3 audit ADM-3). TOTP has no per-code record
+/// to count against, so the cap is per-user consecutive failures on <c>UserMfa</c>.
+/// </summary>
+public interface IMfaSettings
+{
+    /// <summary>Consecutive failed step-up verifications that arm a lockout (per user).</summary>
+    int MaxAttempts { get; }
+
+    /// <summary>How long (minutes) a user's step-up stays locked once the cap is hit.</summary>
+    int LockoutWindowMinutes { get; }
+}
+
+/// <summary>
 /// Tenant-invitation configuration settings.
 /// </summary>
 public interface IInvitationSettings

@@ -59,6 +59,16 @@ return recovery codes **once**), disable (verify a code → wipe secret + codes)
 `VerifyAsync(userId, code)` used by the login step-up (MFA-2). Endpoints under `/api/auth/mfa/*`
 (authenticated). **Also extends account erasure (GDPR-2)** to wipe `UserMfa` + `MfaRecoveryCode`.
 
+> **2026-07-15 — brute-force cap (v3 audit ADM-3).** The step-up verify had no per-user attempt cap —
+> only a per-IP limiter — and a wrong code doesn't consume the challenge, so an attacker holding factor 1
+> could mint a fresh challenge per guess and spray TOTPs across IPs (~333k expected guesses). `VerifyAsync`
+> now tracks **per-user consecutive failures** on `UserMfa` (`FailedAttemptCount` + `LockedUntil`, migration
+> `MfaLockout`): the increment is atomic (conditional `ExecuteUpdate`, cap on the persisted value), a
+> success resets it, and once `Auth:Mfa:MaxAttempts` (default 5) is hit the user's step-up is locked for
+> `Auth:Mfa:LockoutWindowMinutes` (default 15). Recovery codes share the path (also capped). The endpoint
+> keeps its single generic 401 (`mfa_failed`) — no lockout oracle. Tests: `MfaLoginServiceTests`
+> (`Verify_CapWrongCodesAcrossFreshChallenges…`, `Lockout_LiftsAfterTheWindow`, `Success_ResetsTheFailureCounter`).
+
 **Acceptance criteria**
 
 ```gherkin

@@ -80,6 +80,12 @@ internal sealed class TestPasswordlessSettings : IPasswordlessSettings
     public int OtpLockoutWindowMinutes { get; init; } = 15;
 }
 
+internal sealed class TestMfaSettings : IMfaSettings
+{
+    public int MaxAttempts { get; init; } = 5;
+    public int LockoutWindowMinutes { get; init; } = 15;
+}
+
 internal sealed class TestAppSettings : IApplicationSettings
 {
     public string ClientUrl => "https://localhost:7008";
