@@ -24,6 +24,22 @@ public interface ILoginTokenRepository
 
     Task UpdateAsync(LoginToken token, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Atomically claims a single-use credential: stamps <c>ConsumedAt</c> only if it is still null, and
+    /// reports whether THIS caller won. Two concurrent redemptions of one credential (email-client prefetch,
+    /// double-click) would otherwise both pass a read-then-write <c>ConsumedAt == null</c> check and mint two
+    /// sessions (v3 audit LB-AUTH-3) — the caller must issue a session only when this returns true.
+    /// </summary>
+    Task<bool> TryConsumeAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically increments the credential's failed-attempt counter (server-side <c>+1</c>, no
+    /// read-modify-write). Concurrent wrong guesses would otherwise last-writer-wins the increment and let
+    /// the brute-force cap be exceeded (v3 audit LB-AUTH-2); evaluate the cap against a re-read of the
+    /// persisted total (<see cref="CountFailedAttemptsSinceAsync"/>) AFTER calling this.
+    /// </summary>
+    Task IncrementAttemptAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <summary>Consumes every still-active credential of this purpose — called before issuing a new one.</summary>
     Task InvalidateActiveAsync(string email, string purpose, CancellationToken cancellationToken = default);
 }

@@ -42,6 +42,22 @@ public class LoginTokenRepository(AppDbContext db, TimeProvider clock) : ILoginT
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> TryConsumeAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        // The WHERE ConsumedAt IS NULL is the race guard: Postgres serializes the two UPDATEs on the row, so
+        // exactly one caller sees affected == 1 and may issue a session (LB-AUTH-3).
+        var affected = await db.LoginTokens
+            .Where(t => t.Id == id && t.ConsumedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.ConsumedAt, (DateTimeOffset?)clock.GetUtcNow()), cancellationToken);
+        return affected == 1;
+    }
+
+    public async Task IncrementAttemptAsync(Guid id, CancellationToken cancellationToken = default) =>
+        // Server-side increment — never count++ on a value read earlier (LB-AUTH-2).
+        await db.LoginTokens
+            .Where(t => t.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.AttemptCount, t => t.AttemptCount + 1), cancellationToken);
+
     public async Task InvalidateActiveAsync(string email, string purpose, CancellationToken cancellationToken = default) =>
         // Set-based: consume every still-active credential in one statement (standalone commit).
         await db.LoginTokens

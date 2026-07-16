@@ -75,8 +75,10 @@ public class PasswordlessService(
         if (record is null)
             return null;
 
-        record.ConsumedAt = clock.GetUtcNow();
-        await repository.UpdateAsync(record, cancellationToken);
+        // Atomic claim (LB-AUTH-3): two concurrent redemptions of one link (email-client prefetch, a
+        // double-click) both reach here having seen ConsumedAt == null — only the winner may sign in.
+        if (!await repository.TryConsumeAsync(record.Id, cancellationToken))
+            return null;
 
         return await userService.GetOrCreateByEmailAsync(email, cancellationToken: cancellationToken);
     }
@@ -114,22 +116,24 @@ public class PasswordlessService(
         // early-exit string equality.
         if (tokenHasher.Verify(code, record.CodeHash))
         {
-            record.ConsumedAt = clock.GetUtcNow();
-            await repository.UpdateAsync(record, cancellationToken);
+            // Atomic claim (LB-AUTH-3): concurrent submissions of one correct code must mint ONE session.
+            if (!await repository.TryConsumeAsync(record.Id, cancellationToken))
+                return new OtpResult(OtpStatus.Expired, null); // someone else already redeemed it
             var user = await userService.GetOrCreateByEmailAsync(email, cancellationToken: cancellationToken);
             return new OtpResult(OtpStatus.Success, user);
         }
 
-        // Wrong code — count the attempt. Lock out once the cumulative window total hits the cap.
-        record.AttemptCount++;
-        if (failuresInWindow + 1 >= settings.OtpMaxAttempts)
+        // Wrong code — count the attempt atomically, then evaluate the cap against the PERSISTED total
+        // (LB-AUTH-2). A read-modify-write here let racing guesses last-writer-wins the increment and slip
+        // past the cap — the one backstop that is deliberately IP-independent.
+        await repository.IncrementAttemptAsync(record.Id, cancellationToken);
+        var totalFailures = await repository.CountFailedAttemptsSinceAsync(email, LoginTokenPurpose.Otp, windowStart, cancellationToken);
+        if (totalFailures >= settings.OtpMaxAttempts)
         {
-            record.ConsumedAt = clock.GetUtcNow();
-            await repository.UpdateAsync(record, cancellationToken);
+            await repository.TryConsumeAsync(record.Id, cancellationToken); // lock: burn the code
             return new OtpResult(OtpStatus.TooManyAttempts, null);
         }
 
-        await repository.UpdateAsync(record, cancellationToken);
         return new OtpResult(OtpStatus.Invalid, null);
     }
 

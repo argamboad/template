@@ -114,6 +114,42 @@ public class MfaLoginServiceTests(PostgresFixture fixture) : PostgresTestBase(fi
         Assert.True(outcome!.Native);
     }
 
+    // --- LB-AUTH-1: the challenge is claimed BEFORE the factor is touched ---
+
+    [Fact]
+    public async Task VerifyChallenge_WrongCode_LeavesTheChallengeUsable_ForRetry()
+    {
+        // The claim is taken first (so a lost claim can't burn a factor), but a wrong code burns nothing —
+        // so it must be handed back rather than forcing a fresh sign-in for a typo.
+        await using var db = Fixture.CreateContext();
+        var (login, mfa, user) = await BuildWithUserAsync(db);
+        var secret = await EnableMfaAsync(mfa, user.Id);
+        var (_, challenge) = await login.CompleteOrChallengeAsync(user, "otp", "127.0.0.1", native: false);
+
+        Assert.Null(await login.VerifyChallengeAsync(challenge!, "000000", "127.0.0.1"));            // typo
+        Assert.NotNull(await login.VerifyChallengeAsync(challenge!, CurrentCode(secret), "127.0.0.1")); // same challenge still works
+    }
+
+    [Fact]
+    public async Task VerifyChallenge_AlreadyRedeemed_DoesNotBurnARecoveryCode()
+    {
+        // LB-AUTH-1: replaying a spent challenge with a DIFFERENT, still-valid recovery code used to burn
+        // that code (VerifyAsync ran before Consume) and issue no session — the code was simply gone.
+        await using var db = Fixture.CreateContext();
+        var (login, mfa, user) = await BuildWithUserAsync(db);
+        var secret = await EnableMfaAsync(mfa, user.Id);
+        var codes = await RecoveryCodesAsync(mfa, user.Id, secret);
+
+        var (_, challenge) = await login.CompleteOrChallengeAsync(user, "otp", "127.0.0.1", native: false);
+        Assert.NotNull(await login.VerifyChallengeAsync(challenge!, CurrentCode(secret), "127.0.0.1")); // challenge spent
+
+        Assert.Null(await login.VerifyChallengeAsync(challenge!, codes[0], "127.0.0.1")); // replay refused…
+
+        await using var read = Fixture.CreateContext();
+        var used = await read.Set<MfaRecoveryCode>().CountAsync(c => c.UserId == user.Id && c.UsedAt != null);
+        Assert.Equal(0, used); // …and the recovery code was NOT spent
+    }
+
     // --- ADM-3: per-user step-up brute-force cap ---
     // Each verify runs on a FRESH context (mirroring a per-request scope), sharing the DP keys (so the
     // enrolled secret + challenges stay decryptable) and the challenge cache — so the per-user lockout
@@ -232,6 +268,13 @@ public class MfaLoginServiceTests(PostgresFixture fixture) : PostgresTestBase(fi
         var secret = (await mfa.BeginEnrollmentAsync(userId))!.Secret;
         await mfa.ConfirmEnrollmentAsync(userId, CurrentCode(secret));
         return secret;
+    }
+
+    /// <summary>Re-issues enrollment to capture the one-time recovery codes (shown only at confirm).</summary>
+    private static async Task<IReadOnlyList<string>> RecoveryCodesAsync(MfaService mfa, Guid userId, string secret)
+    {
+        var (_, codes) = await mfa.ConfirmEnrollmentAsync(userId, CurrentCode(secret));
+        return codes;
     }
 
     private static string CurrentCode(string base32Secret) =>
