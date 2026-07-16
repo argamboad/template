@@ -52,9 +52,18 @@ public class DocAndConfigSyncTests
 
         var readKeys = new HashSet<string>(StringComparer.Ordinal);
         var access = new Regex(@"(?:GetSection|GetValue<[^>]*>|GetValue|configuration|config|Configuration)\s*[\(\[]\s*""([A-Za-z][A-Za-z0-9]*(?::[A-Za-z0-9]+)+)""");
+        // Keys hoisted into a const are read via the identifier, so the call-site regex above never sees the
+        // literal — a blind spot that silently exempted whole files (Proxy:*, Rls:*) from this gate. Capture
+        // the declarations too, so naming a key doesn't opt it out of being documented.
+        var constKey = new Regex(@"const\s+string\s+\w+\s*=\s*""([A-Za-z][A-Za-z0-9]*(?::[A-Za-z0-9]+)+)""");
         foreach (var f in SourceFiles(Path.Combine(RepoRoot(), "src")))
-            foreach (Match m in access.Matches(File.ReadAllText(f)))
+        {
+            var text = File.ReadAllText(f);
+            foreach (Match m in access.Matches(text))
                 readKeys.Add(m.Groups[1].Value);
+            foreach (Match m in constKey.Matches(text))
+                readKeys.Add(m.Groups[1].Value);
+        }
 
         // A read key is OK if it equals a documented path, is a prefix of one (a section), or a documented
         // path is a prefix of it (a leaf under a documented section).

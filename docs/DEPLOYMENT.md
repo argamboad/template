@@ -200,7 +200,9 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 | `Email__Smtp__FromName` | no | display name on outgoing mail |
 | `Auth__AppBaseUrl` | yes | the public URL — used to build email links |
 | `Hosting__ServeWebClient` | yes | `true` (baked into the image; keep set) |
-| `Proxy__Enabled` | behind a proxy | `true` on Render — honor `X-Forwarded-*` |
+| `Proxy__Enabled` | behind a proxy | `true` on Render — honor `X-Forwarded-*`. **Assumes the proxy is the sole ingress** — see §8 |
+| `Proxy__KnownNetworks__0…` | if directly reachable | CIDRs; honor `X-Forwarded-*` only from a peer inside them (§8) |
+| `Proxy__ForwardLimit` | rarely | proxy hops to trust, from the right (default `1`) (§8) |
 | `PORT` | platform-set | Render provides it; image defaults to 8080 |
 | `Auth__AllowedOrigins` | no | leave empty — single-origin needs no CORS |
 | `Authentication__Google/Microsoft__*` | optional | enable OAuth |
@@ -245,6 +247,42 @@ role the app connects as** — Postgres exempts superusers/`BYPASSRLS` roles ent
 
 Adding a new `ITenantScoped` entity? Ship its policy in the same migration
 (`RlsDdl.StatementsFor`) — the `RlsMigrationGateTests` parity gate fails CI if you forget.
+
+---
+
+## 8. The proxy trust model — sole ingress (v3 audit DEP-1/ADM-10)
+
+`Proxy__Enabled=true` tells the app to believe `X-Forwarded-For` / `X-Forwarded-Proto`. That matters
+because the **real client IP drives the per-IP passwordless rate limiter** (and, through it, the MFA
+attempt cap) and the `https` scheme drives OAuth redirect URIs.
+
+**The assumption:** with no `Proxy__KnownNetworks` set, the app trusts **any** peer's `X-Forwarded-For`.
+This is deliberate. A managed proxy fronts the app from an unknown, rotating IP, so the framework default
+(trust loopback only) would ignore its headers entirely. It is safe **only because the proxy is the app's
+only route in** — on Render the container's port isn't publicly reachable, so the only way to reach the
+app is through the proxy, which *overwrites* the header with the true client IP.
+
+**When that assumption breaks:** if the app is *also* reachable directly (a VM with an open port, a
+cluster without an ingress-only policy, a port-forward), any client can send `X-Forwarded-For: 1.2.3.4`
+and become whoever it likes — defeating the per-IP rate limiter and the brute-force protections built on
+it. **Enabling this on a directly-reachable deployment is the failure mode to avoid.**
+
+**Narrow the trust when you can't guarantee sole ingress:**
+
+```bash
+Proxy__Enabled=true
+Proxy__KnownNetworks__0=10.0.0.0/8        # only honor X-Forwarded-* from peers in these ranges
+Proxy__KnownNetworks__1=192.168.0.0/16    # repeat __2, __3… as needed
+Proxy__ForwardLimit=1                     # hops to walk back (default 1); raise only for real chains
+```
+
+With `KnownNetworks` set, a request arriving from outside those ranges keeps its **real** peer IP and its
+forged header is ignored. `ForwardLimit=1` means only the entry the nearest proxy appended is trusted, so
+a client pre-seeding its own `X-Forwarded-For` can't reach past it — raise it only to the actual number of
+proxies in front of the app.
+
+Both fail closed: an unparseable CIDR or a `ForwardLimit` below 1 **stops startup** rather than quietly
+widening trust. Leave `Proxy__Enabled=false` (the default) whenever there's no proxy at all.
 
 ---
 
