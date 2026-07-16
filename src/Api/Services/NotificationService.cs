@@ -10,6 +10,21 @@ namespace Perezosoft.Api.Services;
 /// <summary>A user's notification delivery preferences (NOTIFY-2). Absence ⇒ both on.</summary>
 public sealed record NotificationPreferences(bool InApp, bool Email);
 
+/// <summary>Notification kind conventions.</summary>
+public static class NotificationKinds
+{
+    /// <summary>
+    /// The <c>security.</c> namespace (e.g. <c>security.mfa_reset</c>) marks account-security events that a
+    /// user must not be able to silence — a staff MFA reset, and any future password/email-change or
+    /// new-device alert. These bypass delivery preferences and go to BOTH channels (v3 audit ADM-1): the
+    /// out-of-band email is the point — an attacker who reached the account can't turn the alert off from
+    /// inside the app. Everything else honors the user's prefs.
+    /// </summary>
+    public const string SecurityPrefix = "security.";
+
+    public static bool IsSecurity(string kind) => kind.StartsWith(SecurityPrefix, StringComparison.Ordinal);
+}
+
 /// <summary>
 /// Per-user in-app notifications (NOTIFY-1, ADR-013). <see cref="NotifyAsync"/> is the seam a feature
 /// calls to notify a user; it <b>stages</b> the in-app row on the caller's unit of work (transactional
@@ -59,8 +74,11 @@ public sealed class NotificationService(
     public async Task NotifyAsync(Guid userId, string kind, string title, string body, object? metadata = null, CancellationToken cancellationToken = default)
     {
         var prefs = await GetPreferencesAsync(userId, cancellationToken);
+        // security.* events are non-suppressible — a user must not be able to hide, e.g., a staff MFA reset
+        // (ADM-1). Force both channels regardless of prefs; everything else honors them.
+        var forceAll = NotificationKinds.IsSecurity(kind);
 
-        if (prefs.InApp)
+        if (prefs.InApp || forceAll)
             // Staged on the caller's unit of work — persists with the triggering change (ADR-013).
             await notifications.AddAsync(new Notification
             {
@@ -72,7 +90,7 @@ public sealed class NotificationService(
                 CreatedAt = clock.GetUtcNow(),
             }, cancellationToken);
 
-        if (prefs.Email)
+        if (prefs.Email || forceAll)
         {
             var user = await users.GetByIdAsync(userId, cancellationToken);
             if (user is not null)
