@@ -69,6 +69,15 @@ return recovery codes **once**), disable (verify a code → wipe secret + codes)
 > keeps its single generic 401 (`mfa_failed`) — no lockout oracle. Tests: `MfaLoginServiceTests`
 > (`Verify_CapWrongCodesAcrossFreshChallenges…`, `Lockout_LiftsAfterTheWindow`, `Success_ResetsTheFailureCounter`).
 
+> **2026-07-15 — claim-before-verify (v3 audit LB-AUTH-1).** `VerifyChallengeAsync` used to call
+> `MfaService.VerifyAsync` (which **burns** a recovery code / advances the anti-replay step) *before*
+> `challenges.Consume`, so a claim that then failed — a replayed challenge, or one evicted from the
+> `IMemoryCache` — spent the second factor with **no session issued** (the user's recovery code simply
+> gone). The challenge is now claimed **first**; only the winner ever touches the factor. A wrong code burns
+> nothing, so the claim is handed back (`IMfaChallengeService.Restore`) and the same step-up stays
+> retryable — the per-user lockout above, not the challenge, is what caps guessing. The signed token's own
+> expiry still caps the real lifetime, so a restore can't extend a challenge.
+
 **Acceptance criteria**
 
 ```gherkin

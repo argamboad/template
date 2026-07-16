@@ -20,6 +20,15 @@ public interface IMfaChallengeService
 
     /// <summary>Marks the challenge redeemed; false if already used (replay) or unknown/expired.</summary>
     bool Consume(string challengeId);
+
+    /// <summary>
+    /// Hands a claimed challenge back after the second-factor check FAILED, so the user can retry the same
+    /// step-up (v3 audit LB-AUTH-1): the caller claims the challenge BEFORE touching the factor, so a lost
+    /// claim can never burn a recovery code — but a mere typo must not force a fresh sign-in. Only ever
+    /// called when no session was issued. The signed token's own expiry still caps the real lifetime, so
+    /// restoring cannot extend a challenge beyond it.
+    /// </summary>
+    void Restore(string challengeId);
 }
 
 public sealed class MfaChallengeService(IDataProtectionProvider dataProtection, IMemoryCache cache) : IMfaChallengeService
@@ -68,6 +77,12 @@ public sealed class MfaChallengeService(IDataProtectionProvider dataProtection, 
             return false;
         cache.Remove(key); // single-use
         return true;
+    }
+
+    public void Restore(string challengeId)
+    {
+        if (!string.IsNullOrEmpty(challengeId))
+            cache.Set(Key(challengeId), true, Lifetime); // the protector's embedded expiry still caps it
     }
 
     private static string Key(string challengeId) => $"{CacheKeyPrefix}:{challengeId}";

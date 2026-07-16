@@ -42,10 +42,21 @@ public sealed class MfaLoginService(
     {
         if (!challenges.TryRead(challenge, out var userId, out var provider, out var native, out var challengeId))
             return null;
-        if (!await mfa.VerifyAsync(userId, code, cancellationToken))
-            return null; // wrong code: challenge NOT consumed, so the user can retry
+
+        // Claim the challenge BEFORE the factor check (LB-AUTH-1). VerifyAsync has side effects — it burns a
+        // recovery code / advances the anti-replay step — so verifying first meant a claim that then failed
+        // (replay, or the challenge evicted from the cache) spent the second factor with no session issued:
+        // the user's recovery code simply gone. Claiming first means only the winner ever touches the factor.
         if (!challenges.Consume(challengeId))
-            return null; // challenge already redeemed (replay) or expired — single-use
+            return null; // already redeemed (replay) or expired — single-use
+
+        if (!await mfa.VerifyAsync(userId, code, cancellationToken))
+        {
+            // A wrong code burns nothing, so hand the claim back and let the user retry this step-up. The
+            // per-user lockout (ADM-3) — not the challenge — is what caps guessing.
+            challenges.Restore(challengeId);
+            return null;
+        }
 
         var user = await userService.GetUserByIdAsync(userId, cancellationToken);
         if (user is null)
