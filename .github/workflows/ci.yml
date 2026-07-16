@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       # Supply-chain (B11-6): restore in LOCKED mode against the committed packages.lock.json
       # files. --locked-mode fails if the resolved graph differs from the lockfile, so a
@@ -108,7 +108,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - name: dotnet-project-licenses (fail on copyleft)
         # Restore first so project.assets.json exists for the transitive walk (the app uses Central
@@ -161,7 +161,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       # The Android target compiles against the JDK; runners preinstall the Android SDK (ANDROID_HOME).
       - uses: actions/setup-java@v4
@@ -225,8 +225,8 @@ jobs:
     # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode
     # and macos-latest can lag several Xcode versions behind (fails with "requires Xcode NN").
     # The workload restore below pins the WORKLOAD SET to the release matching the image's
-    # DEFAULT Xcode: the SDK floats ("10.0.x") and its newest workloads may demand a newer Xcode
-    # than the image default (10.0.302 → Xcode 26.6), but selecting a non-default Xcode is NOT
+    # DEFAULT Xcode: the SDK is pinned via global.json (10.0.301) and its workloads may demand a newer
+    # Xcode than the image default (26.6), but selecting a non-default Xcode is NOT
     # safe — those installs can be incomplete on the images (26.6 lacks MacOSX.sdk;
     # actions/runner-images#13743/#11348). Bump the pin when the image's default Xcode moves.
     runs-on: macos-26
@@ -236,7 +236,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       # See the native-build note: restore installs ALL workloads this host's TFM list needs (on macOS
       # that's ios + maccatalyst + android — the android TFM restores here too, even building -f ios).
@@ -277,7 +277,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - name: Install the MAUI workloads (host-aware, workload set pinned to the image's Xcode)
         run: |
@@ -414,7 +414,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - name: Install the MAUI workloads (host-aware)
         run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
@@ -513,7 +513,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - uses: actions/setup-java@v4
         with:
@@ -654,7 +654,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - name: Point the WASM client at the HTTP API
         # The committed wwwroot/appsettings.json targets the dev https API; the CI stack is http.

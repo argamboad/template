@@ -25,9 +25,11 @@ refresh cookie is first-party and **no CORS configuration is needed** (`Auth__Al
 empty). It listens on `$PORT` (Render provides it; defaults to 8080), migrates the database on boot, and
 exposes `/health` (liveness) + `/health/ready` (DB reachable).
 
-> **SDK pin:** the build image is pinned to `sdk:10.0.301` to match the committed `packages.lock.json`
-> files (the Blazor SDK injects patch-specific implicit packages). If you bump the SDK that regenerates
-> the lockfiles, bump the Dockerfile tag to match.
+> **SDK pin:** the SDK version lives in **`global.json`** (the single source of truth) — CI's
+> `setup-dotnet` reads it, and the Dockerfile build image (`sdk:10.0.301`) + runtime image
+> (`aspnet:10.0.9`) are pinned to match. The Blazor SDK injects patch-specific implicit packages, so a
+> float breaks `--locked-mode`. To bump the SDK, follow the bump-together playbook in `CLAUDE.md` (update
+> global.json → regenerate lockfiles → the two Dockerfile tags → the docs, in one PR).
 
 ### Verify the image locally (no cloud accounts needed)
 
