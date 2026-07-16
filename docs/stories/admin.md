@@ -23,6 +23,14 @@
 > (in-app + email, `security.mfa_reset`). Console UI: confirm-gated **Reset MFA** button on the member
 > row. QA-ADMIN-07.
 
+> **2026-07-15 — admin-write correctness (v3 audit ADM-5 + LB-ADM-2).** (1) Comp/revert now keys its 409 on
+> subscription **liveness** (`Subscription.IsProviderManaged` = has a Stripe id **and** status ≠ canceled),
+> not id-presence — a canceled Stripe sub keeps its id forever, so the old check permanently locked a
+> churned tenant (the exact goodwill-comp target) out of a comp/cleanup. (2) `announce` with an
+> **explicitly-empty `user_ids: []`** now notifies **no one** (was: fell through to the whole tenant, max
+> blast radius) — a missing/null list still means every member. Tests: `AdminControllerTests`
+> (`Staff_CompCanceledSubscription…`, `Staff_RevertCanceledSubscription…`, `Staff_Announce_WithEmptyUserIds…`).
+
 **Epic key:** `ADMIN`
 
 **Prerequisites (external, before any code):**

@@ -587,7 +587,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"title\": \"Postman announcement\",\n  \"body\": \"Hello from the API collection.\",\n  \"user_ids\": null\n}" },
             "url": { "raw": "{{baseUrl}}/api/admin/tenants/{{adminTenantId}}/announce", "host": ["{{baseUrl}}"], "path": ["api", "admin", "tenants", "{{adminTenantId}}", "announce"] },
-            "description": "user_ids: null/omitted = every member; [\"<guid>\"] = just those (intersected with the roster). Audited in-tenant."
+            "description": "user_ids: null/omitted = every member; a NON-empty list = just those (intersected with the roster); an explicitly-empty [] = NO ONE (v3 LB-ADM-2). Audited in-tenant."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"200/403\", () => pm.expect(pm.response.code).to.be.oneOf([200, 403]));", "if (pm.response.code === 200) console.log(pm.response.json());"], "type": "text/javascript" } }]
         },
@@ -609,13 +609,13 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"plan_key\": \"pro\"\n}" },
             "url": { "raw": "{{baseUrl}}/api/admin/tenants/{{adminTenantId}}/subscription", "host": ["{{baseUrl}}"], "path": ["api", "admin", "tenants", "{{adminTenantId}}", "subscription"] },
-            "description": "Simulates a completed checkout (active, never lapses, no provider ids). 409 = tenant has a live Stripe subscription (manage it at the provider — ADR-006/021)."
+            "description": "Simulates a completed checkout (active, never lapses, no provider ids). 409 = tenant has a LIVE Stripe subscription — keyed on liveness (status ≠ canceled), so a churned/canceled tenant is comp-able even though it kept its Stripe id (ADR-006/021, v3 ADM-5)."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"200/400/403/409\", () => pm.expect(pm.response.code).to.be.oneOf([200, 400, 403, 409]));"], "type": "text/javascript" } }]
         },
         {
           "name": "Revert tenant to Free",
-          "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/api/admin/tenants/{{adminTenantId}}/subscription", "host": ["{{baseUrl}}"], "path": ["api", "admin", "tenants", "{{adminTenantId}}", "subscription"] }, "description": "Deletes the projection (absence ⇒ Free). Idempotent. 409 = provider-managed." },
+          "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/api/admin/tenants/{{adminTenantId}}/subscription", "host": ["{{baseUrl}}"], "path": ["api", "admin", "tenants", "{{adminTenantId}}", "subscription"] }, "description": "Deletes the projection (absence ⇒ Free). Idempotent. 409 = LIVE provider subscription (status ≠ canceled); a canceled-but-lingering projection is cleaned up, not blocked (v3 ADM-5)." },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"204/403/409\", () => pm.expect(pm.response.code).to.be.oneOf([204, 403, 409]));"], "type": "text/javascript" } }]
         },
         {
