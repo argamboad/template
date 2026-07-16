@@ -5,9 +5,11 @@ using Perezosoft.Core.Repositories;
 
 namespace Perezosoft.Api.Services;
 
-/// <summary>The outbox payload for a platform-wide staff broadcast (ADMIN-3): the announcement copy,
-/// fanned out to every user by <see cref="AdminBroadcastOutboxHandler"/>.</summary>
-public sealed record AdminBroadcastPayload(string Title, string Body);
+/// <summary>The outbox payload for a platform-wide staff broadcast (ADMIN-3): the announcement copy plus
+/// the acting staff id, fanned out to every user by <see cref="AdminBroadcastOutboxHandler"/>. The
+/// broadcast spans all tenants so it has no in-tenant audit row; this durable message is the attribution
+/// record for the largest-blast-radius admin write (v3 audit ADM-6).</summary>
+public sealed record AdminBroadcastPayload(string Title, string Body, Guid StaffUserId);
 
 /// <summary>
 /// Fans a staff broadcast out to <b>every</b> user across all tenants (ADMIN-3, platform-wide).

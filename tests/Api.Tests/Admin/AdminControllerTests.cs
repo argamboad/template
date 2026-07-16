@@ -372,7 +372,7 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         await handler.HandleAsync(new OutboxMessage
         {
             Type = AdminBroadcastOutboxHandler.MessageType,
-            Payload = JsonSerializer.Serialize(new AdminBroadcastPayload(title, "Everyone gets this.")),
+            Payload = JsonSerializer.Serialize(new AdminBroadcastPayload(title, "Everyone gets this.", Guid.CreateVersion7())),
         });
         await db.SaveChangesAsync(); // handler stages; the outbox processor's tx commits in prod
 
@@ -569,6 +569,41 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task Staff_ResetMfa_RevokesTargetsRefreshTokens()
+    {
+        // v3 ADM-7: a reset is also compromise recovery — an attacker's live sessions must not survive the
+        // second-factor wipe.
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (targetId, tenantId) = await SeedUserInTenantWithIdAsync();
+        await SeedMfaAsync(targetId);
+        await SeedRefreshTokenAsync(targetId);
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<NoContentResult>(await controller.ResetMfa(targetId, default));
+
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.False(await read.Set<RefreshToken>().AnyAsync(t => t.UserId == targetId && !t.IsRevoked)); // all revoked
+    }
+
+    [Fact]
+    public async Task Staff_AnnounceAll_Payload_CarriesTheActingStaffId()
+    {
+        // v3 ADM-6: the platform-wide broadcast has no in-tenant audit, so the durable outbox message must
+        // attribute the acting staff.
+        var staffId = await SeedUserAsync(StaffEmail);
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<AcceptedResult>(await controller.AnnounceAll(
+                new AdminAnnounceRequest { Title = "All hands", Body = "Please read." }, default));
+
+        await using var read = Fixture.CreateContext();
+        var message = await read.Set<OutboxMessage>().SingleAsync(m => m.Type == AdminBroadcastOutboxHandler.MessageType);
+        var payload = System.Text.Json.JsonSerializer.Deserialize<AdminBroadcastPayload>(message.Payload)!;
+        Assert.Equal(staffId, payload.StaffUserId);
+    }
+
+    [Fact]
     public async Task Staff_ResetMfa_UnknownUser_Returns404()
     {
         var staffId = await SeedUserAsync(StaffEmail);
@@ -619,7 +654,11 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
             new EfRepository<Subscription>(db), new EfRepository<AuditEvent>(db),
             new UserRepository(db),
             new JwtTokenService(new TestJwtSettings(), TimeProvider.System, NullLogger<JwtTokenService>.Instance),
-            notifications, mfaService, new EfOutbox(db, TimeProvider.System), new EfUnitOfWork(db), TimeProvider.System);
+            notifications, mfaService,
+            new RefreshTokenService(new RefreshTokenRepository(db, TimeProvider.System), new TokenGenerator(),
+                new TokenHasher(), new TestRefreshSettings(), TimeProvider.System),
+            new EfOutbox(db, TimeProvider.System), new EfUnitOfWork(db),
+            NullLogger<AdminController>.Instance, TimeProvider.System);
 
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, callerId.ToString()) };
         if (impersonatedBy is { } staffId)
@@ -676,6 +715,17 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         await using var db = Fixture.CreateContext();
         db.Set<UserMfa>().Add(new UserMfa { UserId = userId, EncryptedSecret = "enc", Enabled = true, EnrolledAt = DateTimeOffset.UtcNow });
         db.Set<MfaRecoveryCode>().Add(new MfaRecoveryCode { UserId = userId, CodeHash = "hash" });
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SeedRefreshTokenAsync(Guid userId)
+    {
+        await using var db = Fixture.CreateContext();
+        db.Set<RefreshToken>().Add(new RefreshToken
+        {
+            UserId = userId, TokenHash = Guid.NewGuid().ToString("N"), IssuedFromIp = "127.0.0.1", Provider = "test",
+            IssuedAt = DateTimeOffset.UtcNow, ExpiresAt = DateTimeOffset.UtcNow.AddDays(30), IsRevoked = false,
+        });
         await db.SaveChangesAsync();
     }
 

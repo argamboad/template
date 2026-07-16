@@ -31,6 +31,16 @@
 > blast radius) — a missing/null list still means every member. Tests: `AdminControllerTests`
 > (`Staff_CompCanceledSubscription…`, `Staff_RevertCanceledSubscription…`, `Staff_Announce_WithEmptyUserIds…`).
 
+> **2026-07-15 — MFA-reset session revocation + broadcast attribution (v3 audit ADM-7 / ADM-6 / ADM-11).**
+> (1) `DELETE /api/admin/users/{userId}/mfa` now **revokes the target's refresh tokens/sessions**
+> (`IRefreshTokenService.RevokeAllUserTokensAsync`, in the same transaction) — a reset is also a
+> compromise-recovery primitive, and an attacker's live sessions would otherwise survive the second-factor
+> wipe. (2) `announce-all` (largest blast radius, no in-tenant audit) now carries the acting **`StaffUserId`
+> in its durable outbox payload** so it's attributable. (3) A **tenant-less** user's MFA reset — which has
+> no tenant-scoped audit row — now leaves a structured `ILogger` warning (`admin.mfa.reset by staff … for
+> tenant-less user …`); a full platform-scoped audit sink stays deferred (the finding is Info-level).
+> Tests: `Staff_ResetMfa_RevokesTargetsRefreshTokens`, `Staff_AnnounceAll_Payload_CarriesTheActingStaffId`.
+
 **Epic key:** `ADMIN`
 
 **Prerequisites (external, before any code):**
