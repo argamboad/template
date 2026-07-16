@@ -104,8 +104,28 @@ public static class ServiceCollectionExtensions
         // it outside Development would accept forged, unauthenticated cross-tenant billing writes. Fail
         // fast at startup instead, so a misconfigured production deploy cannot boot with the fake.
         services.Configure<StripeSettings>(configuration.GetSection("Billing:Stripe"));
-        if (!string.IsNullOrEmpty(configuration["Billing:Stripe:SecretKey"]))
+        var stripeKey = configuration["Billing:Stripe:SecretKey"];
+        if (!string.IsNullOrEmpty(stripeKey))
+        {
+            // Mode sanity (v3 audit DEP-10): a presence-only check let a real prod deploy boot silently in
+            // TEST mode with a test key, or a LIVE key make real charges on staging. When the deploy
+            // declares which mode it expects (Billing:Stripe:ExpectLiveKey), the key prefix must match —
+            // fail closed at startup otherwise. Unset ⇒ no mode check (local/dev convenience).
+            if (configuration.GetValue<bool?>("Billing:Stripe:ExpectLiveKey") is { } expectLive)
+            {
+                var isLive = stripeKey.StartsWith("sk_live_", StringComparison.Ordinal);
+                var isTest = stripeKey.StartsWith("sk_test_", StringComparison.Ordinal);
+                if (expectLive && !isLive)
+                    throw new InvalidOperationException(
+                        "Billing:Stripe:ExpectLiveKey is true but Billing:Stripe:SecretKey is not a live key "
+                        + "(sk_live_…). Refusing to run a live deployment against Stripe test mode.");
+                if (!expectLive && !isTest)
+                    throw new InvalidOperationException(
+                        "Billing:Stripe:ExpectLiveKey is false but Billing:Stripe:SecretKey is not a test key "
+                        + "(sk_test_…). Refusing to run a non-live deployment against a live key that can make real charges.");
+            }
             services.AddScoped<IBillingProvider, StripeBillingProvider>();
+        }
         else if (environment.IsDevelopment())
             services.AddScoped<IBillingProvider, FakeBillingProvider>();
         else

@@ -224,6 +224,32 @@ app.UseProxyForwarding(app.Configuration);
 var serveWebClient = app.Configuration.GetValue("Hosting:ServeWebClient", false);
 if (serveWebClient)
 {
+    // The API became a browser HTML host in DEPLOY-1 but shipped with zero security/cache headers
+    // (v3 audit DEP-2/DEP-3). Add them for every response served from this origin:
+    //  • security headers — nosniff, clickjacking (frame-ancestors + X-Frame-Options), Referrer-Policy;
+    //  • cache policy — fingerprinted /_framework assets cache immutably; the SPA shell (and other
+    //    client routes) is `no-cache` so a post-deploy Blazor integrity mismatch can't pin a stale shell.
+    // HSTS is added separately below (production only — Development talks cleartext to the Android emulator).
+    app.Use(async (ctx, next) =>
+    {
+        var headers = ctx.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Content-Security-Policy"] = "frame-ancestors 'none'";
+        headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+
+        var path = ctx.Request.Path;
+        ctx.Response.OnStarting(() =>
+        {
+            if (path.StartsWithSegments("/_framework"))
+                ctx.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            else if (!path.StartsWithSegments("/api"))
+                ctx.Response.Headers.CacheControl = "no-cache";
+            return Task.CompletedTask;
+        });
+        await next();
+    });
+
     app.UseBlazorFrameworkFiles();
     app.UseStaticFiles();
 }
@@ -245,7 +271,13 @@ if (app.Environment.IsDevelopment())
 // request being 307'd to a port/cert it can't reach. Native auth uses body tokens (no
 // cookies), so none of the web client's HTTPS/SameSite requirements apply to that leg.
 if (!app.Environment.IsDevelopment())
+{
+    // HSTS pairs with the HTTPS redirect (DEP-2): tell browsers to stick to HTTPS. Production only —
+    // Development skips it for the same cleartext-emulator reason as the redirect.
+    if (serveWebClient)
+        app.UseHsts();
     app.UseHttpsRedirection();
+}
 
 if (allowedOrigins.Length > 0)
     app.UseCors("BlazorClient");

@@ -72,4 +72,40 @@ public class SingleOriginHostingTests(IntegrationTestFactory factory)
 
         Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
     }
+
+    // --- v3 DEP-2/DEP-3: the browser HTML host ships security + cache headers ---
+
+    [Fact]
+    public async Task WhenEnabled_SpaShell_CarriesSecurityHeaders_AndIsNoCache()
+    {
+        using var web = TempWebRoot.Create();
+        var res = await CreateServingClient(web).GetAsync("/settings"); // a client route → the shell
+        res.EnsureSuccessStatusCode();
+
+        Assert.Equal("nosniff", res.Headers.GetValues("X-Content-Type-Options").Single());
+        Assert.Equal("DENY", res.Headers.GetValues("X-Frame-Options").Single());
+        Assert.Contains("frame-ancestors 'none'", res.Headers.GetValues("Content-Security-Policy").Single());
+        Assert.Equal("strict-origin-when-cross-origin", res.Headers.GetValues("Referrer-Policy").Single());
+        Assert.Contains("no-cache", res.Headers.CacheControl!.ToString()); // shell must revalidate (integrity)
+    }
+
+    [Fact]
+    public async Task WhenEnabled_FrameworkAssets_AreImmutablyCacheable()
+    {
+        using var web = TempWebRoot.Create();
+        var res = await CreateServingClient(web).GetAsync("/_framework/dotnet.js");
+        res.EnsureSuccessStatusCode();
+
+        var cache = res.Headers.CacheControl!;
+        Assert.True(cache.Public);
+        Assert.Contains("immutable", cache.ToString());
+    }
+
+    [Fact]
+    public async Task WhenDisabled_NoSecurityHeadersAdded()
+    {
+        // The headers ride with the SPA host; an API-only deployment is unchanged.
+        var res = await _factory.CreateClient().GetAsync("/api/does-not-exist");
+        Assert.False(res.Headers.Contains("X-Frame-Options"));
+    }
 }

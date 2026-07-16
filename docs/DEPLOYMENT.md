@@ -99,6 +99,17 @@ Stripe dashboard. You don't need working billing to sign in — this just satisf
 later wire real billing, add `Billing__Stripe__WebhookSecret` and point a Stripe webhook at
 `/api/billing/webhook`.)
 
+Optionally set **`Billing__Stripe__ExpectLiveKey`** to fail closed on a key/mode mismatch (v3 DEP-10):
+`false` on staging (refuses to boot with an `sk_live_…` key that could make real charges), `true` on
+production (refuses to boot in test mode with an `sk_test_…` key). Unset skips the check.
+
+> **Security + cache headers (v3 DEP-2/DEP-3).** When `Hosting__ServeWebClient=true` (the deployed
+> single-origin container), the API adds `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` +
+> `Content-Security-Policy: frame-ancestors 'none'`, and `Referrer-Policy: strict-origin-when-cross-origin`
+> to every response, plus **HSTS** outside Development. The SPA shell is served `no-cache` (so a post-deploy
+> Blazor integrity mismatch can't pin a stale shell) and `/_framework` assets `immutable`. A fuller
+> resource CSP (script/style/connect) is deferred — it needs validation against the running Blazor WASM app.
+
 ## 4. Render (host, free)
 
 1. Push your branch; in Render choose **New + → Blueprint** and point it at the repo. It reads
