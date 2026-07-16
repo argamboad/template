@@ -29,8 +29,10 @@ public class AdminController(
     IJwtTokenService jwt,
     INotificationService notifications,
     IMfaService mfaService,
+    IRefreshTokenService refreshTokens,
     IOutbox outbox,
     IUnitOfWork unitOfWork,
+    ILogger<AdminController> logger,
     TimeProvider clock) : AdminApiControllerBase(staff)
 {
     // Impersonation tokens are deliberately short-lived and non-refreshable (ADR-014).
@@ -261,7 +263,7 @@ public class AdminController(
     [HttpPost("announce-all")]
     public async Task<IActionResult> AnnounceAll([FromBody] AdminAnnounceRequest request, CancellationToken cancellationToken)
     {
-        var (_, denied) = await RequireStaffAsync(cancellationToken);
+        var (staffUserId, denied) = await RequireStaffAsync(cancellationToken);
         if (denied is not null)
             return denied;
 
@@ -273,14 +275,17 @@ public class AdminController(
                 $"Title (max {AnnounceTitleMaxLength} chars) and body (max {AnnounceBodyMaxLength} chars) are required."));
 
         // Stage the fan-out message and commit it. The handler (AdminBroadcastOutboxHandler) does the
-        // per-user delivery out-of-band. SaveChangesAsync flushes the staged message before commit
-        // (CommitAsync itself does not save).
+        // per-user delivery out-of-band. This platform-wide broadcast spans all tenants so it has no
+        // in-tenant audit row; the durable outbox message carries the acting staff id so the largest-
+        // blast-radius admin write is still attributable (v3 audit ADM-6). SaveChangesAsync flushes the
+        // staged message before commit (CommitAsync itself does not save).
         await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
         await outbox.EnqueueAsync(AdminBroadcastOutboxHandler.MessageType,
-            JsonSerializer.Serialize(new AdminBroadcastPayload(title, body)), tenantId: null, cancellationToken);
+            JsonSerializer.Serialize(new AdminBroadcastPayload(title, body, staffUserId)), tenantId: null, cancellationToken);
         await auditEvents.SaveChangesAsync(cancellationToken);
         await scope.CommitAsync(cancellationToken);
 
+        logger.LogWarning("admin.announce-all by staff {StaffUserId}", staffUserId); // platform-wide action → operational record
         return Accepted(new AdminBroadcastResponse { Status = "queued" });
     }
 
@@ -342,10 +347,15 @@ public class AdminController(
         if (target is null)
             return NotFound(new ErrorResponse("user_not_found", "User not found"));
 
-        // Wipe, notification, and the in-tenant audit commit atomically.
+        // Wipe, session revocation, notification, and the in-tenant audit commit atomically.
         await using var scope = await unitOfWork.BeginTransactionAsync(cancellationToken);
         if (!await mfaService.ResetAsync(userId, cancellationToken))
             return NoContent(); // nothing enrolled — idempotent no-op
+
+        // Revoke the target's refresh tokens (v3 audit ADM-7): a reset is also a compromise-recovery
+        // primitive, and an attacker's existing sessions would otherwise survive the second-factor wipe.
+        // Enlists in this transaction (set-based UPDATE), so it commits with the wipe.
+        await refreshTokens.RevokeAllUserTokensAsync(userId, cancellationToken);
 
         await notifications.NotifyAsync(userId, AdminMfaResetNotification.Kind,
             AdminMfaResetNotification.Title, AdminMfaResetNotification.Body,
@@ -361,7 +371,12 @@ public class AdminController(
                 await auditEvents.SaveChangesAsync(cancellationToken); // inside EnterTenant: the audit row stamps into the target tenant
             }
         else
+        {
+            // A tenant-less user has no tenant-scoped audit trail to write to (ADM-11 — a full platform-scoped
+            // audit sink is deferred). Leave a durable operational record of this high-privilege staff action.
+            logger.LogWarning("admin.mfa.reset by staff {StaffUserId} for tenant-less user {UserId}", staffUserId, userId);
             await auditEvents.SaveChangesAsync(cancellationToken); // flush the staged notification
+        }
 
         await scope.CommitAsync(cancellationToken);
         return NoContent();

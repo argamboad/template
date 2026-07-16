@@ -635,7 +635,7 @@
           "request": {
             "method": "DELETE",
             "url": { "raw": "{{baseUrl}}/api/admin/users/{{adminTargetUserId}}/mfa", "host": ["{{baseUrl}}"], "path": ["api", "admin", "users", "{{adminTargetUserId}}", "mfa"] },
-            "description": "Staff recovery path (ADR-021 addendum): wipes the user's TOTP secret + recovery codes WITHOUT a code — verify their identity out-of-band first. Audited in the target's tenant (admin.mfa.reset) and the user is notified (in-app + email). 204 also when the user had no MFA (idempotent no-op)."
+            "description": "Staff recovery path (ADR-021 addendum): wipes the user's TOTP secret + recovery codes WITHOUT a code — verify their identity out-of-band first. Also REVOKES the target's refresh tokens/sessions (v3 ADM-7 — compromise recovery). Audited in the target's tenant (admin.mfa.reset) and the user is notified (in-app + email). 204 also when the user had no MFA (idempotent no-op)."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"204/403/404\", () => pm.expect(pm.response.code).to.be.oneOf([204, 403, 404]));"], "type": "text/javascript" } }]
         }
