@@ -13,6 +13,12 @@ public static class ClaimsPrincipalExtensions
     public static Guid? GetUserId(this ClaimsPrincipal principal) =>
         Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
+    /// <summary>The authenticated caller's tenant from the <c>tenant_id</c> claim, or null if absent/unparseable.
+    /// Authz resolves membership for THIS tenant so a permission decision is keyed on the JWT, not an
+    /// arbitrary membership (v3 audit LB-ADM-3).</summary>
+    public static Guid? GetTenantId(this ClaimsPrincipal principal) =>
+        Guid.TryParse(principal.FindFirstValue(Services.JwtClaims.TenantId), out var id) ? id : null;
+
     /// <summary>
     /// The staff user driving this request via an impersonation token (the <c>impersonated_by</c> claim,
     /// ADMIN-2/ADR-014), or null on a normal token. Fail-closed on an unparseable value: a present-but-

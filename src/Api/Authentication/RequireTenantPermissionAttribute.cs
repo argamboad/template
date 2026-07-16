@@ -33,8 +33,9 @@ public sealed class RequireTenantPermissionAttribute(Permission permission, stri
         var http = context.HttpContext;
         var tenants = http.RequestServices.GetRequiredService<ITenantRepository>();
 
-        var membership = http.User.GetUserId() is { } userId
-            ? await tenants.GetMembershipAsync(userId, http.RequestAborted)
+        // Resolve the membership for the caller's JWT tenant, never an arbitrary one (LB-ADM-3).
+        var membership = http.User.GetUserId() is { } userId && http.User.GetTenantId() is { } tenantId
+            ? await tenants.GetMembershipAsync(userId, tenantId, http.RequestAborted)
             : null;
 
         if (membership is null)

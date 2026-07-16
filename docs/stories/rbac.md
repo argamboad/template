@@ -45,6 +45,17 @@ the seam (behavior unchanged — only owners exist until RBAC-2); `IsOwner` remo
 path). Tests: `tests/Core.Tests/RolePermissionsTests.cs` (matrix), `tests/Api.Tests/Rbac/`
 (filter allow/deny + `PermissionService` resolution/fail-closed).
 
+> **2026-07-15 — deterministic authz membership lookup (v3 audit LB-ADM-3).** Authz resolution
+> (`PermissionService` + `RequireTenantPermissionAttribute`) used an **unfiltered, unordered**
+> `GetMembershipAsync(userId)` `FirstOrDefault` and never compared the resolved membership's tenant to the
+> caller's JWT `tenant_id`. Both now resolve `GetMembershipAsync(userId, tenantId)` **keyed on the JWT
+> `tenant_id`** (new `ClaimsPrincipal.GetTenantId()`), and the single-arg lookup is now **ordered**
+> (oldest first) so it's never arbitrary. A DB unique index on `UserId` enforces one membership per user
+> today, so the "resolves an arbitrary membership" scenario can't actually occur — this is defense-in-depth
+> that also fails **closed** when a token's `tenant_id` doesn't match the user's membership (stale/forged),
+> instead of silently authorizing against the user's other-tenant role. Test:
+> `PermissionServiceTests.Authz_ResolvesForTheJwtTenant_AndFailsClosedOnAMismatch`.
+
 **As a** platform/app developer
 **I want** authorization expressed as capability checks backed by one role→permission matrix
 **So that** I can add an `admin` tier and gate any endpoint without copying `role == "owner"` tests

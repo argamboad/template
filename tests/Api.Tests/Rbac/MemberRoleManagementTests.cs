@@ -150,7 +150,7 @@ public class MemberRoleManagementTests(PostgresFixture fixture) : PostgresTestBa
         await using var db = Fixture.CreateContext(tenantId);
         // ManageRoles gate moved to [RequireTenantPermission] (B9-5); run it as the pipeline would.
         var result = await TenantPermissionGate.RunAsync(
-            typeof(HouseholdController), nameof(HouseholdController.ChangeMemberRole), new TenantRepository(db), adminId);
+            typeof(HouseholdController), nameof(HouseholdController.ChangeMemberRole), new TenantRepository(db), adminId, tenantId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
@@ -167,7 +167,7 @@ public class MemberRoleManagementTests(PostgresFixture fixture) : PostgresTestBa
         await using var db = Fixture.CreateContext(tenantId);
         // ManageRoles gate moved to [RequireTenantPermission] (B9-5); run it as the pipeline would.
         var result = await TenantPermissionGate.RunAsync(
-            typeof(HouseholdController), nameof(HouseholdController.ChangeMemberRole), new TenantRepository(db), memberId);
+            typeof(HouseholdController), nameof(HouseholdController.ChangeMemberRole), new TenantRepository(db), memberId, tenantId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);

@@ -23,7 +23,7 @@ namespace Perezosoft.Api.Tests.Infrastructure;
 public static class TenantPermissionGate
 {
     public static async Task<IActionResult?> RunAsync(
-        Type controllerType, string actionName, ITenantRepository tenants, Guid callerUserId)
+        Type controllerType, string actionName, ITenantRepository tenants, Guid callerUserId, Guid callerTenantId)
     {
         var attribute = controllerType.GetMethod(actionName)!
             .GetCustomAttribute<RequireTenantPermissionAttribute>()
@@ -31,8 +31,11 @@ public static class TenantPermissionGate
                 $"{controllerType.Name}.{actionName} has no [RequireTenantPermission].");
 
         var services = new ServiceCollection().AddSingleton(tenants).BuildServiceProvider();
+        // The principal carries the JWT tenant_id — authz resolves membership for that tenant (LB-ADM-3).
         var user = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, callerUserId.ToString())], authenticationType: "test"));
+            [new Claim(ClaimTypes.NameIdentifier, callerUserId.ToString()),
+             new Claim(Perezosoft.Api.Services.JwtClaims.TenantId, callerTenantId.ToString())],
+            authenticationType: "test"));
         var httpContext = new DefaultHttpContext { RequestServices = services, User = user };
 
         var actionContext = new ActionContext(

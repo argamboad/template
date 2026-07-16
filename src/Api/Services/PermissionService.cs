@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Perezosoft.Api.Authentication;
 using Perezosoft.Core.Abstractions;
 using Perezosoft.Core.Authorization;
 using Perezosoft.Core.Repositories;
@@ -16,11 +16,13 @@ public sealed class PermissionService(IHttpContextAccessor accessor, ITenantRepo
 {
     public async Task<bool> HasAsync(Permission permission, CancellationToken cancellationToken = default)
     {
-        var userIdValue = accessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!Guid.TryParse(userIdValue, out var userId))
+        var principal = accessor.HttpContext?.User;
+        // Resolve the membership for the caller's JWT tenant, not an arbitrary one (LB-ADM-3). Missing user
+        // or tenant claim ⇒ fail closed.
+        if (principal?.GetUserId() is not { } userId || principal.GetTenantId() is not { } tenantId)
             return false;
 
-        var membership = await tenants.GetMembershipAsync(userId, cancellationToken);
+        var membership = await tenants.GetMembershipAsync(userId, tenantId, cancellationToken);
         return membership is not null && RolePermissions.Grants(membership.Role, permission);
     }
 }

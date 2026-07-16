@@ -34,7 +34,14 @@ public class TenantRepository(AppDbContext db) : ITenantRepository
         await db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
 
     public async Task<TenantMembership?> GetMembershipAsync(Guid userId, CancellationToken cancellationToken = default) =>
-        await db.TenantMemberships.FirstOrDefaultAsync(m => m.UserId == userId, cancellationToken);
+        // Ordered so a user with >1 membership resolves deterministically (oldest), never arbitrarily (LB-ADM-3).
+        await db.TenantMemberships
+            .OrderBy(m => m.JoinedAt).ThenBy(m => m.TenantId)
+            .FirstOrDefaultAsync(m => m.UserId == userId, cancellationToken);
+
+    public async Task<TenantMembership?> GetMembershipAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken = default) =>
+        // The (user, tenant) pair is unique, so this is inherently deterministic — the authz lookup (LB-ADM-3).
+        await db.TenantMemberships.FirstOrDefaultAsync(m => m.UserId == userId && m.TenantId == tenantId, cancellationToken);
 
     public async Task<List<TenantMembership>> GetMembersAsync(Guid tenantId, CancellationToken cancellationToken = default) =>
         await db.TenantMemberships.Where(m => m.TenantId == tenantId).ToListAsync(cancellationToken);
