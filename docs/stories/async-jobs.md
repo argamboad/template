@@ -46,6 +46,15 @@ infra and may carry system effects) but stores an optional `TenantId` for handle
 slice **migrates the existing email sends** (passwordless, invitations) to enqueue → handler, on
 **existing behavior** — the safest way to prove the path (Mailpit still receives the mail).
 
+> **2026-07-15 — commit-time fault bookkeeping (v3 audit LB-BILL-2).** `OutboxProcessor` staged the handler
+> result + `Status=Sent` inside a `try` but ran `SaveChanges`/`Commit` **outside** it. A commit-time fault
+> (transient disconnect, or a handler that stages a constraint-violating row that only faults at
+> `SaveChanges`) rolled the whole thing back, so `AttemptCount` never advanced — the message stayed
+> `Pending`, re-ran the side effect every pass, and **never dead-lettered** (a poison-at-commit loop). Now
+> the save+commit are inside the `try`, and any failure records the attempt in a **separate transaction**
+> (`RecordFailedAttemptAsync`, re-claiming the row `FOR UPDATE`) so bookkeeping survives the rollback and a
+> poison message eventually dead-letters. Test: `ProcessDue_HandlerStagesARowThatFaultsAtCommit_StillAdvancesAttempt_AndDeadLetters`.
+
 **Acceptance criteria**
 
 ```gherkin

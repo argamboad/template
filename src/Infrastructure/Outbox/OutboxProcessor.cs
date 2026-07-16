@@ -44,60 +44,103 @@ public sealed class OutboxProcessor(
             throw new InvalidOperationException("The outbox requires a relational provider (FOR UPDATE SKIP LOCKED).");
 
         var now = clock.GetUtcNow();
+
+        Guid failedMessageId;
+        Exception failure;
+        await using (var tx = await db.Database.BeginTransactionAsync(cancellationToken))
+        {
+            // Claim the oldest due+pending row, skipping any another poller already holds. The raw SQL
+            // orders and LIMITs internally (so at most one row returns); materialize with ToList to keep
+            // EF from layering its own order-less First operator on top — which only logs a noisy,
+            // false-positive "FirstOrDefault without OrderBy" warning on every poll.
+            var message = (await db.Set<OutboxMessage>()
+                .FromSql($"""
+                    SELECT * FROM "OutboxMessages"
+                    WHERE "Status" = {OutboxStatus.Pending} AND "NextAttemptAt" <= {now}
+                    ORDER BY "CreatedAt"
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                    """)
+                .ToListAsync(cancellationToken)).FirstOrDefault();
+
+            if (message is null)
+            {
+                await tx.RollbackAsync(cancellationToken);
+                return false;
+            }
+
+            try
+            {
+                if (!_handlers.TryGetValue(message.Type, out var handler))
+                    throw new InvalidOperationException($"No IOutboxHandler registered for outbox type '{message.Type}'.");
+
+                await handler.HandleAsync(message, cancellationToken);
+                message.Status = OutboxStatus.Sent;
+                message.ProcessedAt = now;
+                message.LastError = null;
+                // Persist + commit INSIDE the try (v3 audit LB-BILL-2): if these fail — a transient
+                // disconnect, or a handler that staged a constraint-violating row that only faults at
+                // SaveChanges — the attempt must still be accounted for below, or the message stays Pending,
+                // re-runs the side effect every pass, and NEVER dead-letters (a poison-at-commit loop).
+                await db.SaveChangesAsync(cancellationToken);
+                await tx.CommitAsync(cancellationToken);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await SafeRollbackAsync(tx, cancellationToken); // undo the partial (handler + status) work
+                failedMessageId = message.Id;
+                failure = ex;
+            }
+        } // the failed transaction is disposed here, freeing the connection for a fresh one
+
+        // Record the failed attempt in its OWN transaction so the bookkeeping survives the rollback above.
+        await RecordFailedAttemptAsync(failedMessageId, failure, now, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Advances attempt/dead-letter bookkeeping for a message whose processing failed, in a fresh
+    /// transaction (LB-BILL-2). Re-claims the row <c>FOR UPDATE</c> so it serializes with other pollers,
+    /// then either schedules a backoff retry or dead-letters once the cap is reached.
+    /// </summary>
+    private async Task RecordFailedAttemptAsync(Guid messageId, Exception cause, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        db.ChangeTracker.Clear(); // drop the rolled-back Status=Sent staging (and any handler-staged rows)
         await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        // Claim the oldest due+pending row, skipping any another poller already holds. The raw SQL
-        // orders and LIMITs internally (so at most one row returns); materialize with ToList to keep
-        // EF from layering its own order-less First operator on top — which only logs a noisy,
-        // false-positive "FirstOrDefault without OrderBy" warning on every poll.
         var message = (await db.Set<OutboxMessage>()
-            .FromSql($"""
-                SELECT * FROM "OutboxMessages"
-                WHERE "Status" = {OutboxStatus.Pending} AND "NextAttemptAt" <= {now}
-                ORDER BY "CreatedAt"
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-                """)
+            .FromSql($"""SELECT * FROM "OutboxMessages" WHERE "Id" = {messageId} FOR UPDATE""")
             .ToListAsync(cancellationToken)).FirstOrDefault();
-
         if (message is null)
         {
-            await tx.RollbackAsync(cancellationToken);
-            return false;
+            await tx.RollbackAsync(cancellationToken); // already handled/removed elsewhere — nothing to do
+            return;
         }
 
-        try
+        message.AttemptCount++;
+        message.LastError = Truncate(cause.Message, 1000);
+        if (message.AttemptCount >= options.MaxAttempts)
         {
-            if (!_handlers.TryGetValue(message.Type, out var handler))
-                throw new InvalidOperationException($"No IOutboxHandler registered for outbox type '{message.Type}'.");
-
-            await handler.HandleAsync(message, cancellationToken);
-            message.Status = OutboxStatus.Sent;
-            message.ProcessedAt = now;
-            message.LastError = null;
+            message.Status = OutboxStatus.DeadLettered;
+            logger.LogError(cause, "Outbox message {Id} ({Type}) dead-lettered after {Attempts} attempt(s)",
+                message.Id, message.Type, message.AttemptCount);
         }
-        catch (Exception ex)
+        else
         {
-            message.AttemptCount++;
-            message.LastError = Truncate(ex.Message, 1000);
-            if (message.AttemptCount >= options.MaxAttempts)
-            {
-                message.Status = OutboxStatus.DeadLettered;
-                logger.LogError(ex, "Outbox message {Id} ({Type}) dead-lettered after {Attempts} attempt(s)",
-                    message.Id, message.Type, message.AttemptCount);
-            }
-            else
-            {
-                var delay = Backoff(message.AttemptCount);
-                message.NextAttemptAt = now + delay;
-                logger.LogWarning(ex, "Outbox message {Id} ({Type}) failed (attempt {Attempts}); retrying after {Delay}",
-                    message.Id, message.Type, message.AttemptCount, delay);
-            }
+            message.NextAttemptAt = now + Backoff(message.AttemptCount);
+            logger.LogWarning(cause, "Outbox message {Id} ({Type}) failed (attempt {Attempts}); retrying after backoff",
+                message.Id, message.Type, message.AttemptCount);
         }
 
         await db.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
-        return true;
+    }
+
+    private static async Task SafeRollbackAsync(Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction tx, CancellationToken cancellationToken)
+    {
+        // A failed commit can leave the transaction already completed at the server; a rollback then throws.
+        try { await tx.RollbackAsync(cancellationToken); } catch { /* already rolled back / completed */ }
     }
 
     private TimeSpan Backoff(int attempt) => options.BackoffBase * Math.Pow(2, attempt - 1);

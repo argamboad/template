@@ -106,6 +106,29 @@ public class OutboxProcessorTests(PostgresFixture fixture) : PostgresTestBase(fi
 
     // --- helpers ---
 
+    [Fact]
+    public async Task ProcessDue_HandlerStagesARowThatFaultsAtCommit_StillAdvancesAttempt_AndDeadLetters()
+    {
+        // v3 LB-BILL-2: the handler succeeds but stages a row that only faults when the processor COMMITS
+        // (a NOT NULL violation here; equivalently a transient commit-time disconnect). The attempt must
+        // still be accounted for and the message must eventually DEAD-LETTER — not stay Pending and re-run
+        // the side effect every pass forever.
+        await SeedAsync("poison", "x");
+        var options = new OutboxOptions { MaxAttempts = 2, BackoffBase = TimeSpan.Zero };
+
+        await using (var db = Fixture.CreateContext())
+        {
+            var handler = new StagesBadRowHandler("poison", db);
+            await NewProcessor(db, handler, options).ProcessDueAsync();
+        }
+
+        await using var read = Fixture.CreateContext();
+        var msg = await read.Set<OutboxMessage>().SingleAsync(m => m.Type == "poison");
+        Assert.Equal(OutboxStatus.DeadLettered, msg.Status); // OLD code: throws / stays Pending forever
+        Assert.Equal(2, msg.AttemptCount);
+        Assert.NotNull(msg.LastError);
+    }
+
     private async Task SeedAsync(string type, string payload, TimeSpan? notBefore = null)
     {
         await using var db = Fixture.CreateContext();
@@ -143,4 +166,23 @@ internal sealed class ThrowingHandler(string type) : IOutboxHandler
 
     public Task HandleAsync(OutboxMessage message, CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("handler boom");
+}
+
+/// <summary>Handler that SUCCEEDS but stages a row that only faults when the processor commits (a NOT NULL
+/// violation on the required Payload column) — the LB-BILL-2 commit-time-failure case.</summary>
+internal sealed class StagesBadRowHandler(string type, AppDbContext db) : IOutboxHandler
+{
+    public string Type => type;
+
+    public Task HandleAsync(OutboxMessage message, CancellationToken cancellationToken = default)
+    {
+        db.Set<OutboxMessage>().Add(new OutboxMessage
+        {
+            Type = "staged-bad",
+            Payload = null!, // NOT NULL column → SaveChanges throws at commit time
+            CreatedAt = DateTimeOffset.UtcNow,
+            NextAttemptAt = DateTimeOffset.UtcNow,
+        });
+        return Task.CompletedTask;
+    }
 }
