@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Perezosoft.Core.Abstractions;
 using Perezosoft.Core.Billing;
 using Perezosoft.Core.Entities;
@@ -68,8 +69,12 @@ public sealed class QuotaService(
             await usage.SaveChangesAsync(cancellationToken);
             return true;
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
         {
+            // ONLY a unique-(TenantId,Key,Period) violation means a concurrent request created the row first
+            // — retry the conditional increment against it. Any OTHER DbUpdateException (serialization/
+            // deadlock, timeout, a future check-constraint) is a real failure: it must propagate, not be
+            // reinterpreted as a benign race that could spuriously deny a request with headroom (LB-BILL-3).
             usage.Remove(row); // detach the failed insert so it doesn't linger in the change tracker
             return await TryIncrementAsync(usageKey, period, amount, limit, now, cancellationToken);
         }

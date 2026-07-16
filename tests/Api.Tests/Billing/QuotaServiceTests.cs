@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
+using Npgsql;
 using Perezosoft.Api.Services;
 using Perezosoft.Api.Tests.Infrastructure;
 using Perezosoft.Core.Billing;
 using Perezosoft.Core.Entities;
+using Perezosoft.Core.Repositories;
 using Perezosoft.Infrastructure.Repositories;
 
 namespace Perezosoft.Api.Tests.Billing;
@@ -200,6 +202,38 @@ public class QuotaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtu
 
         var result = await svc.CreateAsync(tenant, ownerId, "third@x.com");
         Assert.Equal(InviteCreateStatus.Created, result.Status);
+    }
+
+    [Fact]
+    public async Task TryConsume_FirstConsume_NonUniqueDbError_Propagates()
+    {
+        // v3 LB-BILL-3: only a unique-(Tenant,Key,Period) violation (23505) means a concurrent insert race
+        // to retry. Any OTHER DbUpdateException (serialization/deadlock/timeout) must PROPAGATE, not be
+        // swallowed as a benign race — which would spuriously deny a request that had headroom or mask the
+        // real fault.
+        var tenant = Guid.CreateVersion7();
+        await SeedTenantWithMembersAsync(tenant, members: 1);
+
+        await using var db = Fixture.CreateContext(tenant);
+        var quota = new QuotaService(
+            new EfRepository<Subscription>(db), new TenantRepository(db), new TenantInvitationRepository(db),
+            new ThrowingUsageRepository(new EfRepository<UsageCounter>(db)), // throws a NON-23505 on insert
+            new TestCurrentTenant { TenantId = tenant }, TimeProvider.System);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => quota.TryConsumeAsync(UsageKeys.Export));
+    }
+
+    /// <summary>A usage repo that fails the first-consume insert with a NON-unique DbUpdateException.</summary>
+    private sealed class ThrowingUsageRepository(IRepository<UsageCounter> inner) : IRepository<UsageCounter>
+    {
+        public IQueryable<UsageCounter> Query() => inner.Query();
+        public IQueryable<UsageCounter> QueryAllTenants() => inner.QueryAllTenants();
+        public Task AddAsync(UsageCounter entity, CancellationToken cancellationToken = default) => inner.AddAsync(entity, cancellationToken);
+        public void Update(UsageCounter entity) => inner.Update(entity);
+        public void Remove(UsageCounter entity) => inner.Remove(entity);
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+            throw new DbUpdateException("simulated non-unique failure",
+                new PostgresException("serialization failure", "ERROR", "ERROR", "40001")); // NOT 23505
     }
 
     // --- helpers ---

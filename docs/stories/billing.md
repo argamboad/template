@@ -16,6 +16,17 @@
 > follow-up (optional):* advance trial-ending nudge. Design decision and constraints in **ADR-006**.
 > Stories use Gherkin acceptance criteria.
 
+> **2026-07-15 — billing edge-case correctness (v3 audit LB-BILL-1/3/4).** (1) The webhook **recency guard**
+> now rejects only *strictly* older events (`OccurredAt < last`, was `<=`) — Stripe's `Created` is
+> whole-second, so two DISTINCT events in the same second (checkout `created`+`updated`, a rapid plan change)
+> must both apply; exact redelivery is still caught by the inbox EventId. (2) **Dunning** fires only on a
+> transition *out of a granting status* (`SubscriptionStatus.IsGranting`) — a first-ever event carrying
+> `past_due`/`canceled` (failed first invoice, abandoned checkout) no longer duns a tenant that never had a
+> live subscription. (3) `QuotaService` first-consume retry now catches **only** the unique-violation
+> (`SqlState 23505`); any other `DbUpdateException` propagates instead of being misread as a benign insert
+> race (which could spuriously deny a request with headroom). Tests in `BillingWebhookHandlerTests` +
+> `QuotaServiceTests`.
+
 **Epic key:** `BILLING`
 
 **Prerequisites (external, before any code):**

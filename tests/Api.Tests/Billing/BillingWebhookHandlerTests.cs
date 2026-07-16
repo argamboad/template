@@ -98,6 +98,39 @@ public class BillingWebhookHandlerTests(PostgresFixture fixture) : PostgresTestB
         Assert.Equal(BillingNotifications.PastDueKind, note.Kind);
     }
 
+    [Theory]
+    [InlineData(SubscriptionStatus.PastDue)]
+    [InlineData(SubscriptionStatus.Canceled)]
+    public async Task FirstEverEvent_NonGrantingStatus_DoesNotDun_ColdStart(string status)
+    {
+        // v3 LB-BILL-1/LB-BILL-4: the FIRST event for a tenant can carry past_due/canceled (a failed first
+        // invoice, an abandoned checkout later canceled). previousStatus is null, so it must NOT dun — the
+        // tenant never had a live subscription to lapse.
+        var tenant = Guid.CreateVersion7();
+        var ownerId = await SeedOwnerAsync(tenant);
+
+        await HandleAsync(Event(tenant, status, eventId: "evt_cold"));
+
+        await using var read = Fixture.CreateContext(tenant);
+        Assert.Empty(await read.Set<Notification>().Where(n => n.UserId == ownerId).ToListAsync());
+    }
+
+    [Fact]
+    public async Task ActiveToCanceled_NotifiesOwner()
+    {
+        // The positive control for the "transition out of a granting status" rule: a live sub that cancels
+        // still duns.
+        var tenant = Guid.CreateVersion7();
+        var ownerId = await SeedOwnerAsync(tenant);
+
+        await HandleAsync(Event(tenant, SubscriptionStatus.Active, eventId: "evt_a"));
+        await HandleAsync(Event(tenant, SubscriptionStatus.Canceled, eventId: "evt_b"));
+
+        await using var read = Fixture.CreateContext(tenant);
+        var note = Assert.Single(await read.Set<Notification>().Where(n => n.UserId == ownerId).ToListAsync());
+        Assert.Equal(BillingNotifications.CanceledKind, note.Kind);
+    }
+
     [Fact]
     public async Task Renewal_NoStatusChange_DoesNotNotify()
     {
@@ -130,6 +163,23 @@ public class BillingWebhookHandlerTests(PostgresFixture fixture) : PostgresTestB
         await using var read = Fixture.CreateContext(tenant);
         Assert.Equal(SubscriptionStatus.Active, (await read.Set<Subscription>().SingleAsync()).Status); // unchanged
         Assert.True(await EntitledAsync(tenant)); // still entitled
+    }
+
+    [Fact]
+    public async Task SameSecond_DistinctEvents_BothApply_NewerNotDroppedAsStale()
+    {
+        // v3 LB-BILL-1: Stripe's Created is whole-second, so two DISTINCT events in the same second must
+        // both apply — the recency guard rejects only STRICTLY older (<), not <=. Exact redelivery is caught
+        // by the inbox (by EventId), so this can't double-apply the same event.
+        var tenant = Guid.CreateVersion7();
+        var sameInstant = EventEpoch.AddMinutes(10);
+
+        Assert.Equal(WebhookResult.Applied, await HandleAsync(Event(tenant, SubscriptionStatus.Trialing, "evt_created", sameInstant)));
+        Assert.Equal(WebhookResult.Applied, await HandleAsync(Event(tenant, SubscriptionStatus.Active, "evt_updated", sameInstant))); // same second → still applies
+
+        await using var read = Fixture.CreateContext(tenant);
+        Assert.Equal(SubscriptionStatus.Active, (await read.Set<Subscription>().SingleAsync()).Status); // newer won, not dropped
+        Assert.True(await EntitledAsync(tenant));
     }
 
     [Fact]

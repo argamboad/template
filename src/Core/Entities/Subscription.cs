@@ -58,4 +58,8 @@ public static class SubscriptionStatus
     public const string Trialing = "trialing";
     public const string PastDue = "past_due";
     public const string Canceled = "canceled";
+
+    /// <summary>Statuses under which the plan is actually granted (live). Dunning is a transition OUT of one
+    /// of these, so this is also what tells a cold-start `past_due`/`canceled` from a real lapse (LB-BILL-4).</summary>
+    public static bool IsGranting(string? status) => status is Active or Trialing;
 }
