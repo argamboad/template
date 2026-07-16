@@ -76,10 +76,12 @@ public sealed class BillingWebhookHandler(
         var now = clock.GetUtcNow();
         var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken); // entered-tenant scoped
 
-        // Recency guard: webhooks are at-least-once and unordered, so apply only strictly-newer events.
-        // A redelivered older event (e.g. a stale 'canceled' after a live 'active') is acknowledged but
-        // not applied — the inbox already claimed its id, so it won't be reprocessed.
-        if (subscription is not null && subscription.LastEventAt is { } last && evt.OccurredAt <= last)
+        // Recency guard: webhooks are at-least-once and unordered, so apply only STRICTLY-newer events.
+        // Strictly older (<), not `<=` (v3 audit LB-BILL-1): Stripe's Created is whole-second, so two
+        // DISTINCT events in the same second (e.g. checkout created+updated, a rapid plan change) must both
+        // apply — dropping the newer one as "stale" could leave a paid tenant on Free. Exact REDELIVERY is
+        // already caught upstream by the inbox (by EventId), so it never reaches here to be double-applied.
+        if (subscription is not null && subscription.LastEventAt is { } last && evt.OccurredAt < last)
             return (false, subscription.Status);
 
         var previousStatus = subscription?.Status;
@@ -116,8 +118,12 @@ public sealed class BillingWebhookHandler(
 
     private async Task MaybeNotifyDunningAsync(BillingWebhookEvent evt, string? previousStatus, CancellationToken cancellationToken)
     {
-        if (evt.Status == previousStatus)
-            return; // no transition — nothing new to tell the owner
+        // Dun only on a transition OUT OF a granting (live) subscription — never a cold start (LB-BILL-4):
+        // the FIRST-ever event for a tenant can carry past_due/canceled (a failed first invoice, an
+        // abandoned checkout later canceled), and previousStatus is then null, so a bare `Status != previous`
+        // would notify a tenant that never had a live subscription. Also skips a non-transition.
+        if (evt.Status == previousStatus || !SubscriptionStatus.IsGranting(previousStatus))
+            return;
 
         var copy = evt.Status switch
         {
