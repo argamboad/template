@@ -99,7 +99,7 @@ internal sealed class TestInvitationSettings(int lifespanDays = 7) : IInvitation
 
 internal sealed class TestJwtSettings : IJwtSettings
 {
-    public string SecretKey => "test-secret-key-at-least-32-chars-long-000";
+    public string SecretKey { get; init; } = "test-secret-key-at-least-32-chars-long-000";
     public string Issuer => "PerezosoftTests";
     public int ExpiryMinutes => 60;
 }

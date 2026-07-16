@@ -50,7 +50,7 @@ public sealed class MfaService(
     IRepository<MfaRecoveryCode> recoveryCodes,
     IUserRepository users,
     IDataProtectionProvider dataProtection,
-    ITokenHasher hasher,
+    IRecoveryCodeHasher recoveryHasher,
     Configuration.IMfaSettings mfaSettings,
     TimeProvider clock) : IMfaService
 {
@@ -115,7 +115,7 @@ public sealed class MfaService(
         {
             var codeRaw = GenerateRecoveryCode();
             raw.Add(codeRaw);
-            await recoveryCodes.AddAsync(new MfaRecoveryCode { UserId = userId, CodeHash = hasher.HashToken(CanonicalizeRecoveryCode(codeRaw)) }, cancellationToken);
+            await recoveryCodes.AddAsync(new MfaRecoveryCode { UserId = userId, CodeHash = recoveryHasher.Hash(CanonicalizeRecoveryCode(codeRaw)) }, cancellationToken);
         }
         await mfa.SaveChangesAsync(cancellationToken);
         return (MfaConfirmResult.Enabled, raw);
@@ -172,8 +172,9 @@ public sealed class MfaService(
             return true;
         }
 
-        // Otherwise try a single-use recovery code (case- and separator-insensitive).
-        var hash = hasher.HashToken(CanonicalizeRecoveryCode(code));
+        // Otherwise try a single-use recovery code (case- and separator-insensitive). HMAC is deterministic,
+        // so the by-hash lookup still works — just under the peppered key (ADM-4).
+        var hash = recoveryHasher.Hash(CanonicalizeRecoveryCode(code));
         var recovery = await recoveryCodes.Query()
             .FirstOrDefaultAsync(c => c.UserId == userId && c.CodeHash == hash && c.UsedAt == null, cancellationToken);
         if (recovery is null)

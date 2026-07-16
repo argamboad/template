@@ -558,7 +558,7 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
             new UserRepository(db), _email, TimeProvider.System);
         var mfaService = new MfaService(
             new EfRepository<UserMfa>(db), new EfRepository<MfaRecoveryCode>(db), new UserRepository(db),
-            new EphemeralDataProtectionProvider(), new TokenHasher(), new TestMfaSettings(), TimeProvider.System);
+            new EphemeralDataProtectionProvider(), new RecoveryCodeHasher(new TestJwtSettings()), new TestMfaSettings(), TimeProvider.System);
         var controller = new AdminController(
             staff, new TenantRepository(db), ctx,
             new AuditLog(new EfRepository<AuditEvent>(db), TimeProvider.System),

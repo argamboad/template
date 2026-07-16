@@ -207,7 +207,7 @@ public class MfaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture
             new EfRepository<MfaRecoveryCode>(db),
             new UserRepository(db),
             new EphemeralDataProtectionProvider(),
-            new TokenHasher(),
+            new RecoveryCodeHasher(new TestJwtSettings()),
             new TestMfaSettings(),
             TimeProvider.System);
 
