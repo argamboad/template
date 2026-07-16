@@ -130,7 +130,7 @@ public class AdminController(
                 return NotFound(new ErrorResponse("tenant_not_found", "Tenant not found"));
 
             var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken);
-            if (subscription?.StripeSubscriptionId is not null)
+            if (subscription is { IsProviderManaged: true })
                 return Conflict(new ErrorResponse("provider_managed",
                     "This tenant has a live provider subscription; manage its plan at the billing provider."));
 
@@ -187,7 +187,7 @@ public class AdminController(
             var subscription = await subscriptions.Query().FirstOrDefaultAsync(cancellationToken);
             if (subscription is null)
                 return NoContent(); // already Free — nothing to revert
-            if (subscription.StripeSubscriptionId is not null)
+            if (subscription.IsProviderManaged)
                 return Conflict(new ErrorResponse("provider_managed",
                     "This tenant has a live provider subscription; cancel it at the billing provider instead."));
 
@@ -230,11 +230,13 @@ public class AdminController(
             if (tenant is null)
                 return NotFound(new ErrorResponse("tenant_not_found", "Tenant not found"));
 
-            // Optional subset: notify only the requested members (intersect with actual membership so a
-            // stray/non-member id can't notify someone outside this tenant). No list ⇒ every member.
+            // Targeting: a MISSING list (null) ⇒ every member; a PRESENT list ⇒ exactly its intersection
+            // with actual membership — so an explicitly-empty [] notifies NO ONE, not everyone (v3 audit
+            // LB-ADM-2). Intersecting also stops a stray/non-member id from reaching outside this tenant.
+            var targeted = request.UserIds is not null;
             var members = await tenants.GetMembersAsync(id, cancellationToken);
-            var recipients = (request.UserIds is { Count: > 0 } wanted
-                ? members.Where(m => wanted.Contains(m.UserId))
+            var recipients = (targeted
+                ? members.Where(m => request.UserIds!.Contains(m.UserId))
                 : members).ToList();
 
             foreach (var member in recipients)
@@ -242,7 +244,7 @@ public class AdminController(
                     metadata: null, cancellationToken);
 
             await audit.RecordAsync("admin.announcement.sent", staffUserId, nameof(Tenant), id.ToString(),
-                new { member_count = recipients.Count, targeted = request.UserIds is { Count: > 0 } }, cancellationToken);
+                new { member_count = recipients.Count, targeted }, cancellationToken);
             await auditEvents.SaveChangesAsync(cancellationToken);
             await scope.CommitAsync(cancellationToken);
 

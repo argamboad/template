@@ -39,6 +39,16 @@ public class Subscription : ITenantScoped
 
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Whether a live provider (Stripe) subscription owns this projection — the guard that stops staff
+    /// comp/revert from fighting real money (ADR-006). Keyed on LIVENESS, not id-presence: a canceled
+    /// subscription keeps its <see cref="StripeSubscriptionId"/> forever, so an id alone would permanently
+    /// lock a churned tenant out of a goodwill comp / cleanup (v3 audit ADM-5). A terminal
+    /// <see cref="SubscriptionStatus.Canceled"/> is no longer provider-managed. Computed, never stored.
+    /// </summary>
+    public bool IsProviderManaged =>
+        StripeSubscriptionId is not null && Status != SubscriptionStatus.Canceled;
 }
 
 /// <summary>Status constants for <see cref="Subscription.Status"/> (mirrors the Stripe lifecycle).</summary>

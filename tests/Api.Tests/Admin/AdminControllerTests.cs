@@ -306,6 +306,27 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task Staff_Announce_WithEmptyUserIds_NotifiesNoOne()
+    {
+        // v3 LB-ADM-2: a present-but-empty user_ids is an explicit "target this (empty) set" — it must reach
+        // NO ONE, not fall through to the whole tenant (the max-blast-radius bug).
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("ThetaEmpty", members: 3);
+        var title = $"Empty {Guid.NewGuid():N}";
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.Announce(
+                tenantId, new AdminAnnounceRequest { Title = title, Body = "b", UserIds = [] }, default));
+            Assert.Equal(0, Assert.IsType<AdminAnnounceResponse>(ok.Value).NotifiedCount);
+        }
+
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.Equal(0, await read.Set<Notification>().CountAsync(n => n.Title == title));
+    }
+
+    [Fact]
     public async Task NonStaff_AnnounceAll_Returns403()
     {
         var callerId = await SeedUserAsync("normal2@corp.com");
@@ -434,6 +455,39 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
 
         await using var read = Fixture.CreateContext(tenantId);
         Assert.Equal("sub_live_123", (await read.Set<Subscription>().SingleAsync(s => s.TenantId == tenantId)).StripeSubscriptionId);
+    }
+
+    [Fact]
+    public async Task Staff_CompCanceledSubscription_IsAllowed_EvenThoughItKeptItsStripeId()
+    {
+        // v3 ADM-5: a canceled Stripe sub keeps its id forever; keying the 409 on id-PRESENCE would lock a
+        // churned tenant (the exact goodwill-comp target) out permanently. Liveness, not id-presence.
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("MuCanceled", members: 1);
+        await SeedSubscriptionAsync(tenantId, stripeSubscriptionId: "sub_dead_123", status: SubscriptionStatus.Canceled);
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.SetSubscription(
+                tenantId, new AdminSetSubscriptionRequest { PlanKey = PlanKeys.Pro }, default));
+            Assert.Equal(SubscriptionStatus.Active, Assert.IsType<AdminSubscriptionResponse>(ok.Value).Status);
+        }
+    }
+
+    [Fact]
+    public async Task Staff_RevertCanceledSubscription_IsAllowed_NotBlockedByTheDeadStripeId()
+    {
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantId = await SeedTenantAsync("MuCanceledRevert", members: 1);
+        await SeedSubscriptionAsync(tenantId, stripeSubscriptionId: "sub_dead_456", status: SubscriptionStatus.Canceled);
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<NoContentResult>(await controller.RemoveSubscription(tenantId, default)); // cleaned up, not 409
+
+        await using var read = Fixture.CreateContext(tenantId);
+        Assert.False(await read.Set<Subscription>().AnyAsync(s => s.TenantId == tenantId)); // gone
     }
 
     [Fact]
@@ -625,13 +679,13 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         await db.SaveChangesAsync();
     }
 
-    private async Task SeedSubscriptionAsync(Guid tenantId, string? stripeSubscriptionId = null)
+    private async Task SeedSubscriptionAsync(Guid tenantId, string? stripeSubscriptionId = null, string? status = null)
     {
         await using var db = Fixture.CreateContext(tenantId); // interceptor stamps TenantId
         db.Set<Subscription>().Add(new Subscription
         {
             PlanKey = PlanKeys.Pro,
-            Status = SubscriptionStatus.Active,
+            Status = status ?? SubscriptionStatus.Active,
             StripeCustomerId = "cus_x",
             StripeSubscriptionId = stripeSubscriptionId,
             CreatedAt = DateTimeOffset.UtcNow,
