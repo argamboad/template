@@ -26,6 +26,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ICookieService, CookieService>();
         services.AddScoped<ITokenGenerator, TokenGenerator>();
         services.AddScoped<ITokenHasher, TokenHasher>();
+        // Recovery codes are low-entropy, so they get a PEPPERED HMAC (ADM-4) instead of the plain hash the
+        // high-entropy tokens use. Singleton: the key is derived from Jwt:Secret once.
+        services.AddSingleton<IRecoveryCodeHasher, RecoveryCodeHasher>();
         services.AddSingleton<ILinkTokenService, LinkTokenService>();
         services.AddSingleton<INativeAuthCodeService, NativeAuthCodeService>();
         return services;

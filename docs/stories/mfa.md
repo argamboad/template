@@ -78,6 +78,18 @@ return recovery codes **once**), disable (verify a code → wipe secret + codes)
 > retryable — the per-user lockout above, not the challenge, is what caps guessing. The signed token's own
 > expiry still caps the real lifetime, so a restore can't extend a challenge.
 
+> **2026-07-15 — peppered recovery-code hashing (v3 audit ADM-4).** Typeable recovery codes are only ~49.5
+> bits, and were stored under the shared **unsalted SHA-256** `ITokenHasher` — a leaked `MfaRecoveryCode`
+> row was offline-crackable (day-scale on a GPU) into a working second factor. They now hash through a new
+> **`IRecoveryCodeHasher`** — HMAC-SHA256 under a server **pepper** — so a DB leak alone is useless (an
+> attacker needs `Jwt:Secret` too). The pepper is **derived from `Jwt:Secret` via HKDF** with a
+> domain-separation label, so it needs no separate secret and inherits that secret's presence/min-length
+> guard while staying independent of JWT signing. HMAC is deterministic, so the by-hash lookup is unchanged;
+> codes stay 10 chars (no UI change). The high-entropy tokens (magic-link/API-key/invitation) keep plain
+> SHA-256 — the finding is specific to the low-entropy codes. **Upgrade note:** changing the hash invalidates
+> existing recovery-code hashes; a real deployment adopting this must have users regenerate codes (disable +
+> re-enroll) — no dual-read fallback (this template has no real users). Tests: `RecoveryCodeHasherTests`.
+
 **Acceptance criteria**
 
 ```gherkin
