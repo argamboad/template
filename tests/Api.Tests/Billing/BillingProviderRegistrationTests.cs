@@ -32,6 +32,41 @@ public class BillingProviderRegistrationTests
     public void NoStripeKey_OutsideDevelopment_ThrowsAtStartup() =>
         Assert.Throws<InvalidOperationException>(() => ResolveImpl(Environments.Production, new()));
 
+    // v3 DEP-10: when the deploy declares its expected Stripe mode, a mismatched key fails closed at startup.
+
+    [Fact]
+    public void ExpectLiveKey_ButTestKey_ThrowsAtStartup() =>
+        Assert.Throws<InvalidOperationException>(() => ResolveImpl(Environments.Production, new()
+        {
+            ["Billing:Stripe:SecretKey"] = "sk_test_123",
+            ["Billing:Stripe:ExpectLiveKey"] = "true",
+        }));
+
+    [Fact]
+    public void ExpectTestKey_ButLiveKey_ThrowsAtStartup() =>
+        Assert.Throws<InvalidOperationException>(() => ResolveImpl(Environments.Production, new()
+        {
+            ["Billing:Stripe:SecretKey"] = "sk_live_123",
+            ["Billing:Stripe:ExpectLiveKey"] = "false",
+        }));
+
+    [Theory]
+    [InlineData("sk_live_123", "true")]
+    [InlineData("sk_test_123", "false")]
+    public void ExpectedMode_MatchingKey_SelectsStripe(string key, string expectLive) =>
+        Assert.Equal(typeof(StripeBillingProvider), ResolveImpl(Environments.Production, new()
+        {
+            ["Billing:Stripe:SecretKey"] = key,
+            ["Billing:Stripe:ExpectLiveKey"] = expectLive,
+        }));
+
+    [Fact]
+    public void NoExpectLiveKey_SkipsModeCheck_SelectsStripe() => // unset ⇒ no enforcement (local/dev)
+        Assert.Equal(typeof(StripeBillingProvider), ResolveImpl(Environments.Production, new()
+        {
+            ["Billing:Stripe:SecretKey"] = "sk_test_123",
+        }));
+
     private static Type? ResolveImpl(string environmentName, Dictionary<string, string?> settings)
     {
         // A dummy connection string so AddInfrastructure's DbContext registration doesn't need a real DB.
