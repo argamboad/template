@@ -46,7 +46,7 @@ public class BillingControllerTests(PostgresFixture fixture) : PostgresTestBase(
 
         // The owner gate now lives in [RequireTenantPermission] (B9-5); run it as the pipeline would.
         var result = await TenantPermissionGate.RunAsync(
-            typeof(BillingController), nameof(BillingController.Checkout), new TenantRepository(db), memberId);
+            typeof(BillingController), nameof(BillingController.Checkout), new TenantRepository(db), memberId, tenantId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
@@ -108,7 +108,7 @@ public class BillingControllerTests(PostgresFixture fixture) : PostgresTestBase(
 
         // The owner gate now lives in [RequireTenantPermission] (B9-5); run it as the pipeline would.
         var result = await TenantPermissionGate.RunAsync(
-            typeof(BillingController), nameof(BillingController.Portal), new TenantRepository(db), memberId);
+            typeof(BillingController), nameof(BillingController.Portal), new TenantRepository(db), memberId, tenantId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);
@@ -178,7 +178,7 @@ public class BillingControllerTests(PostgresFixture fixture) : PostgresTestBase(
         await using var db = Fixture.CreateContext(tenantId);
 
         var result = await TenantPermissionGate.RunAsync(
-            typeof(BillingController), nameof(BillingController.Summary), new TenantRepository(db), memberId);
+            typeof(BillingController), nameof(BillingController.Summary), new TenantRepository(db), memberId, tenantId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);

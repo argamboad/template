@@ -109,7 +109,7 @@ public class TenantExportTests(PostgresFixture fixture) : PostgresTestBase(fixtu
 
         // ExportData gate moved to [RequireTenantPermission] (B9-5); run it as the pipeline would.
         var result = await TenantPermissionGate.RunAsync(
-            typeof(HouseholdController), nameof(HouseholdController.Export), new TenantRepository(db), callerId);
+            typeof(HouseholdController), nameof(HouseholdController.Export), new TenantRepository(db), callerId, tenantId);
 
         var obj = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status403Forbidden, obj.StatusCode);

@@ -24,8 +24,23 @@ public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(
     [InlineData(Permission.ViewTenant)]
     public async Task Owner_HasEveryPermission(Permission permission)
     {
-        var ownerId = await SeedMembershipAsync(Guid.CreateVersion7(), TenantRoles.Owner);
-        Assert.True(await NewService(ownerId).HasAsync(permission));
+        var tenantId = Guid.CreateVersion7();
+        var ownerId = await SeedMembershipAsync(tenantId, TenantRoles.Owner);
+        Assert.True(await NewService(ownerId, tenantId).HasAsync(permission));
+    }
+
+    [Fact]
+    public async Task Authz_ResolvesForTheJwtTenant_AndFailsClosedOnAMismatch()
+    {
+        // v3 LB-ADM-3: authz must resolve the membership for the caller's JWT tenant. (A DB unique index on
+        // UserId enforces one membership per user today, so the "two memberships" case can't occur — but a
+        // token whose tenant_id does NOT match the user's membership, e.g. stale/forged, must fail closed
+        // rather than silently authorize against the user's other-tenant role.)
+        var tenantId = Guid.CreateVersion7();
+        var ownerId = await SeedMembershipAsync(tenantId, TenantRoles.Owner);
+
+        Assert.True(await NewService(ownerId, tenantId).HasAsync(Permission.TransferOwnership));          // JWT matches → owner
+        Assert.False(await NewService(ownerId, Guid.CreateVersion7()).HasAsync(Permission.TransferOwnership)); // JWT names another tenant → denied
     }
 
     [Theory]
@@ -40,7 +55,7 @@ public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(
         var tenantId = Guid.CreateVersion7();
         await SeedMembershipAsync(tenantId, TenantRoles.Owner);
         var adminId = await SeedMembershipAsync(tenantId, TenantRoles.Admin);
-        Assert.Equal(granted, await NewService(adminId).HasAsync(permission));
+        Assert.Equal(granted, await NewService(adminId, tenantId).HasAsync(permission));
     }
 
     [Theory]
@@ -52,13 +67,13 @@ public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(
         var tenantId = Guid.CreateVersion7();
         await SeedMembershipAsync(tenantId, TenantRoles.Owner);
         var memberId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
-        Assert.Equal(granted, await NewService(memberId).HasAsync(permission));
+        Assert.Equal(granted, await NewService(memberId, tenantId).HasAsync(permission));
     }
 
     [Fact]
     public async Task NoMembership_FailsClosed()
     {
-        Assert.False(await NewService(Guid.CreateVersion7()).HasAsync(Permission.ViewTenant));
+        Assert.False(await NewService(Guid.CreateVersion7(), Guid.CreateVersion7()).HasAsync(Permission.ViewTenant));
     }
 
     [Fact]
@@ -71,10 +86,13 @@ public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(
         Assert.False(await service.HasAsync(Permission.ViewTenant));
     }
 
-    private PermissionService NewService(Guid currentUserId)
+    // The principal carries BOTH the user id and the JWT tenant_id — authz resolves the membership for that
+    // tenant (LB-ADM-3), exactly as a real request does.
+    private PermissionService NewService(Guid currentUserId, Guid tenantId)
     {
         var user = new ClaimsPrincipal(new ClaimsIdentity(
-            [new Claim(ClaimTypes.NameIdentifier, currentUserId.ToString())], authenticationType: "test"));
+            [new Claim(ClaimTypes.NameIdentifier, currentUserId.ToString()), new Claim(JwtClaims.TenantId, tenantId.ToString())],
+            authenticationType: "test"));
         var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = user } };
         return new PermissionService(accessor, new TenantRepository(Fixture.CreateContext()));
     }
@@ -83,12 +101,19 @@ public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(
     private async Task<Guid> SeedMembershipAsync(Guid tenantId, string role)
     {
         var userId = Guid.CreateVersion7();
+        await SeedMembershipForAsync(userId, tenantId, role, createUser: true);
+        return userId;
+    }
+
+    /// <summary>Adds a membership for an existing/new user in a tenant (for the multi-membership case).</summary>
+    private async Task SeedMembershipForAsync(Guid userId, Guid tenantId, string role, bool createUser = false)
+    {
         await using var db = Fixture.CreateContext();
         if (!await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(db.Set<Tenant>(), t => t.Id == tenantId))
             db.Set<Tenant>().Add(new Tenant { Id = tenantId, Name = "Tenant" });
-        db.Set<User>().Add(new User { Id = userId, Email = $"u-{userId:N}@x.com" });
+        if (createUser || !await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(db.Set<User>(), u => u.Id == userId))
+            db.Set<User>().Add(new User { Id = userId, Email = $"u-{userId:N}@x.com" });
         db.Set<TenantMembership>().Add(new TenantMembership { TenantId = tenantId, UserId = userId, Role = role });
         await db.SaveChangesAsync();
-        return userId;
     }
 }
