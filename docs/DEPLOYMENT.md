@@ -160,14 +160,26 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 2. Repo → **Settings → Secrets and variables → Actions**:
    - Secret **`RENDER_DEPLOY_HOOK_STAGING`** = the deploy hook URL.
    - Variable **`STAGING_BASE_URL`** = `https://<app>-staging.onrender.com`.
+
+   > **Set them together — the hook without the base URL now FAILS the run** (v3 audit DEP-6). The hook is
+   > what fires the deploy; the base URL is what verifies it. Previously a hook-without-URL deployed for
+   > real and reported green having asserted nothing. Configure both, or neither.
 3. Now a push to `develop` that passes every CI gate triggers the deploy, **waits for the new build to
    actually be live** (polls `/api/version` until it reports the pushed commit — the old instance keeps
    serving during Render's build), then smoke-tests the live URL (liveness/readiness, SPA shell +
    deep-link, `/api/*` → 404, `/api/auth/providers`). A red smoke fails the run. Until the secret +
    variable exist, the `deploy-staging` job logs a notice and passes.
-4. **Prod** (when you have a prod service): create a **`production`** GitHub Environment (repo Settings →
-   Environments) with a **required reviewer**, and add secret **`RENDER_DEPLOY_HOOK_PROD`**. A push to
-   `main` then waits for your approval before deploying — keeping `main` deploy-only and deliberate.
+4. **Prod** (when you have a prod service) — all three, and the reviewer is the actual gate:
+   - Create a **`production`** GitHub Environment (repo Settings → Environments) and add a **required
+     reviewer**. ⚠️ **Do not skip this.** The `deploy-prod` job names the environment, but the *approval*
+     lives only in repo settings — it cannot be committed. A clone that adds the hook without the reviewer
+     gets **un-gated auto-deploy to prod on every `main` push** (v3 audit DEP-7).
+   - Secret **`RENDER_DEPLOY_HOOK_PROD`** = the prod deploy hook URL.
+   - Variable **`PROD_BASE_URL`** = the prod service URL. Same pairing rule as staging: hook without base
+     URL fails the run rather than shipping unverified.
+
+   Prod then runs the **same** version-gated smoke as staging (they share
+   `.github/scripts/deploy-smoke.sh`, so the two cannot drift), behind your approval.
 5. **Postman workspace mirror** (optional, same graceful-skip pattern): secret **`POSTMAN_API_KEY`**
    (Postman → Settings → API keys) + variable **`POSTMAN_WORKSPACE_ID`** let the `postman-sync`
    workflow push `docs/postman/**` to the Postman workspace on every `develop` change — see
@@ -243,4 +255,5 @@ always-on plan), with **live** Stripe keys, the **two-role RLS setup (§7 — re
 prod-activation checklist)**, a verified email sender domain (DKIM), and — optionally — a
 custom domain (~$10/yr, the first worthwhile paid upgrade: nicer URLs + deliverability). Rehearse risky
 migrations against a **Neon branch** (a free copy-of-prod DB) before promoting. The `main`→prod deploy is
-gated behind a manual approval (DEPLOY-3).
+gated behind a manual approval **only once you add the required reviewer to the `production` Environment**
+— that gate is repo settings, not code, so it does not come with the clone. See §6.4.
