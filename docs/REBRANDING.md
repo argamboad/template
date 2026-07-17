@@ -32,6 +32,14 @@ Backstop after working through the list: `git grep -i perezosoft` and a search f
   collection path in `.github/workflows/postman-sync.yml` in the same commit; and since the sync
   matches workspace items **by name**, delete the old-brand copies in the Postman workspace once
   after the first post-rename sync.
+- **`render.yaml`** (v3 audit DEP-12) — two spots: the blueprint's `Email__Smtp__FromName` value
+  (currently "Perezosoft"; pairs with the appsettings default above), and the **service `name`**
+  (`template-staging`) — it becomes your public `*.onrender.com` URL, and that URL is what you put in
+  the `STAGING_BASE_URL` repo variable and register with OAuth providers/Stripe, so rename it **before**
+  the first deploy, not after.
+- **`src/Maui/Perezosoft.Maui.csproj` — `<ApplicationTitle>`** ("Perezosoft Platform"): the installed
+  app's display name on every native platform (launcher label, window title, app switcher). It sits
+  right next to `ApplicationId` (§5) — change them together.
 
 ## 2. Tagline — "Lazy reputation. Efficient engineering." → yours
 - `src/Shared.Ui/wwwroot/brand/lockup_light.svg` — the wordmark-lockup text
@@ -82,6 +90,26 @@ These must all match each other **and** your OAuth provider registration:
 - `src/Api/appsettings.json` — `Auth:Native:CallbackScheme`
 - `src/Maui/Perezosoft.Maui.csproj` — `ApplicationId` (`com.perezosoft.…`)
 - Provider consoles — register `{scheme}://auth` and your `signin-*` redirect URIs
+
+**…and everything that hardcodes the OLD `ApplicationId` (v3 audit DEP-12/TR-7).** Renaming
+`ApplicationId` per the list above and stopping there **breaks the native CI smokes and Catalyst
+SecureStorage** — these four reference `com.perezosoft.platform` directly and must move in the same
+commit:
+- **`.github/workflows/ci.yml` — the iOS-simulator smoke** (`xcrun simctl launch … com.perezosoft.platform`
+  in `native-smoke-apple`): launches the app by bundle id; a renamed app never starts → red canary. The
+  same block globs the bundle path `Perezosoft.Maui.app` (follows the project/assembly name) and sets the
+  `SIMCTL_CHILD_PEREZOSOFT_API_BASE_URL` env prefix — sweep the whole step, not just the id.
+- **`.github/workflows/ci.yml` — the Android smoke** (`adb install …/com.perezosoft.platform-Signed.apk`,
+  `adb shell monkey -p …`, `adb shell pidof …` in `native-smoke-android`): the APK filename derives from
+  `ApplicationId`, so install, launch, and the crash-log `pidof` all miss after a rename.
+- **`tests/native-smoke-android/smoke.js`** — the `PKG` fallback (`process.env.NATIVE_SMOKE_PKG ||
+  'com.perezosoft.platform'`). The env override exists, but CI doesn't set it — update the committed
+  default.
+- **`src/Maui/Platforms/MacCatalyst/Entitlements.plist`** — `keychain-access-groups` entry
+  `$(AppIdentifierPrefix)com.perezosoft.platform`. Under real signing (Release/store, NATIVE-9) a
+  keychain group that doesn't match the new bundle id means **SecureStorage silently fails on Catalyst**
+  — sessions won't persist. Debug builds won't catch it (they run unsandboxed via
+  `Entitlements.Debug.plist` — see the comment there).
 
 ## Verify the rebrand
 - `git grep -i perezosoft` and a tagline search both return nothing (outside this doc).
