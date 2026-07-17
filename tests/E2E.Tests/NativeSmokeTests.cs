@@ -16,6 +16,14 @@ namespace Perezosoft.E2E.Tests;
 /// smoke selects it with <c>--filter "Category=NativeSmoke"</c>. Config via env:
 /// NATIVE_SMOKE_CDP (default http://127.0.0.1:9223 — IPv4 literal, not localhost: WebView2 150+
 /// binds CDP on IPv4 loopback only), MAILPIT_BASE_URL (the Mailpit helper).
+///
+/// NOT CURRENTLY CI-WIRED (2026-07-17). WebView2 Runtime 150 strips <c>--remote-debugging-port</c>
+/// under an elevated host (GitHub Windows runners run elevated), so the CDP endpoint never binds and
+/// this can't attach there (MicrosoftEdge/WebView2Feedback#5640). The <c>native-smoke-windows</c> CI
+/// leg was de-scoped to a process-alive + provider-probe boot check (matching the Apple leg); the
+/// full UI-driving journey still runs on the Android leg (<c>tests/native-smoke-android/smoke.js</c>).
+/// This fixture stays for LOCAL use on a NON-elevated box, and is the target to re-wire if the Windows
+/// leg later pins Fixed-Version WebView2 149 or launches the app de-elevated.
 /// </summary>
 [TestFixture]
 [Explicit("Needs a running native app with CDP enabled — launched by the native-smoke CI job")]

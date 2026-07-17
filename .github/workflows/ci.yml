@@ -417,11 +417,15 @@ jobs:
           xcrun simctl spawn "$UDID" log show --last 5m --predicate 'process == "Perezosoft.Maui"' --style compact 2>/dev/null | tail -n 40 || true
 
   # Native smoke — Windows (NATIVE-7, ADR-018). Runs the REAL MAUI Windows app against a real API +
-  # Postgres + Mailpit, and drives its WebView2 over the Chrome DevTools Protocol (Playwright
-  # ConnectOverCDP — no Appium): boot → OTP sign-in → an authorized page loads. Develop pushes with
-  # native-relevant changes only (see native-paths; Windows bills 2×, job ~10 min). Deliberately NOT
-  # in the deploy-staging needs — a flaky native run must not block web deploys (accepted-risk note
-  # in ADR-018: native UI automation is flakier than browser E2E; this stays a tiny canary).
+  # Postgres and asserts BOOT-TO-LOGIN: the app process stays up and its Blazor login page reaches the
+  # API (a GET /api/auth/providers 200 in api.log) — proving the WebView booted and can talk to the
+  # backend. This is the same process-alive + provider-probe canary as the Apple leg, NOT a CDP
+  # UI-driving smoke: WebView2 Runtime 150 strips --remote-debugging-port from
+  # WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS when the host runs elevated (GitHub runners do), so the CDP
+  # endpoint never binds (MicrosoftEdge/WebView2Feedback#5640; runner image 20260707.563+). The
+  # UI-driving journey (fill email → OTP → household) still runs end-to-end on the ANDROID leg below,
+  # so that coverage isn't lost. Develop pushes with native-relevant changes only (see native-paths).
+  # Deliberately NOT in the deploy-staging needs — a native run must not block web deploys (ADR-018).
   native-smoke-windows:
     needs: native-paths
     if: needs.native-paths.outputs.changed == 'true'
@@ -437,17 +441,18 @@ jobs:
       - name: Install the MAUI workloads (host-aware)
         run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
 
-      - name: Build the app + API + smoke tests
+      - name: Build the app + API
+        # The boot-probe drives no CDP/Playwright, so E2E.Tests isn't built here (the Linux `e2e` job
+        # already compiles it). API + the Windows MAUI app are all this leg needs.
         run: |
           dotnet restore src/Api/Perezosoft.Api.csproj --locked-mode
-          dotnet restore tests/E2E.Tests/Perezosoft.E2E.Tests.csproj --locked-mode
           dotnet build src/Api/Perezosoft.Api.csproj -c Debug --no-restore
-          dotnet build tests/E2E.Tests/Perezosoft.E2E.Tests.csproj -c Debug --no-restore
           dotnet build src/Maui/Perezosoft.Maui.csproj -f net10.0-windows10.0.19041.0 -c Debug
 
-      - name: Start Postgres (preinstalled) + Mailpit
+      - name: Start Postgres (preinstalled)
         # The Windows runner image ships PostgreSQL with its service disabled (creds
-        # postgres/root via PGUSER/PGPASSWORD). Mailpit is a single Go binary.
+        # postgres/root via PGUSER/PGPASSWORD). No Mailpit: the boot-probe never signs in, so no
+        # email is sent (that path is exercised by the Android leg's full sign-in journey).
         run: |
           $svc = Get-Service postgresql* | Select-Object -First 1
           if (-not $svc) { Write-Error "no preinstalled PostgreSQL service on this image"; exit 1 }
@@ -455,35 +460,22 @@ jobs:
           Start-Service $svc.Name
           $env:PGPASSWORD = "root"
           & "$env:PGBIN\psql" -U postgres -c "CREATE DATABASE smoke;"
-          # Pin the version + verify the hash before executing (v3 audit DEP-9). `releases/latest` made this
-          # non-reproducible AND unverifiable: the binary silently changed under us on every upstream release.
-          # Mailpit publishes no checksums.txt, so this hash was computed from the pinned asset; recompute it
-          # when bumping MAILPIT_VERSION (keep it == the service-container image tags below).
-          $MailpitVersion = "v1.30.4"
-          $MailpitSha256  = "151378799345709C00E287A1B00BFEE6F7CE5F5E8D0C00CC4133E3BBF2EAABDB"
-          Invoke-WebRequest -Uri "https://github.com/axllent/mailpit/releases/download/$MailpitVersion/mailpit-windows-amd64.zip" -OutFile mailpit.zip
-          $got = (Get-FileHash mailpit.zip -Algorithm SHA256).Hash
-          if ($got -ne $MailpitSha256) { Write-Error "mailpit checksum mismatch: got $got, want $MailpitSha256"; exit 1 }
-          Expand-Archive mailpit.zip -DestinationPath mailpit-bin
-          Start-Process -FilePath "mailpit-bin\mailpit.exe" -WindowStyle Hidden
 
-      - name: Boot API + app, run the native smoke
+      - name: Boot API + app, assert boot-to-login
         # Everything process-bound lives in ONE step (the runner tears down a step's process tree).
-        # The app is pointed at the plain-HTTP API via PEREZOSOFT_API_BASE_URL (no dev-cert hoops) and
-        # launched with WebView2 remote debugging for the CDP connection.
+        # The app is pointed at the plain-HTTP API via PEREZOSOFT_API_BASE_URL (no dev-cert hoops).
+        # No CDP: we assert the app stays up AND its login page's provider probe reaches the API
+        # (grep-able because request logging is raised), exactly like the Apple leg.
         env:
           ASPNETCORE_ENVIRONMENT: Development
           ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=smoke;Username=postgres;Password=root"
           Jwt__Secret: "ci-native-smoke-jwt-signing-key-0123"
           PEREZOSOFT_API_BASE_URL: "http://localhost:5238"
-          WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=9223"
-          # 127.0.0.1, NOT localhost: WebView2 Runtime 150 (runner image 20260707.563+) binds the CDP
-          # port on IPv4 loopback only — "localhost" resolves to ::1 first in pwsh, which actively
-          # refuses, and nothing falls back. v149 images worked; v150 broke every run (this exact
-          # regression is upstream as MicrosoftEdge/WebView2Feedback#5640).
-          NATIVE_SMOKE_CDP: "http://127.0.0.1:9223"
-          MAILPIT_BASE_URL: "http://localhost:8025"
         run: |
+          # Raise AspNetCore request logging so the provider probe is grep-able in api.log (the dotted
+          # key can't be a PowerShell $env: assignment — the '.' parses as member access — so set it
+          # via the environment API; Start-Process inherits it).
+          [Environment]::SetEnvironmentVariable('Logging__LogLevel__Microsoft.AspNetCore', 'Information')
           $api = Start-Process dotnet -ArgumentList "run --project src/Api/Perezosoft.Api.csproj -c Debug --no-build --urls http://localhost:5238" -PassThru -RedirectStandardOutput api.log -RedirectStandardError api.err.log
 
           Write-Host "Waiting for the API..."
@@ -496,37 +488,29 @@ jobs:
 
           $exe = "src/Maui/bin/Debug/net10.0-windows10.0.19041.0/win-x64/Perezosoft.Maui.exe"
           if (-not (Test-Path $exe)) { $exe = Get-ChildItem -Recurse -Path src/Maui/bin -Filter Perezosoft.Maui.exe | Select-Object -First 1 -ExpandProperty FullName }
-          Start-Process -FilePath $exe
+          $app = Start-Process -FilePath $exe -PassThru
+          Write-Host "Waiting for the login page's provider probe (app pid $($app.Id))..."
 
-          Write-Host "Waiting for the WebView2 CDP endpoint..."
-          $cdp = $false
-          foreach ($i in 1..40) {
-            # 127.0.0.1, not localhost — WebView2 150 binds IPv4 loopback only (see NATIVE_SMOKE_CDP above).
-            try { if ((Invoke-WebRequest -Uri "http://127.0.0.1:9223/json/version" -UseBasicParsing -TimeoutSec 3).StatusCode -eq 200) { $cdp = $true; break } } catch {}
+          function Probes { (Select-String -Path api.log -Pattern 'Request finished.*GET.*/api/auth/providers.*200' -ErrorAction SilentlyContinue | Measure-Object).Count }
+          $ok = $false
+          foreach ($i in 1..40) {   # up to 2 min — first Blazor boot in a cold WebView2 is slow
+            if ($app.HasExited) { Write-Host "::error::the Windows app process exited after launch (startup crash)"; break }
+            if ((Probes) -gt 0) { $ok = $true; Write-Host "provider probe hit the API after ~$($i*3)s"; break }
             Start-Sleep -Seconds 3
           }
-          if (-not $cdp) {
-            Write-Host "::error::CDP endpoint never came up on 127.0.0.1:9223"
-            # Disambiguate the failure modes that were conflated in one message before (each was a
-            # multi-hour triage): app dead vs runtime missing vs CDP bound elsewhere vs API-side.
-            $proc = Get-Process -Name "Perezosoft.Maui" -ErrorAction SilentlyContinue
-            Write-Host ("app process alive: " + [bool]$proc)
+          if (-not $ok) {
+            Write-Host "::error::the Windows app never reached /api/auth/providers — Blazor did not boot or cannot reach the API"
+            Write-Host ("app process alive: " + (-not $app.HasExited))
             $rt = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue).pv
             Write-Host ("WebView2 runtime: " + ($rt ?? "NOT INSTALLED"))
-            Write-Host "listeners on 9223:"
-            Get-NetTCPConnection -LocalPort 9223 -State Listen -ErrorAction SilentlyContinue |
-              ForEach-Object { Write-Host ("  " + $_.LocalAddress + ":" + $_.LocalPort) }
-            Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction SilentlyContinue |
-              Where-Object { $_.CommandLine -notmatch '--type=' } |
-              ForEach-Object { Write-Host ("webview2 main cmdline: " + $_.CommandLine) }
             Get-Content api.log -Tail 40
             exit 1
           }
 
-          dotnet test tests/E2E.Tests/Perezosoft.E2E.Tests.csproj -c Debug --no-build --filter "Category=NativeSmoke"
-
-      - name: API log (on failure)
-        if: failure()
+      - name: API log (diagnostics)
+        # always(), not failure(): a timed-out job's cancelled steps never satisfy failure(), leaving
+        # zero diagnostics (same reasoning as the Apple/Android legs).
+        if: always()
         run: if (Test-Path api.log) { Get-Content api.log -Tail 100 }
 
   # Native smoke — Android (NATIVE-7, ADR-018). Same canary as the Windows leg, on a real emulator.
