@@ -14,7 +14,8 @@ namespace Perezosoft.E2E.Tests;
 ///
 /// [Explicit] keeps it out of the default `dotnet test` run (the browser e2e job); the CI native
 /// smoke selects it with <c>--filter "Category=NativeSmoke"</c>. Config via env:
-/// NATIVE_SMOKE_CDP (default http://localhost:9223), MAILPIT_BASE_URL (the Mailpit helper).
+/// NATIVE_SMOKE_CDP (default http://127.0.0.1:9223 — IPv4 literal, not localhost: WebView2 150+
+/// binds CDP on IPv4 loopback only), MAILPIT_BASE_URL (the Mailpit helper).
 /// </summary>
 [TestFixture]
 [Explicit("Needs a running native app with CDP enabled — launched by the native-smoke CI job")]
@@ -22,7 +23,7 @@ namespace Perezosoft.E2E.Tests;
 public class NativeSmokeTests
 {
     private static string CdpUrl =>
-        Environment.GetEnvironmentVariable("NATIVE_SMOKE_CDP") ?? "http://localhost:9223";
+        Environment.GetEnvironmentVariable("NATIVE_SMOKE_CDP") ?? "http://127.0.0.1:9223";
 
     [Test]
     public async Task Native_App_Boots_SignsIn_And_LoadsHousehold()
