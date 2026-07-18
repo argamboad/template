@@ -18,11 +18,12 @@
 - `.gitleaks.toml` — secret-scanning gate — part of 'secrets never in the repo'
 - `docker-compose.yml` — Postgres 17 + Mailpit; grows in 2.3/8.2
 
-## 1.1 — Solution, projects & supply chain (14 files)
+## 1.1 — Solution, projects & supply chain (15 files)
 
 - `Directory.Build.props` — warnings-as-errors etc.
 - `Directory.Packages.props` — Central Package Management (R25/R27)
 - `Perezosoft.slnx`
+- `global.json` — single SDK pin source (v3 DEP-4) — pairs with the committed lockfiles
 - `src/Api/Perezosoft.Api.csproj` — created here; PackageReferences added as lessons need them
 - `src/Api/Properties/launchSettings.json`
 - `src/Core/Perezosoft.Core.csproj` — created here; PackageReferences added as lessons need them
@@ -55,7 +56,7 @@
 - `tests/Api.Tests/Infrastructure/TestAppDbContext.cs` — test-only subclass so platform tests don't depend on Notes (R9)
 - `tests/Api.Tests/MigrationsTests.cs`
 
-## 1.4 — Configuration & the options pattern (7 files)
+## 1.4 — Configuration & the options pattern (8 files)
 
 - `src/Api/Configuration/ServiceRegistrationExtensions.cs` — grows as services appear
 - `src/Api/Configuration/SettingsProvider.cs`
@@ -63,6 +64,7 @@
 - `src/Api/appsettings.Development.json` — non-secret config; grows every config lesson
 - `src/Api/appsettings.json` — non-secret config; grows every config lesson
 - `src/Infrastructure/ServiceCollectionExtensions.cs` — grows as infra appears
+- `tests/Api.Tests/Configuration/ConfigPostureTests.cs` — pins every config-gated feature CLOSED under empty config (v3 S0-G3)
 - `tests/Api.Tests/DocAndConfigSyncTests.cs` — config keys must exist in .env.example + appsettings (R20)
 
 ## 1.5 — The error envelope (1 files)
@@ -122,7 +124,7 @@
 - `src/Infrastructure/Email/SmtpSettings.cs`
 - `tests/Api.Tests/SmtpSettingsTests.cs` — incl. the SMTP-revocation knob (PR #125)
 
-## 2.4 — Passwordless: magic link + OTP (11 files)
+## 2.4 — Passwordless: magic link + OTP (12 files)
 
 - `src/Api/Services/PasswordlessService.cs` — single-use, hashed, time-limited
 - `src/Api/Services/SingleUseCacheToken.cs` — one-shot handoff token
@@ -131,6 +133,7 @@
 - `src/Infrastructure/Persistence/Configurations/LoginTokenConfiguration.cs`
 - `src/Infrastructure/Repositories/LoginTokenRepository.cs`
 - `tests/Api.Tests/OtpErrorMappingTests.cs`
+- `tests/Api.Tests/PasswordlessConcurrencyTests.cs` — atomic single-use consume + lockout counter (v3 LB-AUTH-2/3)
 - `tests/Api.Tests/PasswordlessServiceTests.cs`
 - `tests/Api.Tests/SingleUseCacheTokenTests.cs`
 - `tests/Core.Tests/Auth/NativeOtpLockoutTests.cs` — OTP resend-proof lockout coverage on the native verify path (landed on develop post-write)
@@ -152,11 +155,13 @@
 - `tests/Api.Tests/Integration/AuthProvidersEndpointTests.cs`
 - `tests/Api.Tests/ProviderEmailTrustTests.cs`
 
-## 2.6 — Tenancy I — the global query filter (reads) (6 files)
+## 2.6 — Tenancy I — the global query filter (reads) (8 files)
 
 - `src/Api/Services/HttpCurrentTenant.cs` — tenant_id claim -> request scope
 - `src/Core/Abstractions/ICurrentTenant.cs`
 - `src/Core/Entities/ITenantScoped.cs` — the marker the filter keys off
+- `tests/Api.Tests/Architecture/TenantHatchGuard.cs` — polices QueryAllTenants call sites (the sanctioned hatch stays reviewable)
+- `tests/Api.Tests/Architecture/TenantHatchGuardTests.cs`
 - `tests/Api.Tests/HttpCurrentTenantTests.cs`
 - `tests/Api.Tests/TenantInvariantTests.cs` — every ITenantScoped entity filtered or allowlisted (R2)
 - `tests/Api.Tests/TenantScopeFilterTests.cs` — the leak-then-fix test
@@ -214,8 +219,10 @@
 - `tests/Api.Tests/FeatureAuthorizationTests.cs`
 - `tests/Api.Tests/NotesSliceTests.cs`
 
-## 3.3 — Injected clocks & the architecture tests (1 files)
+## 3.3 — Injected clocks & the architecture tests (3 files)
 
+- `tests/Api.Tests/Architecture/RoutePrefixInspector.cs` — route-prefix uniqueness scans MapTenantFeatureGroup too (v3 ADV-P4-1/R100)
+- `tests/Api.Tests/Architecture/RoutePrefixInspectorTests.cs`
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
 ## 3.4 — The web client & auth UI (90 files)
@@ -428,12 +435,13 @@
 - `tests/Api.Tests/Billing/BillingWebhookHandlerTests.cs`
 - `tests/Api.Tests/Billing/StripeBillingProviderTests.cs`
 
-## 5.3 — Quotas, dunning & billing dissolve (13 files)
+## 5.3 — Quotas, dunning & billing dissolve (14 files)
 
 - `src/Api/Services/BillingDataContributor.cs`
 - `src/Api/Services/BillingNotifier.cs`
 - `src/Api/Services/QuotaService.cs` — atomic under concurrency (R30)
 - `src/Api/Services/SubscriptionLapseSweepJob.cs`
+- `src/Api/Services/UsageCounterDataContributor.cs` — quota rows join dissolve/export (v3 LB-TEN-1)
 - `src/Core/Abstractions/IQuotaService.cs`
 - `src/Core/Entities/UsageCounter.cs`
 - `src/Infrastructure/Billing/BillingCancelOutboxHandler.cs`
@@ -491,7 +499,7 @@
 - `tests/Api.Tests/Infrastructure/AllowAllUrlGuard.cs` — test-only bypass
 - `tests/Api.Tests/Webhooks/OutboundUrlGuardTests.cs`
 
-## 6.5 — MFA / TOTP step-up (19 files)
+## 6.5 — MFA / TOTP step-up (21 files)
 
 - `src/Api/Controllers/MfaController.cs`
 - `src/Api/Models/MfaModels.cs`
@@ -499,6 +507,7 @@
 - `src/Api/Services/MfaLoginService.cs`
 - `src/Api/Services/MfaService.cs`
 - `src/Api/Services/MfaUserDataContributor.cs`
+- `src/Api/Services/RecoveryCodeHasher.cs` — HKDF-peppered recovery-code hashing (v3 ADM-4)
 - `src/Core/Entities/MfaRecoveryCode.cs` — hashed, single-use
 - `src/Core/Entities/UserMfa.cs` — secret encrypted at rest
 - `src/Infrastructure/Persistence/Configurations/MfaRecoveryCodeConfiguration.cs`
@@ -510,10 +519,11 @@
 - `tests/Api.Tests/Mfa/MfaChallengeServiceTests.cs`
 - `tests/Api.Tests/Mfa/MfaLoginServiceTests.cs`
 - `tests/Api.Tests/Mfa/MfaServiceTests.cs`
+- `tests/Api.Tests/Mfa/RecoveryCodeHasherTests.cs`
 - `tests/E2E.Tests/MfaJourneyTests.cs`
 - `tests/E2E.Tests/Totp.cs`
 
-## 7.1 — GDPR: export & erasure (7 files)
+## 7.1 — GDPR: export & erasure (8 files)
 
 - `src/Api/Controllers/AccountController.cs`
 - `src/Api/Services/AccountErasureService.cs`
@@ -521,6 +531,7 @@
 - `src/Core/Abstractions/IUserDataContributor.cs` — per-user erasure seam (R12)
 - `tests/Api.Tests/Gdpr/AccountErasureTests.cs`
 - `tests/Api.Tests/Gdpr/TenantExportTests.cs`
+- `tests/Api.Tests/Gdpr/TenantTeardownContributorTests.cs`
 - `tests/E2E.Tests/GdprExportJourneyTests.cs`
 
 ## 7.2 — In-app notifications (13 files)
@@ -539,22 +550,24 @@
 - `tests/Api.Tests/Notify/NotificationServiceTests.cs`
 - `tests/E2E.Tests/NotificationJourneyTests.cs`
 
-## 7.3 — Public API & API keys (9 files)
+## 7.3 — Public API & API keys (10 files)
 
 - `src/Api/Authentication/ApiKeyAuthenticationHandler.cs` — key -> tenant-scoped principal
 - `src/Api/Configuration/PublicApiSettings.cs` — config-gated default-OFF (R21)
 - `src/Api/Configuration/RateLimiting.cs`
 - `src/Api/Endpoints/ApiKeyEndpoints.cs`
+- `src/Api/Services/ApiKeyDataContributor.cs` — hashed keys join dissolve/export (v3 LB-TEN-1)
 - `src/Api/Services/ApiKeyService.cs`
 - `src/Core/Entities/ApiKey.cs` — hash-only storage
 - `src/Infrastructure/Persistence/Configurations/ApiKeyConfiguration.cs`
 - `tests/Api.Tests/PublicApi/ApiKeyServiceTests.cs`
 - `tests/Api.Tests/RateLimitingTests.cs`
 
-## 7.4 — Outbound webhooks (15 files)
+## 7.4 — Outbound webhooks (16 files)
 
 - `src/Api/Configuration/WebhooksSettings.cs`
 - `src/Api/Endpoints/WebhookEndpoints.cs`
+- `src/Api/Services/WebhookDataContributor.cs` — subscriptions + secrets join dissolve/export (v3 LB-TEN-1)
 - `src/Api/Services/WebhookService.cs`
 - `src/Core/Entities/WebhookDelivery.cs`
 - `src/Core/Entities/WebhookSubscription.cs`
@@ -569,17 +582,20 @@
 - `tests/Api.Tests/Webhooks/WebhookSubscriptionServiceTests.cs`
 - `tests/Core.Tests/WebhookSignatureTests.cs`
 
-## 7.5 — Admin back-office & impersonation (10 files)
+## 7.5 — Admin back-office & impersonation (13 files)
 
 - `src/Api/Configuration/PlatformAdminSettings.cs`
 - `src/Api/Controllers/AdminApiControllerBase.cs`
 - `src/Api/Controllers/AdminController.cs` — sanctioned QueryAllTenants + audited EnterTenant
 - `src/Api/Models/AdminModels.cs`
 - `src/Api/Services/AdminBroadcastOutboxHandler.cs` — announce-all -> outbox fan-out to every user
+- `src/Api/Services/HttpCurrentImpersonation.cs`
 - `src/Api/Services/PlatformStaffService.cs`
+- `src/Core/Abstractions/ICurrentImpersonation.cs` — audit rows carry impersonated_by (v3 LB-ADM-1)
 - `src/Shared.Ui/Pages/AdminConsole.razor`
 - `tests/Api.Tests/Admin/AdminControllerTests.cs`
 - `tests/Api.Tests/Admin/PlatformStaffServiceTests.cs`
+- `tests/Api.Tests/Integration/ImpersonationGuardTests.cs` — staff gate rejects impersonation tokens (v3 ADM-2)
 - `tests/E2E.Tests/AnnouncementJourneyTests.cs` — ADMIN-3 announce -> NOTIFY fan-out
 
 ## 8.1 — Single-origin hosting (4 files)
@@ -596,22 +612,29 @@
 - `docs/DEPLOYMENT.md` — the runbook is a taught artifact — the learner writes their own
 - `render.yaml` — Render blueprint (ADR-017)
 
-## 8.3 — The deploy pipeline & CI gates (3 files)
+## 8.3 — The deploy pipeline & CI gates (4 files)
 
+- `.github/scripts/deploy-smoke.sh`
 - `.github/workflows/postman-sync.yml`
 - `docs/QA_TEST_PLAN.md` — release readiness: manual QA plan beside the automated gates
 - `tests/Api.Tests/Integration/VersionEndpointTests.cs` — version-gated deploy smoke
 
-## 8.4 — The RLS tenancy backstop (9 files)
+## 8.4 — The RLS tenancy backstop (15 files)
 
 - `docker/db/provision-rls-runtime-role.sql` — non-BYPASSRLS runtime role — mirrors prod (Neon) provisioning
 - `src/Infrastructure/Persistence/RlsDdl.cs` — policy DDL — source of the RlsMigrationGateTests parity gate
 - `src/Infrastructure/Persistence/RlsPostureGuard.cs` — gates prod activation (ADR-020)
 - `src/Infrastructure/Persistence/RlsSessionInterceptor.cs` — sets the tenant GUC per connection
 - `src/Infrastructure/Persistence/RlsTags.cs`
+- `tests/Api.Tests/Architecture/CrossTenantWriteGuard.cs` — EnterTenant required on set-based cross-tenant writes — tags don't render for ExecuteUpdate (v3/T7)
+- `tests/Api.Tests/Architecture/CrossTenantWriteGuardTests.cs`
+- `tests/Api.Tests/Rls/DissolveUnderForeignTenantTests.cs` — backstop + migration-parity + posture-guard tests
 - `tests/Api.Tests/Rls/RlsBackstopTests.cs` — backstop + migration-parity + posture-guard tests
+- `tests/Api.Tests/Rls/RlsMigrationGateBitesTests.cs` — backstop + migration-parity + posture-guard tests
 - `tests/Api.Tests/Rls/RlsMigrationGateTests.cs` — backstop + migration-parity + posture-guard tests
 - `tests/Api.Tests/Rls/RlsPostureGuardTests.cs` — backstop + migration-parity + posture-guard tests
+- `tests/Api.Tests/Rls/RlsSchemaProbe.cs` — backstop + migration-parity + posture-guard tests
+- `tests/Api.Tests/Rls/RlsTagDetectionTests.cs` — backstop + migration-parity + posture-guard tests
 - `tests/Api.Tests/Rls/RlsTestSetup.cs` — backstop + migration-parity + posture-guard tests
 
 ## 9.1 — Make it yours (rebrand & de-sample) (5 files)
@@ -658,7 +681,7 @@
 - `tests/native-smoke-android/package.json` — Android playwright-core smoke harness
 - `tests/native-smoke-android/smoke.js` — Android playwright-core smoke harness
 
-## A.2 — Appendix — native auth bridge (10 files)
+## A.2 — Appendix — native auth bridge (14 files)
 
 - `src/Api/Controllers/NativeAuthController.cs`
 - `src/Api/Services/NativeAuthCodeService.cs`
@@ -666,12 +689,16 @@
 - `src/Maui/Auth/DebugFileSessionStore.cs`
 - `src/Maui/Auth/LoopbackOAuthInitiator.cs`
 - `src/Maui/Auth/NativeAuthHeaderHandler.cs`
+- `src/Maui/Auth/PreferencesOAuthResumeStore.cs`
 - `src/Maui/Auth/SecureStorageSessionStore.cs`
 - `src/Maui/Auth/WebAuthenticatorOAuthInitiator.cs`
+- `src/Shared.Ui/Auth/IOAuthResumeStore.cs` — OAuth resume-across-process-death seam (NATIVE-12)
+- `src/Shared.Ui/Auth/OAuthResumeResult.cs` — resume outcome handed to Login/Settings (NATIVE-12)
 - `tests/Api.Tests/NativeAuthCodeServiceTests.cs`
 - `tests/Api.Tests/NativeRedirectPolicyTests.cs`
+- `tests/Api.Tests/OAuthResumeTests.cs` — marker lifecycle, TTL, MFA handoff, link outcomes (NATIVE-12)
 
-## [GEN] Generated by tooling in the lesson noted (dotnet ef / dotnet restore) — never hand-typed (49 files)
+## [GEN] Generated by tooling in the lesson noted (dotnet ef / dotnet restore) — never hand-typed (53 files)
 
 - `src/Api/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
 - `src/Core/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
@@ -715,6 +742,10 @@
 - `src/Infrastructure/Persistence/Migrations/20260706222645_RlsTenancyBackstop.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/Persistence/Migrations/20260710163540_AddUserTheme.Designer.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/Persistence/Migrations/20260710163540_AddUserTheme.cs` — dotnet ef migrations add — in the lesson that adds each entity
+- `src/Infrastructure/Persistence/Migrations/20260715224058_AuditEventImpersonatedBy.Designer.cs` — dotnet ef migrations add — in the lesson that adds each entity
+- `src/Infrastructure/Persistence/Migrations/20260715224058_AuditEventImpersonatedBy.cs` — dotnet ef migrations add — in the lesson that adds each entity
+- `src/Infrastructure/Persistence/Migrations/20260715230641_MfaLockout.Designer.cs` — dotnet ef migrations add — in the lesson that adds each entity
+- `src/Infrastructure/Persistence/Migrations/20260715230641_MfaLockout.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/Persistence/Migrations/AppDbContextModelSnapshot.cs` — dotnet ef migrations add — in the lesson that adds each entity
 - `src/Infrastructure/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
 - `src/Shared.Ui/packages.lock.json` — dotnet restore --locked-mode (lesson 1.1)
@@ -777,7 +808,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (118 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (119 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -800,6 +831,7 @@
 - `docs/STATUS.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/TECH_STACK.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/WAYS_OF_WORKING.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/AUDIT_SUITE.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v1-2026-06/AUDIT_REPORT.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v1-2026-06/AUDIT_TASKS.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v2-2026-07/ADVERSARIAL_REPORT.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -898,4 +930,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 731 tracked files · 513 built in lessons · 218 bucketed · 0 unmapped
+**Totals:** 763 tracked files · 540 built in lessons · 223 bucketed · 0 unmapped

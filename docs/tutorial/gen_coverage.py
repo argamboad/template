@@ -507,6 +507,27 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Maui/Auth/*", "A.2", ""),
     ("src/Maui/*", "A.1", ""),
     ("tests/Api.Tests/Infrastructure/TenantPermissionGate.cs", "6.1", "test double for the permission seam"),
+
+    # ---- v3 audit remediation + NATIVE-12 (2026-07) — mapped to the lesson that teaches each seam ----
+    ("global.json", "1.1", "single SDK pin source (v3 DEP-4) — pairs with the committed lockfiles"),
+    ("tests/Api.Tests/PasswordlessConcurrencyTests.cs", "2.4", "atomic single-use consume + lockout counter (v3 LB-AUTH-2/3)"),
+    ("tests/Api.Tests/Architecture/TenantHatchGuard.cs", "2.6", "polices QueryAllTenants call sites (the sanctioned hatch stays reviewable)"),
+    ("tests/Api.Tests/Architecture/TenantHatchGuardTests.cs", "2.6", ""),
+    ("tests/Api.Tests/Configuration/ConfigPostureTests.cs", "1.4", "pins every config-gated feature CLOSED under empty config (v3 S0-G3)"),
+    ("tests/Api.Tests/Architecture/RoutePrefixInspector.cs", "3.3", "route-prefix uniqueness scans MapTenantFeatureGroup too (v3 ADV-P4-1/R100)"),
+    ("tests/Api.Tests/Architecture/RoutePrefixInspectorTests.cs", "3.3", ""),
+    ("src/Api/Services/UsageCounterDataContributor.cs", "5.3", "quota rows join dissolve/export (v3 LB-TEN-1)"),
+    ("src/Api/Services/RecoveryCodeHasher.cs", "6.5", "HKDF-peppered recovery-code hashing (v3 ADM-4)"),
+    ("src/Api/Services/ApiKeyDataContributor.cs", "7.3", "hashed keys join dissolve/export (v3 LB-TEN-1)"),
+    ("src/Api/Services/WebhookDataContributor.cs", "7.4", "subscriptions + secrets join dissolve/export (v3 LB-TEN-1)"),
+    ("src/Core/Abstractions/ICurrentImpersonation.cs", "7.5", "audit rows carry impersonated_by (v3 LB-ADM-1)"),
+    ("src/Api/Services/HttpCurrentImpersonation.cs", "7.5", ""),
+    ("tests/Api.Tests/Integration/ImpersonationGuardTests.cs", "7.5", "staff gate rejects impersonation tokens (v3 ADM-2)"),
+    ("tests/Api.Tests/Architecture/CrossTenantWriteGuard.cs", "8.4", "EnterTenant required on set-based cross-tenant writes — tags don't render for ExecuteUpdate (v3/T7)"),
+    ("tests/Api.Tests/Architecture/CrossTenantWriteGuardTests.cs", "8.4", ""),
+    ("src/Shared.Ui/Auth/IOAuthResumeStore.cs", "A.2", "OAuth resume-across-process-death seam (NATIVE-12)"),
+    ("src/Shared.Ui/Auth/OAuthResumeResult.cs", "A.2", "resume outcome handed to Login/Settings (NATIVE-12)"),
+    ("tests/Api.Tests/OAuthResumeTests.cs", "A.2", "marker lifecycle, TTL, MFA handoff, link outcomes (NATIVE-12)"),
 ]
 
 
