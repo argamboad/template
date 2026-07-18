@@ -2557,3 +2557,10 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   each carries a **PENDING v3 REMEDIATION** banner and is pre-seeded **Blocked (known defect)** in §16
   (never Pass while the finding is open). The other 12 should Pass on current code. §15 gains a
   QA-ADV traceability block; §16 gains 24 sign-off rows. Suite 125 → **149** cases.
+- **Updated 2026-07-17** — **NATIVE-12 (OAuth process-death resilience)** merged onto develop: an OS
+  kill mid-consent no longer loses the sign-in — an `IOAuthResumeStore` marker (MAUI Preferences)
+  brackets the browser round-trip, the cold-started callback activity stashes the redirect, and
+  `AuthService.TryCompletePendingOAuthAsync` completes the exchange on startup (MFA handoff + 5-min
+  TTL guard; interrupted links land on Settings' banner). New **QA-AND-15** (on-device kill test;
+  renumbered from the branch's QA-AND-14 — that slot went to THEME-1's restart test in the interim).
+  Suite 149 → **150** cases.

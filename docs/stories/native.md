@@ -447,7 +447,7 @@ on the tablet emulator** with a scripted drill (playwright-core `_android`): tap
 `perezosoft://auth?code=<invalid>` → the app cold-starts, **stays open**, runs the startup exchange,
 and lands on Login with the friendly OAuth error (pre-fix behavior: flash open + close, no UI); the
 standard Android smoke (boot + OTP + roster) passed after, so the warm path is unregressed. The
-real-consent variant (valid code → signed in) = QA-AND-14 in the NATIVE-6 device pass.
+real-consent variant (valid code → signed in) = QA-AND-15 in the NATIVE-6 device pass.
 
 **As a** native Android user signing in with Google/Microsoft
 **I want** the sign-in to complete even if Android kills the app while I'm on the provider's page
@@ -494,7 +494,7 @@ Scenario: Warm flow unchanged
 
 **DoD:** unit tests for marker lifecycle, TTL expiry, resume exchange, MFA handoff, and link
 outcomes (red-first); warm-path E2E/smokes stay green; `NATIVE_PARITY.md` auth row updated;
-QA-AND-14 added for the on-device kill test (NATIVE-6).
+QA-AND-15 added for the on-device kill test (NATIVE-6).
 
 ---
 
@@ -508,7 +508,7 @@ QA-AND-14 added for the on-device kill test (NATIVE-6).
    `IFileDownloadLauncher`; upload half N-A, no consumer yet), NATIVE-4 (G2 refresh-on-resume via
    `AppResumeNotifier` + G3 Android back handler). All six audit gaps closed; OS-chrome behaviors
    (share sheet, hardware back, real focus transitions) queue for the NATIVE-6 device pass.
-3. 🚧 **NATIVE-6** manual native QA pass — plan authored (117 cases, 118 with QA-AND-14, incl. iOS/macCatalyst first-run
+3. 🚧 **NATIVE-6** manual native QA pass — plan authored (117 cases incl. iOS/macCatalyst first-run
    smoke + §13c release checklist; G7 Apple-boot fix shipped alongside). **Apple column UNPINNED
    2026-07-06** — the maintainer ran §13b on a MacBook Air M1: QA-IOS-01/02/04 + QA-MAC-01/02 +
    the OAuth leg of QA-MAC-03 PASS (two platform gaps found and fixed, PR #125); remaining:
@@ -520,7 +520,7 @@ QA-AND-14 added for the on-device kill test (NATIVE-6).
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
 5. ✅ **NATIVE-12** (out-of-band hardening, 2026-07-07) — OAuth survives process death during the
    browser round-trip; found on the tablet emulator during NATIVE-6 prep, fixed ahead of the device
-   pass so QA-AND-14 can verify it there.
+   pass so QA-AND-15 can verify it there.
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:
 don't automate (7) or distribute (8–11) before the app is verified working (6).
