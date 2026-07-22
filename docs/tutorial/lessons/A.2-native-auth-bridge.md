@@ -136,6 +136,37 @@ initiator was generalized across the three custom-scheme platforms). Fail-fast D
 implementation into an immediate, obvious failure — but only if you actually *run* the platform,
 which is why the smoke harness (A.1 §6) matters.
 
+### Surviving process death mid-round-trip (NATIVE-12)
+
+The external-browser flow has a failure mode the desktop never taught you: while the user is off in
+the consent tab, **your app is backgrounded — and the OS is free to kill it**. `WebAuthenticator`'s
+pending state is in-memory, so on Android the kill used to be fatal: the `perezosoft://` redirect
+cold-started a fresh process with no idea a sign-in was in flight — the app flashed open and closed,
+and the one-time code died with it. (Seen live on a tablet emulator; Custom Tabs shrink the window
+but can't close it.)
+
+The fix is a persistence bracket around the round-trip, behind one more optional seam:
+
+- **`IOAuthResumeStore`** (RCL) — before launching the browser, `AuthService` stashes a marker
+  (provider, optional link token, started-at). MAUI implements it on OS `Preferences`
+  (`PreferencesOAuthResumeStore`); web passes `null` and the whole mechanism no-ops.
+- **The cold-started callback** — Android's `WebAuthenticatorCallbackActivity` detects the
+  no-pending-auth case, stashes the full redirect URI beside the marker, and relaunches
+  `MainActivity` instead of dying.
+- **`TryCompletePendingOAuthAsync`** — on the next startup (`MainLayout`, before the preference
+  reconcile), `AuthService` finds marker + stashed callback, finishes the code exchange, and hands
+  outcomes to the UI: signed in, an MFA challenge (the choke point again — §5), an expired stash
+  (5-minute TTL, matched to the code's own lifetime), or a friendly failure. One-shot semantics:
+  the marker is cleared *before* acting on it, so a crash during resume can't loop.
+
+Two design notes worth stealing. The seam is an **optional constructor parameter** defaulting to
+null — the web build carries zero native machinery, same trick as `IOAuthInitiator`. And the resume
+completes through the same `CompleteFromResponseAsync` path as a live sign-in, so everything wired
+to that choke point (MFA step-up, the `SignedIn` event, session persistence) works on the resumed
+path *by construction* — no parallel code path to forget. The logic is unit-tested from `Api.Tests`
+(`OAuthResumeTests` — the RCL's first unit coverage; it has no test host of its own), and the
+on-device kill drill is QA-AND-15.
+
 ## 5. MFA step-up — free, because of the choke point
 
 Here's the reward for a decision made three parts ago. Native MFA step-up (MFA-4) required *no new

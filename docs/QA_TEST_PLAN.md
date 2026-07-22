@@ -1480,6 +1480,26 @@ if this fails, it becomes a small safe-area fix slice.)*
 the app (or swipe it away) and relaunch. **Expected:** boots dark, no light flash (Android WebView
 localStorage persists). **Auto** follows the system dark theme toggle live.
 
+### QA-AND-15 — OAuth sign-in survives process death (NATIVE-12) 🟠 (Android)
+**Gherkin**
+```gherkin
+Given I tapped Continue with Google and the consent tab is open
+When Android kills the app process before I finish consent
+Then approving still signs me in — the redirect relaunches the app and completes on startup
+```
+**Walkthrough**
+1. Tap **Continue with Google**. **Expected:** the browser tab opens to Google consent.
+2. With the tab in the foreground, kill the app process:
+   `adb shell am kill com.perezosoft.platform` (works because the app is backgrounded behind the
+   browser; *Don't keep activities* + memory pressure reproduces it the organic way).
+3. Approve consent in the still-open tab. **Expected:** the `perezosoft://auth` redirect cold-starts
+   the app, which **stays open** and lands signed in on Home (the stashed code is exchanged during
+   startup — no "flash open and close").
+4. (MFA account) same steps. **Expected:** the app opens on the Login MFA code prompt; entering the
+   TOTP completes sign-in.
+5. (Staleness) repeat 1–2, wait > 5 min before approving. **Expected:** the app opens on Login with
+   "Your sign-in took too long to complete. Please try again." — no crash, retry works.
+
 ---
 
 ## 13b. iOS + macCatalyst — first-run smoke 🟠
@@ -2537,3 +2557,10 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   each carries a **PENDING v3 REMEDIATION** banner and is pre-seeded **Blocked (known defect)** in §16
   (never Pass while the finding is open). The other 12 should Pass on current code. §15 gains a
   QA-ADV traceability block; §16 gains 24 sign-off rows. Suite 125 → **149** cases.
+- **Updated 2026-07-17** — **NATIVE-12 (OAuth process-death resilience)** merged onto develop: an OS
+  kill mid-consent no longer loses the sign-in — an `IOAuthResumeStore` marker (MAUI Preferences)
+  brackets the browser round-trip, the cold-started callback activity stashes the redirect, and
+  `AuthService.TryCompletePendingOAuthAsync` completes the exchange on startup (MFA handoff + 5-min
+  TTL guard; interrupted links land on Settings' banner). New **QA-AND-15** (on-device kill test;
+  renumbered from the branch's QA-AND-14 — that slot went to THEME-1's restart test in the interim).
+  Suite 149 → **150** cases.

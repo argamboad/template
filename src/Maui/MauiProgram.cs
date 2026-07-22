@@ -97,6 +97,11 @@ public static class MauiProgram
 #if ANDROID || IOS || MACCATALYST
 		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
 			new WebAuthenticatorOAuthInitiator(ApiBaseUrl, CallbackScheme, sp.GetRequiredService<ILogger<WebAuthenticatorOAuthInitiator>>()));
+		// WebAuthenticator's pending state is in-memory only — persist an in-flight marker
+		// (+ a stashed callback on Android cold starts) so OAuth survives the OS killing
+		// the process during the browser round-trip (NATIVE-12). Windows' loopback flow
+		// blocks in-process and has no custom-scheme relaunch, so it registers no store.
+		builder.Services.AddSingleton<IOAuthResumeStore, PreferencesOAuthResumeStore>();
 #elif WINDOWS
 		builder.Services.AddSingleton<IOAuthInitiator>(sp =>
 			new LoopbackOAuthInitiator(ApiBaseUrl, sp.GetRequiredService<ILogger<LoopbackOAuthInitiator>>()));
@@ -119,7 +124,8 @@ public static class MauiProgram
 				authClient,
 				sp.GetRequiredService<ILogger<AuthService>>(),
 				sp.GetRequiredService<ISessionStore>(),
-				sp.GetRequiredService<IOAuthInitiator>());
+				sp.GetRequiredService<IOAuthInitiator>(),
+				sp.GetService<IOAuthResumeStore>()); // null on Windows (loopback flow)
 		});
 
 		builder.Services.AddSingleton(sp =>

@@ -430,6 +430,72 @@ Signing** (NATIVE-8's keystore becomes the upload key) and let the **MS Store si
 
 **DoD:** upload step wired (guarded/off by default) or the manual submission path documented per store.
 
+### NATIVE-12 — Survive process death during the OAuth browser round-trip (Android)
+
+**Status: ✅ Implemented** (`feat/native-oauth-resilience`). `AuthService` now brackets the browser
+flow with a persisted `IOAuthResumeStore` marker (MAUI `Preferences` on Android/iOS/macCatalyst;
+Windows' loopback flow needs none), `WebAuthenticatorCallbackActivity` stashes the redirect URI and
+relaunches `MainActivity` when the callback lands in a fresh process (marker set, no in-process
+flow), and `AuthService.TryCompletePendingOAuthAsync()` — called from MainLayout right after
+`InitializeAsync` — finishes the exchange on startup: sign-in through the existing
+`/api/auth/native/exchange` path (MFA challenge handed to Login), link outcomes routed to Settings'
+existing `linked`/`link_error` banners, stashes older than the 5-min code TTL failed with a
+friendly retry message. TDD: 14 red-first unit tests (`OAuthResumeTests`) pin the marker lifecycle,
+resume outcomes, and TTL guard; web is a structural no-op (no store registered). **Mechanism proven
+on the tablet emulator** with a scripted drill (playwright-core `_android`): tap Continue-with-Google
+→ Custom Tab foregrounds → `am kill` (process verified dead) → fire
+`perezosoft://auth?code=<invalid>` → the app cold-starts, **stays open**, runs the startup exchange,
+and lands on Login with the friendly OAuth error (pre-fix behavior: flash open + close, no UI); the
+standard Android smoke (boot + OTP + roster) passed after, so the warm path is unregressed. The
+real-consent variant (valid code → signed in) = QA-AND-15 in the NATIVE-6 device pass.
+
+**As a** native Android user signing in with Google/Microsoft
+**I want** the sign-in to complete even if Android kills the app while I'm on the provider's page
+**So that** the app doesn't flash open and close, silently losing my sign-in
+
+**Context / notes:** observed on the tablet emulator under memory pressure (2026-07-07):
+`WebAuthenticatorOAuthInitiator` awaits `WebAuthenticator.AuthenticateAsync`, whose pending state is
+in-memory only. If the OS kills the process during the provider round-trip, the
+`perezosoft://auth?code=…` redirect cold-starts a fresh process, `WebAuthenticatorCallbackActivity`
+finds no pending operation, and the one-time code is lost. The Custom-Tabs `<queries>` fix (a3bad29)
+shrinks the window but can't close it. Fix: (1) persist an "OAuth in flight" marker
+(`IOAuthResumeStore` → MAUI Preferences) around the browser flow; (2) on a cold-start callback
+(marker set, no in-process flow), stash the callback URI and relaunch `MainActivity`; (3) on startup,
+`AuthService.TryCompletePendingOAuthAsync()` parses the stashed query (`code`/`linked`/`error` — the
+`WebAuthenticatorResult.Properties` shape) and completes the exchange through the existing native
+login path. The one-time code's server TTL is 5 min (`NativeAuthCodeService`) — older stashes fail
+with a friendly retry message instead of a doomed exchange.
+
+```gherkin
+Scenario: Sign-in survives process death
+  Given I started a native Google sign-in and Android killed the app while I was on Google's page
+  When the provider redirects to perezosoft://auth?code=…
+  Then the app relaunches, exchanges the stashed code on startup, and I am signed in
+
+Scenario: MFA step-up after a resumed sign-in
+  Given my resumed code exchange answers mfa_required
+  When the app finishes starting
+  Then the Login screen opens directly on the MFA code prompt
+
+Scenario: Stale stash fails politely
+  Given the stashed callback is older than the one-time code TTL
+  When the app starts
+  Then no exchange is attempted and Login shows a "took too long — try again" message
+
+Scenario: Interrupted account-linking still reports its outcome
+  Given the round-trip was a provider link (linked/error callback) and the process died
+  When the app restarts
+  Then I land on Settings with the existing linked/link_error banner
+
+Scenario: Warm flow unchanged
+  Given the app process survived the round-trip
+  Then WebAuthenticator completes in-process exactly as before and no stash is consumed
+```
+
+**DoD:** unit tests for marker lifecycle, TTL expiry, resume exchange, MFA handoff, and link
+outcomes (red-first); warm-path E2E/smokes stay green; `NATIVE_PARITY.md` auth row updated;
+QA-AND-15 added for the on-device kill test (NATIVE-6).
+
 ---
 
 ## Slice plan (sequenced — guardrails first, distribution last)
@@ -452,6 +518,9 @@ Signing** (NATIVE-8's keystore becomes the upload key) and let the **MS Store si
    boot-to-login canaries in one macOS job, added 2026-07-06 once the QA pass validated the
    runtimes).
 4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
+5. ✅ **NATIVE-12** (out-of-band hardening, 2026-07-07) — OAuth survives process death during the
+   browser round-trip; found on the tablet emulator during NATIVE-6 prep, fixed ahead of the device
+   pass so QA-AND-15 can verify it there.
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:
 don't automate (7) or distribute (8–11) before the app is verified working (6).

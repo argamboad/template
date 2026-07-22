@@ -55,7 +55,18 @@ else
         // before @Body renders. No page triggers its own refresh → no rotation race.
         await Auth.InitializeAsync();
 
+        // Native only (NATIVE-12): the OS may have killed the app mid-OAuth; a stashed
+        // callback from that round-trip is completed here, BEFORE the preference reconcile —
+        // a resumed sign-in sets the session first, so the reconcile below runs for that user
+        // (reconcile-first would no-op unauthenticated). Sign-in outcomes flow through Auth
+        // (session set, or a Login-page handoff); link outcomes reuse Settings' existing
+        // linked/link_error query banners. Its SignedIn fires before OnSignedIn subscribes,
+        // which is deliberate: the cold-start reconcile right below covers the resumed user,
+        // same no-second-pass principle as the startup refresh (PREFS-1).
+        var resume = await Auth.TryCompletePendingOAuthAsync();
+
         // Cross-device preference sync, awaited before @Body renders (PREFS-1, ADR-022).
+        // Subsumes the earlier inline locale apply (MITI-5) — theme AND locale both reconcile here.
         await ReconcilePreferencesAsync();
 
         _initialized = true;
@@ -65,6 +76,17 @@ else
         // whenever a sign-in lands. Subscribed AFTER the cold-start reconcile above so the
         // startup refresh doesn't trigger a second pass.
         Auth.SignedIn += OnSignedIn;
+
+        if (resume.Outcome == OAuthResumeOutcome.LinkCompleted)
+        {
+            Nav.NavigateTo($"/settings?linked={Uri.EscapeDataString(resume.Provider ?? "")}", replace: true);
+            return;
+        }
+        if (resume.Outcome == OAuthResumeOutcome.LinkFailed)
+        {
+            Nav.NavigateTo($"/settings?link_error={Uri.EscapeDataString(resume.Error ?? "link_failed")}", replace: true);
+            return;
+        }
 
         var path = new Uri(Nav.Uri).AbsolutePath;
         var isAnonymous = AnonymousPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));

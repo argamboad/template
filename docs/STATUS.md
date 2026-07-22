@@ -17,7 +17,7 @@ The platform is **feature-complete and continuously verified**:
   the real app through a full OTP sign-in on **Windows** (WebView2 CDP) and an **Android emulator**
   (playwright-core `_android`) in CI.
 - **Safety net:** 473 unit/integration tests (Api 431 + Core 42), 29 browser E2E journeys, 2 native
-  smoke jobs, a 117-case manual QA plan with generated PDFs, plus secret/license/supply-chain/
+  smoke jobs, a 118-case manual QA plan with generated PDFs, plus secret/license/supply-chain/
   doc-sync CI gates. PRs #100–#117 merged in the NATIVE arc.
 
 ## 2. What's missing, who owns it

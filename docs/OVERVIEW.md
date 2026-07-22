@@ -146,7 +146,7 @@ The domain teams underestimate most — here it's done, including the ugly parts
 - **Deploys**: Docker everywhere; staging auto-deploys on merge with a version-gated smoke check;
   production deploys behind a manual approval. Total infra cost to start: **$0** (free tiers).
 - **Ways of working**: TDD, vertical slices, conventional commits, an ADR log explaining every
-  significant decision (18 so far), and a 117-case manual QA plan with printable guides.
+  significant decision (18 so far), and a 118-case manual QA plan with printable guides.
 
 ## The tech stack
 
