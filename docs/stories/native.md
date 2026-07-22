@@ -357,6 +357,13 @@ Scenario: Native smoke runs on every push
 
 ## Wave 4 — Distribution (signed, shippable artifacts)
 
+> **Release builds require `-p:ApiBaseUrl=` (v3 audit NAT-3).** A Release build of `src/Maui` fails
+> unless a real API base URL is supplied — the localhost fallback + `PEREZOSOFT_API_BASE_URL` override
+> and the Android cleartext-traffic exception are **Debug-only**, so a by-the-book signed AAB can never
+> ship pointing at (and sending credentials in plaintext to) device-localhost. Every signing command in
+> this wave must pass e.g. `-p:ApiBaseUrl=https://api.yourapp.com`; it's compiled in via AssemblyMetadata
+> and read back by `MauiProgram`. Debug/CI (native-build, native-smoke) are unaffected.
+
 ### NATIVE-8 — Android: signed AAB/APK in CI
 
 **Context / notes (decisions scoped 2026-07-07):** the keystore IS the app's identity — updates only
