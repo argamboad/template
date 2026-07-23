@@ -49,6 +49,11 @@ else
     // handoff; /join shows the invite prompt and stores its own return URL.
     private static readonly string[] AnonymousPaths = ["/login", "/auth-callback", "/auth-error", "/join"];
 
+    // The subset of anonymous paths a SIGNED-IN user has no reason to stay on, so a locale-mismatch
+    // reload bounces them home. /join + /auth-callback are deliberately excluded (UX-1): a signed-in
+    // user still needs to complete an invite acceptance / OAuth handoff there.
+    private static readonly string[] BounceToHomePaths = ["/login", "/auth-error"];
+
     protected override async Task OnInitializedAsync()
     {
         // THE single auth entry point: one silent refresh from the cookie, awaited
@@ -154,9 +159,20 @@ else
                     CultureInfo.DefaultThreadCurrentCulture = CultureInfo.DefaultThreadCurrentUICulture = culture;
                     await CulturePersistence.PersistAsync(savedLocale);
 
-                    var path = new Uri(Nav.Uri).AbsolutePath;
-                    var isAnonymous = AnonymousPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
-                    Nav.NavigateTo(isAnonymous ? "/" : Nav.Uri, forceLoad: true);
+                    // Only reload if the write actually stuck (UX-2). A store that's readable but not
+                    // writable (quota/policy) swallows the persist, so a reboot would read the OLD value,
+                    // see the same mismatch, and reload FOREVER. If it didn't stick, the in-process switch
+                    // above still serves this session — just skip the satellite-assembly reload.
+                    if (string.Equals(await CulturePersistence.GetAsync(), savedLocale, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Preserve the current path across the reload — EXCEPT the two dead-ends a signed-in
+                        // user has no reason to sit on (UX-1). /join (accept an invite) and /auth-callback
+                        // (OAuth handoff) are anonymous paths a signed-in user still needs to COMPLETE, so
+                        // bouncing every anonymous path to "/" destroyed those journeys.
+                        var path = new Uri(Nav.Uri).AbsolutePath;
+                        var isDeadEnd = BounceToHomePaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+                        Nav.NavigateTo(isDeadEnd ? "/" : Nav.Uri, forceLoad: true);
+                    }
                 }
             }
             else if (!Auth.IsImpersonating && await CulturePersistence.GetAsync() is { Length: > 0 } deviceLocale)
