@@ -645,7 +645,7 @@
 - `docs/brand/linkedin_logo_300.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
 - `docs/brand/play_store_icon_512.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
 
-## A.1 — Appendix — MAUI shells & parity (33 files)
+## A.1 — Appendix — MAUI shells & parity (34 files)
 
 - `src/Maui/App.xaml`
 - `src/Maui/App.xaml.cs`
@@ -658,6 +658,7 @@
 - `src/Maui/Platforms/Android/Resources/values/colors.xml`
 - `src/Maui/Platforms/Android/Resources/xml/network_security_config.xml`
 - `src/Maui/Platforms/Android/WebAuthenticatorCallbackActivity.cs`
+- `src/Maui/Platforms/Android/network_security_config_release.xml`
 - `src/Maui/Platforms/MacCatalyst/AppDelegate.cs`
 - `src/Maui/Platforms/MacCatalyst/Entitlements.Debug.plist`
 - `src/Maui/Platforms/MacCatalyst/Entitlements.plist`
@@ -930,4 +931,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 763 tracked files · 540 built in lessons · 223 bucketed · 0 unmapped
+**Totals:** 764 tracked files · 541 built in lessons · 223 bucketed · 0 unmapped

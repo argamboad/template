@@ -18,12 +18,39 @@ public static class MauiProgram
 	//  - PEREZOSOFT_API_BASE_URL overrides both (dev builds): the CI native smoke (NATIVE-7)
 	//    points the app at its plain-HTTP stack, and a physical device can target a LAN API
 	//    without recompiling.
+	//
+	// The localhost fallback + env override are DEBUG-ONLY (v3 NAT-3): a Release build must not ship
+	// the dev localhost base (it would send OTP codes + refresh tokens cleartext to whatever binds
+	// device-localhost). Release compiles in the real base from the $(ApiBaseUrl) build property —
+	// the csproj fails the build if it's unset — surfaced here via AssemblyMetadata.
 	private static string ApiBaseUrl =>
+#if DEBUG
 		Environment.GetEnvironmentVariable("PEREZOSOFT_API_BASE_URL") is { Length: > 0 } o ? o :
 #if ANDROID
 		"http://localhost:5238";
 #else
 		"https://localhost:7160";
+#endif
+#else
+		ReleaseApiBaseUrl;
+
+	// Release only: the base URL compiled in from $(ApiBaseUrl). Never throws in a real Release build —
+	// the csproj's RequireApiBaseUrlInRelease target fails the build before we get here if it's unset.
+	// (No LINQ: the using would be unused in Debug and trip warnings-as-errors.)
+	private static string ReleaseApiBaseUrl
+	{
+		get
+		{
+			foreach (var attr in typeof(MauiProgram).Assembly
+				.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false))
+			{
+				if (attr is System.Reflection.AssemblyMetadataAttribute { Key: "ApiBaseUrl", Value: { Length: > 0 } value })
+					return value;
+			}
+			throw new InvalidOperationException(
+				"Release build has no ApiBaseUrl compiled in — build with -p:ApiBaseUrl=https://your-api-host (v3 NAT-3).");
+		}
+	}
 #endif
 
 	// Custom URL scheme the Android app registers for the OAuth callback (perezosoft://auth).

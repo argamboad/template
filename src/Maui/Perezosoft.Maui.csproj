@@ -123,4 +123,31 @@
         <Exec Command="&quot;$(_AdbExe)&quot; $(AdbTarget) reverse tcp:5238 tcp:5238" ContinueOnError="true" />
     </Target>
 
+    <!-- ═══ Release must not ship the dev localhost API base (v3 audit NAT-3) ═══════════════════════
+         A Debug build keeps the localhost fallback + PEREZOSOFT_API_BASE_URL override (dev + CI smoke).
+         A Release build compiles in the real base from $(ApiBaseUrl) and REFUSES to build without it —
+         otherwise a by-the-book Release AAB would send OTP codes + refresh tokens cleartext to whatever
+         binds device-localhost:5238. Supply it: dotnet build -c Release -p:ApiBaseUrl=https://api.example.com -->
+    <Target Name="RequireApiBaseUrlInRelease" BeforeTargets="BeforeBuild"
+            Condition="'$(Configuration)' == 'Release' And '$(ApiBaseUrl)' == ''">
+        <Error Text="Release builds require -p:ApiBaseUrl=https://your-api-host — refusing to ship the dev localhost API base (v3 NAT-3). Set it in your release pipeline." />
+    </Target>
+    <ItemGroup Condition="'$(Configuration)' == 'Release' And '$(ApiBaseUrl)' != ''">
+        <!-- MauiProgram.ReleaseApiBaseUrl reads this back at runtime. -->
+        <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+            <_Parameter1>ApiBaseUrl</_Parameter1>
+            <_Parameter2>$(ApiBaseUrl)</_Parameter2>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+    <!-- Cleartext-to-localhost is a DEBUG-ONLY posture (v3 NAT-3). Debug uses the convention-included
+         Resources/xml/network_security_config.xml (permits cleartext to the dev host). Release removes it
+         and Links the HTTPS-only variant (kept outside Resources/xml/ so it isn't auto-globbed) to the same
+         resource name, so the manifest's @xml/network_security_config reference stays valid either way. -->
+    <ItemGroup Condition="$(TargetFramework.Contains('-android')) And '$(Configuration)' != 'Debug'">
+        <AndroidResource Remove="Platforms/Android/Resources/xml/network_security_config.xml" />
+        <AndroidResource Include="Platforms/Android/network_security_config_release.xml"
+                         Link="Resources/xml/network_security_config.xml" />
+    </ItemGroup>
+
 </Project>
