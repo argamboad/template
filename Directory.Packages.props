@@ -59,6 +59,11 @@
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.7.0" />
+    <PackageVersion Include="bunit" Version="2.7.2" /> <!-- RCL component tests (v3 TOOL-2) -->
+    <!-- bUnit 2.7.2 pulls AngleSharp 1.4.0 transitively, which has GHSA-pgww-w46g-26qg (mXSS, moderate);
+         pin the patched 1.5.2 directly so the "0 vulnerable packages" bar (NU1902 as error) stays green. -->
+    <PackageVersion Include="AngleSharp" Version="1.5.2" />
+
     <!-- Consolidated: E2E.Tests referenced 17.14.0, the xUnit test projects 17.14.1 → highest wins. -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Testcontainers.Minio" Version="4.12.0" />

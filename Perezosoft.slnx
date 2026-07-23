@@ -28,4 +28,7 @@
   <Folder Name="/tests/E2E.Tests/">
     <Project Path="tests/E2E.Tests/Perezosoft.E2E.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/Ui.Tests/">
+    <Project Path="tests/Ui.Tests/Perezosoft.Ui.Tests.csproj" />
+  </Folder>
 </Solution>

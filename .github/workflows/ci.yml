@@ -34,6 +34,7 @@ jobs:
           dotnet restore tests/E2E.Tests/Perezosoft.E2E.Tests.csproj --locked-mode
           dotnet restore tests/Core.Tests/Perezosoft.Core.Tests.csproj --locked-mode
           dotnet restore tests/Api.Tests/Perezosoft.Api.Tests.csproj --locked-mode
+          dotnet restore tests/Ui.Tests/Perezosoft.Ui.Tests.csproj --locked-mode
 
       # Build the Linux-buildable graph with warnings-as-errors (Directory.Build.props).
       # The MAUI shells target net10.0-windows / -android and are excluded here; they're
@@ -49,10 +50,11 @@ jobs:
       # migration-drift guard (B6-2); both spin up Postgres via Testcontainers (Docker is
       # available on ubuntu-latest). E2E.Tests need the full running stack and aren't run here.
       # --no-restore: the locked-mode restore already ran.
-      - name: Test (Core + Api)
+      - name: Test (Core + Api + Ui)
         run: |
           dotnet test tests/Core.Tests/Perezosoft.Core.Tests.csproj -c Release --no-restore
           dotnet test tests/Api.Tests/Perezosoft.Api.Tests.csproj -c Release --no-restore
+          dotnet test tests/Ui.Tests/Perezosoft.Ui.Tests.csproj -c Release --no-restore
 
       # Fail the build if the EF model has drifted from the latest migration/snapshot.
       - name: No pending EF model changes
