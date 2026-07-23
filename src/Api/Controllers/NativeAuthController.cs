@@ -32,15 +32,15 @@ public class NativeAuthController(
     /// </summary>
     [HttpGet("native/login/{provider}")]
     public IActionResult NativeLogin(string provider, [FromQuery] string redirect,
-        [FromQuery(Name = "link_token")] string? linkToken = null)
+        [FromQuery(Name = "link_token")] string? linkToken = null, [FromQuery] string? state = null)
     {
         provider = provider.ToLowerInvariant();
         if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
             return BadRequest(new ErrorResponse("invalid_request", "Unsupported provider or redirect target."));
 
-        var callback = $"/api/auth/native/callback/{provider}?redirect={Uri.EscapeDataString(redirect)}";
-        if (!string.IsNullOrEmpty(linkToken))
-            callback += $"&link_token={Uri.EscapeDataString(linkToken)}";
+        // Thread the client's CSRF state through the provider round-trip so the callback can echo it back
+        // for the client to validate (v3 NAT-9). Optional end-to-end — an older client sends none.
+        var callback = NativeAuthUrls.Callback(provider, redirect, linkToken, state);
         var properties = new AuthenticationProperties { RedirectUri = callback };
 
         var scheme = AuthProviders.SchemeFor(provider);
@@ -57,9 +57,12 @@ public class NativeAuthController(
     [HttpGet("native/callback/{provider}")]
     [Authorize(AuthenticationSchemes = ServiceCollectionExtensions.ExternalScheme)]
     public async Task<IActionResult> NativeCallback(string provider, [FromQuery] string redirect,
-        CancellationToken cancellationToken, [FromQuery(Name = "link_token")] string? linkToken = null)
+        CancellationToken cancellationToken, [FromQuery(Name = "link_token")] string? linkToken = null,
+        [FromQuery] string? state = null)
     {
         provider = provider.ToLowerInvariant();
+        // Echo the client's CSRF state on EVERY outcome so it can be validated before the code is used (NAT-9).
+        string To(string key, string value) => NativeAuthUrls.ClientRedirect(redirect, key, value, state);
         try
         {
             if (!AuthProviders.IsSupported(provider) || !IsAllowedNativeRedirect(redirect))
@@ -69,20 +72,20 @@ public class NativeAuthController(
             await HttpContext.SignOutAsync(ServiceCollectionExtensions.ExternalScheme);
 
             if (string.IsNullOrEmpty(providerUserId) || string.IsNullOrEmpty(email))
-                return Redirect(AppendQuery(redirect, "error", "auth_failed"));
+                return Redirect(To("error", "auth_failed"));
 
             // LINK MODE: attach this identity to the initiating account, don't sign in.
             if (!string.IsNullOrEmpty(linkToken))
             {
                 var linkUserId = linkTokenService.Redeem(linkToken);
                 if (linkUserId is null)
-                    return Redirect(AppendQuery(redirect, "error", "expired"));
+                    return Redirect(To("error", "expired"));
 
                 var linkResult = await userService.LinkLoginAsync(linkUserId.Value, provider, providerUserId, cancellationToken);
                 logger.LogInformation("Native link {Provider} to user {UserId}: {Result}", provider, linkUserId, linkResult);
                 return linkResult == LinkLoginResult.OwnedByAnotherAccount
-                    ? Redirect(AppendQuery(redirect, "error", "in_use"))
-                    : Redirect(AppendQuery(redirect, "linked", provider));
+                    ? Redirect(To("error", "in_use"))
+                    : Redirect(To("linked", provider));
             }
 
             var user = await userService.GetOrCreateUserAsync(email, providerUserId, provider,
@@ -90,16 +93,16 @@ public class NativeAuthController(
 
             var code = nativeAuthCodeService.Issue(user.Id, provider);
             logger.LogInformation("Native OAuth callback successful for {Email} via {Provider}", email, provider);
-            return Redirect(AppendQuery(redirect, "code", code));
+            return Redirect(To("code", code));
         }
         catch (UnverifiedEmailConflictException)
         {
-            return Redirect(AppendQuery(redirect, "error", "email_unverified"));
+            return Redirect(To("error", "email_unverified"));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Native OAuth callback failed");
-            return Redirect(AppendQuery(redirect, "error", "auth_failed"));
+            return Redirect(To("error", "auth_failed"));
         }
     }
 

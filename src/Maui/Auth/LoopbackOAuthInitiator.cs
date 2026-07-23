@@ -1,6 +1,7 @@
 #if WINDOWS
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.ApplicationModel;
@@ -24,6 +25,10 @@ public sealed class LoopbackOAuthInitiator(string apiBaseUrl, ILogger<LoopbackOA
     public async Task<IReadOnlyDictionary<string, string>?> RunBrowserFlowAsync(string provider, string? linkToken = null)
     {
         var redirectUri = $"http://127.0.0.1:{GetFreeLoopbackPort()}/";
+        // Per-flow CSRF nonce (v3 NAT-9): the listener accepts whatever hits its port, so without this a
+        // local process or a malicious page could inject an attacker's ?code= and sign us into their
+        // account. The API echoes it back; we reject any callback that doesn't carry the exact value.
+        var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
         using var listener = new HttpListener();
         listener.Prefixes.Add(redirectUri);
@@ -40,7 +45,8 @@ public sealed class LoopbackOAuthInitiator(string apiBaseUrl, ILogger<LoopbackOA
         try
         {
             var loginUrl = $"{apiBaseUrl}/api/auth/native/login/{provider.ToLowerInvariant()}" +
-                           $"?redirect={Uri.EscapeDataString(redirectUri)}";
+                           $"?redirect={Uri.EscapeDataString(redirectUri)}" +
+                           $"&state={Uri.EscapeDataString(state)}";
             if (!string.IsNullOrEmpty(linkToken))
                 loginUrl += $"&link_token={Uri.EscapeDataString(linkToken)}";
             await Browser.Default.OpenAsync(loginUrl, BrowserLaunchMode.SystemPreferred);
@@ -58,6 +64,13 @@ public sealed class LoopbackOAuthInitiator(string apiBaseUrl, ILogger<LoopbackOA
                 .Where(k => k is not null)
                 .ToDictionary(k => k!, k => query[k] ?? string.Empty);
 
+            if (!StateMatches(result.GetValueOrDefault("state"), state))
+            {
+                logger.LogWarning("OAuth loopback: state mismatch — rejecting a possibly forged callback");
+                await WriteClosePageAsync(context.Response, "state_mismatch");
+                return null;
+            }
+
             await WriteClosePageAsync(context.Response, result.GetValueOrDefault("error"));
             return result;
         }
@@ -71,6 +84,13 @@ public sealed class LoopbackOAuthInitiator(string apiBaseUrl, ILogger<LoopbackOA
             listener.Stop();
         }
     }
+
+    // Constant-time compare of the echoed state against the one we generated (equal length by construction,
+    // but guard the null/empty case). Rejects a forged or absent state.
+    private static bool StateMatches(string? returned, string expected) =>
+        !string.IsNullOrEmpty(returned) &&
+        CryptographicOperations.FixedTimeEquals(
+            Encoding.ASCII.GetBytes(returned), Encoding.ASCII.GetBytes(expected));
 
     private static int GetFreeLoopbackPort()
     {

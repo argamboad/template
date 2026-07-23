@@ -682,10 +682,11 @@
 - `tests/native-smoke-android/package.json` — Android playwright-core smoke harness
 - `tests/native-smoke-android/smoke.js` — Android playwright-core smoke harness
 
-## A.2 — Appendix — native auth bridge (14 files)
+## A.2 — Appendix — native auth bridge (16 files)
 
 - `src/Api/Controllers/NativeAuthController.cs`
 - `src/Api/Services/NativeAuthCodeService.cs`
+- `src/Api/Services/NativeAuthUrls.cs` — state CSRF round-trip through login→callback (v3 NAT-9)
 - `src/Api/Services/NativeRedirectPolicy.cs`
 - `src/Maui/Auth/DebugFileSessionStore.cs`
 - `src/Maui/Auth/LoopbackOAuthInitiator.cs`
@@ -696,6 +697,7 @@
 - `src/Shared.Ui/Auth/IOAuthResumeStore.cs` — OAuth resume-across-process-death seam (NATIVE-12)
 - `src/Shared.Ui/Auth/OAuthResumeResult.cs` — resume outcome handed to Login/Settings (NATIVE-12)
 - `tests/Api.Tests/NativeAuthCodeServiceTests.cs`
+- `tests/Api.Tests/NativeAuthUrlsTests.cs`
 - `tests/Api.Tests/NativeRedirectPolicyTests.cs`
 - `tests/Api.Tests/OAuthResumeTests.cs` — marker lifecycle, TTL, MFA handoff, link outcomes (NATIVE-12)
 
@@ -931,4 +933,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 764 tracked files · 541 built in lessons · 223 bucketed · 0 unmapped
+**Totals:** 766 tracked files · 543 built in lessons · 223 bucketed · 0 unmapped

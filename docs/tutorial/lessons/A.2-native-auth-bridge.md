@@ -119,7 +119,11 @@ OAuth is a browser redirect flow; native has no browser in-process, so each plat
 ```
 
 - **Windows** uses a **loopback HTTP listener**: it opens the system browser at the provider, and a
-  tiny local `http://localhost:<port>/` server captures the redirect.
+  tiny local `http://127.0.0.1:<port>/` server captures the redirect. That listener accepts *whatever*
+  hits its port, so the flow carries a per-request random **`state` nonce** (v3 NAT-9): the app puts it
+  on the login URL, the API threads it through the provider round-trip and echoes it on the redirect
+  (`NativeAuthUrls`), and the app rejects any callback whose state doesn't match — otherwise a local
+  process or a malicious page could inject an attacker's `?code=` and sign you into *their* account.
 - **Android/iOS/macCatalyst** use **`WebAuthenticator`** with a **custom URL scheme**
   (`perezosoft://auth`): the OS routes the provider's redirect back to the app via a registered
   scheme (Android intent-filter, Apple `CFBundleURLSchemes`).
