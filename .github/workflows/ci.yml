@@ -192,7 +192,7 @@ jobs:
       # when building just one (-f), so each runner needs the workloads for all TFMs its OS exposes —
       # e.g. macOS needs android too (NETSDK1147 otherwise). restore resolves that per-host, forever.
       - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
+        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Perezosoft.Maui.csproj -f ${{ matrix.tfm }} -c Debug -p:AcceptAndroidSDKLicenses=true
@@ -439,7 +439,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
+        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
 
       - name: Build the app + API
         # The boot-probe drives no CDP/Playwright, so E2E.Tests isn't built here (the Linux `e2e` job
@@ -552,7 +552,7 @@ jobs:
           java-version: "17"
 
       - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj
+        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
 
       - name: Build the app (self-contained APK) + API + smoke deps
         run: |
@@ -643,7 +643,7 @@ jobs:
             [ -n "$pid" ] && { echo "app pid $pid"; break; }
             sleep 3
           done
-          [ -n "$pid" ] || { echo "::error::the app never started (fast-deployment APK? startup crash?)"; adb logcat -d | grep -iE "companyname|FATAL" | tail -40; exit 1; }
+          [ -n "$pid" ] || { echo "::error::the app never started (fast-deployment APK? startup crash?)"; adb logcat -d | grep -iE "perezosoft|FATAL" | tail -40; exit 1; }
 
           node tests/native-smoke-android/smoke.js
 
@@ -657,7 +657,7 @@ jobs:
           tail -n 60 api.log || true
           # "chromium" is the tag Blazor WebView unhandled .NET exceptions surface under —
           # run 28949312350 only kept the last stack frame because the filter missed it.
-          adb logcat -d 2>/dev/null | grep -iE "companyname|FATAL|blazor|chromium" | tail -n 120 || true
+          adb logcat -d 2>/dev/null | grep -iE "perezosoft|FATAL|blazor|chromium" | tail -n 120 || true
 
   # End-to-end tests (v2 audit B8-5). Boots the REAL stack — Postgres + Mailpit (service containers) +
   # the API + the Blazor WASM Web app — and drives a headless Chromium through the QA smoke journeys,
