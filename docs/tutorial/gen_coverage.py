@@ -240,6 +240,7 @@ RULES: list[tuple[str, str, str]] = [
     ("tests/Api.Tests/NotesSliceTests.cs", "3.2", ""),
     ("tests/Api.Tests/FeatureAuthorizationTests.cs", "3.2", ""),
     ("tests/Api.Tests/ArchitectureTests.cs", "3.3", "born here; gains a rule per part (R5/R6/R15…)"),
+    ("tests/Ui.Tests/*", "3.4", "bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test"),
     ("src/Web/Program.cs", "3.4", ""),
     ("src/Web/_Imports.razor", "3.4", ""),
     ("src/Web/Http/AuthHeaderHandler.cs", "3.4", ""),
