@@ -26,7 +26,8 @@ public class BillingJourneyTests : E2ETestBase
         // Fresh tenant: free plan, 1/3 seats, never subscribed → no portal button.
         var billing = new BillingPage(Page);
         await billing.GotoAsync();
-        await Expect(billing.Plan).ToHaveTextAsync("free", new() { Timeout = 30_000 });
+        // UX-5: the page renders the LOCALIZED plan/status labels (EN culture here), not the raw API tokens.
+        await Expect(billing.Plan).ToHaveTextAsync("Free", new() { Timeout = 30_000 });
         await Expect(billing.Seats).ToContainTextAsync("1 of 3");
         await Expect(billing.Portal).Not.ToBeVisibleAsync();
 
@@ -50,8 +51,8 @@ public class BillingJourneyTests : E2ETestBase
 
         // Back on the billing page: the projection made the tenant pro (10 seats, portal available).
         await billing.GotoAsync();
-        await Expect(billing.Plan).ToHaveTextAsync("pro", new() { Timeout = 30_000 });
-        await Expect(billing.Status).ToHaveTextAsync("active");
+        await Expect(billing.Plan).ToHaveTextAsync("Pro", new() { Timeout = 30_000 });
+        await Expect(billing.Status).ToHaveTextAsync("Active");
         await Expect(billing.Seats).ToContainTextAsync("1 of 10");
         await Expect(billing.Portal).ToBeVisibleAsync();
     }
