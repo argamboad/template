@@ -19,4 +19,10 @@ public class PreferencesCulturePersistence : ICulturePersistence
 
     public Task<string?> GetAsync() =>
         Task.FromResult(Preferences.Default.Get<string?>(PreferenceKey, null));
+
+    public Task ClearAsync()
+    {
+        Preferences.Default.Remove(PreferenceKey);
+        return Task.CompletedTask;
+    }
 }

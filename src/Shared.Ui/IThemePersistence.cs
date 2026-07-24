@@ -15,4 +15,6 @@ public interface IThemePersistence
 
     /// <summary>The device-stored theme, or null when the user never chose one.</summary>
     Task<string?> GetAsync();
+    /// <summary>Removes the device-stored theme (sign-out, so the next user can't inherit it — ADM-9).</summary>
+    Task ClearAsync();
 }

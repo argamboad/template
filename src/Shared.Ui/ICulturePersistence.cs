@@ -15,4 +15,6 @@ public interface ICulturePersistence
 
     /// <summary>The device-stored culture code, or null when the user never chose one.</summary>
     Task<string?> GetAsync();
+    /// <summary>Removes the device-stored culture (sign-out, so the next user can't inherit it — ADM-9).</summary>
+    Task ClearAsync();
 }

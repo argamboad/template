@@ -51,9 +51,11 @@ public abstract class ComponentTestBase : BunitContext
         string? name = "Ada Lovelace",
         string? tenantName = "Test Household",
         string? locale = null,
-        string? theme = null)
+        string? theme = null,
+        string? impersonatedBy = null)
     {
-        var jwt = TestJwt.Build(name: name, tenantName: tenantName, locale: locale, theme: theme);
+        var jwt = TestJwt.Build(name: name, tenantName: tenantName, locale: locale, theme: theme,
+            impersonatedBy: impersonatedBy);
         Http.On(HttpMethod.Post, "/api/auth/refresh", $"{{\"access_token\":\"{jwt}\"}}");
         await Auth.InitializeAsync();
     }

@@ -81,6 +81,7 @@ else
         // whenever a sign-in lands. Subscribed AFTER the cold-start reconcile above so the
         // startup refresh doesn't trigger a second pass.
         Auth.SignedIn += OnSignedIn;
+        Auth.SignedOut += OnSignedOut;
 
         if (resume.Outcome == OAuthResumeOutcome.LinkCompleted)
         {
@@ -99,7 +100,24 @@ else
             Nav.NavigateTo("/login", replace: true);
     }
 
-    public void Dispose() => Auth.SignedIn -= OnSignedIn;
+    public void Dispose()
+    {
+        Auth.SignedIn -= OnSignedIn;
+        Auth.SignedOut -= OnSignedOut;
+    }
+
+    // Wipe the device-stored preferences on sign-out so the next user on a shared device can't inherit
+    // this account's theme/locale (ADM-9). A new sign-in can only follow a logout — the refresh cookie
+    // would otherwise auto-restore this session — so clearing here fully closes the cross-user vector.
+    private async void OnSignedOut()
+    {
+        try
+        {
+            await ThemePersistence.ClearAsync();
+            await CulturePersistence.ClearAsync();
+        }
+        catch { /* best-effort — a store that can't clear is no worse than before */ }
+    }
 
     private async void OnSignedIn()
     {
@@ -123,6 +141,12 @@ else
     private async Task ReconcilePreferencesAsync()
     {
         if (!Auth.IsAuthenticated) return;
+
+        // No preference reconcile while impersonating (ADM-9, defence-in-depth): an admin session must not
+        // adopt/apply the impersonated user's theme or locale, nor write them to the admin's device — even
+        // if the impersonation token were ever to carry those claims. (The else-branch server writes are
+        // also guarded below; this makes the whole reconcile a no-op up front.)
+        if (Auth.IsImpersonating) return;
 
         // Theme first — it applies live (data-bs-theme), no reload involved.
         try

@@ -18,6 +18,7 @@ public static class TestJwt
         string? tenantId = "22222222-2222-2222-2222-222222222222",
         string? locale = null,
         string? theme = null,
+        string? impersonatedBy = null,
         TimeSpan? lifetime = null)
     {
         var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, userId) };
@@ -27,6 +28,7 @@ public static class TestJwt
         Add(AppClaims.TenantId, tenantId);
         Add(AppClaims.Locale, locale);
         Add(AppClaims.Theme, theme);
+        Add(AppClaims.ImpersonatedBy, impersonatedBy);
 
         var now = DateTime.UtcNow;
         var token = new JwtSecurityToken(
