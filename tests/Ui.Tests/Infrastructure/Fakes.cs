@@ -21,6 +21,8 @@ public sealed class FakeThemePersistence : IThemePersistence
     public string? Value { get; private set; }
     public Task PersistAsync(string theme) { Value = theme; return Task.CompletedTask; }
     public Task<string?> GetAsync() => Task.FromResult(Value);
+    public Task ClearAsync() { Value = null; Cleared = true; return Task.CompletedTask; }
+    public bool Cleared { get; private set; }
 }
 
 /// <summary>
@@ -34,6 +36,8 @@ public sealed class FakeCulturePersistence : ICulturePersistence
     public bool WritesBlocked { get; set; }
     public Task PersistAsync(string cultureCode) { if (!WritesBlocked) Value = cultureCode; return Task.CompletedTask; }
     public Task<string?> GetAsync() => Task.FromResult(Value);
+    public Task ClearAsync() { Value = null; Cleared = true; return Task.CompletedTask; }
+    public bool Cleared { get; private set; }
 }
 
 /// <summary>

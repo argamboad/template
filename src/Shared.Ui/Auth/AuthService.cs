@@ -50,6 +50,15 @@ public class AuthService(
     /// </summary>
     public event Action? SignedIn;
 
+    /// <summary>
+    /// Raised when the service transitions from authenticated to signed-out (logout, or a refresh that
+    /// finds no valid session). NOT raised when already signed out. MainLayout clears device-stored
+    /// preferences on it so the next user on a shared device can't inherit this account's theme/locale
+    /// (v3 audit ADM-9) — safe because a new sign-in can only follow a logout (the refresh cookie
+    /// otherwise auto-restores this session).
+    /// </summary>
+    public event Action? SignedOut;
+
     private TimeProvider Time => timeProvider ?? TimeProvider.System;
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && !IsTokenExpired(_accessToken);
@@ -532,10 +541,13 @@ public class AuthService(
 
     private async Task ClearSessionAsync()
     {
+        var wasAuthenticated = IsAuthenticated;
         _accessToken = null;
         _isStaff = null;
         if (sessionStore.UsesBodyTransport)
             await sessionStore.ClearAsync();
+        if (wasAuthenticated)
+            SignedOut?.Invoke();
     }
 
     /// <summary>
