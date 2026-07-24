@@ -23,11 +23,16 @@ public sealed class FakeThemePersistence : IThemePersistence
     public Task<string?> GetAsync() => Task.FromResult(Value);
 }
 
-/// <summary>In-memory <see cref="ICulturePersistence"/> — starts unset.</summary>
+/// <summary>
+/// In-memory <see cref="ICulturePersistence"/> — starts unset. Set <see cref="WritesBlocked"/> to model a
+/// store that's readable but NOT writable (quota/policy): writes are silently swallowed, exactly the
+/// condition that could loop the locale reload forever (UX-2).
+/// </summary>
 public sealed class FakeCulturePersistence : ICulturePersistence
 {
     public string? Value { get; private set; }
-    public Task PersistAsync(string cultureCode) { Value = cultureCode; return Task.CompletedTask; }
+    public bool WritesBlocked { get; set; }
+    public Task PersistAsync(string cultureCode) { if (!WritesBlocked) Value = cultureCode; return Task.CompletedTask; }
     public Task<string?> GetAsync() => Task.FromResult(Value);
 }
 
