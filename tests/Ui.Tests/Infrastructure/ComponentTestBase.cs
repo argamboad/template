@@ -24,6 +24,12 @@ public abstract class ComponentTestBase : BunitContext
 
     protected ComponentTestBase()
     {
+        // Deterministic per test: MainLayout's locale reconcile mutates the process-global
+        // CultureInfo.CurrentUICulture, which would otherwise leak into the next test (xUnit runs a class's
+        // tests in one process). Reset to English so culture-sensitive components start from a known state.
+        System.Globalization.CultureInfo.CurrentCulture =
+            System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo("en");
+
         var sessionStore = new FakeSessionStore();
         Auth = new AuthService(
             new HttpClient(Http) { BaseAddress = new Uri("http://localhost") },
