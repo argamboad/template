@@ -226,7 +226,7 @@
 - `tests/Api.Tests/Architecture/RoutePrefixInspectorTests.cs`
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (99 files)
+## 3.4 — The web client & auth UI (100 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -325,6 +325,7 @@
 - `tests/Ui.Tests/Infrastructure/TestJwt.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/LocaleReloadDeepLinkTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/LocaleReloadLoopGuardTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/NotifyBillingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/PreferenceScopingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/SwitcherStateTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 
@@ -544,7 +545,7 @@
 - `tests/Api.Tests/Gdpr/TenantTeardownContributorTests.cs`
 - `tests/E2E.Tests/GdprExportJourneyTests.cs`
 
-## 7.2 — In-app notifications (13 files)
+## 7.2 — In-app notifications (14 files)
 
 - `src/Api/Controllers/NotificationsController.cs`
 - `src/Api/Models/NotificationModels.cs`
@@ -556,6 +557,7 @@
 - `src/Infrastructure/Persistence/Configurations/NotificationPreferenceConfiguration.cs`
 - `src/Shared.Ui/Components/NotificationBell.razor`
 - `src/Shared.Ui/Components/NotificationPrefsCard.razor`
+- `tests/Api.Tests/Integration/NotificationClearScopeTests.cs` — bulk-clear requires an explicit scope (v3 LB-UI-10)
 - `tests/Api.Tests/Notify/NotificationFanOutTests.cs`
 - `tests/Api.Tests/Notify/NotificationServiceTests.cs`
 - `tests/E2E.Tests/NotificationJourneyTests.cs`
@@ -944,4 +946,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 777 tracked files · 553 built in lessons · 224 bucketed · 0 unmapped
+**Totals:** 779 tracked files · 555 built in lessons · 224 bucketed · 0 unmapped

@@ -37,9 +37,9 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h2 class="h6 fw-bold mb-1">@Localizer["Billing_CurrentPlan"]</h2>
-                        <div class="h5 mb-0 text-capitalize" data-testid="billing-plan">@_summary.PlanKey</div>
+                        <div class="h5 mb-0 text-capitalize" data-testid="billing-plan">@Label($"Plan_{_summary.PlanKey}", _summary.PlanKey)</div>
                     </div>
-                    <span class="badge bg-info-subtle text-info-emphasis" data-testid="billing-status">@_summary.Status</span>
+                    <span class="badge bg-info-subtle text-info-emphasis" data-testid="billing-status">@Label($"BillingStatus_{_summary.Status}", _summary.Status)</span>
                 </div>
                 @if (_summary.CurrentPeriodEnd is { } end)
                 {
@@ -75,6 +75,16 @@
 </div>
 
 @code {
+    // Localize a plan/status token via its "Plan_{key}" / "BillingStatus_{status}" resource, falling back
+    // to the raw token when there's no string for it — so the money page never renders bare machine tokens
+    // for known values, and an unmapped one degrades to the (capitalized) token instead of a missing key
+    // (v3 UX-5).
+    private string Label(string key, string fallback)
+    {
+        var s = Localizer[key];
+        return s.ResourceNotFound ? fallback : s.Value;
+    }
+
     // Plan keys mirror src/Core/Billing/PlanCatalog.cs (EXAMPLE plans — retune per app with the catalog).
     private const string FreePlanKey = "free";
     private const string UpgradePlanKey = "pro";
