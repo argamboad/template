@@ -38,6 +38,43 @@ public class NotifyBillingTests : ComponentTestBase
         Assert.Equal("1", cut.Find("[data-testid='notif-count']").TextContent.Trim());
     }
 
+    [Theory]
+    [InlineData(30, "Notif_JustNow")] // < 1 minute → the localized "just now"
+    [InlineData(5 * 60, "5m")]        // minutes bucket
+    [InlineData(3 * 3600, "3h")]      // hours bucket
+    [InlineData(2 * 86400, "2d")]     // days bucket
+    public async Task Bell_RendersRelativeAge_PerBucket(int ageSeconds, string expected)
+    {
+        // v3 TB-UI backfill (T45c): the Ago buckets — just-now / m / h / d — rendered through the
+        // real component (the method is private; the list item's timestamp line is the contract).
+        await SignInAsync();
+        var created = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(ageSeconds);
+        Http.On(HttpMethod.Get, "/api/notifications/unread-count", """{"count":1}""");
+        Http.On(HttpMethod.Get, "/api/notifications",
+            $$"""[{"id":"{{ItemA}}","kind":"x","title":"T","body":"","read_at":null,"created_at":"{{created:O}}"}]""");
+
+        var cut = Render<NotificationBell>();
+        cut.Find("[data-testid='notif-bell']").Click();
+
+        Assert.Contains(expected, cut.Find("[data-testid='notif-item']").TextContent);
+    }
+
+    [Fact]
+    public async Task Bell_RendersOldNotifications_AsADate_NotRelative()
+    {
+        // ≥ 7 days falls back to a real date — "43d" would read like an error.
+        await SignInAsync();
+        var created = DateTimeOffset.UtcNow - TimeSpan.FromDays(10);
+        Http.On(HttpMethod.Get, "/api/notifications/unread-count", """{"count":1}""");
+        Http.On(HttpMethod.Get, "/api/notifications",
+            $$"""[{"id":"{{ItemA}}","kind":"x","title":"T","body":"","read_at":null,"created_at":"{{created:O}}"}]""");
+
+        var cut = Render<NotificationBell>();
+        cut.Find("[data-testid='notif-bell']").Click();
+
+        Assert.Contains(created.LocalDateTime.ToString("d"), cut.Find("[data-testid='notif-item']").TextContent);
+    }
+
     [Fact]
     public async Task Billing_RendersLocalizedPlanAndStatus_NotRawTokens()
     {

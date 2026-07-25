@@ -101,7 +101,20 @@ public class AuthService(
     /// token. MainLayout is the single refresh entry point now, so this is mostly
     /// defense-in-depth. Blazor WASM is single-threaded, so sharing the Task suffices.
     /// </summary>
-    public Task<bool> TryRefreshAsync() => _refreshInFlight ??= RunRefreshAsync();
+    public Task<bool> TryRefreshAsync()
+    {
+        if (_refreshInFlight is { } inFlight)
+            return inFlight;
+        var refresh = RunRefreshAsync();
+        // Cache only a task that is still RUNNING (v3 T45c). When RunRefreshAsync completes
+        // synchronously — a native session store answering "no stored token" without yielding — its
+        // finally has ALREADY cleared the field, and `_refreshInFlight ??= …` would re-cache the
+        // completed task forever: every later refresh would replay the stale result without ever
+        // hitting the network, leaving a native session dead until app restart.
+        if (!refresh.IsCompleted)
+            _refreshInFlight = refresh;
+        return refresh;
+    }
 
     private async Task<bool> RunRefreshAsync()
     {
