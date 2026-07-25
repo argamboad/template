@@ -72,6 +72,37 @@ public class BillingWebhookHandlerTests(PostgresFixture fixture) : PostgresTestB
     }
 
     [Fact]
+    public async Task Webhook_OverACompedSubscription_Applies_AndRestoresProviderManagement()
+    {
+        // v3 TB-ADM-6/7 (T45a): the comp→webhook→revert interleaving. A staff comp writes a projection
+        // with NO provider ids and NO LastEventAt — so when the tenant later subscribes for real, the
+        // provider webhook must APPLY over the comp (the recency guard can't block: nothing to compare)
+        // and re-establish provider linkage. From that point the staff comp/revert endpoints 409 again
+        // (proven by Staff_CompOrRevert_ProviderManagedSubscription_Returns409) — Stripe is the source
+        // of truth for real money, and a past comp must not leave a backdoor around it.
+        var tenant = Guid.CreateVersion7();
+        await using (var seed = Fixture.CreateContext(tenant))
+        {
+            seed.Set<Subscription>().Add(new Subscription
+            {
+                PlanKey = PlanKeys.Pro,
+                Status = SubscriptionStatus.Active,
+                StripeCustomerId = null, StripeSubscriptionId = null, // a comp, not a provider sub
+                CurrentPeriodEnd = null, LastEventAt = null,
+                CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        Assert.Equal(WebhookResult.Applied, await HandleAsync(Event(tenant, SubscriptionStatus.Active)));
+
+        await using var read = Fixture.CreateContext(tenant);
+        var sub = await read.Set<Subscription>().SingleAsync(); // still ONE projection, not a second row
+        Assert.Equal("sub_1", sub.StripeSubscriptionId);        // provider-managed again → comp/revert 409
+        Assert.NotNull(sub.LastEventAt);                        // recency guard re-armed
+    }
+
+    [Fact]
     public async Task Applied_OnlyVisibleToItsOwnTenant()
     {
         var tenant = Guid.CreateVersion7();

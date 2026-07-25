@@ -400,6 +400,7 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Api/Services/NotificationUserDataContributor.cs", "7.2", ""),
     ("src/Api/Controllers/NotificationsController.cs", "7.2", ""),
     ("tests/Api.Tests/Integration/NotificationClearScopeTests.cs", "7.2", "bulk-clear requires an explicit scope (v3 LB-UI-10)"),
+    ("tests/Api.Tests/Integration/ContributorRegistrationTests.cs", "6.3", "every declared contributor resolves from the app DI (v3 TB-TEN-11)"),
     ("src/Api/Models/NotificationModels.cs", "7.2", ""),
     ("src/Shared.Ui/Components/NotificationBell.razor", "7.2", ""),
     ("src/Shared.Ui/Components/NotificationPrefsCard.razor", "7.2", ""),
