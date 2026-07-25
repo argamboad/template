@@ -72,16 +72,25 @@ else
 
         // Cross-device preference sync, awaited before @Body renders (PREFS-1, ADR-022).
         // Subsumes the earlier inline locale apply (MITI-5) — theme AND locale both reconcile here.
-        await ReconcilePreferencesAsync();
-
-        _initialized = true;
+        var reloading = await ReconcilePreferencesAsync();
 
         // Interactive sign-ins (OTP/MFA/native OAuth) are soft navigations — this layout
         // instance stays alive and OnInitializedAsync never re-runs — so reconcile again
         // whenever a sign-in lands. Subscribed AFTER the cold-start reconcile above so the
-        // startup refresh doesn't trigger a second pass.
+        // startup refresh doesn't trigger a second pass — but BEFORE the doomed-boot return
+        // below: the instance lives until the browser navigation lands, so its handlers
+        // (e.g. sign-out clears the device prefs, ADM-9) stay wired for that window.
         Auth.SignedIn += OnSignedIn;
         Auth.SignedOut += OnSignedOut;
+
+        // A TRUE result means the reconcile issued the locale reload: this boot is doomed, so stop
+        // here with the body unrendered — pages' boot side effects (Join's auto-accept POST) must
+        // fire once, on the boot the reload lands on, not twice (v3 T45c: the double-accept showed
+        // a joined user the error state).
+        if (reloading)
+            return;
+
+        _initialized = true;
 
         if (resume.Outcome == OAuthResumeOutcome.LinkCompleted)
         {
@@ -138,15 +147,18 @@ else
     //    pre-auth login-page pick becomes the account preference (never while impersonating —
     //    an admin's device must not rewrite the impersonated user's preferences).
     // Idempotent: everything is compare-then-act, so re-running is a no-op when in sync.
-    private async Task ReconcilePreferencesAsync()
+    // Returns TRUE when it issued the locale reload — the caller's boot is then doomed and must not
+    // render @Body (v3 T45c): a page's boot side effects (Join's auto-accept POST) would otherwise fire
+    // on the doomed boot AND again after the reload — the user joined but saw the error state.
+    private async Task<bool> ReconcilePreferencesAsync()
     {
-        if (!Auth.IsAuthenticated) return;
+        if (!Auth.IsAuthenticated) return false;
 
         // No preference reconcile while impersonating (ADM-9, defence-in-depth): an admin session must not
         // adopt/apply the impersonated user's theme or locale, nor write them to the admin's device — even
         // if the impersonation token were ever to carry those claims. (The else-branch server writes are
         // also guarded below; this makes the whole reconcile a no-op up front.)
-        if (Auth.IsImpersonating) return;
+        if (Auth.IsImpersonating) return false;
 
         // Theme first — it applies live (data-bs-theme), no reload involved.
         try
@@ -196,6 +208,7 @@ else
                         var path = new Uri(Nav.Uri).AbsolutePath;
                         var isDeadEnd = BounceToHomePaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
                         Nav.NavigateTo(isDeadEnd ? "/" : Nav.Uri, forceLoad: true);
+                        return true; // this boot is doomed — the caller must not render @Body
                     }
                 }
             }
@@ -206,6 +219,7 @@ else
         }
         catch (CultureNotFoundException) { /* unknown saved locale — keep the current culture */ }
         catch { /* best-effort — the device default stands */ }
+        return false;
     }
 
     // Leave the impersonated session and reload as the staff user (restored from the refresh cookie).

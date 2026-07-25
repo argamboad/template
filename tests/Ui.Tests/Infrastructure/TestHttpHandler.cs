@@ -20,6 +20,8 @@ public sealed class TestHttpHandler : HttpMessageHandler
     /// <summary>Stub "METHOD /path" (path only, query ignored) to return <paramref name="json"/> with <paramref name="status"/>.</summary>
     public TestHttpHandler On(HttpMethod method, string path, string json = "{}", HttpStatusCode status = HttpStatusCode.OK)
     {
+        _gated.Remove(Key(method, path)); // a later On() replaces a gate — a stale (completed) gate would
+                                          // otherwise shadow the new stub and replay its consumed response
         _routes[Key(method, path)] = _ => new HttpResponseMessage(status)
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json"),

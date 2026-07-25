@@ -17,6 +17,35 @@ namespace Perezosoft.Ui.Tests;
 public class LocaleReloadLoopGuardTests : ComponentTestBase
 {
     [Fact]
+    public async Task ReloadingBoot_DoesNotRenderTheBody_NoDoubledPageSideEffects()
+    {
+        // v3 T45c (found by the TB-UI-16 E2E journey): when the cold-start reconcile issues the
+        // locale reload, THIS boot is doomed — rendering @Body anyway lets pages fire their boot
+        // side effects (Join's auto-accept POST!) which then re-fire after the reload; the user
+        // joined but was shown the error state. A reloading boot must keep the body unrendered.
+        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en");
+        await SignInAsync(locale: "es"); // mismatch → the reconcile reloads
+
+        var cut = Render<MainLayout>(ps => ps.Add(m => m.Body, b => b.AddMarkupContent(0, "<div id='page-body'>side effects live here</div>")));
+
+        var nav = (Bunit.TestDoubles.BunitNavigationManager)Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        Assert.Contains(nav.History, h => h.Options.ForceLoad); // the reload WAS issued…
+        Assert.Empty(cut.FindAll("#page-body"));                // …so the body must not have rendered
+    }
+
+    [Fact]
+    public async Task NonReloadingBoot_RendersTheBody()
+    {
+        // The counterpart: an in-sync boot renders normally.
+        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en");
+        await SignInAsync(locale: "en");
+
+        var cut = Render<MainLayout>(ps => ps.Add(m => m.Body, b => b.AddMarkupContent(0, "<div id='page-body'>body</div>")));
+
+        Assert.NotNull(cut.Find("#page-body"));
+    }
+
+    [Fact]
     public async Task WritableStore_ReloadsOnce()
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en");

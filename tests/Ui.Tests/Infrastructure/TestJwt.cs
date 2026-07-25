@@ -31,10 +31,12 @@ public static class TestJwt
         Add(AppClaims.ImpersonatedBy, impersonatedBy);
 
         var now = DateTime.UtcNow;
+        var expires = now.Add(lifetime ?? TimeSpan.FromHours(1));
         var token = new JwtSecurityToken(
             claims: claims,
-            notBefore: now,
-            expires: now.Add(lifetime ?? TimeSpan.FromHours(1)));
+            // A negative lifetime builds an ALREADY-EXPIRED token (notBefore must precede expires).
+            notBefore: expires < now ? expires.AddMinutes(-10) : now,
+            expires: expires);
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
