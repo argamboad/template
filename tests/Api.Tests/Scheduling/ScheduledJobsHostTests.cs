@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Perezosoft.Core.Abstractions;
 using Perezosoft.Infrastructure.Scheduling;
 
@@ -44,7 +45,27 @@ public class ScheduledJobsHostTests
         Assert.Equal(1, job.Runs);
     }
 
-    private static ScheduledJobsHost NewHost(params IScheduledJob[] jobs)
+    [Fact]
+    public async Task RunDueJobs_RerunsAfterTheIntervalElapses()
+    {
+        // v3 TB-BILL backfill (T45b): the other half of the interval contract — the job DOES run
+        // again once its interval has passed (provable only with an injected clock).
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
+        var job = new RecordingJob("a", TimeSpan.FromHours(1));
+        var host = NewHost(clock, job);
+
+        await host.RunDueJobsAsync();
+        clock.Advance(TimeSpan.FromMinutes(59));
+        await host.RunDueJobsAsync(); // not yet
+        clock.Advance(TimeSpan.FromMinutes(2));
+        await host.RunDueJobsAsync(); // interval elapsed → runs again
+
+        Assert.Equal(2, job.Runs);
+    }
+
+    private static ScheduledJobsHost NewHost(params IScheduledJob[] jobs) => NewHost(TimeProvider.System, jobs);
+
+    private static ScheduledJobsHost NewHost(TimeProvider clock, params IScheduledJob[] jobs)
     {
         var services = new ServiceCollection();
         foreach (var j in jobs) services.AddSingleton<IScheduledJob>(j);
@@ -53,7 +74,7 @@ public class ScheduledJobsHostTests
         return new ScheduledJobsHost(
             provider.GetRequiredService<IServiceScopeFactory>(),
             new ScheduledJobsOptions(),
-            TimeProvider.System,
+            clock,
             NullLogger<ScheduledJobsHost>.Instance);
     }
 }

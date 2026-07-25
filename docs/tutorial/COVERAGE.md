@@ -496,7 +496,7 @@
 - `tests/Api.Tests/Files/LocalDiskFileStorageTests.cs`
 - `tests/Api.Tests/Files/S3FileStorageMinioTests.cs`
 
-## 6.3 — Data protection: signed URLs & secrets at rest (6 files)
+## 6.3 — Data protection: signed URLs & secrets at rest (7 files)
 
 - `src/Api/Controllers/FilesController.cs`
 - `src/Infrastructure/Files/FileDownloadTokenizer.cs` — DataProtection-signed URLs
@@ -504,6 +504,7 @@
 - `src/Shared.Ui/IFileDownloadLauncher.cs` — download seam (NATIVE-3): web same-tab, native share sheet
 - `tests/Api.Tests/Files/FileDownloadTokenizerTests.cs`
 - `tests/Api.Tests/Files/FilesControllerTests.cs`
+- `tests/Api.Tests/Integration/ContributorRegistrationTests.cs` — every declared contributor resolves from the app DI (v3 TB-TEN-11)
 
 ## 6.4 — The SSRF seam (4 files)
 
@@ -948,4 +949,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 781 tracked files · 557 built in lessons · 224 bucketed · 0 unmapped
+**Totals:** 782 tracked files · 558 built in lessons · 224 bucketed · 0 unmapped

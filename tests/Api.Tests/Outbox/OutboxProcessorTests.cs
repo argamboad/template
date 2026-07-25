@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using Perezosoft.Api.Tests.Infrastructure;
 using Perezosoft.Core.Abstractions;
 using Perezosoft.Core.Entities;
@@ -129,6 +130,80 @@ public class OutboxProcessorTests(PostgresFixture fixture) : PostgresTestBase(fi
         Assert.NotNull(msg.LastError);
     }
 
+    [Fact]
+    public async Task ProcessDue_FailingHandler_BackoffGrowsExponentially()
+    {
+        // v3 TB-BILL backfill (T45b): the retry SCHEDULE, not just the retry count — the nth failure
+        // must push NextAttemptAt out by Base * 2^(n-1), or a hot-failing handler hammers its
+        // downstream at poll frequency instead of backing off.
+        await SeedAsync("boom", "x");
+        // The seed stamps NextAttemptAt with the REAL wall clock, so the fake clock must start ahead
+        // of it for the message to be due on the first pass.
+        var clock = new FakeTimeProvider(new DateTimeOffset(2100, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = new OutboxOptions { MaxAttempts = 5, BackoffBase = TimeSpan.FromSeconds(10) };
+        var handler = new ThrowingHandler("boom");
+
+        foreach (var expectedDelay in new[] { 10, 20, 40 }) // 10s * 2^(n-1) for n = 1, 2, 3
+        {
+            await using (var db = Fixture.CreateContext())
+                Assert.Equal(1, await NewProcessor(db, handler, options, clock).ProcessDueAsync());
+
+            await using var read = Fixture.CreateContext();
+            var msg = await read.Set<OutboxMessage>().SingleAsync();
+            Assert.Equal(OutboxStatus.Pending, msg.Status);
+            Assert.Equal(clock.GetUtcNow() + TimeSpan.FromSeconds(expectedDelay), msg.NextAttemptAt);
+
+            clock.Advance(TimeSpan.FromSeconds(expectedDelay)); // make it due for the next round
+        }
+    }
+
+    [Fact]
+    public async Task ProcessDue_MessageWithNoRegisteredHandler_RetriesThenDeadLetters()
+    {
+        // v3 TB-BILL backfill (T45b): a message whose type has NO registered handler (a renamed
+        // constant, a handler dropped from DI) must follow the normal retry→dead-letter path with a
+        // diagnosable error — not crash the poller or silently vanish.
+        await SeedAsync("nobody-handles-this", "x");
+        var options = new OutboxOptions { MaxAttempts = 2, BackoffBase = TimeSpan.Zero };
+
+        await using (var db = Fixture.CreateContext())
+            await NewProcessor(db, new RecordingHandler("some-other-type"), options).ProcessDueAsync();
+
+        await using var read = Fixture.CreateContext();
+        var msg = await read.Set<OutboxMessage>().SingleAsync();
+        Assert.Equal(OutboxStatus.DeadLettered, msg.Status);
+        Assert.Contains("No IOutboxHandler", msg.LastError);
+    }
+
+    [Fact]
+    public async Task ProcessDue_TwoConcurrentPollers_DeliverEachMessageExactlyOnce()
+    {
+        // v3 TB-BILL backfill (T45b): two dispatcher instances polling the same table (two app
+        // replicas, or the host overlapping a slow pass) must not double-deliver — the claim is
+        // FOR UPDATE SKIP LOCKED, so every message is handled exactly once across both.
+        const int messages = 6;
+        for (var i = 0; i < messages; i++)
+            await SeedAsync("recording", $"m{i}");
+
+        var (handlerA, handlerB) = (new RecordingHandler("recording"), new RecordingHandler("recording"));
+        async Task<int> DrainAsync(RecordingHandler handler)
+        {
+            var delivered = 0;
+            await using var db = Fixture.CreateContext();
+            var processor = NewProcessor(db, handler);
+            int batch;
+            while ((batch = await processor.ProcessDueAsync()) > 0) delivered += batch;
+            return delivered;
+        }
+
+        var counts = await Task.WhenAll(DrainAsync(handlerA), DrainAsync(handlerB));
+
+        Assert.Equal(messages, counts.Sum());                       // nothing lost, nothing doubled —
+        Assert.Equal(messages, handlerA.Handled.Count + handlerB.Handled.Count);
+        await using var read = Fixture.CreateContext();
+        Assert.Equal(messages, await read.Set<OutboxMessage>().CountAsync(m => m.Status == OutboxStatus.Sent));
+    }
+
     private async Task SeedAsync(string type, string payload, TimeSpan? notBefore = null)
     {
         await using var db = Fixture.CreateContext();
@@ -144,8 +219,8 @@ public class OutboxProcessorTests(PostgresFixture fixture) : PostgresTestBase(fi
         await db.SaveChangesAsync();
     }
 
-    private static OutboxProcessor NewProcessor(AppDbContext db, IOutboxHandler handler, OutboxOptions? options = null) =>
-        new(db, [handler], TimeProvider.System, options ?? new OutboxOptions(), NullLogger<OutboxProcessor>.Instance);
+    private static OutboxProcessor NewProcessor(AppDbContext db, IOutboxHandler handler, OutboxOptions? options = null, TimeProvider? clock = null) =>
+        new(db, [handler], clock ?? TimeProvider.System, options ?? new OutboxOptions(), NullLogger<OutboxProcessor>.Instance);
 }
 
 internal sealed class RecordingHandler(string type) : IOutboxHandler
