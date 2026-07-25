@@ -133,19 +133,25 @@ jobs:
         # Package Management, so versions resolve from Directory.Packages.props). The tool targets an
         # older runtime, so roll forward to the installed .NET. It prints the full license table and
         # exits non-zero if any license in .github/forbidden-licenses.json (GPL/AGPL/LGPL/SSPL) appears.
+        # Scans EVERY shipped graph (v3 audit TOOL-1, T46): Api (server) AND Web (the WASM client,
+        # which transitively covers Shared.Ui's packages) — a copyleft package added client-side used
+        # to ship unscanned. The Maui graph needs the MAUI workloads to restore, so its scan lives in
+        # the native-build android leg, which already has them.
         env:
           DOTNET_ROLL_FORWARD: LatestMajor
         run: |
-          dotnet restore src/Api/Perezosoft.Api.csproj
           # Version-pinned (v3 audit DEP-9): unpinned, a new release could change the license table or the
           # forbidden-list semantics and flip this gate's verdict on an untouched dependency graph.
           dotnet tool install --global dotnet-project-licenses --version 2.7.1
           export PATH="$PATH:$HOME/.dotnet/tools"
-          dotnet-project-licenses \
-            --input src/Api/Perezosoft.Api.csproj \
-            --include-transitive \
-            --use-project-assets-json \
-            --forbidden-license-types .github/forbidden-licenses.json
+          for proj in src/Api/Perezosoft.Api.csproj src/Web/Perezosoft.Web.csproj; do
+            dotnet restore "$proj"
+            dotnet-project-licenses \
+              --input "$proj" \
+              --include-transitive \
+              --use-project-assets-json \
+              --forbidden-license-types .github/forbidden-licenses.json
+          done
 
   # Production image build gate (DEPLOY-2, ADR-017). The multi-stage Dockerfile (publishes Web + Api and
   # serves the WASM single-origin) must keep building. Build-only — no push, and no run here: the
@@ -198,6 +204,23 @@ jobs:
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Perezosoft.Maui.csproj -f ${{ matrix.tfm }} -c Debug -p:AcceptAndroidSDKLicenses=true
+
+      # The Maui half of the license gate (v3 audit TOOL-1, T46): the license-scan job can't restore
+      # this project (needs the MAUI workloads), so scan it here where the build above already
+      # produced project.assets.json. Android leg only — the package graph is TFM-invariant enough
+      # for license purposes, and one leg keeps it off the paid-runner path.
+      - name: dotnet-project-licenses (Maui graph, fail on copyleft)
+        if: contains(matrix.tfm, 'android')
+        env:
+          DOTNET_ROLL_FORWARD: LatestMajor
+        run: |
+          dotnet tool install --global dotnet-project-licenses --version 2.7.1
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet-project-licenses \
+            --input src/Maui/Perezosoft.Maui.csproj \
+            --include-transitive \
+            --use-project-assets-json \
+            --forbidden-license-types .github/forbidden-licenses.json
 
   # Relevance gate for the expensive native legs. Born as a free-tier cost guard (the 2026-07-03
   # NATIVE sprint burned a month of private-repo minutes in one day: ~10 develop pushes × [2 macOS

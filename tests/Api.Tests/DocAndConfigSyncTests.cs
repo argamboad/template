@@ -56,6 +56,13 @@ public class DocAndConfigSyncTests
         // literal — a blind spot that silently exempted whole files (Proxy:*, Rls:*) from this gate. Capture
         // the declarations too, so naming a key doesn't opt it out of being documented.
         var constKey = new Regex(@"const\s+string\s+\w+\s*=\s*""([A-Za-z][A-Za-z0-9]*(?::[A-Za-z0-9]+)+)""");
+        // v3 TR-9 (T47): two more read shapes the gate was blind to. (1) A SINGLE-segment GetSection
+        // ("Admin") binds a whole options class without any dotted literal at the call site. (2) Raw
+        // Environment.GetEnvironmentVariable reads bypass IConfiguration entirely (deploy-injected
+        // values like APP_BUILD_COMMIT) — Section__Sub names map onto config paths; FLAT names must be
+        // documented verbatim in .env.example.
+        var sectionOnly = new Regex(@"GetSection\s*\(\s*""([A-Za-z][A-Za-z0-9]*)""\s*\)");
+        var envRead = new Regex(@"Environment\.GetEnvironmentVariable\s*\(\s*""([A-Za-z_][A-Za-z0-9_]*)""\s*\)");
         foreach (var f in SourceFiles(Path.Combine(RepoRoot(), "src")))
         {
             var text = File.ReadAllText(f);
@@ -63,6 +70,10 @@ public class DocAndConfigSyncTests
                 readKeys.Add(m.Groups[1].Value);
             foreach (Match m in constKey.Matches(text))
                 readKeys.Add(m.Groups[1].Value);
+            foreach (Match m in sectionOnly.Matches(text))
+                readKeys.Add(m.Groups[1].Value);
+            foreach (Match m in envRead.Matches(text))
+                readKeys.Add(m.Groups[1].Value.Contains("__") ? m.Groups[1].Value.Replace("__", ":") : m.Groups[1].Value);
         }
 
         // A read key is OK if it equals a documented path, is a prefix of one (a section), or a documented
@@ -102,6 +113,10 @@ public class DocAndConfigSyncTests
                 var key = line[..eq].Trim();
                 if (Regex.IsMatch(key, @"^[A-Za-z][A-Za-z0-9]*(?:__[A-Za-z0-9]+)+$"))
                     paths.Add(key.Replace("__", ":"));
+                // FLAT env-var names (APP_BUILD_COMMIT, deploy-injected) document raw
+                // Environment.GetEnvironmentVariable reads (v3 TR-9, T47).
+                else if (Regex.IsMatch(key, @"^[A-Za-z_][A-Za-z0-9_]*$"))
+                    paths.Add(key);
             }
 
         return paths;
