@@ -42,6 +42,7 @@ public abstract class ComponentTestBase : BunitContext
         Services.AddSingleton<IThemePersistence>(ThemeStore);
         Services.AddSingleton<ICulturePersistence>(CultureStore);
         Services.AddSingleton<IStringLocalizer<AppStrings>>(new FakeStringLocalizer());
+        Services.AddSingleton<AppResumeNotifier>(); // pages that refresh on app-resume (Billing) inject it
 
         // bUnit ships a fake NavigationManager (assert via Services.GetRequiredService<NavigationManager>())
         // and a JSInterop (JSInterop.Mode = Loose so unmatched JS calls no-op rather than throw).

@@ -75,14 +75,19 @@ public class NotificationsController(INotificationService notifications) : Contr
     }
 
     /// <summary>Clears the caller's notifications: <c>?read=true</c> removes only the already-read ones,
-    /// otherwise all of them. Returns how many were cleared.</summary>
+    /// <c>?read=false</c> removes ALL of them. The scope is REQUIRED — an omitted <c>read</c> is a 400, so
+    /// the destructive "delete everything" can never be reached by a dropped query param (v3 LB-UI-10).
+    /// Returns how many were cleared.</summary>
     [HttpDelete]
-    public async Task<IActionResult> Clear([FromQuery] bool read, CancellationToken cancellationToken)
+    public async Task<IActionResult> Clear([FromQuery] bool? read, CancellationToken cancellationToken)
     {
         if (CurrentUserId is not { } userId)
             return Unauthorized(new ErrorResponse("invalid_token", "Invalid user identity"));
+        if (read is null)
+            return BadRequest(new ErrorResponse("scope_required",
+                "Specify ?read=true (clear only read) or ?read=false (clear all)."));
 
-        var cleared = await notifications.DeleteAllAsync(userId, onlyRead: read, cancellationToken);
+        var cleared = await notifications.DeleteAllAsync(userId, onlyRead: read.Value, cancellationToken);
         return Ok(new NotificationsClearedResponse { Cleared = cleared });
     }
 

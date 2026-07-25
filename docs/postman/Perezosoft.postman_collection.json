@@ -461,7 +461,7 @@
         },
         {
           "name": "Clear all",
-          "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/api/notifications", "host": ["{{baseUrl}}"], "path": ["api", "notifications"] } },
+          "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/api/notifications?read=false", "host": ["{{baseUrl}}"], "path": ["api", "notifications"], "query": [{ "key": "read", "value": "false" }] }, "description": "Clears ALL of the caller's notifications. The scope is REQUIRED (v3 LB-UI-10): read=false = all, read=true = only read; omitting ?read is a 400 (scope_required), so delete-all can never be hit by a dropped param." },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"200 + cleared count\", () => pm.response.to.have.status(200));", "console.log(pm.response.json());"], "type": "text/javascript" } }]
         },
         {

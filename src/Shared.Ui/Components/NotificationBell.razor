@@ -155,16 +155,18 @@
     private async Task OnItemClick(NotificationDto n)
     {
         if (n.ReadAt is not null) return;
+
+        // Mark optimistically BEFORE the await (v3 LB-UI-9): a rapid second click would otherwise pass the
+        // null-ReadAt guard again while the first request is still in flight, and decrement the count twice.
+        var previous = n.ReadAt;
+        n.ReadAt = DateTimeOffset.UtcNow;
+        if (_count > 0) _count--;
         try
         {
             var res = await Http.PostAsync($"/api/notifications/{n.Id}/read", null);
-            if (res.IsSuccessStatusCode)
-            {
-                n.ReadAt = DateTimeOffset.UtcNow;
-                if (_count > 0) _count--;
-            }
+            if (!res.IsSuccessStatusCode) { n.ReadAt = previous; _count++; } // revert — leave unread, user can retry
         }
-        catch { /* leave unread; user can retry */ }
+        catch { n.ReadAt = previous; _count++; }
     }
 
     private async Task MarkAllRead()
@@ -211,7 +213,9 @@
     {
         try
         {
-            var res = await Http.DeleteAsync("/api/notifications");
+            // Explicit ?read=false — the server now REQUIRES the scope so "delete all" can't be reached by
+            // a dropped param (v3 LB-UI-10).
+            var res = await Http.DeleteAsync("/api/notifications?read=false");
             if (res.IsSuccessStatusCode) { _items.Clear(); _count = 0; }
         }
         catch { /* retryable */ }

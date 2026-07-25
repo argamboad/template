@@ -15,6 +15,8 @@ public sealed class TestHttpHandler : HttpMessageHandler
     /// <summary>Every request the components made, in order — assert against these.</summary>
     public List<HttpRequestMessage> Requests { get; } = [];
 
+    private readonly Dictionary<string, TaskCompletionSource<HttpResponseMessage>> _gated = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Stub "METHOD /path" (path only, query ignored) to return <paramref name="json"/> with <paramref name="status"/>.</summary>
     public TestHttpHandler On(HttpMethod method, string path, string json = "{}", HttpStatusCode status = HttpStatusCode.OK)
     {
@@ -25,10 +27,27 @@ public sealed class TestHttpHandler : HttpMessageHandler
         return this;
     }
 
+    /// <summary>
+    /// Stub "METHOD /path" to HANG until the returned action is invoked — for testing concurrent requests
+    /// (e.g. a rapid double-click while the first call is still in flight). Every request to this route
+    /// awaits the SAME gate.
+    /// </summary>
+    public Action OnGated(HttpMethod method, string path, string json = "{}")
+    {
+        var tcs = new TaskCompletionSource<HttpResponseMessage>();
+        _gated[Key(method, path)] = tcs;
+        return () => tcs.TrySetResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        });
+    }
+
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
         var key = Key(request.Method, request.RequestUri?.AbsolutePath ?? "/");
+        if (_gated.TryGetValue(key, out var gate))
+            return gate.Task;
         var response = _routes.TryGetValue(key, out var factory)
             ? factory(request)
             : new HttpResponseMessage(HttpStatusCode.NotFound)
