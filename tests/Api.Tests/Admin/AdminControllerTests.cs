@@ -414,6 +414,48 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task AdminBroadcast_ThroughTheRealProcessor_IsExactlyOnce_EvenWhenPolledAgain()
+    {
+        // v3 TB-BILL backfill (T45b): the broadcast's idempotency is BY CONSTRUCTION — the per-user
+        // rows commit atomically with the message's Sent flip inside the processor's transaction. Pin
+        // it at the machinery level: run the real OutboxProcessor over the broadcast message twice;
+        // the second pass must find nothing to do, and every user has exactly ONE notification row.
+        var u1 = await SeedUserAsync($"bc-a-{Guid.NewGuid():N}@x.com");
+        var u2 = await SeedUserAsync($"bc-b-{Guid.NewGuid():N}@x.com");
+        var title = $"OnceOnly {Guid.NewGuid():N}";
+
+        await using (var seed = Fixture.CreateContext())
+        {
+            seed.Set<OutboxMessage>().Add(new OutboxMessage
+            {
+                Type = AdminBroadcastOutboxHandler.MessageType,
+                Payload = JsonSerializer.Serialize(new AdminBroadcastPayload(title, "b", Guid.CreateVersion7())),
+                Status = OutboxStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow, NextAttemptAt = DateTimeOffset.UtcNow,
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        async Task<int> PollAsync()
+        {
+            await using var db = Fixture.CreateContext();
+            var handler = new AdminBroadcastOutboxHandler(new UserRepository(db), new NotificationService(
+                new EfRepository<Notification>(db), new EfRepository<NotificationPreference>(db),
+                new UserRepository(db), _email, TimeProvider.System));
+            return await new Perezosoft.Infrastructure.Outbox.OutboxProcessor(
+                db, [handler], TimeProvider.System, new Perezosoft.Infrastructure.Outbox.OutboxOptions(),
+                NullLogger<Perezosoft.Infrastructure.Outbox.OutboxProcessor>.Instance).ProcessDueAsync();
+        }
+
+        Assert.Equal(1, await PollAsync()); // delivered + Sent, atomically
+        Assert.Equal(0, await PollAsync()); // an at-least-once re-poll finds nothing pending
+
+        await using var read = Fixture.CreateContext();
+        Assert.Equal(1, await read.Set<Notification>().IgnoreQueryFilters().CountAsync(n => n.Title == title && n.UserId == u1));
+        Assert.Equal(1, await read.Set<Notification>().IgnoreQueryFilters().CountAsync(n => n.Title == title && n.UserId == u2));
+    }
+
+    [Fact]
     public async Task NonStaff_SetSubscription_Returns403()
     {
         var callerId = await SeedUserAsync("normal3@corp.com");

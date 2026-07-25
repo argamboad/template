@@ -62,6 +62,40 @@ public class AcceptSeatQuotaTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task Accept_SameInvitationConcurrently_JoinsExactlyOne()
+    {
+        // v3 TB-BILL backfill (T45b, the BILLING-9 race): the invitation reserved ONE seat, so two
+        // users racing to redeem the SAME token must produce exactly one join — the conditional
+        // status flip (TryAcceptAsync) is the guard; the loser's membership move rolls back with the
+        // scope and they stay in their old tenant.
+        var tenant = Guid.CreateVersion7();
+        await SeedTenantWithMembersAsync(tenant, members: 2);
+        var token = await SeedPendingInviteAsync(tenant, "contested@x.com"); // 2 + 1 pending = 3/3
+        var (aId, aTenant) = await ProvisionInviteeAsync("racer-a@x.com");
+        var (bId, bTenant) = await ProvisionInviteeAsync("racer-b@x.com");
+
+        async Task<AcceptStatus> AcceptAsync(Guid userId)
+        {
+            var ambient = new TestCurrentTenant();
+            await using var db = Fixture.CreateTestContext(ambient);
+            return await new ServiceHarness(db, currentTenant: ambient).InvitationService().AcceptAsync(userId, token);
+        }
+
+        var results = await Task.WhenAll(AcceptAsync(aId), AcceptAsync(bId));
+
+        // One winner, one InvalidToken (the flip already consumed it) — in either order.
+        Assert.Single(results, r => r == AcceptStatus.Joined);
+        Assert.Single(results, r => r == AcceptStatus.InvalidToken);
+
+        await using var read = Fixture.CreateContext();
+        Assert.Equal(3, await read.TenantMemberships.CountAsync(m => m.TenantId == tenant)); // 3/3, not 4
+        var winnerIsA = results[0] == AcceptStatus.Joined;
+        var (winner, loser, loserHome) = winnerIsA ? (aId, bId, bTenant) : (bId, aId, aTenant);
+        Assert.Equal(tenant, (await read.TenantMemberships.SingleAsync(m => m.UserId == winner)).TenantId);
+        Assert.Equal(loserHome, (await read.TenantMemberships.SingleAsync(m => m.UserId == loser)).TenantId); // rolled back home
+    }
+
+    [Fact]
     public async Task Accept_BlockedOverCap_SelfHealsWhenTheTenantUpgrades()
     {
         var tenant = Guid.CreateVersion7();

@@ -176,6 +176,26 @@ public class QuotaServiceTests(PostgresFixture fixture) : PostgresTestBase(fixtu
         Assert.True(await quota.TryConsumeAsync(UsageKeys.Export)); // fresh period
     }
 
+    [Fact]
+    public async Task TryConsume_YearRollover_ResetsCounter()
+    {
+        // v3 TB-BILL backfill (T45b): Dec→Jan is the period-key edge where a month-only key ("12" vs
+        // "01") would still work but a misbuilt year component ("2026-12" vs "2027-01") could collide
+        // or never reset. Pin the UTC year boundary explicitly.
+        var tenant = Guid.CreateVersion7();
+        await SeedTenantWithMembersAsync(tenant, members: 1);
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 12, 31, 23, 30, 0, TimeSpan.Zero));
+
+        await using var db = Fixture.CreateContext(tenant);
+        var quota = BuildQuota(db, tenant, clock);
+
+        for (var i = 0; i < 3; i++) Assert.True(await quota.TryConsumeAsync(UsageKeys.Export));
+        Assert.False(await quota.TryConsumeAsync(UsageKeys.Export)); // December exhausted
+
+        clock.Advance(TimeSpan.FromHours(1)); // 2027-01-01 00:30 UTC
+        Assert.True(await quota.TryConsumeAsync(UsageKeys.Export)); // fresh year, fresh period
+    }
+
     // --- invite-flow integration: the seat quota blocks a new invite past the cap ---
 
     [Fact]
