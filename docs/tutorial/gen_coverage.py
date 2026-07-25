@@ -150,6 +150,8 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Api/Services/ITokenHasher.cs", "2.1", ""),
     ("src/Api/Services/TokenHasher.cs", "2.1", "store hashes, never raw tokens"),
     ("tests/Api.Tests/TokenServiceTests.cs", "2.1", ""),
+    ("tests/Api.Tests/TokenHasherTests.cs", "2.1", "hasher hostile-input + fixed-time contract (v3 TB-AUTH-8)"),
+    ("tests/Api.Tests/Integration/RefreshReplayTests.cs", "2.1", "rotated-token replay revokes all sessions (v3 TB-AUTH-1)"),
     ("src/Api/Controllers/AuthControllerBase.cs", "2.1", ""),
     ("src/Api/Controllers/AuthController.cs", "2.1", "grows through 2.4/2.5/6.5"),
     ("src/Api/Models/AuthModels.cs", "2.1", ""),
