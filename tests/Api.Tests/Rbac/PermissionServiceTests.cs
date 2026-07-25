@@ -17,11 +17,15 @@ namespace Perezosoft.Api.Tests.Rbac;
 [Collection(PostgresCollection.Name)]
 public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(fixture)
 {
+    // The three role theories below together pin the COMPLETE role×permission matrix — every
+    // Permission member appears in each (v3 TB-ADM-11/12, T45a). MemberData over the enum keeps the
+    // owner row future-proof; a NEW permission must then be placed in the admin/member theories
+    // explicitly, which is the point: its author decides the row, not a default.
+    public static TheoryData<Permission> AllPermissions =>
+        [.. Enum.GetValues<Permission>()];
+
     [Theory]
-    [InlineData(Permission.ManageBilling)]
-    [InlineData(Permission.ManageRoles)]
-    [InlineData(Permission.ManageMembers)]
-    [InlineData(Permission.ViewTenant)]
+    [MemberData(nameof(AllPermissions))]
     public async Task Owner_HasEveryPermission(Permission permission)
     {
         var tenantId = Guid.CreateVersion7();
@@ -44,12 +48,16 @@ public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(
     }
 
     [Theory]
-    [InlineData(Permission.ManageMembers, true)]
-    [InlineData(Permission.RenameTenant, true)]
     [InlineData(Permission.ViewTenant, true)]
-    [InlineData(Permission.ManageBilling, false)]
-    [InlineData(Permission.ManageRoles, false)]
+    [InlineData(Permission.RenameTenant, true)]
+    [InlineData(Permission.ManageMembers, true)]
+    [InlineData(Permission.ManageRoles, false)]        // privilege escalation — owner-only
+    [InlineData(Permission.ManageBilling, false)]      // financial — owner-only
+    [InlineData(Permission.ExportData, false)]         // GDPR export — owner-only
     [InlineData(Permission.TransferOwnership, false)]
+    [InlineData(Permission.DissolveTenant, false)]
+    [InlineData(Permission.ManageApiKeys, false)]      // programmatic tenant access — owner-only (TB-ADM-12)
+    [InlineData(Permission.ManageWebhooks, false)]     // outbound data flow — owner-only (TB-ADM-12)
     public async Task Admin_HasManagementButNotOwnerOnly(Permission permission, bool granted)
     {
         var tenantId = Guid.CreateVersion7();
@@ -60,14 +68,41 @@ public class PermissionServiceTests(PostgresFixture fixture) : PostgresTestBase(
 
     [Theory]
     [InlineData(Permission.ViewTenant, true)]
+    [InlineData(Permission.RenameTenant, false)]
     [InlineData(Permission.ManageMembers, false)]
+    [InlineData(Permission.ManageRoles, false)]
     [InlineData(Permission.ManageBilling, false)]
+    [InlineData(Permission.ExportData, false)]
+    [InlineData(Permission.TransferOwnership, false)]
+    [InlineData(Permission.DissolveTenant, false)]
+    [InlineData(Permission.ManageApiKeys, false)]
+    [InlineData(Permission.ManageWebhooks, false)]
     public async Task Member_HasOnlyViewTenant(Permission permission, bool granted)
     {
         var tenantId = Guid.CreateVersion7();
         await SeedMembershipAsync(tenantId, TenantRoles.Owner);
         var memberId = await SeedMembershipAsync(tenantId, TenantRoles.Member);
         Assert.Equal(granted, await NewService(memberId, tenantId).HasAsync(permission));
+    }
+
+    [Fact]
+    public void AdminAndMemberTheories_CoverEveryPermission()
+    {
+        // Completeness canary for the two matrices above: adding a Permission member without placing
+        // its admin/member rows must fail HERE, not silently default to untested.
+        var admin = RowsOf(nameof(Admin_HasManagementButNotOwnerOnly));
+        var member = RowsOf(nameof(Member_HasOnlyViewTenant));
+        foreach (var p in Enum.GetValues<Permission>())
+        {
+            Assert.Contains(p, admin);
+            Assert.Contains(p, member);
+        }
+
+        static HashSet<Permission> RowsOf(string methodName) =>
+            [.. typeof(PermissionServiceTests).GetMethod(methodName)!
+                .GetCustomAttributes(typeof(InlineDataAttribute), false)
+                .Cast<InlineDataAttribute>()
+                .Select(a => (Permission)a.GetData(null!).Single()[0]!)];
     }
 
     [Fact]

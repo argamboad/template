@@ -78,7 +78,7 @@
 - `.github/pull_request_template.md` — the PR checklist — process as a gate
 - `.github/workflows/ci.yml` — born here (build+test+secret/license gates); every part adds jobs — e2e 3.6, docker 8.2, deploy 8.3, native A.1
 
-## 2.1 — Users & JWT access tokens (21 files)
+## 2.1 — Users & JWT access tokens (23 files)
 
 - `src/Api/Authentication/ClaimsPrincipalExtensions.cs`
 - `src/Api/Configuration/IJwtSettings.cs`
@@ -99,6 +99,8 @@
 - `src/Core/Repositories/IUserRepository.cs`
 - `src/Infrastructure/Persistence/Configurations/UserConfiguration.cs`
 - `src/Infrastructure/Repositories/UserRepository.cs`
+- `tests/Api.Tests/Integration/RefreshReplayTests.cs` — rotated-token replay revokes all sessions (v3 TB-AUTH-1)
+- `tests/Api.Tests/TokenHasherTests.cs` — hasher hostile-input + fixed-time contract (v3 TB-AUTH-8)
 - `tests/Api.Tests/TokenServiceTests.cs`
 - `tests/Api.Tests/UserServiceTests.cs`
 
@@ -946,4 +948,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 779 tracked files · 555 built in lessons · 224 bucketed · 0 unmapped
+**Totals:** 781 tracked files · 557 built in lessons · 224 bucketed · 0 unmapped

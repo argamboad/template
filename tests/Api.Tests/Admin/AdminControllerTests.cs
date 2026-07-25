@@ -327,6 +327,37 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task Staff_Announce_WithForeignOrUnknownUserIds_NotifiesNoOne_Anywhere()
+    {
+        // v3 TB-ADM-8 (T45a): user_ids is intersected with ACTUAL membership of the target tenant, so an
+        // id belonging to another tenant (or a random guid) must reach no one — neither in the target
+        // tenant nor, crucially, in the foreign user's own tenant.
+        var staffId = await SeedUserAsync(StaffEmail);
+        var targetTenant = await SeedTenantAsync("Xi", members: 2);
+        var otherTenant = await SeedTenantAsync("Omicron", members: 1);
+        var title = $"Foreign {Guid.NewGuid():N}";
+
+        Guid foreignUserId;
+        await using (var seed = Fixture.CreateContext(otherTenant))
+            foreignUserId = await seed.Set<TenantMembership>()
+                .Where(m => m.TenantId == otherTenant).Select(m => m.UserId).SingleAsync();
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+        {
+            var ok = Assert.IsType<OkObjectResult>(await controller.Announce(
+                targetTenant,
+                new AdminAnnounceRequest { Title = title, Body = "b", UserIds = [foreignUserId, Guid.CreateVersion7()] },
+                default));
+            Assert.Equal(0, Assert.IsType<AdminAnnounceResponse>(ok.Value).NotifiedCount);
+        }
+
+        // No rows with this title exist ANYWHERE — not in the target tenant, not in the foreign one.
+        await using var read = Fixture.CreateContext();
+        Assert.Equal(0, await read.Set<Notification>().IgnoreQueryFilters().CountAsync(n => n.Title == title));
+    }
+
+    [Fact]
     public async Task NonStaff_AnnounceAll_Returns403()
     {
         var callerId = await SeedUserAsync("normal2@corp.com");
@@ -420,6 +451,30 @@ public class AdminControllerTests(PostgresFixture fixture) : PostgresTestBase(fi
         Assert.Null(sub.CurrentPeriodEnd);     // never lapses
         Assert.True(await read.Set<AuditEvent>().AnyAsync(
             e => e.Action == "admin.subscription.comped" && e.ActorUserId == staffId));
+    }
+
+    [Fact]
+    public async Task Staff_CompForTenantA_LeavesTenantBUntouched()
+    {
+        // v3 TB-TEN-10 (T45a): the comp is an ENUMERATED cross-tenant write (ADR-021) that enters the
+        // target tenant — it must land in that tenant only. Tenant B keeps its own subscription
+        // byte-for-byte, and A's new projection is stamped to A.
+        var staffId = await SeedUserAsync(StaffEmail);
+        var tenantA = await SeedTenantAsync("Pi", members: 1);
+        var tenantB = await SeedTenantAsync("Rho", members: 1);
+        await SeedSubscriptionAsync(tenantB, stripeSubscriptionId: "sub_b_live", status: SubscriptionStatus.PastDue);
+
+        var (controller, db) = BuildController(staffId);
+        await using (db)
+            Assert.IsType<OkObjectResult>(await controller.SetSubscription(
+                tenantA, new AdminSetSubscriptionRequest { PlanKey = PlanKeys.Pro }, default));
+
+        await using var read = Fixture.CreateContext();
+        var subA = await read.Set<Subscription>().IgnoreQueryFilters().SingleAsync(s => s.TenantId == tenantA);
+        Assert.Equal(SubscriptionStatus.Active, subA.Status); // the comp, in A
+        var subB = await read.Set<Subscription>().IgnoreQueryFilters().SingleAsync(s => s.TenantId == tenantB);
+        Assert.Equal(SubscriptionStatus.PastDue, subB.Status);    // B untouched —
+        Assert.Equal("sub_b_live", subB.StripeSubscriptionId);    // — provider linkage intact
     }
 
     [Theory]

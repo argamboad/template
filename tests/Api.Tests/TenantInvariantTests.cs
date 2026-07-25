@@ -29,6 +29,29 @@ public class TenantInvariantTests(PostgresFixture fixture) : PostgresTestBase(fi
     }
 
     [Fact]
+    public async Task TransferOwnership_StaleOwner_GetsConcurrentModification_SingleOwnerHolds()
+    {
+        // v3 TB-ADM-13 (T45a): the conditional update (role flip guarded on the caller STILL being
+        // owner) is what keeps the single-owner invariant under racing transfers. A caller whose
+        // ownership already moved must get ConcurrentModification (the controller maps it to 409) —
+        // and crucially must NOT mint a second owner.
+        var (oId, oTenant, mId) = await TwoMemberHouseholdAsync();
+
+        await using (var db = Fixture.CreateContext(oTenant))
+            Assert.Equal(TransferResult.Transferred,
+                await new ServiceHarness(db).TenantService().TransferOwnershipAsync(oTenant, oId, mId));
+
+        // The ex-owner retries with a stale view of the world: 0 rows match the owner-guarded update.
+        await using (var db = Fixture.CreateContext(oTenant))
+            Assert.Equal(TransferResult.ConcurrentModification,
+                await new ServiceHarness(db).TenantService().TransferOwnershipAsync(oTenant, oId, mId));
+
+        var roles = await RolesAsync(oTenant);
+        Assert.Equal(TenantRoles.Owner, roles[mId]);   // exactly one owner —
+        Assert.Equal(TenantRoles.Member, roles[oId]);  // — and the loser stayed demoted
+    }
+
+    [Fact]
     public async Task RemoveMember_RemovesFromTenantAndReHomesAsOwner()
     {
         var (oId, oTenant, mId) = await TwoMemberHouseholdAsync();
