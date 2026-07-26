@@ -435,6 +435,39 @@ public class ArchitectureTests
         Assert.DoesNotContain("RlsTestSetup.ProvisionAsync", text);
     }
 
+    [Fact]
+    public void OutboundHttpSenders_RouteThroughTheUrlGuard_OrAreAllowlisted()
+    {
+        // R76 machine half (v3 audit S0-G4, T48): server-initiated HTTP to a DYNAMIC URL is the SSRF
+        // surface (v2 GAP-2) — every server-side file that actually SENDS via HttpClient must either
+        // reference IOutboundUrlGuard (WebhookSender is the model) or be allowlisted here with a
+        // rationale saying why its destinations are not attacker-influenced. Registration-only files
+        // (AddHttpClient with no send call) pass automatically. File-level granularity, matching the
+        // other source scans in this class.
+        var allowlisted = new Dictionary<string, string>
+        {
+            // (none today — WebhookSender, the only dynamic-URL sender, injects the guard)
+        };
+
+        var send = new Regex(
+            @"\.(SendAsync|PostAsync|PostAsJsonAsync|GetAsync|GetStringAsync|GetFromJsonAsync|GetByteArrayAsync|PutAsync|PutAsJsonAsync|PatchAsync|DeleteAsync)\s*\(");
+        var offenders = new List<string>();
+        foreach (var dir in new[] { "Api", "Infrastructure", "Core" }) // server-side; the client talks only to its own API
+        foreach (var f in SourceFiles(Path.Combine(RepoRoot(), "src", dir)))
+        {
+            var text = File.ReadAllText(f);
+            if (!text.Contains("HttpClient") || !send.IsMatch(text))
+                continue; // not an HTTP sender
+            if (text.Contains("IOutboundUrlGuard") || allowlisted.ContainsKey(Path.GetFileName(f)))
+                continue;
+            offenders.Add(Path.GetFileName(f));
+        }
+
+        Assert.True(offenders.Count == 0,
+            "Server-side HTTP senders that neither use IOutboundUrlGuard nor carry an allowlist rationale "
+            + $"(SSRF surface — route tenant-supplied URLs through the guard): {string.Join(", ", offenders)}");
+    }
+
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>
         !Directory.Exists(dir)
             ? []
