@@ -468,6 +468,24 @@ public class ArchitectureTests
             + $"(SSRF surface — route tenant-supplied URLs through the guard): {string.Join(", ", offenders)}");
     }
 
+    [Fact]
+    public void OtpNet_IsConfinedToMfaService()
+    {
+        // v3 audit TOOL-4 (T50, R66): Otp.NET is effectively single-maintainer AND on the MFA path —
+        // accepted (tiny RFC-6238 surface, no I/O), but only while it stays a ONE-FILE dependency:
+        // confined to MfaService so it can be swapped for another implementation (or inline HMAC)
+        // behind IMfaService without touching anything else. Tests may reference it freely (they
+        // generate codes to drive the real service). See docs/TECH_STACK.md.
+        var offenders = SourceFiles(Path.Combine(RepoRoot(), "src"))
+            .Where(f => File.ReadAllText(f).Contains("OtpNet"))
+            .Select(f => Path.GetFileName(f))
+            .Where(name => name != "MfaService.cs")
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Otp.NET must stay confined to MfaService (swappable-seam contract, TOOL-4): {string.Join(", ", offenders)}");
+    }
+
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>
         !Directory.Exists(dir)
             ? []
