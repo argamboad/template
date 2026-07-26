@@ -228,7 +228,7 @@
 - `tests/Api.Tests/Architecture/RoutePrefixInspectorTests.cs`
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (100 files)
+## 3.4 — The web client & auth UI (102 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -320,6 +320,7 @@
 - `src/Web/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map`
 - `src/Web/wwwroot/og_image_1200x630.png`
 - `tests/E2E.Tests/ThemeJourneyTests.cs` — dark-mode journey (live flip, reload persist, cross-device reconcile)
+- `tests/Ui.Tests/AuthServiceTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/HomePageTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/Infrastructure/ComponentTestBase.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/Infrastructure/Fakes.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
@@ -329,9 +330,10 @@
 - `tests/Ui.Tests/LocaleReloadLoopGuardTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/NotifyBillingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/PreferenceScopingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/ReconcileMatrixTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/SwitcherStateTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 
-## 3.5 — Localization (EN/ES) (9 files)
+## 3.5 — Localization (EN/ES) (10 files)
 
 - `src/Infrastructure/Email/EmailStrings.es.resx`
 - `src/Shared.Ui/Components/LanguageSwitcher.razor`
@@ -342,6 +344,7 @@
 - `src/Shared.Ui/Resources/AppStrings.resx`
 - `tests/Api.Tests/AccountControllerTests.cs` — PREFS-1/ADR-022: theme+locale preference-endpoint storage rules
 - `tests/E2E.Tests/I18nTests.cs`
+- `tests/E2E.Tests/LocaleMismatchJoinTests.cs` — locale-mismatch reload preserves /join (v3 TB-UI-16, UX-1 end-to-end)
 
 ## 3.6 — The E2E harness (Playwright) (12 files)
 
@@ -627,9 +630,10 @@
 - `docs/DEPLOYMENT.md` — the runbook is a taught artifact — the learner writes their own
 - `render.yaml` — Render blueprint (ADR-017)
 
-## 8.3 — The deploy pipeline & CI gates (4 files)
+## 8.3 — The deploy pipeline & CI gates (5 files)
 
 - `.github/scripts/deploy-smoke.sh`
+- `.github/scripts/qa-runlog-append-only.sh`
 - `.github/workflows/postman-sync.yml`
 - `docs/QA_TEST_PLAN.md` — release readiness: manual QA plan beside the automated gates
 - `tests/Api.Tests/Integration/VersionEndpointTests.cs` — version-gated deploy smoke
@@ -949,4 +953,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 782 tracked files · 558 built in lessons · 224 bucketed · 0 unmapped
+**Totals:** 786 tracked files · 562 built in lessons · 224 bucketed · 0 unmapped

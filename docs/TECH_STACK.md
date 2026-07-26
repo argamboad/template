@@ -148,7 +148,11 @@ Production reads the same keys from real environment variables, never a committe
   `ActivitySource` (not the beta EF Core instrumentation). Exporter config-gated: OTLP when
   `OpenTelemetry:Otlp:Endpoint` is set, else nothing (or console via `OpenTelemetry:ConsoleExporter`).
 - **`Otp.NET` 1.4.1** — authenticator-app TOTP (MFA-1 / ADR-012); the standard RFC-6238 math behind the
-  encrypted per-user secret and step-up verification.
+  encrypted per-user secret and step-up verification. **Supply-chain note (v3 audit TOOL-4/R66):** the
+  package is effectively single-maintainer, and it sits on the MFA path — accepted because the surface
+  is tiny (RFC-6238 HMAC math, no I/O, no network) and it is **confined to `MfaService`** (arch-tested:
+  `OtpNet_IsConfinedToMfaService`), so swapping it for another RFC-6238 implementation — or ~30 lines of
+  inline HMAC — is a one-file change behind `IMfaService`. Review releases before bumping the pin.
 - **`AWSSDK.S3` 4.0.100** — the S3-compatible `IFileStorage` implementation (FILES-3 / ADR-010; works
   with AWS S3, MinIO, R2, DO Spaces). Selected only when `Storage:S3:*` is configured; else local disk.
 - **`Swashbuckle.AspNetCore` 7.2.0** — the leak-free public OpenAPI document at
