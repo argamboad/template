@@ -1636,7 +1636,8 @@ the API directly:
 > notification/webhook/api-key id (create them if needed) for the cross-tenant probes.
 >
 > **⚠️ EXPECT-FAIL discipline.** Roughly half of these assert behaviour the v3 audit says is
-> **currently broken**. Each such case carries a bold **PENDING v3 REMEDIATION** banner naming the
+> **broken at authoring time (2026-07); ALL are fixed as of the v3 remediation (PRs #147–#191)**. Each
+> formerly-broken case carries a ✅ v3-landed note naming the
 > finding. When it fails, record **Blocked (known defect)** against the id in §16 — **never Pass**. A
 > QA plan that green-ticks a broken isolation path is worse than no case at all. The remaining cases
 > should **Pass on current code**; a failure there is a real regression.
@@ -1677,8 +1678,7 @@ Then each is 404 and nothing cross-tenant is read, replayed or revoked
    (audit **LB-TEN-2 / RLS-8**).
 
 ### QA-ADV-03 — Export includes EVERY tenant-scoped table, secret-free 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until LB-TEN-1 (export completeness) lands; record
-BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given PUBAPI + HOOKS are enabled and my tenant has an API key, a webhook and metered usage
@@ -1697,8 +1697,7 @@ Then the bundle covers api-keys (metadata only), webhook subscriptions (no secre
    `whsec_…`) regardless.
 
 ### QA-ADV-04 — Dissolve / erasure actually deletes api keys, webhook secrets, usage counters, delivery logs 🟠 (curl + DB)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until LB-TEN-1 (dissolve/erasure cleanup) lands; record
-BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given a tenant with an API key, a webhook subscription (+ deliveries) and usage counters
@@ -1715,8 +1714,7 @@ Then all those rows are physically gone — no orphaned keys, secrets, counters 
    (an encrypted webhook secret outlives its tenant). This case **FAILS** today — record **Blocked**.
 
 ### QA-ADV-05 — Writes during impersonation are attributed to the acting staff 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until LB-ADM-1 (impersonation write attribution) lands;
-record BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given a staff user is impersonating a member (token carries impersonated_by)
@@ -1733,8 +1731,7 @@ Then each mutation's audit row records impersonated_by=<staff>, not just the tar
    staff identity is lost on mutations. **FAILS** today — record **Blocked**.
 
 ### QA-ADV-06 — An impersonation session cannot reach staff-only actions 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until ADM-2 (staff gate rejects impersonated tokens)
-lands; record BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given I hold an impersonation token (impersonated_by present, target is a normal member)
@@ -1767,8 +1764,7 @@ Then I get exactly the 403 the member themselves would get
    confers no owner power (audit **TB-ADM-3**). Should **Pass** on current code.
 
 ### QA-ADV-08 — Impersonation never rewrites target prefs; shared-device pref poisoning 🟠 (curl + Web — two contexts)
-**⚠️ PENDING v3 REMEDIATION (partial) — the shared-device leg is expected to FAIL until LB-UI-4/5 lands;
-record that leg BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given I impersonate a user and change theme/language in their session
@@ -1787,8 +1783,7 @@ And on a shared browser, a fresh sign-in never inherits the previous user's save
    adopts A's Español/theme. That leg **FAILS** — record **Blocked** (audit **ADM-8/9, LB-UI-4/5**).
 
 ### QA-ADV-09 — A staff MFA-reset notification cannot be silenced by target prefs 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until ADM-1 (security notifications bypass prefs) lands;
-record BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given a user has turned BOTH notification channels (in-app + email) off
@@ -1805,8 +1800,7 @@ Then the security.mfa_reset in-app row AND the email are still delivered (securi
    **Blocked**.
 
 ### QA-ADV-10 — MFA step-up locks out after repeated wrong codes 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until ADM-3 (per-user MFA attempt cap) lands; record
-BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given an MFA-enabled account at the sign-in step-up
@@ -1854,8 +1848,7 @@ Then the duplicate is a no-op (inbox dedup) and the later state (active) still a
    second-granular timestamp that would wrongly drop it as stale) (audit **LB-BILL-1**). Should **Pass**.
 
 ### QA-ADV-13 — A first-ever webhook in a bad state does not false-notify 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until LB-BILL-4 (no dunning without a prior live sub)
-lands; record BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given a tenant that has NEVER had a live subscription
@@ -1871,8 +1864,7 @@ Then NO dunning notification is sent to the owner (there was nothing to lapse)
    including from "no sub", so the owner gets a spurious dunning alert. **FAILS** — record **Blocked**.
 
 ### QA-ADV-14 — Comp / revert a churned (canceled) tenant 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until ADM-5 (comp allowed on a canceled sub) lands;
-record BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given a tenant whose Stripe subscription is canceled (its subscription id still persisted)
@@ -1932,8 +1924,7 @@ Then it is rejected AND all of the user's sessions are revoked
    automated `RefreshTokenServiceTests` note to a manual probe. Should **Pass**.
 
 ### QA-ADV-18 — Spanish account on an English device accepts an invite 🔴 (Web — two contexts)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until UX-1 / LB-UI-1/2 (locale-reload preserves the
-deep-link) lands; record BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given a user whose saved locale is Español, on an English-default browser
@@ -1977,8 +1968,7 @@ Then only the read ones are removed; every unread notification survives
    **LB-UI-10**). Should **Pass**.
 
 ### QA-ADV-21 — Security headers on the single-origin host (staging / Environment B) 🟠 (curl)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until DEP-2/3 (security + cache headers) lands; record
-BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given the deployed single-origin host serving API + WASM
@@ -2010,8 +2000,7 @@ Then the per-IP limit + OTP/MFA lockout is NOT bypassed
    recorded N-A with the documented assumption).
 
 ### QA-ADV-23 — A Release native build points at a real HTTPS base URL, not cleartext localhost 🟠 (Desktop/Android)
-**⚠️ PENDING v3 REMEDIATION — expected to FAIL until NAT-3 (Release base-URL guard) lands; record
-BLOCKED, not Pass.**
+**✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
 Given a Release (non-dev) native build with no dev overrides
@@ -2249,35 +2238,36 @@ Record one row per executed case. Build = API/web commit SHA (`git rev-parse --s
 | QA-SMK-02 | Web | | | | | |
 | … | | | | | | |
 
-**§14a adversarial / tenant-isolation (QA-ADV-*).** The rows below are pre-seeded: cases the v3 audit
-flags as currently broken start at **Blocked (known defect)** — do **not** overwrite with Pass while the
-finding is open; the rest are **Not-run** (blank) until executed.
+**§14a adversarial / tenant-isolation (QA-ADV-*).** All rows are **Not-run** (blank) until executed.
+The formerly pre-seeded **Blocked (known defect)** rows were reset when the v3 remediation completed
+(2026-07, PRs #147–#191) — their Notes record which defect each was blocked on, and every one of those
+cases now expects **Pass** on re-run.
 
 | Case ID | Client | Result (P/F/Blocked/N-A) | Tester | Build (SHA) | Date | Notes / defect link |
 |---------|--------|--------------------------|--------|-------------|------|---------------------|
 | QA-ADV-01 | API | | | | | |
 | QA-ADV-02 | API | | | | | |
-| QA-ADV-03 | API | Blocked | | | | Known defect — LB-TEN-1 (export incomplete); expected FAIL until v3 remediation |
-| QA-ADV-04 | API | Blocked | | | | Known defect — LB-TEN-1 (orphaned rows on dissolve); expected FAIL until v3 remediation |
-| QA-ADV-05 | API | Blocked | | | | Known defect — LB-ADM-1 (impersonation write attribution); expected FAIL until v3 remediation |
-| QA-ADV-06 | API | Blocked | | | | Known defect — ADM-2 (staff gate re-escalation); expected FAIL until v3 remediation |
+| QA-ADV-03 | API | | | | | Was pre-seeded Blocked (LB-TEN-1 (export incomplete)) — fixed in v3; re-run |
+| QA-ADV-04 | API | | | | | Was pre-seeded Blocked (LB-TEN-1 (orphaned rows on dissolve)) — fixed in v3; re-run |
+| QA-ADV-05 | API | | | | | Was pre-seeded Blocked (LB-ADM-1 (impersonation write attribution)) — fixed in v3; re-run |
+| QA-ADV-06 | API | | | | | Was pre-seeded Blocked (ADM-2 (staff gate re-escalation)) — fixed in v3; re-run |
 | QA-ADV-07 | API | | | | | |
-| QA-ADV-08 | API/Web | Blocked | | | | Known defect (partial) — LB-UI-4/5 shared-device pref bleed; Leg A (impersonation) should Pass |
-| QA-ADV-09 | API | Blocked | | | | Known defect — ADM-1 (security notice suppressible by prefs); expected FAIL until v3 remediation |
-| QA-ADV-10 | API | Blocked | | | | Known defect — ADM-3 (no per-user MFA lockout); expected FAIL until v3 remediation |
+| QA-ADV-08 | API/Web | | | | | Was pre-seeded Blocked (LB-UI-4/5 shared-device pref bleed) — fixed in v3 (ADM-9 sign-out clear); re-run both legs |
+| QA-ADV-09 | API | | | | | Was pre-seeded Blocked (ADM-1 (security notice suppressible by prefs)) — fixed in v3; re-run |
+| QA-ADV-10 | API | | | | | Was pre-seeded Blocked (ADM-3 (no per-user MFA lockout)) — fixed in v3; re-run |
 | QA-ADV-11 | Web | | | | | |
 | QA-ADV-12 | API | | | | | |
-| QA-ADV-13 | API | Blocked | | | | Known defect — LB-BILL-4 (false dunning on first bad webhook); expected FAIL until v3 remediation |
-| QA-ADV-14 | API | Blocked | | | | Known defect — ADM-5 (comp stuck 409 on churned sub); expected FAIL until v3 remediation |
+| QA-ADV-13 | API | | | | | Was pre-seeded Blocked (LB-BILL-4 (false dunning on first bad webhook)) — fixed in v3; re-run |
+| QA-ADV-14 | API | | | | | Was pre-seeded Blocked (ADM-5 (comp stuck 409 on churned sub)) — fixed in v3; re-run |
 | QA-ADV-15 | Web | | | | | |
 | QA-ADV-16 | Web | | | | | |
 | QA-ADV-17 | API | | | | | |
-| QA-ADV-18 | Web | Blocked | | | | Known defect — UX-1/LB-UI-1/2 (locale reload drops /join deep-link); expected FAIL until v3 remediation |
+| QA-ADV-18 | Web | | | | | Was pre-seeded Blocked (UX-1/LB-UI-1/2 (locale reload drops /join deep-link)) — fixed in v3; re-run |
 | QA-ADV-19 | Web | | | | | |
 | QA-ADV-20 | Web | | | | | |
-| QA-ADV-21 | API | Blocked | | | | Known defect — DEP-2/3 (no security/cache headers); expected FAIL until v3 remediation |
+| QA-ADV-21 | API | | | | | Was pre-seeded Blocked (DEP-2/3 (no security/cache headers)) — fixed in v3; re-run |
 | QA-ADV-22 | API | | | | | |
-| QA-ADV-23 | Desktop/Android | Blocked | | | | Known defect — NAT-3 (Release build cleartext localhost base URL); expected FAIL until v3 remediation |
+| QA-ADV-23 | Desktop/Android | | | | | Was pre-seeded Blocked (NAT-3 (Release build cleartext localhost base URL)) — fixed in v3; re-run |
 | QA-ADV-24 | Desktop | | | | | |
 
 **Release gate (suggested):** all 🔴 Smoke + all 🟠 Core cases Pass on Web; the §13c native
@@ -2554,7 +2544,7 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   refresh-reuse), preference bleed on shared devices + the locale-reload deep-link break (UX-1,
   LB-UI-1/2/4/5/10), and deploy/native hardening (DEP-1/2/3, NAT-3/10). **12 cases are EXPECT-FAIL**
   (assert not-yet-fixed behaviour): ADV-03, 04, 05, 06, 08 (partial), 09, 10, 13, 14, 18, 21, 23 —
-  each carries a **PENDING v3 REMEDIATION** banner and is pre-seeded **Blocked (known defect)** in §16
+  each formerly carried a **PENDING v3 REMEDIATION** banner (now ✅ v3-landed notes) and their §16 rows are reset for a re-run
   (never Pass while the finding is open). The other 12 should Pass on current code. §15 gains a
   QA-ADV traceability block; §16 gains 24 sign-off rows. Suite 125 → **149** cases.
 - **Updated 2026-07-17** — **NATIVE-12 (OAuth process-death resilience)** merged onto develop: an OS
