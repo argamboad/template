@@ -225,6 +225,24 @@ config now, a data migration with a rollback plan after live tenants exist.
 
 ---
 
+## 12. Explicit system scope (`EnterSystem` / `ISystemScope`) — `SYSSCOPE` → **DECIDED: DEFERRED (v3 T43, 2026-07-27)**
+Make tenantless system paths (auth endpoints, background jobs, dispatchers, the webhook before
+`EnterTenant`) **declare** themselves the way tenant paths declare via `EnterTenant` — so code that
+accidentally touches a tenant-scoped table from a tenantless context **throws loudly** instead of
+silently seeing 0 rows (the RLS-2/RLS-8 bug shape).
+- **Design:** `ITenantContext.EnterSystem()` returns a scope marking "intentionally no tenant";
+  grants **no access** — tenant-table reads inside it still require `QueryAllTenants()`, writes
+  `EnterTenant`. Repository access to an `ITenantScoped` set outside ANY declared scope throws.
+  Pair with an arch scan enumerating entry points so a missed adoption is caught at build, not 500.
+- **Why deferred (the v3 T43 decision, user-approved):** every concrete instance the audit found is
+  fixed individually with tests; the silent-no-op class is caught structurally today — the whole
+  integration harness runs **RLS-enforced as the runtime role**, so a tenantless read of a tenant
+  table surfaces as red tests (how the RLS-2 shape was caught). Retrofitting the declaration across
+  the most availability-critical paths (sign-in, refresh) inverts risk/benefit: one missed call
+  site turns a working auth endpoint into a production 500. Adopt seam-first in a downstream
+  greenfield or a future major refactor, not as a retrofit.
+- **Deps:** none. **Size:** ~1 slice + an adoption sweep; the sweep is the risk.
+
 ## Not planned (explicitly out unless a need appears)
 - **Full-text / vector search** — Postgres FTS covers a lot before reaching for a search engine.
 - **Marketing email / CRM** — distinct from transactional `IEmailSender`; an integration, not core.
