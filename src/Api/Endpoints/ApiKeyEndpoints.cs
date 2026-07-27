@@ -36,7 +36,7 @@ public static class ApiKeyEndpoints
 
             var created = await keys.CreateAsync(userId.Value, request.Name ?? "", request.Scopes, request.ExpiresAt, ct);
             if (created is null)
-                return Results.BadRequest(new { error = "invalid_scopes", message = "None of the requested scopes are recognized." });
+                return Results.BadRequest(new ErrorResponse("invalid_scopes", "None of the requested scopes are recognized."));
             // The raw key is returned ONCE here and never again.
             return Results.Created($"/api/apikeys/{created.Key.Id}", ApiKeyResponse.FromCreated(created));
         });
@@ -85,14 +85,17 @@ public static class ApiScopeEndpointExtensions
             if (hasScope)
                 return await next(context);
 
-            return Results.Json(new
-            {
-                error = "insufficient_scope",
+            return Results.Json(new InsufficientScopeResponse(
+                "insufficient_scope",
                 scope,
-                message = $"This endpoint requires the '{scope}' API-key scope.",
-            }, statusCode: StatusCodes.Status403Forbidden);
+                $"This endpoint requires the '{scope}' API-key scope."), statusCode: StatusCodes.Status403Forbidden);
         });
 }
+
+/// <summary>The public-API 403 body: the shared <c>error</c>/<c>message</c> envelope plus the missing
+/// scope. A NAMED record (v3 audit TR-5/R76) so the wire contract is reviewable — byte-identical to the
+/// previous anonymous shape.</summary>
+public sealed record InsufficientScopeResponse(string Error, string Scope, string Message);
 
 public sealed record CreateApiKeyRequest
 {

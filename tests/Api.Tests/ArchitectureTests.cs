@@ -486,6 +486,25 @@ public class ArchitectureTests
             $"Otp.NET must stay confined to MfaService (swappable-seam contract, TOOL-4): {string.Join(", ", offenders)}");
     }
 
+    [Fact]
+    public void FeatureErrors_UseTheSharedErrorResponse_NotAdHocShapes()
+    {
+        // R76 (v3 audit TR-5, T53): slice error bodies must be the shared ErrorResponse record —
+        // clients key their copy off `error` codes with a stable contract, and Phase 4 proved the
+        // ad-hoc `new { error … }` shape propagates: copying the Notes exemplar reproduced it
+        // verbatim. Banned in the slice surface (Features/ + Endpoints/); the exemplar now models
+        // the right shape.
+        var anonError = new Regex(@"new\s*\{\s*error\b");
+        var offenders = SourceFiles(Path.Combine(RepoRoot(), "src", "Api", "Features"))
+            .Concat(SourceFiles(Path.Combine(RepoRoot(), "src", "Api", "Endpoints")))
+            .Where(f => anonError.IsMatch(File.ReadAllText(f)))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            $"Ad-hoc anonymous error shapes in the slice surface — use the shared ErrorResponse record: {string.Join(", ", offenders)}");
+    }
+
     private static IEnumerable<string> SourceFiles(string dir, string pattern = "*.cs") =>
         !Directory.Exists(dir)
             ? []

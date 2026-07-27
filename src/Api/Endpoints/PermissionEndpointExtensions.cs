@@ -23,11 +23,14 @@ public static class PermissionEndpointExtensions
             if (await permissions.HasAsync(permission, context.HttpContext.RequestAborted))
                 return await next(context);
 
-            return Results.Json(new
-            {
-                error = "forbidden",
-                permission = permission.ToString(),
-                message = $"This action requires the '{permission}' permission.",
-            }, statusCode: StatusCodes.Status403Forbidden);
+            return Results.Json(new PermissionDeniedResponse(
+                "forbidden",
+                permission.ToString(),
+                $"This action requires the '{permission}' permission."), statusCode: StatusCodes.Status403Forbidden);
         });
 }
+
+/// <summary>The 403 body: the shared <c>error</c>/<c>message</c> envelope plus which permission was
+/// required. A NAMED record (v3 audit TR-5/R76) so the wire contract is reviewable — byte-identical to
+/// the previous anonymous shape.</summary>
+public sealed record PermissionDeniedResponse(string Error, string Permission, string Message);

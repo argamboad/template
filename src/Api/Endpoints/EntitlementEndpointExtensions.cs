@@ -24,12 +24,19 @@ public static class EntitlementEndpointExtensions
                 return await next(context);
 
             var app = context.HttpContext.RequestServices.GetRequiredService<IApplicationSettings>();
-            return Results.Json(new
-            {
-                error = "payment_required",
-                entitlement = entitlementKey,
-                message = $"This feature requires a plan that includes '{entitlementKey}'.",
-                upgrade_url = $"{app.ClientUrl.TrimEnd('/')}/billing",
-            }, statusCode: StatusCodes.Status402PaymentRequired);
+            return Results.Json(new PaymentRequiredResponse(
+                "payment_required",
+                entitlementKey,
+                $"This feature requires a plan that includes '{entitlementKey}'.",
+                $"{app.ClientUrl.TrimEnd('/')}/billing"), statusCode: StatusCodes.Status402PaymentRequired);
         });
 }
+
+/// <summary>The 402 body: the shared <c>error</c>/<c>message</c> envelope plus which entitlement was
+/// missing and where to upgrade. A NAMED record (v3 audit TR-5/R76) so the wire contract is reviewable —
+/// byte-identical to the previous anonymous shape (incl. the snake_case <c>upgrade_url</c>).</summary>
+public sealed record PaymentRequiredResponse(
+    string Error,
+    string Entitlement,
+    string Message,
+    [property: System.Text.Json.Serialization.JsonPropertyName("upgrade_url")] string UpgradeUrl);
