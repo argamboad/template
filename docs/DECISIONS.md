@@ -225,6 +225,16 @@ distinction is structural, not just narrative:
    fails on any raw `.MapGroup(` there, so a future slice can't quietly bypass the shared tenant-API auth.
    This is a pure move + namespace change — no route, behavior, or signature changed.
 
+*Amendment (v3 audit Phase 4, 2026-07-27, T58) — the touchpoint contract is verified-adversarially and
+gains one member.* Phase 4 built a real entity-bearing slice against this ADR and measured the central
+edits: the "~5 mechanical touchpoints" list is accurate **plus one the list omitted — the RLS policy**.
+`dotnet ef migrations add` scaffolds no RLS DDL, so an `ITenantScoped` entity's policy must be appended
+to the same migration by hand (ADR-020; step 4 of the add-a-slice checklist in `WAYS_OF_WORKING.md`,
+enforced by the `RlsMigrationGateTests` parity gate). Read "without touching central code" as the
+bounded ~6-touchpoint contract above — never as literally zero; the durable half of the claim is what
+Phase 4 confirmed HOLDS: the EF filter, stamping interceptor, RLS backstop, and the group auth policy
+are all inherited with no slice re-implementation.
+
 **ADR-005 — Apple Sign In fits the agnostic provider model; implementation DEFERRED, web-first. (2026-06-24)**
 A third OAuth provider (Apple) was assessed against the provider-agnostic auth stack (ADR-002). The
 verdict: the **backend absorbs it with small, mechanical additions** — `.AddApple(...)` in

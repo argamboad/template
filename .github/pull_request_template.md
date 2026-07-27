@@ -25,6 +25,8 @@
 - [ ] Docs updated (FEATURES / DATA_MODEL / DECISIONS) if behavior or decisions changed
 - [ ] Postman collection (`docs/postman/`) updated if API endpoints changed (route, verb,
       params, request/response shape, auth, or error codes)
+- [ ] New `ITenantScoped` entity ships its **RLS policy in the same migration** (ADR-020 —
+      `RlsDdl.StatementsFor`; the scaffold emits none, the parity gate fails CI without it)
 
 ## Notes
 <!-- anything reviewers/future-you should know -->

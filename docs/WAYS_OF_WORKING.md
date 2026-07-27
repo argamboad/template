@@ -71,11 +71,19 @@ app (UI components go in the Shared.Ui RCL).
 1. **Entity** → `src/Core/Entities/<Entity>.cs`, implementing `ITenantScoped`.
 2. **DbSet + config** → add the `DbSet<>` to `AppDbContext` and any `IEntityTypeConfiguration`.
 3. **Migration** → `dotnet ef migrations add Add<Entity>` (in `src/Infrastructure/Persistence/Migrations/`).
-4. **DI wiring** → register the handler/services (`Add*`) and map the group (`app.Map<Feature>()`) in
+4. **RLS policy — same migration** (ADR-020, v3 audit TR-4): `dotnet ef migrations add` scaffolds
+   **no RLS DDL**, so append the new table's policy to the migration you just created —
+   `migrationBuilder.Sql(...)` with the statements from `RlsDdl.StatementsFor` (copy the shape from
+   the platform's RLS migration; `Down` drops the policy + disables RLS). The
+   `RlsMigrationGateTests` parity gate fails CI on any `ITenantScoped` table whose policy didn't
+   arrive by migration — this step is why it stays green.
+5. **DI wiring** → register the handler/services (`Add*`) and map the group (`app.Map<Feature>()`) in
    `Program.cs`.
-5. **Contributor** → register the `ITenantDataContributor` (all four members) in DI.
-6. **Fixture reset** → add the new table(s) to the test fixture's reset/truncate list.
-7. **UI** → nav entry + component in the Shared.Ui RCL, and add the resx (`.resx`) strings (EN/ES).
+6. **Contributor** → register the `ITenantDataContributor` (all four members) in DI.
+7. **Fixture reset** → add the new table(s) to the test fixture's reset/truncate list.
+8. **UI** → nav entry + component in the Shared.Ui RCL, and add the resx (`.resx`) strings (EN/ES).
+   **Namespace your keys per feature** (`Notes_Title`, `Notes_Empty`, …) — `AppStrings.resx` is one
+   shared file, and unprefixed keys (`Title`, `Empty`) collide across slices (v3 audit / Phase-4 obs).
 
 **Reference:** `src/Api/Features/Notes` is a complete, working example (marked "🗑️ DELETE-ME").
 Copy its shape; delete it when you ship your first real feature.

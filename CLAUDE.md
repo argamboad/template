@@ -121,13 +121,17 @@ deferred items without an explicit decision.
 - Seed data (if any) — _TODO_.
 - Concrete schema (EF Core migrations) — generated from `docs/DATA_MODEL.md`.
 - **User stories: generated per-epic at build time**, under `docs/stories/` (one file per epic).
-- Deferred sub-decisions: non-web framework commitment (see `docs/TECH_STACK.md`). Hosting is now
-  **decided** (ADR-017: Render free single-origin + Neon + Brevo) — built by epic `DEPLOY`.
+- Non-web framework: **decided and built** — MAUI Blazor Hybrid ships all four native shells
+  (epic `NATIVE`, ADR-018; signing/stores are downstream per its 2026-07-06 amendment). Hosting is
+  likewise **decided** (ADR-017: Render free single-origin + Neon + Brevo) — built by epic `DEPLOY`.
 
 ## Doc map
 | File | Purpose |
 |------|---------|
 | `CLAUDE.md` (root) | This file — operating manual, auto-loaded |
+| `_PLATFORM_PRIMER.md` (root) | Conceptualization primer — paste into a NEW project chat to pre-load the constant decisions and jump straight to what the app does |
+| `docs/NEW_APP_GUIDE.md` | **The onboarding spine** — every phase from idea to production, in order, linking the detailed doc per step |
+| `docs/OVERVIEW.md` | Friendly platform tour (PM/power-user/developer/architect) — no codebase knowledge assumed |
 | `docs/PROJECT_BRIEF.md` | Why/what/scope (lean PRD) + OUT list |
 | `docs/FEATURES.md` | User flows & behavior |
 | `docs/DATA_MODEL.md` | Entities, relationships, derived rules |
@@ -138,11 +142,12 @@ deferred items without an explicit decision.
 | `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
-| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (149 cases: smoke + regression + §14a v3-audit adversarial/tenant-isolation + §13c native release checklist) |
+| `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (150 cases: smoke + regression + §14a v3-audit adversarial/tenant-isolation + §13c native release checklist) |
 | `docs/ROADMAP.md` | Sequenced plan — pillars done (JOBS/BILLING/OBS) + the next waves (RBAC, files, GDPR, MFA, …) |
 | `docs/STATUS.md` | 2026-07-04 status snapshot + operator guides — native QA pass, Apple first-run smoke (MacBook walkthrough), prod activation; SaaS-readiness assessment |
 | `docs/PLATFORM_BACKLOG.md` | Per-item design sketches for the future foundation slices (the detail behind ROADMAP) |
 | `docs/stories/` | User stories per epic — generated at build time |
+| `docs/stories/ui.md` | epic `UI` ✅ COMPLETE — **retrospective** (v3 T59, closing v2 DOC-22): the four 2026-07 web-UI slices that shipped without a story file — UI-1 GDPR export/erasure UI, UI-2 MFA UI, UI-3 notification bell/prefs UI, UI-4 staff `/admin` console; defines what QA §2 + the traceability matrix cite |
 | `docs/stories/billing.md` | epic `BILLING` ✅ COMPLETE — entitlements + Checkout + webhook + Portal (1–4) + seat/usage quotas (5, `IQuotaService`) + trial/dunning (6, `IBillingNotifier` + lapse sweep via NOTIFY) + dissolve cleanup (7, `BillingDataContributor` cancels the provider sub + wipes the projection) + billing page (8, `GET /api/billing` summary + `/billing` UI, fake-provider E2E upgrade loop) + seat re-check at invitation accept (9, 2026-07-14: downgrade left stale invites joinable past the cap → 402 `seat_limit_reached` + `/join` "household full" state, self-heals on upgrade); ADR-006 |
 | `docs/stories/async-jobs.md` | epic `JOBS` ✅ COMPLETE — outbox+dispatcher, inbox, scheduler (ADR-007) |
 | `docs/stories/observability.md` | epic `OBS` ✅ COMPLETE — logging, OpenTelemetry, health, append-only audit log (ADR-008) |

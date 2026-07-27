@@ -13,6 +13,12 @@ but their translations are **not done yet** — see "Adding a language" below.
 | UI (all razor pages/components) | `src/Shared.Ui/Resources/AppStrings.resx` (en) + `AppStrings.{culture}.resx` |
 | Transactional emails | `src/Infrastructure/Email/EmailStrings.resx` (en) + `EmailStrings.{culture}.resx` |
 
+**Key naming — namespace per feature** (v3 audit T58): `AppStrings.resx` is one shared file, so a
+slice's keys carry the feature prefix — `Notes_Title`, `Notes_Empty`, `Billing_Upgrade` — never bare
+`Title`/`Empty`, which collide across slices. Platform surfaces already follow this
+(`Notif_*`, `Join_*`, `Plan_*`/`BillingStatus_*`); copy the convention (add-a-slice checklist step 8
+in `WAYS_OF_WORKING.md`).
+
 Any key missing from a culture file falls back to the neutral (English) file.
 
 ## How the language is chosen
