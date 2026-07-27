@@ -225,6 +225,16 @@ distinction is structural, not just narrative:
    fails on any raw `.MapGroup(` there, so a future slice can't quietly bypass the shared tenant-API auth.
    This is a pure move + namespace change — no route, behavior, or signature changed.
 
+*Amendment (v3 audit Phase 4, 2026-07-27, T58) — the touchpoint contract is verified-adversarially and
+gains one member.* Phase 4 built a real entity-bearing slice against this ADR and measured the central
+edits: the "~5 mechanical touchpoints" list is accurate **plus one the list omitted — the RLS policy**.
+`dotnet ef migrations add` scaffolds no RLS DDL, so an `ITenantScoped` entity's policy must be appended
+to the same migration by hand (ADR-020; step 4 of the add-a-slice checklist in `WAYS_OF_WORKING.md`,
+enforced by the `RlsMigrationGateTests` parity gate). Read "without touching central code" as the
+bounded ~6-touchpoint contract above — never as literally zero; the durable half of the claim is what
+Phase 4 confirmed HOLDS: the EF filter, stamping interceptor, RLS backstop, and the group auth policy
+are all inherited with no slice re-implementation.
+
 **ADR-005 — Apple Sign In fits the agnostic provider model; implementation DEFERRED, web-first. (2026-06-24)**
 A third OAuth provider (Apple) was assessed against the provider-agnostic auth stack (ADR-002). The
 verdict: the **backend absorbs it with small, mechanical additions** — `.AddApple(...)` in
@@ -1025,7 +1035,7 @@ only change alongside a re-encryption migration. The Render service keeps the na
 (Render treats the name as service identity; renaming would mint a new service + URL and churn the
 OAuth consoles for zero functional gain — fold into a future console-touching change if desired).
 
-**ADR-020 — Tenancy defense-in-depth: Postgres row-level security as a second, DB-level wall under the EF query filter. Implementation DEFERRED — hard prerequisite for production activation. (2026-07-06)**
+**ADR-020 — Tenancy defense-in-depth: Postgres row-level security as a second, DB-level wall under the EF query filter. (2026-07-06; IMPLEMENTED — see the addenda. Header fixed 2026-07-27, v3 T57: it still read "DEFERRED" long after the backstop merged)**
 Tenant isolation is currently enforced entirely in the application layer: the ADR-003 global query
 filter, the write-side interceptor (V2-B2), and the arch-test bans. One missed seam in a future
 feature — most plausibly a downstream app's vertical slice, written outside this repo's review
@@ -1085,6 +1095,13 @@ activation)**. Design detail: `docs/PLATFORM_BACKLOG.md` §11.
    it), `docker/db/provision-rls-runtime-role.sql`, `DEPLOYMENT.md` §7, and the
    `RlsMigrationGateTests` parity gate (a new `ITenantScoped` entity without its policy migration
    fails CI).
+
+*Addendum (v3 audit remediation, 2026-07) — the backstop re-hardened where the audit bit it:* the
+parity gate above was proven TAUTOLOGICAL as first shipped (v3 RLS-1: the harness back-filled
+model-derived policies into the database the gate inspected) and was fixed to migrations-only
+provisioning with a bites-test; dissolve/erasure under a foreign entered tenant (RLS-2) was made
+all-or-nothing; and the slice recipe is now documented + enforced end-to-end (the hand-written
+policy step in `WAYS_OF_WORKING.md` + the PR-template checkbox + the honest gate — v3 T52/T57).
 
 **ADR-021 — Admin back-office writes: narrow, enumerated, audited mutations (amends ADR-014's "read-only" posture). (2026-07-09)**
 ADR-014 point 2 declared admin **read-only over tenant data** ("inspect, don't mutate"), with the
@@ -1168,3 +1185,28 @@ pre-paint, and the columns already serve that; only the sync behavior changes.
 5. **"system" is stored verbatim** (amends THEME-1): `User.Theme` null now means "never chose",
    which is what makes adoption (3) well-defined and lets System propagate across devices like the
    other two values. No schema change — same nullable column, same endpoints.
+
+**ADR-023 — API documentation governance: the repo Postman collection is the canonical, machine-enforced API contract; the workspace is a one-way mirror. (2026-07-27)**
+The platform documents its API as a Postman collection rather than a spec-first OpenAPI document.
+This was practice (CLAUDE.md rule + `docs/postman/README.md`) without a recorded decision; the v3
+audit (TR-6/TR-10, T55/T57) found the gap and this ADR closes it. Decided:
+
+1. **`docs/postman/Perezosoft.postman_collection.json` is canonical.** Any change to an API
+   endpoint (route, verb, params, request/response shape, auth, error codes) updates the
+   collection **in the same slice** — the PR-template checkbox and review enforce the habit; the
+   `PostmanParityTests` CI gate (T55) enforces the floor: every endpoint the app actually maps
+   under `/api` must have a matching request, or an inline exclusion rationale. Browser-flow
+   endpoints are documented as annotated **`(doc-only)`** requests.
+2. **The Postman workspace is a disposable one-way mirror.** The `postman-sync` workflow pushes
+   `docs/postman/**` to the workspace on every `develop` change (sync-by-name); edits made in the
+   Postman UI are overwritten on the next sync and are never pulled back. The repo copy is the only
+   reviewed, versioned artifact.
+3. **Why not spec-first OpenAPI:** the collection *is* executable documentation — chained
+   auth flows (OTP via Mailpit, token rotation, shown-once secrets), per-environment files, and
+   test scripts double as a manual API harness, which a generated spec can't replace. The one
+   OpenAPI surface that exists stays: the leak-free public-API document at
+   `/api/public/openapi.json` (ADR-015) serves *external* consumers of the config-gated PUBAPI
+   only. Revisit if a downstream app needs full-API OpenAPI for client generation — that would be
+   a new ADR, generating *from* the code, with this collection remaining the human-facing harness.
+4. **Rebrand note:** the collection, environments, and the sync workflow's file path all rename
+   with the app (`docs/REBRANDING.md` already lists them).
