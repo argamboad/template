@@ -92,7 +92,8 @@ _TODO_
   tenant query scoping.
 
 ## API documentation (constant)
-- **The Postman collection mirrors the API — and the repo copy is canonical.** Any change to API
+- **The Postman collection mirrors the API — and the repo copy is canonical (ADR-023; the
+  `PostmanParityTests` CI gate enforces the floor).** Any change to API
   endpoints (route, verb, path/query params, request/response shape, auth requirements, or error
   codes) must update **`docs/postman/Perezosoft.postman_collection.json`** (+ the environment
   files when config/env expectations change) in the same slice. Controllers in
