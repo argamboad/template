@@ -1,4 +1,5 @@
 using Perezosoft.Api.Endpoints;
+using Perezosoft.Api.Services;
 
 namespace Perezosoft.Api.Features.Notes;
 
@@ -20,8 +21,10 @@ public static class NotesEndpoints
         group.MapPost("/", async (CreateNoteRequest request, NotesHandler handler, CancellationToken ct) =>
         {
             var created = await handler.CreateAsync(request, ct);
+            // Errors use the SHARED ErrorResponse shape (v3 audit TR-5) — this exemplar is what every
+            // downstream slice copies, and ad-hoc anonymous error shapes are banned in Features/**.
             return created is null
-                ? Results.BadRequest(new { error = "invalid_request", message = "A note title is required" })
+                ? Results.BadRequest(new ErrorResponse("invalid_request", "A note title is required"))
                 : Results.Created($"/api/notes/{created.Id}", created);
         });
 

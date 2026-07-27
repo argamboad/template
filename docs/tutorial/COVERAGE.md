@@ -18,8 +18,9 @@
 - `.gitleaks.toml` — secret-scanning gate — part of 'secrets never in the repo'
 - `docker-compose.yml` — Postgres 17 + Mailpit; grows in 2.3/8.2
 
-## 1.1 — Solution, projects & supply chain (16 files)
+## 1.1 — Solution, projects & supply chain (17 files)
 
+- `.config/dotnet-tools.json` — committed CI tool-version manifest (v3 T51/R63)
 - `Directory.Build.props` — warnings-as-errors etc.
 - `Directory.Packages.props` — Central Package Management (R25/R27)
 - `Perezosoft.slnx`
@@ -516,7 +517,7 @@
 - `tests/Api.Tests/Infrastructure/AllowAllUrlGuard.cs` — test-only bypass
 - `tests/Api.Tests/Webhooks/OutboundUrlGuardTests.cs`
 
-## 6.5 — MFA / TOTP step-up (21 files)
+## 6.5 — MFA / TOTP step-up (22 files)
 
 - `src/Api/Controllers/MfaController.cs`
 - `src/Api/Models/MfaModels.cs`
@@ -532,6 +533,7 @@
 - `src/Shared.Ui/Components/MfaCard.razor`
 - `src/Shared.Ui/Pages/Settings.razor`
 - `src/Shared.Ui/wwwroot/js/mfa-qr.js` — JS interop to render the TOTP QR
+- `tests/Api.Tests/DataProtectionIdentityTests.cs` — DataProtection purposes frozen — a rename orphans every protected payload (v3 TR-8)
 - `tests/Api.Tests/Integration/MfaStepUpIntegrationTests.cs` — step-up on EVERY sign-in path
 - `tests/Api.Tests/Mfa/MfaChallengeServiceTests.cs`
 - `tests/Api.Tests/Mfa/MfaLoginServiceTests.cs`
@@ -831,7 +833,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (119 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (120 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -876,6 +878,7 @@
 - `docs/postman/Perezosoft.postman_collection.json` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/postman/Perezosoft.staging.postman_environment.json` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/postman/README.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/requirements.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/_EXAMPLE_epic.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/admin.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/apple-signin.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -953,4 +956,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 786 tracked files · 562 built in lessons · 224 bucketed · 0 unmapped
+**Totals:** 789 tracked files · 564 built in lessons · 225 bucketed · 0 unmapped

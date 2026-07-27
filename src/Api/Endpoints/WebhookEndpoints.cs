@@ -35,7 +35,7 @@ public static class WebhookEndpoints
 
             var created = await svc.CreateAsync(userId.Value, request.Url ?? "", request.EventTypes, ct);
             return created is null
-                ? Results.BadRequest(new { error = "invalid_request", message = "A valid https URL and at least one known event type are required." })
+                ? Results.BadRequest(new ErrorResponse("invalid_request", "A valid https URL and at least one known event type are required."))
                 : Results.Created($"/api/webhooks/{created.Subscription.Id}", WebhookResponse.FromCreated(created)); // secret shown once
         });
 
