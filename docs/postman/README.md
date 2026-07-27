@@ -7,6 +7,13 @@ delete/clear), billing (+ the fake-provider webhook that simulates payment compl
 Notes sample slice, the staff admin surface (announce/broadcast/comp — ADR-021), and the
 config-gated Public API + outbound webhooks.
 
+**"Every HTTP surface" is machine-enforced** (v3 audit TR-6): the CI parity gate
+(`tests/Api.Tests/Integration/PostmanParityTests.cs`) reads the app's real route table and fails
+when a mapped `/api` endpoint has no matching request here. Browser-flow endpoints (OAuth
+redirects/callbacks, the emailed magic-link verify, provider linking, signed file downloads) are
+included as **`(doc-only)`** requests — they document the contract but aren't runnable from
+Postman; everything else is executable and chained.
+
 ## Files
 
 | File | Becomes in Postman |

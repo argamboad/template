@@ -178,6 +178,63 @@
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"200 (429 = rate limit)\", () => pm.expect(pm.response.code).to.be.oneOf([200, 429]));"], "type": "text/javascript" } }]
         }
+,
+        {
+          "name": "OAuth: start browser sign-in (doc-only)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/auth/login/google", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login", "google"] },
+            "description": "**Documentation-only \u2014 a browser flow, not runnable from Postman.** Listed so the collection stays a complete mirror of the API surface (v3 audit TR-6; the parity gate `PostmanParityTests` enforces it). Full-page navigation: 302 to the provider's consent screen. {provider} = a configured provider from GET /api/auth/providers. No auth; errors land on the client's /auth-error."
+          }
+        },
+        {
+          "name": "OAuth: provider callback (doc-only)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/auth/callback/google", "host": ["{{baseUrl}}"], "path": ["api", "auth", "callback", "google"] },
+            "description": "**Documentation-only \u2014 a browser flow, not runnable from Postman.** Listed so the collection stays a complete mirror of the API surface (v3 audit TR-6; the parity gate `PostmanParityTests` enforces it). The PROVIDER redirects here after consent (carries its code/state). Issues the session (refresh cookie) and 302s to the client. Never called by an API client directly."
+          }
+        },
+        {
+          "name": "Magic link: verify (doc-only)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/auth/magic-link/verify?token={{magicLinkToken}}", "host": ["{{baseUrl}}"], "path": ["api", "auth", "magic-link", "verify"], "query": [{ "key": "token", "value": "{{magicLinkToken}}" }] },
+            "description": "**Documentation-only \u2014 a browser flow, not runnable from Postman.** Listed so the collection stays a complete mirror of the API surface (v3 audit TR-6; the parity gate `PostmanParityTests` enforces it). The emailed magic-link URL. Single-use, hashed, time-limited token in the query; consumes it, sets the refresh cookie (or MFA step-up redirect), then 302s to the client."
+          }
+        },
+        {
+          "name": "Native OAuth: start browser flow (doc-only)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/auth/native/login/google", "host": ["{{baseUrl}}"], "path": ["api", "auth", "native", "login", "google"] },
+            "description": "**Documentation-only \u2014 a browser flow, not runnable from Postman.** Listed so the collection stays a complete mirror of the API surface (v3 audit TR-6; the parity gate `PostmanParityTests` enforces it). Opened in the OS browser by MAUI clients (WebAuthenticator). Like /login/{provider} but the callback returns a deep link carrying a one-time code instead of a cookie."
+          }
+        },
+        {
+          "name": "Native OAuth: provider callback (doc-only)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/auth/native/callback/google", "host": ["{{baseUrl}}"], "path": ["api", "auth", "native", "callback", "google"] },
+            "description": "**Documentation-only \u2014 a browser flow, not runnable from Postman.** Listed so the collection stays a complete mirror of the API surface (v3 audit TR-6; the parity gate `PostmanParityTests` enforces it). Provider redirect for the native flow: issues a short-lived ONE-TIME CODE and 302s to the app's custom-scheme deep link. The code is redeemed via POST /api/auth/native/exchange."
+          }
+        },
+        {
+          "name": "Native OAuth: exchange one-time code",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "X-Native-Client", "value": "true" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"{{nativeOneTimeCode}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/auth/native/exchange", "host": ["{{baseUrl}}"], "path": ["api", "auth", "native", "exchange"] },
+            "description": "Redeems the one-time code from the native callback deep link for tokens on the BODY transport (access + refresh token JSON; no cookie). 400/401 invalid_code on unknown/expired/replayed codes (single-use, 5-min TTL); {mfa_required, challenge} when the user has MFA enabled — step up via POST /api/auth/mfa/verify. Requires the X-Native-Client: true header."
+          }
+        }
       ]
     },
     {
@@ -232,6 +289,25 @@
             "description": "GDPR erasure — IRREVERSIBLE. Owner-with-members → 400 (transfer first). Sole owner → 409 until confirm_dissolve=true (which also dissolves the household)."
           },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"deliberate outcome\", () => pm.expect(pm.response.code).to.be.oneOf([204, 400, 409]));"], "type": "text/javascript" } }]
+        }
+,
+        {
+          "name": "Link provider: start browser flow (doc-only)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/auth/link/google", "host": ["{{baseUrl}}"], "path": ["api", "auth", "link", "google"] },
+            "description": "**Documentation-only \u2014 a browser flow, not runnable from Postman.** Listed so the collection stays a complete mirror of the API surface (v3 audit TR-6; the parity gate `PostmanParityTests` enforces it). Starts linking an additional OAuth provider to the signed-in account: responds with the provider redirect carrying a short-lived link token; completes at the callback with ?linked=\u2026 (or ?link_error=\u2026) on the client's /settings. Requires the Bearer token."
+          }
+        },
+        {
+          "name": "Signed file download (doc-only)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/files/{{fileDownloadToken}}", "host": ["{{baseUrl}}"], "path": ["api", "files", "{{fileDownloadToken}}"] },
+            "description": "**Documentation-only \u2014 a browser flow, not runnable from Postman.** Listed so the collection stays a complete mirror of the API surface (v3 audit TR-6; the parity gate `PostmanParityTests` enforces it). Time-limited signed download URL minted by the export/file surfaces (FILES-2; the token IS the authorization \u2014 DataProtection-signed, tenant-scoped). Browser navigation; responds with Content-Disposition: attachment."
+          }
         }
       ]
     },
