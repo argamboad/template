@@ -57,6 +57,21 @@ v1.0 (R1–R35)** — read it before writing/modifying code. The new machine-enf
 When you add a feature, copy `src/Api/Features/Notes` (the DELETE-ME reference slice), comply with
 `FOUNDATION_RULES.md`, and keep these guards green. That is the whole contract.
 
+## v3 extension (2026-07) — the Definition of Solid is now FOUNDATION_RULES v2.0
+
+The v3 delta audit (post-DEPLOY/NATIVE/RLS/THEME/PREFS epics) consolidated the bar into
+**[`docs/audits/v3-2026-07/FOUNDATION_RULES_v2.md`](docs/audits/v3-2026-07/FOUNDATION_RULES_v2.md)**:
+**R1–R35 carried unchanged from v1.0 + R36–R76** (each tagged `[machine]`/`[review]` with its
+enforcement mechanism). **That file is the Definition of Solid** — read it before writing or
+modifying code; the v2 section above remains as the historical layer it extends. Headline v3
+additions, all machine-enforced on develop: the honest RLS migration-parity gate (R37) + the RLS
+policy ships in the entity's own migration (R42), tenant-axis dissolution/export completeness +
+DI-registered contributors (R43), impersonation never reaches the staff gate and audit writes
+carry the acting principal (R45/R52), atomic single-use credentials + per-user second-factor caps
+(R47–R49), the outbound-URL SSRF scan (R76), the client component-test chassis (R70), the Postman
+parity gate (R74, ADR-023), one SDK pin source (R61), host `index.html` parity (R68), and
+doc-map/QA-count sync (R75) — see `tests/Api.Tests/EnforcementGateTests.cs` for the last three.
+
 > **Remaining v2 enforcement backlog** (tracked in `docs/audits/v2-2026-07/AUDIT_TASKS.md` B11, not yet
 > wired): CI doc-sync + config-key + secret scan, Central Package Management + lockfile + license scan,
 > the `MailKit`-outside-`Infrastructure/Email` ban, and the `MA0048` file-name analyzer.

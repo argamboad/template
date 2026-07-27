@@ -8,11 +8,13 @@
 _TODO_ — full context in `docs/PROJECT_BRIEF.md`.
 
 ## Read before you act
-- **Writing or modifying ANY code → `docs/audits/v2-2026-07/FOUNDATION_RULES.md` (v1.0, R1–R35) is
-  binding.** It encodes the post-audit invariants (tenancy, second-factor/event replay, SSRF,
-  fail-closed normalization, atomic quotas, per-user erasure, injected clocks, slice boundaries) as
-  machine-enforced arch tests + CI gates. Comply; if a task seems to require violating a rule, stop and
-  surface it. The frozen quality bar lives in `CONTRIBUTING.md`.
+- **Writing or modifying ANY code → `docs/audits/v3-2026-07/FOUNDATION_RULES_v2.md` (v2.0: R1–R35
+  carried from v1.0 + R36–R76) is binding.** It encodes the post-audit invariants (tenancy incl. the
+  RLS backstop parity, second-factor/event replay, SSRF, fail-closed normalization, atomic quotas +
+  single-use credentials, per-user AND per-tenant erasure completeness, injected clocks, slice
+  boundaries, host parity, doc/Postman sync) as machine-enforced arch tests + CI gates. Comply; if a
+  task seems to require violating a rule, stop and surface it. The frozen quality bar lives in
+  `CONTRIBUTING.md` (v1.0 remains at `docs/audits/v2-2026-07/FOUNDATION_RULES.md` as the historical layer).
 - **Hardening the template (or a clone) → follow `docs/audits/AUDIT_SUITE.md`.** The single repeatable
   super-audit (5 diagnostic/gate phases + QA-paranoia + docs/course currency) that produced the `audits/v*`
   runs. It's **triggered, not routine** — run it on a structural core change, a new wave of epics, a major

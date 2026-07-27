@@ -111,6 +111,7 @@ RULES: list[tuple[str, str, str]] = [
     ("Directory.Packages.props", "1.1", "Central Package Management (R25/R27)"),
     (".config/dotnet-tools.json", "1.1", "committed CI tool-version manifest (v3 T51/R63)"),
     ("tests/Api.Tests/DataProtectionIdentityTests.cs", "6.5", "DataProtection purposes frozen — a rename orphans every protected payload (v3 TR-8)"),
+    ("tests/Api.Tests/EnforcementGateTests.cs", "1.4", "SDK-pin agreement, host index.html parity, doc-map/QA-count sync (v3 T60: R61/R68/R75)"),
     ("*/Perezosoft.*.csproj", "1.1", "created here; PackageReferences added as lessons need them"),
     ("src/Api/Properties/launchSettings.json", "1.1", ""),
     ("src/Maui/Properties/launchSettings.json", "A.1", ""),
