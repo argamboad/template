@@ -632,12 +632,13 @@
 - `docs/DEPLOYMENT.md` — the runbook is a taught artifact — the learner writes their own
 - `render.yaml` — Render blueprint (ADR-017)
 
-## 8.3 — The deploy pipeline & CI gates (5 files)
+## 8.3 — The deploy pipeline & CI gates (6 files)
 
 - `.github/scripts/deploy-smoke.sh`
 - `.github/scripts/qa-runlog-append-only.sh`
 - `.github/workflows/postman-sync.yml`
 - `docs/QA_TEST_PLAN.md` — release readiness: manual QA plan beside the automated gates
+- `tests/Api.Tests/Integration/PostmanParityTests.cs` — every mapped /api endpoint documented in the canonical collection (v3 TR-6)
 - `tests/Api.Tests/Integration/VersionEndpointTests.cs` — version-gated deploy smoke
 
 ## 8.4 — The RLS tenancy backstop (15 files)
@@ -956,4 +957,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 789 tracked files · 564 built in lessons · 225 bucketed · 0 unmapped
+**Totals:** 790 tracked files · 565 built in lessons · 225 bucketed · 0 unmapped
