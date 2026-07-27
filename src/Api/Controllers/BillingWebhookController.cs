@@ -30,7 +30,8 @@ public class BillingWebhookController(BillingWebhookHandler handler, ILogger<Bil
             // observable with the source IP rather than a silent 400. No payload contents are logged.
             var sourceIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             logger.LogWarning("Rejected billing webhook with an invalid signature from {SourceIp}.", sourceIp);
-            return BadRequest(new { error = "invalid_signature" });
+            // The shared envelope (v3 TR-5/R76) — same `error` key on the wire, plus the standard message.
+            return BadRequest(new ErrorResponse("invalid_signature", "The webhook signature is invalid."));
         }
 
         return Ok(); // Applied / Duplicate / Ignored all acknowledge, so the provider stops retrying

@@ -835,7 +835,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (122 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (137 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -873,7 +873,22 @@
 - `docs/audits/v2-2026-07/tooling/packages.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v2-2026-07/tooling/test-run.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v2-2026-07/tooling/vulnerable.txt` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/ADVERSARIAL_REPORT.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/AUDIT_RECONCILIATION.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/AUDIT_REPORT.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/AUDIT_TASKS.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/FOUNDATION_RULES.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/audits/v3-2026-07/FOUNDATION_RULES_v2.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/IMPLEMENTATION_TRACKER.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/LOGIC_AND_TEST_REPORT.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/PHASE5_GATE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/RULE_CONFLICTS.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/tooling/build-tests.txt` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/tooling/coverage-summary.txt` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/tooling/deprecated-packages.txt` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/tooling/test-run-summary.txt` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/tooling/vulnerable-packages.txt` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/audits/v3-2026-07/tooling/web-locked-restore.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/check_qa_artifacts.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_guide.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/gen_qa_runlog.py` — authoring docs; the course TEACHES writing these in 0.1
@@ -960,4 +975,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 793 tracked files · 566 built in lessons · 227 bucketed · 0 unmapped
+**Totals:** 808 tracked files · 566 built in lessons · 242 bucketed · 0 unmapped

@@ -492,11 +492,13 @@ public class ArchitectureTests
         // R76 (v3 audit TR-5, T53): slice error bodies must be the shared ErrorResponse record —
         // clients key their copy off `error` codes with a stable contract, and Phase 4 proved the
         // ad-hoc `new { error … }` shape propagates: copying the Notes exemplar reproduced it
-        // verbatim. Banned in the slice surface (Features/ + Endpoints/); the exemplar now models
-        // the right shape.
+        // verbatim. Banned across the whole HTTP surface — Features/ + Endpoints/ AND Controllers/
+        // (the post-campaign reconcile found a straggler in BillingWebhookController the narrower
+        // scope missed); the exemplar models the right shape.
         var anonError = new Regex(@"new\s*\{\s*error\b");
         var offenders = SourceFiles(Path.Combine(RepoRoot(), "src", "Api", "Features"))
             .Concat(SourceFiles(Path.Combine(RepoRoot(), "src", "Api", "Endpoints")))
+            .Concat(SourceFiles(Path.Combine(RepoRoot(), "src", "Api", "Controllers")))
             .Where(f => anonError.IsMatch(File.ReadAllText(f)))
             .Select(Path.GetFileName)
             .ToList();
