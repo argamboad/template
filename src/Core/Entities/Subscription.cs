@@ -32,8 +32,10 @@ public class Subscription : ITenantScoped
 
     /// <summary>
     /// When the provider emitted the most recently <em>applied</em> webhook event. The webhook handler
-    /// applies an incoming event only if it is strictly newer than this, so a redelivered/out-of-order
-    /// older event cannot clobber newer state (v2 audit LOGIC-B1). Null until the first event is applied.
+    /// rejects only events strictly OLDER than this (v3 audit LB-BILL-1 relaxed v2 LOGIC-B1's
+    /// strictly-newer rule: provider timestamps are whole-second, so two distinct same-second events
+    /// must both apply; exact redeliveries are deduped upstream by the inbox on EventId). Null until
+    /// the first event is applied.
     /// </summary>
     public DateTimeOffset? LastEventAt { get; set; }
 

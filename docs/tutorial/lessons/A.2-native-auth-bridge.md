@@ -168,7 +168,8 @@ null — the web build carries zero native machinery, same trick as `IOAuthIniti
 completes through the same `CompleteFromResponseAsync` path as a live sign-in, so everything wired
 to that choke point (MFA step-up, the `SignedIn` event, session persistence) works on the resumed
 path *by construction* — no parallel code path to forget. The logic is unit-tested from `Api.Tests`
-(`OAuthResumeTests` — the RCL's first unit coverage; it has no test host of its own), and the
+(`OAuthResumeTests` — the RCL's first unit coverage, written before the RCL had a test host of its
+own; the bUnit component chassis in `tests/Ui.Tests` arrived later, in the v3 audit), and the
 on-device kill drill is QA-AND-15.
 
 ## 5. MFA step-up — free, because of the choke point

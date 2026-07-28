@@ -20,7 +20,8 @@ namespace Perezosoft.Infrastructure.Persistence;
 /// transactions. Safe with pooling because the state is re-asserted per logical connection open —
 /// and Npgsql resets session state when a physical connection is returned to the pool.</item>
 /// <item>Per-connection state avoids a round-trip per command; it is invalidated where Postgres can
-/// silently revert the GUCs: connection (re)open, transaction rollback, and savepoint rollback
+/// silently revert the GUCs: connection (re)open, transaction rollback, savepoint rollback, and a
+/// FAILED commit/rollback (v3 audit RLS-5)
 /// (<c>set_config</c> is transactional even at session level).</item>
 /// <item>Evaluated per command (not per request) because the tenant can change mid-request
 /// (<c>ITenantContext.EnterTenant</c>) and individual queries can be sanctioned cross-tenant

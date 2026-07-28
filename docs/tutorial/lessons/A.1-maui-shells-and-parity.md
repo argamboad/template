@@ -147,9 +147,12 @@ different" ones.
 
 Native support that isn't exercised *rots* — a refactor breaks a platform nobody built locally, and
 you find out in a store review. So the CI (8.3) grows a **compile gate for all four TFMs** plus a
-**boot smoke** per platform: Windows drives the real MAUI app via WebView2's CDP endpoint; Android
-runs it on a real emulator; iOS-simulator and Mac Catalyst assert boot-to-login canaries (WKWebView
-has no CDP, so they prove process-alive + a provider probe returns 200, not full UI driving). It's
+**boot smoke** per platform: Windows boots the real MAUI app and probes that it reached the login
+screen (it originally drove the UI via WebView2's CDP endpoint, but WebView2 150 stopped exposing
+CDP under the elevated CI runner, so the leg was rescoped to a boot-probe); Android runs the full
+OTP sign-in journey on a real emulator; iOS-simulator and Mac Catalyst assert boot-to-login
+canaries (WKWebView has no CDP, so they prove process-alive + a provider probe returns 200, not
+full UI driving). It's
 tiered by cost (macOS runners bill 10×, so the Apple legs run only on native-relevant develop pushes)
 and gated so docs-only changes skip the native legs entirely. This is the DevOps discipline of Part 8
 extended to the hardest-to-test surface: even a canary that only proves "the Apple app still boots to

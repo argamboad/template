@@ -286,9 +286,9 @@ jobs:
     # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode
     # and macos-latest can lag several Xcode versions behind (fails with "requires Xcode NN").
     # The workload restore below pins the WORKLOAD SET to the release matching the image's
-    # DEFAULT Xcode: the SDK is pinned via global.json (10.0.301) and its workloads may demand a newer
-    # Xcode than the image default (26.6), but selecting a non-default Xcode is NOT
-    # safe — those installs can be incomplete on the images (26.6 lacks MacOSX.sdk;
+    # DEFAULT Xcode (26.5 on macos-26): the SDK is pinned via global.json (10.0.301) and its workloads
+    # may demand a newer Xcode (26.6), but selecting a non-default Xcode is NOT
+    # safe — those installs can be incomplete on the images (the 26.6 install lacks MacOSX.sdk;
     # actions/runner-images#13743/#11348). Bump the pin when the image's default Xcode moves.
     runs-on: macos-26
     timeout-minutes: 60

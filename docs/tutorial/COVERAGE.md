@@ -335,7 +335,7 @@
 - `tests/Ui.Tests/ReconcileMatrixTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/SwitcherStateTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 
-## 3.5 — Localization (EN/ES) (10 files)
+## 3.5 — Localization (EN/ES) (11 files)
 
 - `src/Infrastructure/Email/EmailStrings.es.resx`
 - `src/Shared.Ui/Components/LanguageSwitcher.razor`
@@ -345,6 +345,7 @@
 - `src/Shared.Ui/Resources/AppStrings.es.resx`
 - `src/Shared.Ui/Resources/AppStrings.resx`
 - `tests/Api.Tests/AccountControllerTests.cs` — PREFS-1/ADR-022: theme+locale preference-endpoint storage rules
+- `tests/Api.Tests/ResourceParityTests.cs` — EN/ES resx key parity — no untranslated or orphan keys (2026-07 truth-up)
 - `tests/E2E.Tests/I18nTests.cs`
 - `tests/E2E.Tests/LocaleMismatchJoinTests.cs` — locale-mismatch reload preserves /join (v3 TB-UI-16, UX-1 end-to-end)
 
@@ -975,4 +976,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 808 tracked files · 566 built in lessons · 242 bucketed · 0 unmapped
+**Totals:** 809 tracked files · 567 built in lessons · 242 bucketed · 0 unmapped
