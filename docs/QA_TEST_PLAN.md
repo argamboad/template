@@ -13,19 +13,21 @@
 - **Run the Smoke suite (§4) first.** It's the ~15-minute critical path. If any smoke case fails,
   stop and report — deeper suites will likely cascade.
 - **Each case has an ID** (e.g. `QA-AUTH-03`). Record the result against the ID using the
-  **sign-off sheet (§14)**: Pass / Fail / Blocked / N-A, plus tester, build/commit, date, notes.
+  **sign-off sheet (§16)**: Pass / Fail / Blocked / N-A, plus tester, build/commit, date, notes.
 - **Priority:** 🔴 Smoke (critical path) · 🟠 Core (run every regression) · 🟢 Edge (run on full
   regression or when the area changed).
 - **⚙️ Automated in CI** on a case title means a Playwright journey in `tests/E2E.Tests` now exercises
   the same path on every push (the `e2e` job in `.github/workflows/ci.yml`). Human QA can **spot-check**
   these rather than run them in full each cycle; they still need a manual pass on Desktop/Android (the
-  E2E job runs Web only) and whenever the area changes. See §15 for the exact list and §17 for the run
+  E2E job runs Web only) and whenever the area changes. The ⚙️ marker on each case title is authoritative (≈35 cases); §15 maps the major journeys. See §17 for the run
   procedure.
 - **Both formats describe the same test.** Read whichever suits you; the Gherkin is the source of
   truth for automation.
 - **"App" = whichever client the suite header names.** Most behavior is identical across clients
-  (same API, same shared RCL UI); the per-client suites (§11–12) only cover what genuinely
-  differs — the auth transport and session persistence.
+  (same API, same shared RCL UI); the per-client suites (§12–§13) cover the auth transport and
+  session persistence **plus the full per-feature native parity added by NATIVE-6** (share-sheet
+  downloads, hardware back, refresh-on-return, theme/locale persistence — QA-DSK-08..15,
+  QA-AND-07..15).
 
 ---
 
@@ -143,11 +145,13 @@ beyond Google/Microsoft, FR/DE/PT languages (scaffolded but not translated — s
 `docs/LOCALIZATION.md`), and any app-specific domain features not yet built on this platform.
 
 **Platform services with no client UI (API-/operational-level, not manually testable through the app
-yet):** the billing API (`/api/billing/*`), the append-only audit log, OpenTelemetry telemetry, the
-health endpoints, the background outbox/inbox/scheduled-jobs, and **file storage** — the `IFileStorage`
-seam + the signed download endpoint `GET /api/files/{token}` (anonymous, the token *is* the
-authorization; local-disk only — cloud backends hand out native presigned URLs). These are **covered by
-automated tests** (`tests/Api.Tests`); E2E is pending. Health has a smoke check (QA-SMK-07); manual
+yet):** the append-only audit log, OpenTelemetry telemetry, the health endpoints, the background
+outbox/inbox/scheduled-jobs, and **file storage** — the `IFileStorage` seam + the signed download
+endpoint `GET /api/files/{token}` (anonymous, the token *is* the authorization; local-disk only —
+cloud backends hand out native presigned URLs). These are **covered by automated tests**
+(`tests/Api.Tests`); browser E2E for them is deliberately out of scope (headless machinery). The
+**billing page** is NO longer in this list — BILLING-8 shipped `/billing` (§10c, QA-BILL-01/02) with
+the fake-provider E2E journey (`BillingJourneyTests`). Health has a smoke check (QA-SMK-07); manual
 cases for the rest will be added when client UI exists. **GDPR data export** (`POST /api/household/export`)
 and **account erasure** (`DELETE /api/auth/me`) now **have a web UI** (UI-1: owner Household → Data,
 Settings → Danger zone) — covered by the manual cases QA-HH-13 + QA-SET-07. **RBAC role management now has a web UI**
@@ -161,13 +165,13 @@ by QA-ADMIN-01..07. The **public API (PUBAPI)** and **outbound webhooks (HOOKS)*
 UI-less (they're for machines) and **config-gated off** — they have **manual curl/Postman cases in §14b**
 (QA-API-01..06), in addition to automated tests.
 
-**Automated in CI (Web):** a Playwright/NUnit E2E suite (`tests/E2E.Tests`) now runs the core auth,
-MFA, and i18n journeys against the real booted stack on every push — the `e2e` job in
-`.github/workflows/ci.yml`. The cases it covers are marked **⚙️ Automated in CI** (QA-SMK-01,
-QA-SMK-03, QA-AUTH-09, QA-MFA-01, QA-MFA-02, QA-I18N-01, QA-I18N-02, QA-SET-08, QA-INV-10; see the
-§15 note). Human QA can spot-check
-those on Web and focus effort on the un-automated cases and the Desktop/Android clients, which the CI
-job does not exercise.
+**Automated in CI (Web):** a Playwright/NUnit E2E suite (`tests/E2E.Tests`, currently 34 journeys)
+runs against the real booted stack on every push — the `e2e` job in `.github/workflows/ci.yml`. Every
+case it covers is marked **⚙️ Automated in CI** on its title (≈35 cases across auth, MFA, i18n,
+household/roster, invitations, notifications, admin, billing, theme, and GDPR — the case titles are
+authoritative; §15 maps the major journeys). Human QA can spot-check those on Web and focus effort on
+the un-automated cases and the native clients — where CI runs two smoke canaries (Android boots the
+real app and drives the OTP journey on an emulator; Windows is a boot-to-login probe only).
 
 ---
 
@@ -195,7 +199,7 @@ And the header shows my household name and my display name
 **Walkthrough**
 1. Open <https://localhost:7008> → you're redirected to `/login`.
 2. In the email field enter `qa-smoke@example.com`; click **Email me a 6-digit code**.
-3. **Expected:** the form switches to a code-entry view ("Enter the code we sent to…").
+3. **Expected:** the form switches to a code-entry view ("Enter the 6-digit code sent to …").
 4. Open Mailpit (<http://localhost:8025>); open the newest mail; copy the 6-digit code.
 5. Enter the code; click **Verify code**.
 6. **Expected:** you land on the home page; the top header shows a tenant badge (household name)
@@ -272,8 +276,8 @@ And I open the emailed link from Mailpit
 Then I am signed in and landed in the app
 ```
 **Walkthrough**
-1. On `/login` enter `qa-magic@example.com`; click **Send me a magic link**.
-2. **Expected:** a success panel — "Check your inbox… we sent a link to qa-magic@example.com" — with
+1. On `/login` enter `qa-magic@example.com`; click **Email me a magic link**.
+2. **Expected:** a success panel — "Check your inbox." + "A sign-in link was sent to qa-magic@example.com. It expires in 15 minutes." — with
    a **Use a different email** link.
 3. In Mailpit open the newest mail; click the sign-in link (or copy it into the same browser).
 4. **Expected:** the link resolves and you end up signed in, in the app.
@@ -342,16 +346,17 @@ And separately, an unused code is rejected once it passes its lifespan (default 
 ### QA-AUTH-11 — Passwordless endpoints are rate-limited 🟠 (Web)
 **Gherkin**
 ```gherkin
-Given I rapidly request codes/links (or verify attempts) for the same client
-When I exceed the per-IP limit (default 5 per minute)
+Given I rapidly request codes/links for the same client
+When I exceed the per-IP send limit (default 5 per minute)
 Then further requests are rejected with HTTP 429 until the window resets
 ```
 **Walkthrough**
 1. From `/login`, request an OTP (or magic link) repeatedly in quick succession — more than 5 within
    a minute.
 2. **Expected:** after the limit the request is throttled (**HTTP 429**), surfaced on `/login` as
-   **"Too many requests. Please wait a minute, then try again."** The same throttle — and the same
-   message — applies to **OTP verify**.
+   **"Too many requests. Please wait a minute, then try again."** **OTP verify** has its own,
+   larger per-IP budget — max(send limit, OTP attempt cap + 5) = 10/min by default (so the lockout
+   cap in QA-AUTH-04 is reachable) — with the same 429 + message when exceeded.
 3. Wait ~1 minute; requests succeed again.
 > Protects against email-bombing and OTP brute-forcing. Expected behavior, not a defect — see the
 > §1.1 pacing note.
@@ -401,7 +406,7 @@ Then a human-readable error banner is shown
 **Expected:** inline "enter a valid email" validation; no request sent.
 
 ### QA-AUTH-10 — Magic link & OTP available on web; OAuth always 🟢 (Web)
-**Walkthrough:** confirm the web login page shows **both** "Send magic link" and "Email me a code",
+**Walkthrough:** confirm the web login page shows **both** "Email me a magic link" and "Email me a 6-digit code",
 plus Google/Microsoft buttons. (Native clients hide magic link — covered in §11–12.)
 
 ---
@@ -489,11 +494,11 @@ leave/dissolve button. The single-owner invariant is enforced in the UI.
 **Gherkin**
 ```gherkin
 Given I am the only member and owner of my household
-When I click "Leave and delete household" and confirm
+When I click "Leave and delete" and confirm
 Then the household is dissolved and I am re-homed to a fresh solo household
 ```
 **Walkthrough**
-1. As sole owner (no other members), bottom card → **Leave & delete household**.
+1. As sole owner (no other members), bottom card ("Leave & dissolve") → **Leave and delete**.
 2. **Expected:** a confirm dialog warning the household will be deleted; on confirm, the app reloads
    and you land signed in with a **new empty household you own** (you're never left tenant-less).
 
@@ -629,9 +634,11 @@ Then they become a member of the inviter's household
 a household who accepts another invite moves to the new household — verify their old membership is
 replaced, honoring the one-tenant invariant.)*
 
-### QA-INV-04 — Join link with missing token 🟢 (Web)
-**Walkthrough:** open `/join` with no `?token=`. **Expected:** "invalid invitation / missing token"
-state, no crash.
+### QA-INV-04 — Join page with no token offers manual code entry 🟢 (Web)
+**Walkthrough:** open `/join` with no `?token=`. **Expected:** the **manual invite-code entry** state
+("Join with an invite code" + input + submit — the NATIVE-4b path for emailed codes), no crash.
+Pasting a garbage code shows the inline error and lets you retry (⚙️ automated:
+`MembershipLifecycleTests.Pasting_An_Invalid_Code_Shows_An_Inline_Error`).
 
 ### QA-INV-05 — Join with invalid/expired/used token 🟠 (Web)
 **Gherkin**
@@ -937,7 +944,7 @@ And "Clear read" removes only the read rows; "Clear all" empties the list
 2. Footer → **Clear read**. **Expected:** only the already-read rows vanish; unread ones (and the
    badge) survive. The button is disabled when nothing is read.
 3. Footer → **Clear all**. **Expected:** the list empties ("You're all caught up."), badge gone.
-4. Reload → deletions persist (server-side; `DELETE /api/notifications/{id}`, `?read=true`, and all).
+4. Reload → deletions persist (server-side; `DELETE /api/notifications/{id}`; bulk requires an explicit scope — `?read=true` clears read, `?read=false` clears all, omitted → 400 `scope_required`).
 
 ### QA-NOTIF-03 — Delivery preferences 🟠 (Web) ⚙️ Automated in CI
 **Gherkin**
@@ -1102,8 +1109,10 @@ And a provider-managed (Stripe-backed) subscription refuses the override
 2. Comp it → confirm. **Expected:** "Subscription updated."; badge flips to `pro` / `active`; the
    button is replaced by **Revert to Free**. The comp **never lapses** (no period end) and is audited
    in-tenant (`admin.subscription.comped`).
-3. As that tenant's owner, check `/billing`. **Expected:** plan **Pro**, seat limit 10 — identical to
-   a completed checkout (this simulates payment completion; QA-BILL/QA-HH-14 behaviors follow the plan).
+3. As that tenant's owner, check `/billing`. **Expected:** plan **Pro**, seat limit 10 — same plan +
+   entitlements as a completed checkout, but **no Manage subscription button** (a comp has no
+   provider customer, so the portal is absent). This simulates payment completion for
+   entitlement purposes; QA-BILL/QA-HH-14 behaviors follow the plan.
 4. **Revert to Free** → confirm. **Expected:** badge back to `free`; entitlements fall back
    (absence ⇒ Free, fail-closed); audited (`admin.subscription.reverted`). Reverting again is a no-op.
 5. **Provider-managed guard:** for a tenant with a **real Stripe subscription** (QA-BILL-02), the
@@ -1151,9 +1160,9 @@ Then I see my current plan, its status, and seat usage vs the plan limit
 And a member opening /billing sees only the "ask your owner" notice
 ```
 **Walkthrough**
-1. As **owner**, open **Billing** in the header. **Expected:** current plan (e.g. `free`), status
+1. As **owner**, open **Billing** in the header. **Expected:** current plan shown as its localized label (e.g. **Free** — the raw `free` token stays wire-only), status
    badge, and seats (e.g. `1 of 3 used`); an **Upgrade to Pro** button on the free plan; **Manage
-   subscription** only when a subscription exists.
+   subscription** only when a provider customer exists (a comped tenant has a subscription row but no portal button).
 2. As a **member**, open `/billing`. **Expected:** no plan/usage — just the owner-only notice.
 
 ### QA-BILL-02 — Upgrade via checkout + provider webhook lands on Pro 🟠 (Web) ⚙️ Automated in CI
@@ -1169,7 +1178,7 @@ Then /billing shows plan pro, status active, the pro seat limit, and the portal 
 2. Simulate payment completion by POSTing the webhook (fake provider): `POST {api}/api/billing/webhook`
    with header `Stripe-Signature: valid` and a PascalCase JSON body (`EventId`, `TenantId`, `PlanKey:
    "pro"`, `Status: "active"`, `StripeCustomerId`, `OccurredAt`). **Expected:** 200.
-3. Reload `/billing`. **Expected:** plan `pro` / status `active`, seats `x of 10`, **Manage
+3. Reload `/billing`. **Expected:** plan **Pro** / status **Active** (localized labels; raw tokens on the wire), seats `x of 10`, **Manage
    subscription** now visible.
 
 ---
@@ -1210,7 +1219,7 @@ in spam — a domain/DKIM concern, not an app bug.)*
 > The desktop client reuses the same UI; only the **auth transport** (loopback browser flow, body
 > token, OS secure storage) differs. Magic link is intentionally **absent** on native.
 
-### QA-DSK-01 — OTP sign-in 🔴 (Desktop) ⚙️ Automated in CI
+### QA-DSK-01 — OTP sign-in 🔴 (Desktop) — CI covers boot-to-login only
 **Gherkin**
 ```gherkin
 Given the desktop app is on the login screen
@@ -1511,7 +1520,8 @@ Then approving still signs me in — the redirect relaunches the app and complet
 > `dotnet build src/Maui -t:Run -f net10.0-ios` (simulator) / `-f net10.0-maccatalyst`.
 > The **G7 fix is required** (PR #109) — before it, both platforms crashed at first resolve (no
 > `IOAuthInitiator` registered). OAuth is wired via `ASWebAuthenticationSession` + the `perezosoft`
-> scheme in Info.plist but has **never been exercised** — treat QA-IOS-04 as its first real test.
+> scheme in Info.plist; first exercised **and passed** in the 2026-07-06 §13b run (PR #125 fixed the
+> two gaps it found) — QA-IOS-04 re-verifies it each pass.
 
 ### QA-IOS-01 — App boots to the login screen 🔴 (iOS)
 **Walkthrough:** launch on the simulator. **Expected:** the app opens (no startup crash — this *was*
@@ -1555,7 +1565,7 @@ spot-check, and record results in §16:
 | Platform | Always (🔴) | Plus one of (🟠) |
 |---|---|---|
 | Windows desktop | DSK-01, DSK-03, DSK-06 | DSK-08..12 |
-| Android | AND-01, AND-03, AND-07 | AND-08..12 |
+| Android | AND-01, AND-03, AND-07 | AND-08..15 |
 | iOS | IOS-01, IOS-02 | IOS-03, IOS-04 |
 | macCatalyst | MAC-01, MAC-02 | MAC-03 |
 
@@ -1692,9 +1702,7 @@ Then the bundle covers api-keys (metadata only), webhook subscriptions (no secre
 3. **Expected (post-remediation):** it contains an **api-keys** section (name/prefix/scopes,
    **no hash**), a **webhook-subscriptions** section (url/event-types, **no signing secret**), and the
    **usage counters** — or an explicit documented exclusion note for each.
-4. **Current (audit LB-TEN-1):** these newer tenant-scoped tables are **omitted silently** — the export
-   is incomplete, so this case **FAILS**. Record **Blocked**. Also assert **no secret leaks** (hashes /
-   `whsec_…`) regardless.
+4. **Was (pre-v3 audit LB-TEN-1):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**. Also assert **no secret leaks** (hashes / `whsec_…`) regardless — the export stays secret-free.
 
 ### QA-ADV-04 — Dissolve / erasure actually deletes api keys, webhook secrets, usage counters, delivery logs 🟠 (curl + DB)
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
@@ -1710,8 +1718,7 @@ Then all those rows are physically gone — no orphaned keys, secrets, counters 
 3. Query the DB (or the staff console) for that tenant's `ApiKey`, `WebhookSubscription`,
    `WebhookDelivery`, `UsageCounter` rows.
 4. **Expected (post-remediation):** **0 rows** for the dissolved tenant — every contributor cleaned up.
-5. **Current (audit LB-TEN-1):** these tables have **no dissolve contributor**, so rows are **orphaned**
-   (an encrypted webhook secret outlives its tenant). This case **FAILS** today — record **Blocked**.
+5. **Was (pre-v3 audit LB-TEN-1):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-05 — Writes during impersonation are attributed to the acting staff 🟠 (curl)
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
@@ -1727,8 +1734,7 @@ Then each mutation's audit row records impersonated_by=<staff>, not just the tar
 3. Export the tenant audit trail (household export / staff console audit view).
 4. **Expected (post-remediation):** each write's audit entry carries **`impersonated_by=<staff-id>`** so
    an operator can tell staff-driven changes from the user's own.
-5. **Current (audit LB-ADM-1):** impersonated writes are stamped as the **target only** — the acting
-   staff identity is lost on mutations. **FAILS** today — record **Blocked**.
+5. **Was (pre-v3 audit LB-ADM-1):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-06 — An impersonation session cannot reach staff-only actions 🟠 (curl)
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
@@ -1745,9 +1751,7 @@ Then every one is refused at the staff gate — impersonation must not be a ladd
    `POST /api/admin/announce-all`.
 3. **Expected (post-remediation):** **403** on each — the staff gate treats a token bearing
    `impersonated_by` as **non-staff**, closing privilege re-escalation.
-4. **Current (audit ADM-2):** the staff check keys off the underlying identity and an impersonated
-   staff→staff token can still reach these — so at least one call **succeeds**. **FAILS** — record
-   **Blocked**. (Test with a member target so a success is unmistakably a defect.)
+4. **Was (pre-v3 audit ADM-2):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-07 — Impersonation cannot exceed the target's role 🟠 (curl)
 **Gherkin**
@@ -1779,8 +1783,7 @@ And on a shared browser, a fresh sign-in never inherits the previous user's save
    out. In the **same** browser, sign in as user B who has **never chosen** a language/theme.
 3. **Expected (post-remediation):** B renders in B's own default (server never-set ⇒ B does not adopt
    A's leftover device value while a *different* account signs in).
-4. **Current (audit LB-UI-4/5):** the device-stored choice (localStorage) bleeds — B's first paint
-   adopts A's Español/theme. That leg **FAILS** — record **Blocked** (audit **ADM-8/9, LB-UI-4/5**).
+4. **Was (pre-v3 audit LB-UI-4/5):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-09 — A staff MFA-reset notification cannot be silenced by target prefs 🟠 (curl)
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
@@ -1795,9 +1798,7 @@ Then the security.mfa_reset in-app row AND the email are still delivered (securi
 2. As staff, `DELETE /api/admin/users/{targetUserId}/mfa`.
 3. **Expected (post-remediation):** the target still gets the **`security.mfa_reset`** bell row **and**
    the email — a security-critical notice is not suppressible by user prefs.
-4. **Current (audit ADM-1):** the reset notice honours the prefs gate like any other, so with both
-   channels off the user is **never told** their second factor was removed. **FAILS** — record
-   **Blocked**.
+4. **Was (pre-v3 audit ADM-1):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-10 — MFA step-up locks out after repeated wrong codes 🟠 (curl)
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
@@ -1813,8 +1814,7 @@ Then a per-user cumulative MFA lockout engages — not merely the per-IP 429
    window, pacing under the 429 verify throttle.
 3. **Expected (post-remediation):** after N cumulative failures the **account's** step-up is locked
    (distinct from QA-AUTH-11's per-IP 429), mirroring the OTP cumulative lockout (QA-AUTH-04).
-4. **Current (audit ADM-3):** MFA verify has **only** the per-IP rate limit — no per-user cumulative
-   cap — so unlimited guesses are possible from rotating IPs. **FAILS** — record **Blocked**.
+4. **Was (pre-v3 audit ADM-3):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-11 — A recovery code is single-use 🟠 (Web)
 **Gherkin**
@@ -1844,7 +1844,7 @@ Then the duplicate is a no-op (inbox dedup) and the later state (active) still a
    is applied exactly once.
 3. POST two **distinct** events with the **same whole-second** `OccurredAt`: first `created`, then
    `active`.
-4. **Expected:** the flip to **`active`** is applied (ordering breaks the tie by sequence, not by a
+4. **Expected:** the flip to **`active`** is applied (the strictly-older recency guard drops stale events; same-second ties apply in arrival order (exact redeliveries are inbox-deduped), not by a
    second-granular timestamp that would wrongly drop it as stale) (audit **LB-BILL-1**). Should **Pass**.
 
 ### QA-ADV-13 — A first-ever webhook in a bad state does not false-notify 🟠 (curl)
@@ -1860,8 +1860,7 @@ Then NO dunning notification is sent to the owner (there was nothing to lapse)
    `canceled`) to `/api/billing/webhook`.
 2. **Expected (post-remediation):** the owner receives **no** billing/dunning notification — a dunning
    notice requires a transition **out of** an active/paid state.
-3. **Current (audit LB-BILL-4):** the handler notifies on any transition **into** `past_due`/`canceled`,
-   including from "no sub", so the owner gets a spurious dunning alert. **FAILS** — record **Blocked**.
+3. **Was (pre-v3 audit LB-BILL-4):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-14 — Comp / revert a churned (canceled) tenant 🟠 (curl)
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
@@ -1876,9 +1875,7 @@ Then the comp should succeed — a churned tenant is not permanently un-comp-abl
    Stripe id. As staff, `PUT /api/admin/tenants/{id}/subscription` (comp to Pro).
 2. **Expected (post-remediation):** comp **succeeds** — a canceled/churned sub is treated as
    not-provider-managed for comp purposes.
-3. **Current (audit ADM-5):** the guard returns **409** whenever a Stripe id is present, even if the sub
-   is dead — so the tenant is **stuck at 409 forever**. **FAILS** — record **Blocked**. (Contrast
-   QA-ADMIN-06, where 409 on a *live* Stripe sub is correct.)
+3. **Was (pre-v3 audit ADM-5):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**. (The guard now keys on *liveness*: 409 only for a live provider sub — see QA-ADMIN-06, where 409 on a live Stripe sub is correct.)
 
 ### QA-ADV-15 — Concurrent acceptance of the last seat 🟠 (Web — two contexts)
 **Gherkin**
@@ -1923,7 +1920,7 @@ Then it is rejected AND all of the user's sessions are revoked
    silent refresh from another live session now **fails** too (forces re-auth). Promotes QA-SEC-05's
    automated `RefreshTokenServiceTests` note to a manual probe. Should **Pass**.
 
-### QA-ADV-18 — Spanish account on an English device accepts an invite 🔴 (Web — two contexts)
+### QA-ADV-18 — Spanish account on an English device accepts an invite 🔴 (Web — two contexts) ⚙️ Automated in CI
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
@@ -1936,8 +1933,7 @@ Then the locale-mismatch reload preserves the /join deep-link and the invite is 
 2. Open a valid `/join?token=…` while signed in (or sign in through the join flow).
 3. **Expected (post-remediation):** the one-time locale-mismatch reload (WASM satellite assemblies,
    PREFS-1) **preserves** the `/join?token=…` URL and the invite is **accepted**.
-4. **Current (audit UX-1, LB-UI-1/2):** the reconcile reload drops the query and lands the user on `/`,
-   **losing the invite** — the flagship PREFS-1 deep-link break. **FAILS** — record **Blocked**.
+4. **Was (pre-v3 audit UX-1, LB-UI-1/2):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-19 — Theme/locale doesn't revert after a soft (OTP/MFA) sign-in 🟠 (Web)
 **Gherkin**
@@ -1963,8 +1959,9 @@ Then only the read ones are removed; every unread notification survives
 **Walkthrough**
 1. Seed a mix (mark some read, leave some unread). In the bell, click **Clear read**.
 2. **Expected:** the client sends `DELETE /api/notifications?read=true` — **read-only** clear; unread
-   rows remain. Confirm the destructive **all**-clear (`DELETE /api/notifications`, no query) is a
-   distinct **Clear all** action, so dropping `?read=true` can never silently wipe unread (audit
+   rows remain. Confirm the bulk clear **requires an explicit scope**: `?read=true` clears read only,
+   `?read=false` is the distinct **Clear all**, and an omitted scope returns **400 `scope_required`** —
+   so a dropped param can never silently wipe unread (audit
    **LB-UI-10**). Should **Pass**.
 
 ### QA-ADV-21 — Security headers on the single-origin host (staging / Environment B) 🟠 (curl)
@@ -1980,7 +1977,7 @@ Then HSTS, nosniff, a CSP/frame-ancestors and Referrer-Policy are present, with 
 2. **Expected (post-remediation):** `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, a
    `Content-Security-Policy` (or `frame-ancestors`), and `Referrer-Policy`; **index.html** served
    `no-cache`, `_framework/*` fingerprinted assets `immutable`.
-3. **Current (audit DEP-2/3):** none of these headers are emitted today. **FAILS** — record **Blocked**.
+3. **Was (pre-v3 audit DEP-2/3):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-22 — Forged X-Forwarded-For cannot bypass the per-IP rate limit 🟠 (curl)
 **Gherkin**
@@ -2012,8 +2009,7 @@ Then it targets the configured HTTPS API (build fails if none) — no http://loc
    security config.
 2. **Expected (post-remediation):** base URL is the configured **HTTPS** API; a missing base URL **fails
    the build**; no `http://localhost:5238` and no cleartext-permitting network config is shipped.
-3. **Current (audit NAT-3):** Release builds still fall back to the dev `http://localhost:5238` base and
-   ship a cleartext-tolerant config. **FAILS** — record **Blocked**.
+3. **Was (pre-v3 audit NAT-3):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-24 — Windows loopback OAuth binds state (login-CSRF guard) 🟢 (Desktop)
 **Gherkin**
@@ -2164,12 +2160,12 @@ Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 | GDPR data export | **HH-13** (owner Household → Data → download, ⚙️ E2E `GdprExportJourneyTests`) + **DSK-10 / AND-10** (native share — NATIVE-3) + `Api.Tests` (`TenantExportTests`) | `POST /api/household/export` (owner-only `ExportData` → 403 else; JSON bundle via `IFileStorage`, signed URL; secret-free, tenant-scoped, audited) |
 | GDPR account erasure | **SET-07** (Settings → Danger zone) + `Api.Tests` (`AccountErasureTests`) | `DELETE /api/auth/me` (wipes identity/PII in one tx; owner-with-members → 400, solo owner → 409 without `confirm_dissolve`; member removed not re-homed; audited; audit trail survives) |
 | MFA / TOTP | **MFA-01..05**, **DSK-12 / AND-12** (native) (Settings enroll/QR/confirm/recovery + disable; step-up on OTP, OAuth/magic-link, **and** native logins) + `Api.Tests` (`MfaServiceTests`, `MfaChallengeServiceTests`, `MfaLoginServiceTests`) | `GET|POST /api/auth/mfa[/enroll|/confirm|/disable]` (enroll/manage; secret encrypted, hashed single-use recovery codes) + **login step-up** `POST /api/auth/mfa/verify` (MFA-on logins get a signed challenge instead of a session; verify a TOTP/recovery code to complete). **Every sign-in path enforces it** (web + native): OTP returns the challenge as JSON; OAuth callback + magic-link redirect to `/login?mfa=<challenge>`; native OTP/OAuth-exchange return the challenge in the body and the MAUI client steps up in-app. |
-| In-app notifications | **NOTIF-01..04**, **DSK-13** (header bell: list/unread-count/mark-read/delete/clear; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, `DELETE /{id}`, `DELETE /api/notifications` (+ `?read=true` for read-only clear), and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
-| Admin back-office | **ADMIN-01..06**, **DSK-14** (native spot) (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop; targeted/broadcast announce; plan comp/revert) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}` — returns `plan_key` + `provider_managed`), `POST /api/admin/impersonate/{userId}`, `POST /api/admin/tenants/{id}/announce` (optional `user_ids[]` subset, intersected with membership), `POST /api/admin/announce-all` (202; outbox fan-out to **every** user), `PUT|DELETE /api/admin/tenants/{id}/subscription` (comp/revert; 409 when Stripe-backed) — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
+| In-app notifications | **NOTIF-01..04**, **DSK-13** (header bell: list/unread-count/mark-read/delete/clear; Settings delivery-preference switches) + `Api.Tests` (`NotificationServiceTests`, `NotificationFanOutTests`) | `GET /api/notifications` (+ `?before=&limit=`), `/unread-count`, `POST /{id}/read`, `/read-all`, `DELETE /{id}`, `DELETE /api/notifications?read=true|false` (scope REQUIRED — read-only vs all; omitted → 400), and `GET|PUT /api/notifications/preferences` — **per-user** (scoped to the caller). `NotifyAsync` fans out to in-app + email (outbox-backed) per prefs (default both on). |
+| Admin back-office | **ADMIN-01..06**, **DSK-14** (native spot) (staff `/admin` console: tenant list/detail + impersonate w/ banner + stop; targeted/broadcast announce; plan comp/revert) + `Api.Tests` (`PlatformStaffServiceTests`, `AdminControllerTests`) | `GET /api/admin/me` (staff probe, 200 `{is_staff}` for any caller — drives the nav/gate), `GET /api/admin/tenants` (+ `/{id}` — returns `plan_key` + `provider_managed`), `POST /api/admin/impersonate/{userId}`, `POST /api/admin/tenants/{id}/announce` (optional `user_ids[]` subset, intersected with membership), `POST /api/admin/announce-all` (202; outbox fan-out to **every** user), `PUT|DELETE /api/admin/tenants/{id}/subscription` (comp/revert; 409 only for a LIVE provider sub — canceled Stripe-backed subs are comp-able) — **platform-staff only** (config `Admin:StaffEmails`; non-staff → 403). Detail enters the target tenant (filter never loosened); impersonation returns a **short-lived, non-refreshable** token with an `impersonated_by` claim, **audited in the target's tenant**. |
 
 **Adversarial & tenant-isolation (§14a, QA-ADV-*) — v3-audit hardening probes.** Rows tagged
-**⚠️ v3** assert currently-broken behaviour and are **Blocked/known-defect** until the named finding
-lands (see §16); untagged rows should Pass on current code.
+**⚠️ v3** were authored against then-broken behaviour and sat **Blocked** until their finding landed;
+**every tagged finding is fixed** (v3 remediation, PRs #147–#191), so ALL rows now expect **Pass**.
 
 | Probe (finding) | Test case(s) | Key API endpoint(s) / surface |
 |---|---|---|
@@ -2190,17 +2186,17 @@ lands (see §16); untagged rows should Pass on current code.
 | Concurrent last-seat accept (TB-BILL-19/BILLING-9) | ADV-15 | `POST /api/household/invitations/accept` (one 200, one 402 `seat_limit_reached`) |
 | Magic-link/OTP double-redemption (LB-AUTH-3) | ADV-16 | `GET /api/auth/magic-link/verify`, `POST /api/auth/otp/verify` (exactly one session) |
 | Rotated refresh-token replay revokes family (SEC-05 promoted) | ADV-17 | `POST /api/auth/refresh` (reuse → 401 + all sessions revoked) |
-| Locale-reload preserves deep-link (**⚠️ v3** UX-1/LB-UI-1/2) | ADV-18 | `/join?token=…` under a PREFS-1 locale-mismatch reload |
+| Locale-reload preserves deep-link (**⚠️ v3** UX-1/LB-UI-1/2) | ADV-18 (⚙️ E2E `LocaleMismatchJoinTests`) | `/join?token=…` under a PREFS-1 locale-mismatch reload |
 | No pref revert after soft sign-in (UX-3/4) | ADV-19 | OTP soft-nav sign-in reconcile (`theme`/`locale` claims) |
-| "Clear read" spares unread (LB-UI-10) | ADV-20 | `DELETE /api/notifications?read=true` vs `DELETE /api/notifications` |
+| "Clear read" spares unread (LB-UI-10) | ADV-20 | `DELETE /api/notifications?read=true` vs `?read=false`; omitted scope → 400 `scope_required` |
 | Security/cache headers on single-origin (**⚠️ v3** DEP-2/3) | ADV-21 | `curl -I /` + `/_framework/*` (HSTS/nosniff/CSP/Referrer-Policy; cache-control) |
 | Forged XFF ≠ rate-limit bypass (DEP-1/ADM-10) | ADV-22 | `POST /api/auth/otp/send` w/ rotating `X-Forwarded-For` (trusted-proxy only) |
 | Release native build HTTPS base URL (**⚠️ v3** NAT-3) | ADV-23 | Release AAB/MSIX base URL + Android network-security-config (no cleartext localhost) |
 | Loopback OAuth state binding (NAT-10) | ADV-24 | desktop loopback callback rejects mismatched `state` |
 
 **Per-client coverage:** Web = full (all suites). Desktop = DSK-01..15 (auth + per-feature parity).
-Android = AND-01..14 (auth + per-feature parity incl. hardware back + share sheet). iOS = IOS-01..04
-and macCatalyst = MAC-01..03 (first-run smoke — never run before; needs a Mac). Magic link is
+Android = AND-01..15 (auth + per-feature parity incl. hardware back, share sheet, OAuth kill drill). iOS = IOS-01..04
+and macCatalyst = MAC-01..03 (first-run smoke — first passed 2026-07-06; needs a Mac). Magic link is
 **web-only** by design; the §13c checklist is the per-release native subset.
 
 **Automated (E2E CI ⚙️):** the following manual cases have an equivalent Playwright/NUnit journey in
@@ -2218,7 +2214,16 @@ Postgres + Mailpit + API + Web stack — so they are continuously regression-gua
 | QA-I18N-02 (language follows the user across browsers) | `I18nTests.LocaleChoice_FollowsTheUser_AcrossBrowsers` |
 | QA-SET-08 (dark mode applies/persists/follows, incl. Auto propagation) | `ThemeJourneyTests.ThemeChoice_AppliesLive_PersistsLocally_AndFollowsTheUser` |
 | QA-INV-10 (accept refused after a downgrade — seat re-check) | `SeatQuotaJourneyTests.Accepting_An_Invite_After_A_Downgrade_Shows_The_HouseholdFull_State` |
-| QA-DSK-01 (desktop OTP sign-in) | `NativeSmokeTests` — the `native-smoke-windows` job boots the REAL Windows exe and drives it over WebView2 CDP (OTP + household load) |
+| QA-AUTH-01/05 (magic link happy + single-use) | `MagicLinkJourneyTests` |
+| QA-HH-02/03/05/07/08 (rename, invite/join, leave, dissolve, delete account) | `MembershipLifecycleTests` |
+| QA-HH-09..12 (roster: promote/demote/remove/owner-protection) | `RosterJourneyTests` |
+| QA-HH-13 (data export download) | `GdprExportJourneyTests` |
+| QA-INV-01/02/08 (invite create/accept/regenerate) | `MembershipLifecycleTests` (+ invalid-code inline error) |
+| QA-NOTIF-01..03 (bell list/unread/mark-read via announcements) | `NotificationJourneyTests` + `AnnouncementJourneyTests` |
+| QA-ADMIN-01/04 (staff console gate, announce) | `AnnouncementJourneyTests` |
+| QA-BILL-01/02 (billing page + fake-provider upgrade loop) | `BillingJourneyTests` |
+| QA-ADV-18 (locale-mismatch × invite acceptance) | `LocaleMismatchJoinTests` |
+| QA-DSK-01 (desktop boot) | the `native-smoke-windows` job boots the REAL Windows exe as a process-alive + provider-probe canary (WebView2 150 strips CDP under elevation — PRs #170/#171); the OTP journey is CI-driven on Android only. `NativeSmokeTests` remains for local non-elevated runs |
 | QA-AND-01 (Android OTP sign-in) | `tests/native-smoke-android/smoke.js` — the `native-smoke-android` job boots a real emulator and drives the app via playwright-core's `_android` module |
 
 The two native smoke jobs run on develop pushes that touch native-relevant paths (see the

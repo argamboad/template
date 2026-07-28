@@ -273,6 +273,7 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Shared.Ui/Resources/AppStrings.es.resx", "3.5", ""),
     ("src/Shared.Ui/Components/LanguageSwitcher.razor", "3.5", ""),
     ("tests/E2E.Tests/I18nTests.cs", "3.5", ""),
+    ("tests/Api.Tests/ResourceParityTests.cs", "3.5", "EN/ES resx key parity — no untranslated or orphan keys (2026-07 truth-up)"),
     ("tests/E2E.Tests/LocaleMismatchJoinTests.cs", "3.5", "locale-mismatch reload preserves /join (v3 TB-UI-16, UX-1 end-to-end)"),
     ("tests/E2E.Tests/E2ETestBase.cs", "3.6", ""),
     ("tests/E2E.Tests/Mailpit.cs", "3.6", "read OTPs from the fake inbox"),
