@@ -22,7 +22,7 @@
 > ⚠️ **RE-VERIFY at project start.** Versions move; search for current stable before committing.
 > Policy: **target the latest _stable_ release, never previews.**
 >
-> **Verified 2026-06-17:** .NET SDK **pinned in `global.json` (10.0.301)** — the single source of truth
+> **Verified 2026-06-17:** .NET SDK **pinned in `global.json` (10.0.303)** — the single source of truth
 > (CI `setup-dotnet` + both Dockerfile image tags follow it; v3 audit DEP-4) · ASP.NET Core / EF Core
 > **10.0.9** · Npgsql.EntityFrameworkCore.PostgreSQL **10.0.2** · PostgreSQL server **17**.
 > Note: `Guid.CreateVersion7()` (time-ordered UUIDv7) is supported in .NET 9+ — already used in
