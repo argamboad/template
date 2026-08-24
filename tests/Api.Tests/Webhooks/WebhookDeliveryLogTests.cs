@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Perezosoft.Api.Services;
 using Perezosoft.Api.Tests.Infrastructure;
 using Perezosoft.Core.Entities;
@@ -13,8 +14,12 @@ namespace Perezosoft.Api.Tests.Webhooks;
 
 /// <summary>
 /// Drives HOOKS-2 (ADR-016): the delivery log + replay. The outbox handler records one
-/// <see cref="WebhookDelivery"/> per attempt (success or failure — committed with the message outcome);
-/// the read side is tenant-scoped; replay re-enqueues the exact stored payload.
+/// <see cref="WebhookDelivery"/> per attempt: a SUCCESS row is staged on the shared context (it
+/// commits atomically with the message's Sent flip), while a FAILED attempt is written through a
+/// fresh out-of-band context — the processor rolls the ambient transaction back on failure, so a
+/// staged row would be silently discarded and the log would only ever show successes (the
+/// 2026-08-24 finding: an operator diagnosing a failing endpoint saw an empty log).
+/// The read side is tenant-scoped; replay re-enqueues the exact stored payload.
 /// </summary>
 [Collection(PostgresCollection.Name)]
 public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase(fixture)
@@ -28,7 +33,7 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
 
         await using (var db = Fixture.CreateContext())
         {
-            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.OK)), new AllowAllUrlGuard()), protector, TimeProvider.System);
+            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.OK)), new AllowAllUrlGuard()), protector, TimeProvider.System, Fixture.CreateContextFactory());
             await handler.HandleAsync(Message(tenant, subId, "{}"), default);
             await db.SaveChangesAsync(); // stands in for the OutboxProcessor's commit
         }
@@ -41,7 +46,7 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
     }
 
     [Fact]
-    public async Task Handler_RecordsDelivery_OnFailure()
+    public async Task Handler_RecordsDelivery_OnFailure_WithoutTheAmbientContextEverSaving()
     {
         var tenant = Guid.CreateVersion7();
         var protector = new WebhookSecretProtector(new EphemeralDataProtectionProvider());
@@ -49,16 +54,67 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
 
         await using (var db = Fixture.CreateContext())
         {
-            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.InternalServerError)), new AllowAllUrlGuard()), protector, TimeProvider.System);
-            try { await handler.HandleAsync(Message(tenant, subId, "{}"), default); }
-            catch (InvalidOperationException) { /* expected — triggers the outbox retry */ }
-            await db.SaveChangesAsync(); // the failed attempt is still recorded
+            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.InternalServerError)), new AllowAllUrlGuard()), protector, TimeProvider.System, Fixture.CreateContextFactory());
+            await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(Message(tenant, subId, "{}"), default));
+            // Deliberately NO SaveChanges here: in production the processor ROLLS BACK on failure.
+            // The row must already be durable regardless.
         }
 
         await using var read = Fixture.CreateContext();
         var delivery = Assert.Single(await read.Set<WebhookDelivery>().ToListAsync());
         Assert.False(delivery.Success);
         Assert.Equal(500, delivery.StatusCode);
+        Assert.NotNull(delivery.Error);
+        Assert.Equal(tenant, delivery.TenantId);
+    }
+
+    [Fact]
+    public async Task FailedDelivery_SurvivesTheProcessorRollback_AndRetries()
+    {
+        // The end-to-end path the old unit test missed: the REAL OutboxProcessor claims the message,
+        // the handler fails, the processor rolls back and clears the tracker — the failed-attempt
+        // row must survive all of that, and the message must be scheduled for retry.
+        var tenant = Guid.CreateVersion7();
+        var protector = new WebhookSecretProtector(new EphemeralDataProtectionProvider());
+        var subId = await SeedSubscriptionAsync(tenant, protector);
+        await SeedOutboxMessageAsync(tenant, subId);
+
+        await using (var db = Fixture.CreateContext())
+        {
+            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.InternalServerError)), new AllowAllUrlGuard()), protector, TimeProvider.System, Fixture.CreateContextFactory());
+            await new OutboxProcessor(db, [handler], TimeProvider.System, new OutboxOptions(), NullLogger<OutboxProcessor>.Instance).ProcessDueAsync();
+        }
+
+        await using var read = Fixture.CreateContext();
+        var delivery = Assert.Single(await read.Set<WebhookDelivery>().ToListAsync());
+        Assert.False(delivery.Success);
+        Assert.Equal(500, delivery.StatusCode);
+
+        var msg = await read.Set<OutboxMessage>().SingleAsync();
+        Assert.Equal(OutboxStatus.Pending, msg.Status); // scheduled for retry, not lost
+        Assert.Equal(1, msg.AttemptCount);
+    }
+
+    [Fact]
+    public async Task DeadLetteredDelivery_KeepsOneRowPerAttempt()
+    {
+        // "Retries add rows" (DATA_MODEL.md): a delivery that exhausts its attempts leaves the full
+        // per-attempt trail — the exact evidence an operator needs when an endpoint is down.
+        var tenant = Guid.CreateVersion7();
+        var protector = new WebhookSecretProtector(new EphemeralDataProtectionProvider());
+        var subId = await SeedSubscriptionAsync(tenant, protector);
+        await SeedOutboxMessageAsync(tenant, subId);
+        var options = new OutboxOptions { MaxAttempts = 2, BackoffBase = TimeSpan.Zero };
+
+        await using (var db = Fixture.CreateContext())
+        {
+            var handler = new WebhookOutboxHandler(db, new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.InternalServerError)), new AllowAllUrlGuard()), protector, TimeProvider.System, Fixture.CreateContextFactory());
+            await new OutboxProcessor(db, [handler], TimeProvider.System, options, NullLogger<OutboxProcessor>.Instance).ProcessDueAsync();
+        }
+
+        await using var read = Fixture.CreateContext();
+        Assert.Equal(2, await read.Set<WebhookDelivery>().CountAsync(d => !d.Success));
+        Assert.Equal(OutboxStatus.DeadLettered, (await read.Set<OutboxMessage>().SingleAsync()).Status);
     }
 
     [Fact]
@@ -133,6 +189,13 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
         db.Set<WebhookSubscription>().Add(sub);
         await db.SaveChangesAsync();
         return sub.Id;
+    }
+
+    private async Task SeedOutboxMessageAsync(Guid tenant, Guid subId)
+    {
+        await using var db = Fixture.CreateContext();
+        db.Set<OutboxMessage>().Add(Message(tenant, subId, "{}"));
+        await db.SaveChangesAsync();
     }
 
     private async Task<Guid> SeedDeliveryAsync(Guid tenant, Guid subscriptionId, string eventId, string body)

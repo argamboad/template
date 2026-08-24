@@ -72,7 +72,10 @@ Scenario: Management + the surface are owner-only and off by default
 **HOOKS-2 (✅ done, `feat/hooks-2-delivery-log`):** a tenant-facing **delivery log** — `WebhookDelivery`
 (one row per attempt: event, success, status/error, and the sent body; **not** `ITenantScoped`, written
 from the tenant-less dispatcher, read side filters by `TenantId`; migration `AddWebhookDelivery`). The
-outbox handler records each attempt (committed with the message outcome). Owner routes
+outbox handler records each attempt — a success row commits atomically with the message's Sent flip;
+a **failed** attempt is written through a fresh out-of-band context so it survives the processor's
+rollback (**2026-08-24 fix**: staged failure rows were silently discarded by the rollback, so the log
+only ever showed successes — blind exactly when an endpoint was failing). Owner routes
 `GET /api/webhooks/{id}/deliveries` (recent attempts) + `POST /api/webhooks/deliveries/{id}/replay`
 (re-enqueue the exact stored payload — same event id so the receiver dedups). Covered by
 `WebhookDeliveryLogTests`. **Still out of scope (candidate HOOKS-3):** a Blazor **management UI** (the API +

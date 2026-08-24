@@ -84,6 +84,19 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// An <see cref="IDbContextFactory{TContext}"/> over <see cref="CreateContext"/> for services
+    /// that write OUT-OF-BAND of the ambient transaction (the webhook delivery recorder): each
+    /// created context is fresh — own connection, no ambient tenant — exactly like the scoped
+    /// factory the production DI registers.
+    /// </summary>
+    public IDbContextFactory<AppDbContext> CreateContextFactory() => new FixtureContextFactory(this);
+
+    private sealed class FixtureContextFactory(PostgresFixture fixture) : IDbContextFactory<AppDbContext>
+    {
+        public AppDbContext CreateDbContext() => fixture.CreateContext();
+    }
+
+    /// <summary>
     /// Truncates every table so each test starts from a clean slate. The table list is DERIVED from the
     /// EF model (v2 audit TR-3), so a new entity is reset automatically — no hand-maintained list to
     /// forget. Call at the top of a test (or in the class constructor) when tests share the container.

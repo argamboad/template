@@ -247,7 +247,10 @@ _TODO_
   from the tenant-less outbox dispatcher, so `tenant_id` is a **plain filter column** the read side
   filters on, not a global-filter scoping key. A per-attempt delivery record (retries add rows):
   `subscription_id`, `event_type`, `event_id`, `body` (the exact JSON sent — retained so a delivery can
-  be **replayed**), `success`, `status_code` (nullable), `error` (nullable), `created_at`.
+  be **replayed**), `success`, `status_code` (nullable), `error` (nullable), `created_at`. Success rows
+  commit atomically with the outbox `sent` flip; **failure rows are written through a fresh out-of-band
+  context** so they survive the processor's rollback (2026-08-24 fix — staged failure rows were being
+  discarded, leaving the log success-only).
 - **`OutboxMessage`**, **`InboxMessage`**, **`AuditEvent`** — see below.
 
 ### ER diagram — platform entities (as built)
