@@ -600,6 +600,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Free disk space (the emulator needs ~7.4 GB free for its userdata partition)
+        # Run 32748305585 attempt 1 died at launch: "Not enough space to create userdata
+        # partition. Available: 2220 MB, need 7372 MB" — free space on ubuntu-latest varies per
+        # runner instance, and this job stacks workloads + system image + APK on top. Drop the
+        # biggest preinstalled toolchains it never uses (never /usr/share/dotnet, the Android SDK,
+        # or Java — those it needs).
+        run: |
+          df -h / | tail -1
+          sudo rm -rf /usr/share/swift /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules /usr/share/miniconda
+          df -h / | tail -1
+
       - name: Install the MAUI workloads (host-aware)
         run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
 
