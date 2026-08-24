@@ -57,6 +57,20 @@ app-specific docs; after that it's your feature slices, with per-epic user stori
 > Then propose the first feature epic from `docs/FEATURES.md` (the `Notes` sample slice gets
 > deleted when the first real feature lands).
 
+## Reading order
+
+For a newcomer, motivation first, mechanics last:
+
+1. [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — what the platform is and why it saves months; no codebase knowledge assumed.
+2. [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md) — what *this* app is for, and (as important) the OUT list.
+3. [`docs/NEW_APP_GUIDE.md`](docs/NEW_APP_GUIDE.md) — the end-to-end path from idea to production, phase by phase.
+4. [`docs/DECISIONS.md`](docs/DECISIONS.md) — the "why" behind every settled choice; read before disagreeing with any of them.
+5. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the shape in diagrams: projects, seams, subsystems.
+6. [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — entities, ER diagrams, invariants, lifecycles.
+7. [`docs/FLOWS.md`](docs/FLOWS.md) — the call stacks that matter, traced through the code.
+8. [`docs/WAYS_OF_WORKING.md`](docs/WAYS_OF_WORKING.md) — how work actually lands: slices, stories, TDD, PR conventions.
+9. [`CONTRIBUTING.md`](CONTRIBUTING.md) — the frozen quality bar and the machine-enforced rules behind it.
+
 ## What's constant vs. per-project
 
 - **Constant (don't re-decide):** the stack, the clean-API-boundary + RCL architecture,

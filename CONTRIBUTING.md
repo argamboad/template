@@ -3,6 +3,9 @@
 Working conventions (slices, Gherkin stories, Conventional Commits, the PR template) live in
 [`docs/WAYS_OF_WORKING.md`](docs/WAYS_OF_WORKING.md). Test-Driven Development is mandatory — write the
 failing test before the production code on every slice (see `CLAUDE.md`, golden rule 7).
+For orientation before touching platform code, the diagram layer is
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (structure) and [`docs/FLOWS.md`](docs/FLOWS.md)
+(call stacks) — both drawn from the code and cross-linked to the ADRs.
 
 ## Definition of "Solid" — the frozen quality bar
 

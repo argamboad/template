@@ -319,4 +319,6 @@ budget real time for it: that enforcement layer is a big part of what makes this
 | Build a feature | `docs/WAYS_OF_WORKING.md` + the `Notes` sample |
 | Understand the stack in depth | `docs/TECH_STACK.md` |
 | Understand a decision | `docs/DECISIONS.md` |
+| See the architecture in diagrams | `docs/ARCHITECTURE.md` |
+| Trace a call stack (sign-in, webhook, dissolve…) | `docs/FLOWS.md` |
 | Deploy it | `docs/DEPLOYMENT.md` |
