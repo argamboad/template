@@ -7,6 +7,13 @@
 > The **constant ADRs** below (C-prefixed) are pre-decided across all projects from this platform
 > — keep them. Add **app-specific ADRs** (number them 001, 002, …) as you make decisions during
 > conceptualization.
+>
+> **Diagrams:** the shapes these decisions produced are drawn (from the code) in
+> [`ARCHITECTURE.md`](ARCHITECTURE.md) (component + class diagrams), [`FLOWS.md`](FLOWS.md)
+> (sequence diagrams per call stack), and [`DATA_MODEL.md`](DATA_MODEL.md) (ER + lifecycle
+> diagrams). Key mappings: ADR-002 → FLOWS §3–7; ADR-003/020 → ARCHITECTURE §3 + FLOWS §2;
+> ADR-006 → ARCHITECTURE §6 + FLOWS §8; ADR-007 → ARCHITECTURE §5 + FLOWS §9–10;
+> ADR-011 → FLOWS §11; ADR-012 → FLOWS §6.
 
 ## Constant decisions (carry forward — do not re-debate)
 

@@ -140,6 +140,8 @@ deferred items without an explicit decision.
 | `docs/DATA_MODEL.md` | Entities, relationships, derived rules |
 | `docs/TECH_STACK.md` | Stack choices + rationale |
 | `docs/DECISIONS.md` | ADR log (the "why") |
+| `docs/ARCHITECTURE.md` | Mermaid diagram layer — solution map, seams, per-subsystem class diagrams; drawn from the code, ADR-cross-linked |
+| `docs/FLOWS.md` | Sequence diagrams for the core call stacks (auth, tenancy, outbox, billing webhook, dissolve) + the OTP line-level walkthrough |
 | `docs/WAYS_OF_WORKING.md` | Slices, story format, commit/PR conventions |
 | `docs/audits/AUDIT_SUITE.md` | **The repeatable super-audit** — 5 diagnostic/gate phases + QA-paranoia + docs/course currency; triggered, not routine; `audits/v1..v3` are its worked runs |
 | `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
