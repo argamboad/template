@@ -605,10 +605,10 @@ jobs:
         # partition. Available: 2220 MB, need 7372 MB" — free space on ubuntu-latest varies per
         # runner instance, and this job stacks workloads + system image + APK on top. Drop the
         # biggest preinstalled toolchains it never uses (never /usr/share/dotnet, the Android SDK,
-        # or Java — those it needs).
+        # Java, or /usr/local/lib/node_modules — npm itself lives there and the smoke runs npm ci).
         run: |
           df -h / | tail -1
-          sudo rm -rf /usr/share/swift /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/lib/node_modules /usr/share/miniconda
+          sudo rm -rf /usr/share/swift /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/miniconda
           df -h / | tail -1
 
       - name: Install the MAUI workloads (host-aware)
