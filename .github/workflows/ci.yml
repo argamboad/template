@@ -692,7 +692,7 @@ jobs:
             [ -n "$pid" ] && { echo "app pid $pid"; break; }
             sleep 3
           done
-          [ -n "$pid" ] || { echo "::error::the app never started (fast-deployment APK? startup crash?)"; adb logcat -d | grep -iE "perezosoft|FATAL" | tail -40; exit 1; }
+          [ -n "$pid" ] || { echo "::error::the app never started (fast-deployment APK? startup crash?)"; timeout 60 adb logcat -d | grep -iE "perezosoft|FATAL" | tail -40; exit 1; }
 
           node tests/native-smoke-android/smoke.js
 
@@ -700,13 +700,17 @@ jobs:
         # always(), not failure(): a job TIMEOUT cancels remaining steps, and cancelled steps
         # don't satisfy failure() — the first hung run produced zero diagnostics because of this.
         if: always()
+        timeout-minutes: 3
         run: |
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
           tail -n 40 emulator.log || true
           tail -n 60 api.log || true
           # "chromium" is the tag Blazor WebView unhandled .NET exceptions surface under —
           # run 28949312350 only kept the last stack frame because the filter missed it.
-          adb logcat -d 2>/dev/null | grep -iE "perezosoft|FATAL|blazor|chromium" | tail -n 120 || true
+          # timeout: with a half-dead emulator, adb logcat can block forever — the boot step's
+          # "nothing here may block without a deadline" rule applies to diagnostics too (a hung
+          # diagnostics step sat 30+ min on 2026-08-24 until it was cancelled by hand).
+          timeout 60 adb logcat -d 2>/dev/null | grep -iE "perezosoft|FATAL|blazor|chromium" | tail -n 120 || true
 
   # End-to-end tests (v2 audit B8-5). Boots the REAL stack — Postgres + Mailpit (service containers) +
   # the API + the Blazor WASM Web app — and drives a headless Chromium through the QA smoke journeys,
