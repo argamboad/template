@@ -36,16 +36,12 @@ async function waitForOtp(toEmail, timeoutMs) {
   throw new Error(`No OTP email for ${toEmail} within ${timeoutMs / 1000}s`);
 }
 
-(async () => {
-  const devices = await _android.devices();
-  if (devices.length === 0) throw new Error('no adb device/emulator attached');
-  const device = devices[0];
-  console.log(`device: ${device.serial()}`);
-
-  // Boot: attaching to the app's WebView proves the app started (a G7-style crash dies here).
+// Boot: attaching to the app's WebView proves the app process started (a G7-style crash dies
+// here), and the visible login box proves Blazor booted inside it.
+async function bootToLogin(device, attempt) {
   const webView = await device.webView({ pkg: PKG }, { timeout: 60_000 });
   const page = await webView.page();
-  console.log(`connected: ${page.url()}`);
+  console.log(`connected (attempt ${attempt}): ${page.url()}`);
 
   // Unhandled .NET exceptions in the Blazor WebView only show up as console errors; without
   // this the smoke just times out waiting for UI and the root cause lives in logcat noise.
@@ -56,6 +52,32 @@ async function waitForOtp(toEmail, timeoutMs) {
 
   const emailBox = page.getByTestId('login-email');
   await emailBox.waitFor({ state: 'visible', timeout: 60_000 });
+  return { page, emailBox };
+}
+
+(async () => {
+  const devices = await _android.devices();
+  if (devices.length === 0) throw new Error('no adb device/emulator attached');
+  const device = devices[0];
+  console.log(`device: ${device.serial()}`);
+
+  // ONE relaunch retry, boot phase only: MAUI's BlazorWebView has a startup race where an early
+  // Android Activity recreate disposes the service scope while the attach IPC is in flight —
+  // "Cannot access a disposed object: 'IServiceProvider'" at WebViewManager.AttachToPageAsync —
+  // and the login page then never renders (run 32769356890; the same APK passed twice that
+  // morning). A single force-stop + relaunch distinguishes that transient race from a real
+  // startup crash: the G7 class this canary exists for fails BOTH attempts.
+  let boot;
+  try {
+    boot = await bootToLogin(device, 1);
+  } catch (e) {
+    console.error(`boot attempt 1 failed (${e.message}); force-stopping and relaunching once (MAUI attach race)`);
+    await device.shell(`am force-stop ${PKG}`);
+    await new Promise(r => setTimeout(r, 2000));
+    await device.shell(`monkey -p ${PKG} -c android.intent.category.LAUNCHER 1`);
+    boot = await bootToLogin(device, 2);
+  }
+  const { page, emailBox } = boot;
 
   // OTP sign-in end-to-end through the real API + Mailpit (the native body-token transport).
   const email = `native-smoke-${Date.now()}@example.com`;
