@@ -38,16 +38,10 @@
     <!-- Web (Blazor WASM) -->
     <PackageVersion Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.9" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.9" />
-    <!-- The WASM SDK injects these three build-time packs at the version of the LATEST INSTALLED
-         runtime patch, not the SDK's bundled one — so the Web lockfile silently depended on which
-         runtimes an environment happened to carry (CI images preinstall newer patches than the
-         Docker image ships → NU1004 in locked-mode restore, the 2026-08 red streak). Pinning them
-         explicitly makes the lockfile environment-independent. Pin at the version the Docker
-         image's runtime can EXECUTE (ILLink is a framework-dependent tool: it rolls forward onto
-         newer runtimes but can never run on an older one); bump alongside the SDK playbook. -->
-    <PackageVersion Include="Microsoft.AspNetCore.App.Internal.Assets" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.NET.ILLink.Tasks" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.NET.Sdk.WebAssembly.Pack" Version="10.0.10" />
+    <!-- The Web project pins the WASM SDK's implicit build-time packs (ILLink & co.) via
+         VersionOverride in its own csproj, NOT as PackageVersion entries here: the MAUI SDK also
+         injects ILLink.Tasks implicitly, and a central version for an SDK-implicit package fails
+         its restore with NU1009. See the note in src/Web/Perezosoft.Web.csproj. -->
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.9" />
     <!-- Api hosts the published WASM bundle single-origin (DEPLOY-1, ADR-017). -->
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.9" />
