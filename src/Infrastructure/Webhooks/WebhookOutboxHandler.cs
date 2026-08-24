@@ -20,7 +20,8 @@ public sealed class WebhookOutboxHandler(
     AppDbContext db,
     IWebhookSender sender,
     IWebhookSecretProtector protector,
-    TimeProvider clock) : IOutboxHandler
+    TimeProvider clock,
+    IDbContextFactory<AppDbContext> dbFactory) : IOutboxHandler
 {
     public const string MessageType = "webhook";
     public string Type => MessageType;
@@ -52,9 +53,15 @@ public sealed class WebhookOutboxHandler(
 
         var success = status is >= 200 and < 300;
 
-        // Record the attempt (HOOKS-2). Added to the shared context; the OutboxProcessor's SaveChanges
-        // commits it together with the message's sent/retry outcome (whether we return or throw below).
-        db.Set<WebhookDelivery>().Add(new WebhookDelivery
+        // Record the attempt (HOOKS-2). Two paths, deliberately different:
+        //  - SUCCESS: staged on the shared context, so the row commits atomically with the message's
+        //    Sent flip — the log never shows a success the outbox didn't record.
+        //  - FAILURE: written through a FRESH out-of-band context (own connection, own SaveChanges)
+        //    BEFORE the throw. The OutboxProcessor rolls the ambient transaction back on failure and
+        //    clears the tracker, so a staged row would be silently discarded — which is exactly what
+        //    happened until 2026-08-24: the delivery log only ever recorded successes, leaving an
+        //    operator blind precisely when an endpoint was failing.
+        var delivery = new WebhookDelivery
         {
             TenantId = message.TenantId ?? subscription.TenantId,
             SubscriptionId = subscription.Id,
@@ -65,10 +72,21 @@ public sealed class WebhookOutboxHandler(
             StatusCode = status,
             Error = success ? null : transportError ?? $"HTTP {status}",
             CreatedAt = clock.GetUtcNow(),
-        });
+        };
 
-        if (!success)
-            throw new InvalidOperationException(
-                transportError ?? $"Webhook delivery to {subscription.Url} returned HTTP {status}."); // → outbox retry
+        if (success)
+        {
+            db.Set<WebhookDelivery>().Add(delivery);
+            return;
+        }
+
+        await using (var auditDb = await dbFactory.CreateDbContextAsync(cancellationToken))
+        {
+            auditDb.Set<WebhookDelivery>().Add(delivery);
+            await auditDb.SaveChangesAsync(cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            transportError ?? $"Webhook delivery to {subscription.Url} returned HTTP {status}."); // → outbox retry
     }
 }

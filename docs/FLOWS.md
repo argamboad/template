@@ -352,16 +352,18 @@ sequenceDiagram
     alt 2xx
         WOH->>OB: stage WebhookDelivery(success) - commits with sent flip
     else non-2xx / transport error
+        WOH->>WOH: write WebhookDelivery(failure) via a FRESH context - survives the rollback
         WOH->>OB: throw - outbox retry/backoff/dead-letter
     end
 ```
 
 Divergences: the send-test endpoint (`POST /api/webhooks/{id}/test`) bypasses the outbox and
 POSTs synchronously. Replay re-enqueues the **same** `EventId` so receivers dedup on
-`X-Webhook-Id`. **Caveat verified in code:** on a failed attempt the processor rolls the
-transaction back and clears the change tracker, so the staged failure `WebhookDelivery` row is
-discarded — the delivery log ends up recording successful attempts only (the handler's comment
-claims otherwise; flagged as a finding, see `OutboxProcessor.cs:109`).
+`X-Webhook-Id`. The two recording paths differ deliberately: a success row is staged on the
+shared context (commits atomically with the `sent` flip), while a failed attempt is persisted
+out-of-band **before** the throw — the processor rolls the ambient transaction back on failure,
+which until 2026-08-24 silently discarded staged failure rows and left the delivery log
+success-only (fixed; `FailedDelivery_SurvivesTheProcessorRollback_AndRetries` pins it).
 
 ## 11. Household dissolve (leave / erasure)
 

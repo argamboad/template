@@ -268,7 +268,7 @@ flowchart LR
     PUB["IWebhookPublisher<br/>(seam wired, no production caller yet)"] --> OB[("Outbox")]
     OES --> OB
     OB --> WOH["WebhookOutboxHandler<br/>HMAC sign + POST, 10s timeout"]
-    WOH --> DLV[("WebhookDelivery log<br/>see FLOWS.md for the failure-path caveat")]
+    WOH --> DLV[("WebhookDelivery log<br/>one row per attempt - failures written out-of-band")]
 ```
 
 ## 8. Files & GDPR ([ADR-010](DECISIONS.md), [ADR-011](DECISIONS.md))

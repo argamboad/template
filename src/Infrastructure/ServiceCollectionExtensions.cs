@@ -42,6 +42,13 @@ public static class ServiceCollectionExtensions
         // Persistence
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+        // A SCOPED context factory for services that must write OUT-OF-BAND of the ambient
+        // transaction — the webhook delivery recorder persists failed-attempt rows through it, so
+        // they survive the OutboxProcessor's rollback (HOOKS-2). Scoped (not the default
+        // singleton) because AppDbContext takes the scoped ICurrentTenant in its constructor.
+        services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")),
+            ServiceLifetime.Scoped);
 
         // Data Protection — keys stored in DB so the OAuth correlation/nonce cookies
         // survive server restarts/redeploys.
