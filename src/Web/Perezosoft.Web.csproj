@@ -15,6 +15,12 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <!-- Promote the SDK-injected build-time packs to explicit refs so their versions are pinned
+         (see the note in Directory.Packages.props): otherwise they float with the machine's latest
+         installed runtime patch and break locked-mode restore across environments. -->
+    <PackageReference Include="Microsoft.AspNetCore.App.Internal.Assets" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Sdk.WebAssembly.Pack" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
