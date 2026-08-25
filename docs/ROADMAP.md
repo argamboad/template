@@ -124,14 +124,33 @@ plan. Free-tier trade-offs are recorded decisions, not surprises (instance sleep
 staging-acceptable, never prod; real SMTP means email QA cases stay manual on staging).
 **DEPLOY is now ✅ COMPLETE** (all three slices; staging live + auto-deploy with a version-gated smoke).
 
-## Next up: NATIVE — full MAUI parity (planned 2026-07-02)
+## NATIVE — full MAUI parity (planned 2026-07-02) → ✅ COMPLETE (2026-07-14)
 
 The MAUI Blazor-Hybrid shells reuse the shared RCL, so they already render every web screen and have
-native auth wired — but native isn't built in CI, the full feature surface is inherited-but-unverified,
-and there are no signed artifacts. Epic **`NATIVE`** (ADR-018, `stories/native.md`) commits to **full
-parity across Android/Windows/iOS/macOS**, in four waves: **guardrails** (CI build gate + a
+native auth wired — but native isn't built in CI and the full feature surface is
+inherited-but-unverified. Epic **`NATIVE`** (ADR-018, `stories/native.md`) commits to **full
+parity across Android/Windows/iOS/macOS**, in three platform waves: **guardrails** (CI build gate + a
 `docs/NATIVE_PARITY.md` audit), **gap-fixes** (WebView deltas — downloads, external links, back button,
-culture/theming), **verification** (a per-feature native QA pass + automated emulator/simulator smoke),
-and **distribution** (signed AAB / MSIX / IPA / pkg). Recorded costs (the user opted into everything): a
-**macOS CI runner** + **Apple Developer account** + signing material in secrets. Parity means "what web
-does" — OS push/biometrics are beyond scope; web-first still holds (this keeps native *caught up*).
+culture/theming), and **verification** (a per-feature native QA pass + automated emulator/simulator
+smoke). **Distribution (signed AAB / MSIX / IPA / pkg + store submission) is downstream-app work per
+ADR-024 (decided 2026-07-14)** — signing identity is per-app; the platform ships the
+first-native-release checklist (`NEW_APP_GUIDE.md` Phase 9) instead of artifacts, and the epic
+completes at NATIVE-6. Recorded platform cost: the **macOS CI runner** (the Apple Developer account +
+signing material moved to the downstream list). Parity means "what web does" — OS push/biometrics are
+beyond scope; web-first still holds (this keeps native *caught up*).
+
+**Epic closed 2026-07-14:** the NATIVE-6 Android + Windows device pass came back green (the Apple
+§13b smoke had passed 2026-07-06), completing the last platform slice. NATIVE-12 (OAuth
+process-death resilience, PR #172) was added post-close as a QA-finding fix slice.
+
+## Terminal state (reached 2026-07-14) — the platform roadmap is done
+
+Every planned epic is complete and verified on web + all four native platforms; staging deploys
+continuously from develop. Two scope decisions closed the tail: **native distribution** (signing,
+installers, stores — ADR-024) and **production activation** (ADR-017 amendment: staging is the
+platform's terminal environment) are **downstream-app work**, executed per app via
+`NEW_APP_GUIDE.md` Phases 8–9. The **v3 delta audit** (2026-07-15 → 07-27, 62 tasks, PRs
+#147–#191) then hardened the finished platform rather than extending it — FOUNDATION_RULES v2.0
+is the resulting quality bar. What remains here is by-choice backlog (HOOKS-3 UI, API-key
+rotation, CACHE, FR/DE/PT — see above) and maintenance: toolchain drift, QA findings (§14a re-runs
++ QA-AND-15 are the open device items), and keeping docs/CI honest as downstream apps report back.

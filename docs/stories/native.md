@@ -2,8 +2,12 @@
 
 > One file per epic. Brings the **MAUI Blazor Hybrid** clients (Android, Windows, **iOS, macOS**) to
 > **full parity** with web: every feature verified working on native, WebView-specific gaps closed, the
-> native build + UI tested in CI, and **signed, shippable artifacts**. Design decision + accepted costs
-> in **ADR-018**. Stories use Gherkin acceptance criteria. **Status: 📝 PLANNED (full-parity scope).**
+> native build + UI tested in CI. Design decision + accepted costs in **ADR-018**. Stories use Gherkin
+> acceptance criteria. **Status: ✅ EPIC COMPLETE (2026-07-14) — the NATIVE-6 Android + Windows
+> device pass came back green, closing the last platform slice.** (NATIVE-12 landed after as a
+> QA-finding hardening slice, PR #172; its QA-AND-15 on-device drill is the open device item.)
+> **Scope change (ADR-024, 2026-07-14):** signed artifacts + store submission (Wave 4, NATIVE-8..11)
+> are **downstream-app work**, kept below as reference only.
 
 **Epic key:** `NATIVE`
 
@@ -12,14 +16,15 @@
 is already native (OTP, OAuth via system browser, MFA step-up MFA-4, secure-storage tokens). So this epic
 is **mostly verification + native-glue + CI/distribution plumbing, not rebuilding features.** The work is:
 (1) guard the native build, (2) close the handful of places a WebView differs from a browser, (3) verify
-the full feature surface on every platform, (4) test it automatically, (5) ship signed artifacts.
+the full feature surface on every platform, (4) test it automatically. ((5) shipping signed artifacts
+was the original fifth step — moved downstream per ADR-024; Wave 4 below is now reference material.)
 
-**Prerequisites (external — these are the real cost of "everything", per ADR-018):**
-- A **macOS CI runner** (GitHub-hosted `macos-latest`) — required to build/test/sign **iOS + macCatalyst**.
-- An **Apple Developer account** ($99/yr) — iOS/macOS signing certs + provisioning profiles.
-- **Signing material as repo secrets** (never committed): Android keystore, Windows code-sign cert, Apple
-  cert + profile (base64-encoded). Loaded at build time, same discipline as `.env` (ADR-001).
+**Prerequisites (external — the platform's real costs, per ADR-018):**
+- A **macOS CI runner** (GitHub-hosted `macos-latest`) — required to build/test **iOS + macCatalyst**.
 - Android SDK + the `.NET maui` workloads on the runners.
+- ~~An Apple Developer account ($99/yr) + signing material as repo secrets~~ — **downstream-release
+  prerequisites now (ADR-024)**; each app brings its own identity (Android keystore, Windows/MSIX
+  publisher, Apple certs + profiles — base64 in *its* repo secrets, ADR-001 discipline).
 
 **Current baseline:** targets `net10.0-android` + `net10.0-windows`; not built in CI; QA covers 13
 auth-focused desktop/Android cases (`QA-DSK-01..07`, `QA-AND-01..06`). See `docs/MOBILE_TESTING.md`.
@@ -355,7 +360,14 @@ Scenario: Native smoke runs on every push
 
 ---
 
-## Wave 4 — Distribution (signed, shippable artifacts)
+## Wave 4 — Distribution (signed, shippable artifacts) — ⤵ MOVED DOWNSTREAM (ADR-024, 2026-07-14)
+
+> **NATIVE-8..11 are no longer platform slices.** ADR-024 resolved the ADR-018 NATIVE-8 gate:
+> signing identity (keystore / Apple certs / MSIX publisher) is inherently per-app, so signed
+> artifacts and store listings are downstream-app deliverables. Those four sections are kept as the
+> **downstream reference** — the scoped knowledge a new app's first native release needs; the
+> actionable checklist lives in `docs/NEW_APP_GUIDE.md` Phase 9. The epic closes at NATIVE-6
+> (verification). NATIVE-12 below is unaffected — a platform hardening slice, merged (PR #172).
 
 > **Release builds require `-p:ApiBaseUrl=` (v3 audit NAT-3).** A Release build of `src/Maui` fails
 > unless a real API base URL is supplied — the localhost fallback + `PEREZOSOFT_API_BASE_URL` override
@@ -515,22 +527,26 @@ QA-AND-15 added for the on-device kill test (NATIVE-6).
    `IFileDownloadLauncher`; upload half N-A, no consumer yet), NATIVE-4 (G2 refresh-on-resume via
    `AppResumeNotifier` + G3 Android back handler). All six audit gaps closed; OS-chrome behaviors
    (share sheet, hardware back, real focus transitions) queue for the NATIVE-6 device pass.
-3. 🚧 **NATIVE-6** manual native QA pass — plan authored (117 cases incl. iOS/macCatalyst first-run
+3. ✅ **NATIVE-6** manual native QA pass — plan authored (117 cases incl. iOS/macCatalyst first-run
    smoke + §13c release checklist; G7 Apple-boot fix shipped alongside). **Apple column UNPINNED
    2026-07-06** — the maintainer ran §13b on a MacBook Air M1: QA-IOS-01/02/04 + QA-MAC-01/02 +
-   the OAuth leg of QA-MAC-03 PASS (two platform gaps found and fixed, PR #125); remaining:
-   QA-IOS-03 + rest of QA-MAC-03 spot-checks, then the Windows/Android device pass. **NATIVE-7 ✅
+   the OAuth leg of QA-MAC-03 PASS (two platform gaps found and fixed, PR #125). **NATIVE-7 ✅
    COMPLETE — smokes for all four platforms in CI:** Windows (WebView2-CDP `native-smoke-windows`),
    Android (`native-smoke-android`), and iOS-simulator + Mac Catalyst (`native-smoke-apple`,
    boot-to-login canaries in one macOS job, added 2026-07-06 once the QA pass validated the
-   runtimes).
-4. 📝 **NATIVE-8/9/10** signing + packaging per platform, then **NATIVE-11** submission (optional).
+   runtimes). **✅ NATIVE-6 PASSED 2026-07-14** — the maintainer completed the ENTIRE manual QA
+   process as the plan stood then (125 cases: web + all four native columns, incl. the leftover
+   §13b Apple spot-checks), no open findings (recipe kept in `STATUS.md` §3). **Epic NATIVE
+   COMPLETE.** (Post-pass additions — §14a re-run rows + QA-AND-15 — are the open device items.)
+4. ⤵ **NATIVE-8/9/10/11** signing + packaging + store submission — **moved downstream (ADR-024)**:
+   per-app work, executed by each downstream app at its first native release (checklist in
+   `NEW_APP_GUIDE.md` Phase 9; Wave 4 above is the reference). **The epic completes at NATIVE-6.**
 5. ✅ **NATIVE-12** (out-of-band hardening, 2026-07-07) — OAuth survives process death during the
    browser round-trip; found on the tablet emulator during NATIVE-6 prep, fixed ahead of the device
    pass so QA-AND-15 can verify it there.
 
 Each slice is an independent, mergeable PR (branch off develop; TDD/verification per slice). Waves gate:
-don't automate (7) or distribute (8–11) before the app is verified working (6).
+don't automate (7) before the app is verified working (6); distribution (8–11) is downstream-app work.
 
 **Known sharp edges (from ADR-018):**
 - **iOS/macOS need a Mac** — no macOS runner ⇒ NATIVE-1/7/10 can't cover Apple platforms; sequence Apple

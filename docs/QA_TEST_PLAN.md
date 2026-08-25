@@ -2497,7 +2497,7 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   needs the restricted `keychain-access-groups` entitlement (MissingEntitlement without it, SIGKILL at
   launch with it) → store entitlement added to `Entitlements.plist` for signed builds, Debug builds swap
   to `Entitlements.Debug.plist` (unsandboxed) + a `DebugFileSessionStore` fallback (`MACCATALYST && DEBUG`
-  only); NATIVE-9 must re-verify SecureStorage under real signing.
+  only); SecureStorage must be re-verified under real signing at the downstream first native release (ADR-024; `NEW_APP_GUIDE.md` Phase 9).
 - **Updated 2026-07-09** — first findings + features from the manual QA pass (`bugfix/qa-manual-pass`):
   (1) **rate-limit split** — passwordless *verify* endpoints got their own per-IP budget (attempt cap +
   headroom, default 10/min) so the cumulative-lockout 401 (QA-AUTH-04) surfaces before the 429 can mask
@@ -2542,6 +2542,17 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   seat their invite reserved) and `/join` shows a "This household is full" state (EN/ES); the token
   stays pending and self-heals on re-upgrade. New **QA-INV-10** (⚙️ automated —
   `SeatQuotaJourneyTests`, fake-provider webhook downgrade). Suite 124 → **125** cases.
+- **Updated 2026-07-14** *(recorded 2026-08-25 — the branch carrying this entry never merged and
+  was recovered during branch housekeeping)* — **FULL MANUAL PASS COMPLETE**: the maintainer
+  finished the entire manual QA process as the plan stood that day — the web suite (the
+  2026-07-09/10 sessions' findings all fixed and merged), the §12–13 native columns (Android +
+  Windows device pass), and the remaining §13b Apple spot-checks (QA-IOS-03 + rest of QA-MAC-03,
+  on top of the 2026-07-06 first run) — **all 125 cases passing, no open findings**. With epic
+  NATIVE closed the same day (ADR-024: distribution is downstream work), this pass is the
+  platform's verification baseline; future passes follow §13c per release and the full plan on
+  native-glue/toolchain changes. *Rider:* everything added below this entry postdates the
+  baseline — the §14a adversarial cases (12 §16 re-run rows) and QA-AND-15 (NATIVE-12) are the
+  open device items on the current plan.
 - **Updated 2026-07-15** — **§14a Adversarial & tenant-isolation (QA-ADV-*)**: 24 new curl/Postman +
   two-browser-context cases from the **v3 audit**, probing cross-tenant read/write isolation at the
   **API** layer (RLS-2/4, LB-TEN-1/2), impersonation attribution/confinement (LB-ADM-1, ADM-2/3/5),
