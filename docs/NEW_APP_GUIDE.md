@@ -126,14 +126,53 @@ Per `DEPLOYMENT.md` §6 / `STATUS.md` §5: create the prod Render service (separ
 **`RENDER_DEPLOY_HOOK_PROD`**, and create the **`production` environment with a required
 reviewer**. Releases become: PR `develop → main`, merge, click approve.
 
+⚠️ Heads-up: the platform itself never activated production (ADR-017 amendment — it's a template;
+staging is its terminal environment), so **your** activation is the first real run of two guards:
+the **RLS two-role setup + posture guard** (`DEPLOYMENT.md` §7) and the **live-Stripe-key startup
+guard**. Both are tested in CI, but budget a smoke check (sign-in + a checkout round-trip) right
+after flipping them on.
+
 ## Phase 9 — Native apps (optional, and deliberately last)
 
-The Windows/Android/iOS/macOS shells already build in CI and carry your brand from Phase 3.
-When the web product is stable and you want installable apps: run the native QA pass
-(`docs/QA_TEST_PLAN.md` §12–13, guides in the QA PDFs), then the signing/store work (NATIVE-8..11
-in `docs/stories/native.md`). Needs: a Google Play account ($25 once), an Apple Developer account
-($99/yr), and for iOS/macOS a Mac to build on. Until then, web-first costs you nothing — golden
-rule 5.
+The Windows/Android/iOS/macOS shells already build in CI and carry your brand from Phase 3. When
+the web product is stable and you want installable apps, this phase is **yours, not the
+platform's** — signing identity (keystore, certs, store listings) is inherently per-app, so the
+platform deliberately ships no release workflow (ADR-024). What it ships instead is this
+checklist, plus the full scoping notes in `docs/stories/native.md` Wave 4 (read the matching
+section before each step — the traps below were found the hard way).
+
+**First, verify:** run the native QA pass (`docs/QA_TEST_PLAN.md` §12–13, guides in the QA PDFs).
+Don't sign an app you haven't seen working.
+
+**Then, the first-native-release checklist:**
+
+1. **Android** (native.md → NATIVE-8): generate the release keystore once with `keytool` — it IS
+   your app's identity; losing it is unrecoverable. Base64 → repo secrets + an offline backup,
+   never git. Build with `AndroidKeyStore=true` + the four signing props from env,
+   `AndroidPackageFormat=aab`, in a **tag-triggered** release workflow (`ubuntu-latest`); assert
+   the artifact with `jarsigner -verify`. Enroll in **Play App Signing** — your keystore becomes
+   the upload key (Google holds the app-signing key; effectively required for new Play apps).
+2. **Windows** (native.md → NATIVE-9): the app runs unpackaged today (`WindowsPackageType=None`);
+   add a packaged Release flavor (MSIX + `Package.appxmanifest`). Don't buy a code-signing cert —
+   real OV certs need an HSM since 2023; **let the Microsoft Store sign the package** (~$19
+   one-time account), or self-sign for sideloading only. ⚠️ **Trap: packaged MSIX runs
+   containerized** — manually boot the PACKAGED build and re-verify sign-in +
+   Preferences/SecureStorage/file paths before shipping; every QA pass so far ran unpackaged
+   (same failure class as the Catalyst keychain surprise, platform PR #125).
+3. **iOS/macOS** (native.md → NATIVE-10): needs the Apple Developer account ($99/**yr**,
+   recurring — certs lapse if it stops) + certs/provisioning profiles as base64 secrets, built on
+   a macOS runner (iOS `.ipa`, macCatalyst `.pkg`). ⚠️ **Trap: re-verify SecureStorage under the
+   real signing identity** — properly-provisioned builds can claim `keychain-access-groups`, at
+   which point the platform's `DebugFileSessionStore` fallback (Catalyst Debug, PR #125) should be
+   re-tested and considered for retirement in your fork.
+4. **Store submission** (native.md → NATIVE-11): Play Console / App Store Connect / MS Store —
+   accounts: Google $25 once, Apple $99/yr, Microsoft ~$19 once. Wire the upload step guarded/off
+   by default, or document your manual path.
+5. **Every native release thereafter:** gate on the §13c checklist in `docs/QA_TEST_PLAN.md`
+   (smoke cases per platform + one feature spot-check; full §12–13b regression when native glue or
+   the toolchain changed).
+
+Until you need installable apps, web-first costs you nothing — golden rule 5.
 
 ---
 

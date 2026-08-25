@@ -24,14 +24,26 @@ The platform is **feature-complete and continuously verified**:
 
 | # | Item | Owner | Unblocks |
 |---|------|-------|----------|
-| 1 | NATIVE-6 manual QA pass — Android + Windows (§3) | **You** | NATIVE-8/9 (signing) |
-| 2 | ~~Apple first-run smoke~~ → **✅ RUN 2026-07-06** (5/7 cases + OAuth PASS; two fixes PR #125; CI Apple smokes shipped — `native-smoke-apple`). Remaining: QA-IOS-03 + rest of QA-MAC-03 (§4 note) | **You** (~10 min) | NATIVE-10/11 (with the Apple account) |
-| 3 | NATIVE-8/9 signed AAB + MSIX release plumbing | Claude, after #1 | Store distribution |
-| 4 | ~~RLS tenancy backstop~~ → **✅ BUILT** (ADR-020 addendum; prod activation now includes the two-role setup, `DEPLOYMENT.md` §7) | — | Production deploy activation |
-| 5 | Production deploy activation (§5) | **You** (~15 min incl. RLS §7) | A real prod environment |
+| 1 | ~~NATIVE-6 manual QA pass — Android + Windows~~ → **✅ PASSED 2026-07-14** (maintainer device pass, §3) — **epic NATIVE COMPLETE** | — | Done — nothing follows it on this repo (ADR-024) |
+| 2 | ~~Apple first-run smoke~~ → **✅ COMPLETE** (first run 2026-07-06: 5/7 + OAuth PASS, two fixes PR #125, CI Apple smokes shipped; remaining spot-checks closed in the 2026-07-14 full pass) | — | Nothing |
+| 3 | ~~NATIVE-8/9 signed AAB + MSIX release plumbing~~ → **⤵ MOVED DOWNSTREAM 2026-07-14 (ADR-024)** — signing/stores are per-app; checklist in `NEW_APP_GUIDE.md` Phase 9 | — | Nothing here (each app's first native release) |
+| 4 | ~~RLS tenancy backstop~~ → **✅ MERGED** (ADR-020 addendum; staging live-enforced; two-role prod setup in `DEPLOYMENT.md` §7) | — | Downstream prod activation |
+| 5 | ~~Production deploy activation~~ → **⤵ MOVED DOWNSTREAM 2026-07-14 (ADR-017 amendment)** — the platform never activates prod; staging is its terminal environment. §5 stays as the downstream Phase-8 runbook | — | Each app's Phase 8 (`NEW_APP_GUIDE.md`) |
 | 6 | Parked by choice: HOOKS-3 UI, API-key rotation, CACHE (multi-node), FR/DE/PT translations | — | Nothing today |
 
+> **With rows 1–5 resolved, the platform reached its terminal state (2026-07-14)**: every epic
+> complete, verified on web + all four native platforms, staging continuously deployed. The v3
+> delta audit (2026-07-15 → 07-27) then hardened it in place; its §14a re-run rows + QA-AND-15
+> (NATIVE-12) are the open device items on the current 150-case plan. What remains is maintenance
+> (toolchain drift, QA findings) and building downstream apps (`NEW_APP_GUIDE.md`).
+
 ## 3. Guide — native QA pass on Android + Windows (~1–2 h)
+
+> **Executed 2026-07-14 — PASSED**, as part of the maintainer completing the **entire manual QA
+> process** as the plan stood then (125 cases: web + all four native columns incl. the §13b Apple
+> leftovers — no open findings; see the QA_TEST_PLAN changelog). Kept as the recipe for future
+> passes (full §12–13b regression is due whenever native glue or the .NET/MAUI toolchain changes;
+> the post-pass additions — §14a re-runs + QA-AND-15 — are tracked in §2's terminal-state note).
 
 1. **Prep:** `git pull` on develop. Open `docs/QA_TEST_GUIDE.pdf` (walkthroughs) and
    `docs/QA_RUN_LOG.pdf` (the sheet to mark Pass/Fail per case).
@@ -47,7 +59,8 @@ The platform is **feature-complete and continuously verified**:
    Minimum = AND-01, AND-03, AND-07 + one of AND-08..12. Human-only cases: **AND-07** (hardware
    back), **AND-10** (share sheet), **AND-13** (edge-to-edge on Android 15).
 5. **Record & report:** mark each case in the run log; report failures (each becomes a small fix
-   slice). All-pass on §13c ⇒ NATIVE-6 done ⇒ signing work (NATIVE-8/9) starts.
+   slice). All-pass on §13c ⇒ NATIVE-6 done ⇒ **epic NATIVE complete** (signing/store distribution
+   is downstream-app work per ADR-024 — no NATIVE-8/9 follows).
 
 ## 4. Guide — Apple first-run smoke on the MacBook (§13b: QA-IOS-01..04, QA-MAC-01..03)
 
@@ -55,7 +68,7 @@ The platform is **feature-complete and continuously verified**:
 > the OAuth leg of QA-MAC-03 **PASS** on the maintainer's MacBook (iPhone 17 / 17 Pro Max / iPad Air
 > simulators + Mac Catalyst). Two platform gaps were found and fixed (PR #125: SMTP revocation knob;
 > Catalyst Debug session store), and the pass unpinned the CI Apple smokes (`native-smoke-apple`).
-> Remaining: QA-IOS-03 + the rest of QA-MAC-03 (share sheet, language + restart persistence).
+> The remaining spot-checks (QA-IOS-03 + rest of QA-MAC-03) **passed in the 2026-07-14 full pass**.
 > **One recipe correction is baked in below** (Phase 4 step 2): the ASP.NET dev cert **cannot** be a
 > simulator trust anchor — it's `CA:FALSE`, and iOS rejects it with `errSSL -9813`, which reads as
 > "OAuth buttons missing on the login page". Use the CA-signed localhost cert instead.
@@ -64,7 +77,8 @@ These seven cases had **never been run** before 2026-07-06 — iOS/macCatalyst c
 app had only ever booted on Apple hardware in theory. QA-IOS-01 alone (it boots at all) validates
 the G7 crash fix on a real Apple runtime. **No paid Apple Developer account is needed for any of
 this** — the simulator and Mac Catalyst run free; the $99/**yr, recurring** account only matters
-later for physical-iPhone installs and store distribution (NATIVE-10/11).
+for physical-iPhone installs and store distribution, which are downstream-app work (ADR-024;
+`NEW_APP_GUIDE.md` Phase 9).
 
 ### Phase 0 — check the MacBook is viable (5 min)
 
@@ -169,8 +183,9 @@ restart persistence).
 ### Phase 5 — record & report
 
 Mark the seven §13b rows in the run log and report results. Failures become fix slices; a green
-pass unpins the Apple column: the iOS-simulator CI smoke leg gets built, and NATIVE-10/11
-(IPA/pkg signing + store submission) become schedulable once an Apple Developer account exists.
+pass unpins the Apple column: the iOS-simulator CI smoke leg gets built. (IPA/pkg signing + store
+submission are downstream-app work per ADR-024 — an Apple Developer account is only needed by an
+app that ships, not by the platform.)
 
 ### Troubleshooting
 
@@ -183,7 +198,13 @@ pass unpins the Apple column: the iOS-simulator CI smoke leg gets built, and NAT
 | App can't reach the API | API must be on the **https** profile (port 7160); check `/health` in Safari on the Mac |
 | Want to test on a physical iPhone | Different setup (LAN-bound API + `PEREZOSOFT_API_BASE_URL` + free-provisioning signing) — not needed for §13b; ask Claude when ready |
 
-## 5. Guide — activate production (~10 min, whenever you want a real prod)
+## 5. Guide — activate production (~10 min) — ⤵ downstream-app work (ADR-017 amendment, 2026-07-14)
+
+> **The platform itself never runs this** — staging is its terminal environment; a prod service
+> with zero users is pure cost. This guide is each downstream app's **Phase 8**
+> (`NEW_APP_GUIDE.md`). Note for that first activation: the **RLS two-role setup + posture guard**
+> (§7 of `DEPLOYMENT.md`) and the **live-Stripe-key startup guard** run for real for the first
+> time there — budget a smoke check after flipping them on.
 
 > **Prerequisite (hard gate):** the **Postgres RLS tenancy backstop** (ADR-020,
 > `PLATFORM_BACKLOG.md` §11) must be implemented and merged first. Pre-production it's a

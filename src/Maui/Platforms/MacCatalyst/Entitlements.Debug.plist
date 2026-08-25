@@ -8,8 +8,8 @@
          that entitlement and runs unsandboxed. WITHOUT keychain-access-groups, SecureStorage
          CANNOT reach the data-protection keychain either — so Catalyst Debug swaps in the
          file-based DebugFileSessionStore (see MauiProgram's #if MACCATALYST && DEBUG branch and
-         DebugFileSessionStore, PR #125). Release/store builds (NATIVE-9) keep Entitlements.plist +
-         a real signing identity, where SecureStorage works. (Corrected: v3 audit NAT-8 — this
+         DebugFileSessionStore, PR #125). Release/store builds (a downstream app's signed release —
+         ADR-024) keep Entitlements.plist + a real signing identity, where SecureStorage works. (Corrected: v3 audit NAT-8 — this
          comment previously claimed SecureStorage worked here, contradicting the code.) -->
     <dict>
         <key>com.apple.security.network.client</key>

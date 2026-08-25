@@ -67,7 +67,7 @@ Native launcher icon + splash (MAUI):
 
 Marketing & store submission (not shipped in the app):
 - `docs/brand/{linkedin_banner_1128x191.png, linkedin_logo_300.png}`
-- `docs/brand/{app_store_icon_1024.png, play_store_icon_512.png, android_adaptive_foreground_432.png}` — NATIVE-8..11 store assets
+- `docs/brand/{app_store_icon_1024.png, play_store_icon_512.png, android_adaptive_foreground_432.png}` — store assets for the downstream release checklist (`NEW_APP_GUIDE.md` Phase 9; ADR-024)
 
 ## 4. Colour palette — derive from your logo
 The palette is semantic tokens, single-sourced for web **and** all native shells:
@@ -106,7 +106,7 @@ commit:
   'com.perezosoft.platform'`). The env override exists, but CI doesn't set it — update the committed
   default.
 - **`src/Maui/Platforms/MacCatalyst/Entitlements.plist`** — `keychain-access-groups` entry
-  `$(AppIdentifierPrefix)com.perezosoft.platform`. Under real signing (Release/store, NATIVE-9) a
+  `$(AppIdentifierPrefix)com.perezosoft.platform`. Under real signing (a downstream app's Release/store build — ADR-024) a
   keychain group that doesn't match the new bundle id means **SecureStorage silently fails on Catalyst**
   — sessions won't persist. Debug builds won't catch it (they run unsandboxed via
   `Entitlements.Debug.plist` — see the comment there).

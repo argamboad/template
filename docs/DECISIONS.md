@@ -971,6 +971,20 @@ deliberate first paid upgrade (pretty URLs + DKIM deliverability); nothing in th
 depends on it.
 Stories + slice plan: `docs/stories/deploy.md` (epic `DEPLOY`).
 
+*Amendment (2026-07-14; recorded 2026-08-25 — the branch carrying it predated ADR-023's numbering
+and was recovered during branch housekeeping) — the platform itself never activates production;
+staging is its terminal environment.* Point 5 already assigned prod provisioning to "each
+downstream app's first deployment step"; this makes it explicit after `STATUS.md` kept listing prod
+activation as a platform to-do (same scope logic as ADR-024): a live prod service for the platform
+would be a paid Stripe key, a prod Neon DB, and an always-on Render instance serving an app with
+zero users — recurring cost and operational surface proving nothing that the live, auto-deployed,
+RLS-enforced staging doesn't already prove. The `main`→prod pipeline (DEPLOY-3), the `STATUS.md`
+§5 walkthrough, and `DEPLOYMENT.md` §6–7 stay maintained as the **downstream Phase-8 runbook**
+(`NEW_APP_GUIDE.md`). One consequence carried as a Phase-8 note, mirroring ADR-024's signing traps:
+the pieces that only run at prod activation — the **RLS two-role topology + posture guard**
+(ADR-020, `DEPLOYMENT.md` §7) and the **Production live-Stripe-key startup guard** — get their
+first real execution during a downstream app's activation, not here.
+
 **ADR-018 — Native (MAUI) client: commit to full feature parity across Android/Windows/iOS/macOS, incl. automated native tests + signed distribution. (2026-07-02)**
 Resolves the deferred "non-web framework commitment" from `docs/TECH_STACK.md`. The platform already ships
 **MAUI Blazor Hybrid** shells that reuse the shared RCL (`Shared.Ui`) and have native auth wired (OTP,
@@ -1217,3 +1231,55 @@ audit (TR-6/TR-10, T55/T57) found the gap and this ADR closes it. Decided:
    a new ADR, generating *from* the code, with this collection remaining the human-facing harness.
 4. **Rebrand note:** the collection, environments, and the sync workflow's file path all rename
    with the app (`docs/REBRANDING.md` already lists them).
+
+**ADR-024 — Native distribution (signing, packaging, store submission) is downstream-app work, not platform scope (resolves ADR-018's NATIVE-8 gate; NATIVE-8..11 leave the platform roadmap). (2026-07-14; recorded 2026-08-25)**
+*Recording note:* this decision was made and drafted 2026-07-14 — before ADR-023 (2026-07-27) took
+that number — but the branch carrying it never merged; it was recovered during branch housekeeping
+and renumbered here. It predates the v3 audit in substance.
+
+ADR-018's 2026-07-06 amendment made distribution a decision **re-made at the NATIVE-8 gate** rather
+than an autopilot consequence of the parity commitment. That gate is now decided: signed artifacts
+and store listings are **per-app deliverables**. This repo is horizontal chassis only (ADR-019
+posture); a release artifact is the ultimate vertical.
+
+*Rationale:*
+1. **Signing identity is inherently per-app.** The Android keystore *is* the app's identity; Apple
+   certs/profiles bind to a bundle id + team; the MSIX publisher must match a specific manifest.
+   The platform has no shippable app — anything it signed would be `com.perezosoft.platform`, an
+   artifact nobody ships, so the resulting workflow would be **untested plumbing** the moment a
+   downstream app swapped in its own identity.
+2. **The costs are recurring and buy the platform nothing.** The Apple Developer account is
+   $99/**yr** and lapses certs when it stops; per-release QA columns and store-review friction are
+   exactly the distribution tail the 2026-07-06 amendment flagged.
+3. **Capability is already proven without artifacts.** The parity commitment is held by the CI
+   build gate (NATIVE-1, all four TFMs), the four boot smokes (NATIVE-7), and the QA plan
+   (§12–13b + the per-release §13c checklist).
+
+*Decision:*
+1. **NATIVE-8, -9, -10, -11 are removed from the platform roadmap** and reclassified as the
+   downstream **first-native-release checklist**. Canonical actionable home:
+   `docs/NEW_APP_GUIDE.md` Phase 9. The detailed scoping knowledge (keystore discipline,
+   tag-triggered release-workflow shape, signing reality per platform, store-account costs) stays
+   in `docs/stories/native.md` Wave 4, re-badged as downstream reference — it is **hardening for
+   the apps**, not slices this repo will build.
+2. **Epic NATIVE closes at verification**: NATIVE-6 (the manual device QA pass) remains the last
+   platform slice; all-pass on §13c completes the epic. ADR-018's parity commitment is otherwise
+   unchanged (capability on all four platforms, web-first, parity ≠ more).
+3. **Two platform-code risks that only manifest under a real signing identity transfer as hard
+   checklist items** (they cannot be verified here, precisely because verification needs the
+   identity only a downstream app has):
+   (a) **packaged MSIX runs containerized** — Preferences/SecureStorage/file paths must be
+   re-verified in the packaged flavor before shipping Windows (same failure class as the Catalyst
+   keychain gap, PR #125);
+   (b) **properly-provisioned Apple builds can claim `keychain-access-groups`** — re-verify
+   SecureStorage under the real identity and re-evaluate retiring `DebugFileSessionStore` (the
+   `MACCATALYST && DEBUG` fallback from PR #125).
+4. **Pre-scoped sub-decisions carry with the checklist** (decided 2026-07-07, still good): enroll
+   in Play App Signing (the keystore becomes the upload key); let the MS Store sign the MSIX (no
+   purchased cert / HSM); signing material lives only in repo secrets, base64, ADR-001 discipline.
+
+**Accepted trade-off:** every downstream app pays its own signing bring-up — there is no
+ready-made release workflow to inherit. Accepted because an unverifiable workflow is a liability,
+not an asset; the checklist and scoping notes transfer the knowledge instead. This supersedes
+ADR-018's "honest counterweight" (store distribution as a platform commitment) in the downstream
+direction the 2026-07-06 amendment anticipated.

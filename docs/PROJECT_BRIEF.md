@@ -28,6 +28,10 @@ _TODO_
 ## MVP scope — what's OUT (deferred / pinned)
 <!-- Good ideas deliberately parked. Record them so they're not re-debated as "forgotten." -->
 - Non-web clients (mobile + desktop) — planned, not in MVP. *(constant)*
+- **App signing, installers & store distribution — OUT for the platform, permanently (ADR-024).**
+  Signed AAB/MSIX/IPA/pkg + store listings are per-app deliverables; each downstream app runs the
+  first-native-release checklist (`NEW_APP_GUIDE.md` Phase 9). The platform proves capability via
+  the CI build gate + boot smokes only. *(constant)*
 - _TODO_
 
 ## Guiding principles
