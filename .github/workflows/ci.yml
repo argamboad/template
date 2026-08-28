@@ -285,18 +285,17 @@ jobs:
           - tfm: net10.0-maccatalyst
     # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode
     # and macos-latest can lag several Xcode versions behind (fails with "requires Xcode NN").
-    # The workload restore below pins the WORKLOAD SET (10.0.400.1, iOS/macCatalyst 26.5.x, requires
-    # Xcode 26.5). macos-26's DEFAULT Xcode moved to 26.6 on 2026-07-21, but NO 26.6-matched
-    # iOS/macCatalyst workload exists yet (re-checked 2026-08-25 at the 10.0.400 SDK bump: the
-    # 10.0.400 band still ships 26.5.x), so DEVELOPER_DIR selects the image's still-installed full
-    # Xcode 26.5 instead.
-    # When a 26.6-matched workload set ships, bump the set pin + DEVELOPER_DIR together. (The old
-    # "non-default Xcodes can be incomplete" caveat — actions/runner-images#13743/#11348 — applied
-    # to a NEWER-than-default install; 26.5 was the complete default until 2026-07-21.)
+    # The workload restore below pins the WORKLOAD SET (10.0.400.1, iOS/macCatalyst 26.5.10315,
+    # which REQUIRES Xcode 26.6 — ⚠️ the workload's version number does NOT encode its Xcode
+    # requirement: the 10.0.300-band 26.5.x packs required Xcode 26.5, the 10.0.400-band 26.5.10315
+    # requires 26.6; the pack's own build error is the authority, learned at the 2026-08-28 SDK
+    # bump). macos-26's DEFAULT Xcode is 26.6 (since 2026-07-21), so DEVELOPER_DIR pins the
+    # default explicitly — bump the set pin + DEVELOPER_DIR together, and trust a red build over
+    # the version numbers.
     runs-on: macos-26
     timeout-minutes: 60
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.5.app
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app
     steps:
       - uses: actions/checkout@v5
 
@@ -306,8 +305,8 @@ jobs:
 
       # See the native-build note: restore installs ALL workloads this host's TFM list needs (on macOS
       # that's ios + maccatalyst + android — the android TFM restores here too, even building -f ios).
-      # --version pins the workload set (10.0.400.1 ships the iOS/macCatalyst workloads matched to
-      # Xcode 26.5, selected via DEVELOPER_DIR above) — same feature band as the pinned SDK.
+      # --version pins the workload set (10.0.400.1 ships the iOS/macCatalyst workloads requiring
+      # Xcode 26.6, selected via DEVELOPER_DIR above) — same feature band as the pinned SDK.
       - name: Install the MAUI workloads (host-aware, workload set pinned to the image's Xcode)
         run: |
           xcodebuild -version
@@ -334,12 +333,12 @@ jobs:
   native-smoke-apple:
     needs: native-paths
     if: needs.native-paths.outputs.changed == 'true'
-    # Same Xcode reasoning as native-build-apple: pinned image + workload set 10.0.400.1 (iOS 26.5.x)
-    # + DEVELOPER_DIR selecting Xcode 26.5 until a 26.6-matched workload set ships.
+    # Same Xcode reasoning as native-build-apple: pinned image + workload set 10.0.400.1 (iOS
+    # 26.5.10315, requires Xcode 26.6) + DEVELOPER_DIR pinning the image's default Xcode 26.6.
     runs-on: macos-26
     timeout-minutes: 60
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.5.app
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app
     steps:
       - uses: actions/checkout@v5
 
