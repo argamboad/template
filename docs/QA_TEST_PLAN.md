@@ -1724,16 +1724,27 @@ Then all those rows are physically gone — no orphaned keys, secrets, counters 
 **✅ v3 REMEDIATION LANDED (2026-07, PRs #147–#191) — this case now expects PASS; re-run and record normally.**
 **Gherkin**
 ```gherkin
-Given a staff user is impersonating a member (token carries impersonated_by)
-When they perform tenant writes (rename household, mark a notification read)
+Given a staff user is impersonating the household owner (token carries impersonated_by)
+When they perform audited tenant writes (export the household, change a member's role)
 Then each mutation's audit row records impersonated_by=<staff>, not just the target
 ```
+> **Pick writes that are actually audited.** The audited-action catalog is small —
+> `tenant.exported`, `member.role_changed`, `account.erased`, and the staff-only `admin.*` actions.
+> Household rename (`PUT /api/household`) and mark-notification-read (`POST /api/notifications/{id}/read`)
+> emit **no** `AuditEvent`, so they produce nothing to inspect; the two owner-gated writes below do. The
+> stamp itself is ambient (`AuditLog` reads `ICurrentImpersonation`), so it lands on **every** audited
+> event regardless of call site — the point is to exercise one that exists.
+
 **Walkthrough**
-1. As staff, `POST /api/admin/impersonate/{memberUserId}` → short-lived token with `impersonated_by`.
-2. With that token: `PUT /api/household` (rename), `POST /api/notifications/{id}/read`.
-3. Export the tenant audit trail (household export / staff console audit view).
-4. **Expected (post-remediation):** each write's audit entry carries **`impersonated_by=<staff-id>`** so
-   an operator can tell staff-driven changes from the user's own.
+1. As staff, `POST /api/admin/impersonate/{ownerUserId}` → short-lived token with `impersonated_by`. Pick
+   the household **owner** so the writes below are permitted; the tenant must also have **at least one other
+   member** for the role change.
+2. With that token, perform two **audited** tenant writes: `POST /api/household/export` (→ `tenant.exported`)
+   and `PUT /api/household/members/{memberUserId}/role` (flip admin↔member → `member.role_changed`).
+3. Inspect the tenant's audit trail (staff-console audit view, or query the `AuditEvent` rows in the DB).
+4. **Expected (post-remediation):** the `tenant.exported` **and** `member.role_changed` rows each carry
+   **`impersonated_by=<staff-id>`** (with `actor_user_id=<owner>`), so an operator can tell staff-driven
+   changes from the user's own — the stamp is applied to every event, not per call site.
 5. **Was (pre-v3 audit LB-ADM-1):** this step used to FAIL and was recorded Blocked. The finding is fixed (v3 remediation, PRs #147–#191) — the assertions above now hold; expect **Pass**.
 
 ### QA-ADV-06 — An impersonation session cannot reach staff-only actions 🟠 (curl)
@@ -1745,7 +1756,8 @@ When I call staff-only admin endpoints with it
 Then every one is refused at the staff gate — impersonation must not be a ladder back to staff power
 ```
 **Walkthrough**
-1. Obtain an impersonation token for a member (QA-ADV-05 step 1).
+1. Impersonate a **plain member** (`POST /api/admin/impersonate/{memberUserId}`, as in QA-ADV-05 step 1
+   but targeting a non-owner) → token with `impersonated_by`.
 2. With it, attempt: `POST /api/admin/impersonate/{x}`,
    `PUT /api/admin/tenants/{id}/subscription`, `DELETE /api/admin/users/{x}/mfa`,
    `POST /api/admin/announce-all`.
