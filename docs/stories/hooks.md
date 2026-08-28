@@ -71,14 +71,16 @@ Scenario: Management + the surface are owner-only and off by default
 
 **HOOKS-2 (✅ done, `feat/hooks-2-delivery-log`):** a tenant-facing **delivery log** — `WebhookDelivery`
 (one row per attempt: event, success, status/error, and the sent body; **not** `ITenantScoped`, written
-from the tenant-less dispatcher, read side filters by `TenantId`; migration `AddWebhookDelivery`). The
-outbox handler records each attempt — a success row commits atomically with the message's Sent flip;
-a **failed** attempt is written through a fresh out-of-band context so it survives the processor's
-rollback (**2026-08-24 fix**: staged failure rows were silently discarded by the rollback, so the log
-only ever showed successes — blind exactly when an endpoint was failing). Owner routes
-`GET /api/webhooks/{id}/deliveries` (recent attempts) + `POST /api/webhooks/deliveries/{id}/replay`
-(re-enqueue the exact stored payload — same event id so the receiver dedups). Covered by
-`WebhookDeliveryLogTests`. **Still out of scope (candidate HOOKS-3):** a Blazor **management UI** (the API +
+from the tenant-less dispatcher *and* the request-scoped send-test, read side filters by `TenantId`;
+migration `AddWebhookDelivery`). The **async outbox** path records each attempt — a success row commits
+atomically with the message's Sent flip, while a **failed** attempt is written through a fresh out-of-band
+context so it survives the processor's rollback (**2026-08-24 fix**: staged failure rows were silently
+discarded by the rollback, so the log only ever showed successes — blind exactly when an endpoint was
+failing). The synchronous `/{id}/test` records its attempt too (`SendTestAsync`, success **and** failure) —
+without it the log would be empty on the shipped template, since the sample app publishes no events (**fixed
+2026-08-28, QA-API-06**). Owner routes `GET /api/webhooks/{id}/deliveries` (recent attempts) + `POST
+/api/webhooks/deliveries/{id}/replay` (re-enqueue the exact stored payload — same event id so the receiver
+dedups). Covered by `WebhookDeliveryLogTests`. **Still out of scope (candidate HOOKS-3):** a Blazor **management UI** (the API +
 public OpenAPI doc make it usable headless — a UI for a default-off developer feature is lower value);
 per-subscription rate limiting; automatic disable after N consecutive failures.
 **Definition of done:** tests first; encrypted secret + one-time reveal; publish fans out to matching active

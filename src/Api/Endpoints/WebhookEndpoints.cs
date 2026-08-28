@@ -1,11 +1,9 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Perezosoft.Api.Authentication;
 using Perezosoft.Api.Configuration;
 using Perezosoft.Api.Services;
 using Perezosoft.Core.Authorization;
 using Perezosoft.Core.Entities;
-using Perezosoft.Infrastructure.Webhooks;
 
 namespace Perezosoft.Api.Endpoints;
 
@@ -43,34 +41,18 @@ public static class WebhookEndpoints
             await svc.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound());
 
         // Synchronous "send test" (like Stripe's) — POSTs a signed ping and returns the endpoint's status.
-        group.MapPost("/{id:guid}/test", async (
-            Guid id, IWebhookSubscriptionService svc, IWebhookSender sender, IWebhookSecretProtector protector,
-            TimeProvider clock, CancellationToken ct) =>
+        // Also records a WebhookDelivery row (success or failure) so the delivery log / replay are populated
+        // in-template — the test-send is the only path that fires a delivery on the shipped platform (HOOKS-2).
+        group.MapPost("/{id:guid}/test", async (Guid id, IWebhookSubscriptionService svc, CancellationToken ct) =>
         {
-            var subscription = await svc.GetAsync(id, ct);
-            if (subscription is null)
+            var result = await svc.SendTestAsync(id, ct);
+            if (result is null)
                 return Results.NotFound();
 
-            var secret = protector.Unprotect(subscription.EncryptedSecret);
-            var eventId = Guid.CreateVersion7().ToString();
-            var body = JsonSerializer.Serialize(new
-            {
-                id = eventId,
-                type = WebhookEvents.Ping,
-                created_at = clock.GetUtcNow(),
-                data = new { message = "This is a test event from your app." },
-            });
-
-            try
-            {
-                var status = await sender.SendAsync(subscription.Url, secret, WebhookEvents.Ping, eventId, body, ct);
-                return Results.Ok(new { delivered = status is >= 200 and < 300, status_code = status });
-            }
-            catch (Exception)
-            {
-                // Don't leak internal DNS/connection detail to the tenant (GAP-3) — keep it in server logs.
-                return Results.Ok(new { delivered = false, error = "delivery_failed" });
-            }
+            // Don't leak internal DNS/connection detail to the tenant (GAP-3) — it stays in the delivery row.
+            return result.TransportFailed
+                ? Results.Ok(new { delivered = false, error = "delivery_failed" })
+                : Results.Ok(new { delivered = result.Delivered, status_code = result.StatusCode });
         });
 
         // Delivery log (HOOKS-2): recent attempts for a subscription — the tenant's debug trail.

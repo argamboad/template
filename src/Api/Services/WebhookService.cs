@@ -11,6 +11,14 @@ namespace Perezosoft.Api.Services;
 public sealed record WebhookCreated(WebhookSubscription Subscription, string Secret);
 
 /// <summary>
+/// Outcome of a synchronous "send test" (HOOKS-2). <see cref="Delivered"/> is true only on a 2xx;
+/// <see cref="StatusCode"/> is the endpoint's HTTP status (null on a transport failure) and
+/// <see cref="TransportFailed"/> distinguishes a network/DNS error from an endpoint that answered non-2xx.
+/// The full failure detail is never surfaced here — it's kept in the recorded <c>WebhookDelivery</c> (GAP-3).
+/// </summary>
+public sealed record WebhookTestResult(bool Delivered, int? StatusCode, bool TransportFailed);
+
+/// <summary>
 /// Manages a tenant's outbound webhook subscriptions (HOOKS, ADR-016). Runs in the current tenant's scope
 /// (owner-gated at the endpoint). Generates a signing secret at creation (returned once; stored encrypted),
 /// validates the target URL and event types.
@@ -21,6 +29,13 @@ public interface IWebhookSubscriptionService
     Task<IReadOnlyList<WebhookSubscription>> ListAsync(CancellationToken cancellationToken = default);
     Task<WebhookSubscription?> GetAsync(Guid id, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a synchronous signed <c>ping</c> to the subscription and returns the outcome; null if the
+    /// subscription isn't found in the current tenant. Records a <see cref="WebhookDelivery"/> row for the
+    /// attempt (success and failure) so the delivery log / replay work in-template — HOOKS-2.
+    /// </summary>
+    Task<WebhookTestResult?> SendTestAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Recent delivery attempts for a subscription (newest first, current tenant only) — HOOKS-2.</summary>
     Task<IReadOnlyList<WebhookDelivery>> ListDeliveriesAsync(Guid subscriptionId, CancellationToken cancellationToken = default);
@@ -36,6 +51,7 @@ public sealed class WebhookSubscriptionService(
     ICurrentTenant currentTenant,
     ITokenGenerator tokenGenerator,
     IWebhookSecretProtector protector,
+    IWebhookSender sender,
     IOutboundUrlGuard urlGuard,
     TimeProvider clock) : IWebhookSubscriptionService
 {
@@ -79,6 +95,56 @@ public sealed class WebhookSubscriptionService(
         subscriptions.Remove(subscription);
         await subscriptions.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<WebhookTestResult?> SendTestAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var subscription = await GetAsync(id, cancellationToken); // tenant-scoped
+        if (subscription is null)
+            return null;
+
+        var secret = protector.Unprotect(subscription.EncryptedSecret);
+        var eventId = Guid.CreateVersion7().ToString();
+        var body = JsonSerializer.Serialize(new
+        {
+            id = eventId,
+            type = WebhookEvents.Ping,
+            created_at = clock.GetUtcNow(),
+            data = new { message = "This is a test event from your app." },
+        });
+
+        // Same delivery shape as the async outbox handler (WebhookOutboxHandler): a returned HTTP status vs.
+        // a transport error, then record ONE WebhookDelivery row either way so the log / replay are testable.
+        int? status = null;
+        string? transportError = null;
+        try
+        {
+            status = await sender.SendAsync(subscription.Url, secret, WebhookEvents.Ping, eventId, body, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            transportError = ex.Message; // network/timeout/DNS — no HTTP status
+        }
+
+        var success = status is >= 200 and < 300;
+
+        await deliveries.AddAsync(new WebhookDelivery
+        {
+            TenantId = currentTenant.TenantId ?? subscription.TenantId,
+            SubscriptionId = subscription.Id,
+            EventType = WebhookEvents.Ping,
+            EventId = eventId,
+            Body = body,
+            Success = success,
+            StatusCode = status,
+            Error = success ? null : transportError ?? $"HTTP {status}", // kept server-side; never a secret
+            CreatedAt = clock.GetUtcNow(),
+        }, cancellationToken);
+        await deliveries.SaveChangesAsync(cancellationToken);
+
+        // Don't leak internal DNS/connection detail to the tenant (GAP-3): the row keeps the detail, the
+        // caller only learns delivered/status and whether the transport failed.
+        return new WebhookTestResult(success, status, TransportFailed: transportError is not null);
     }
 
     public async Task<IReadOnlyList<WebhookDelivery>> ListDeliveriesAsync(Guid subscriptionId, CancellationToken cancellationToken = default)
