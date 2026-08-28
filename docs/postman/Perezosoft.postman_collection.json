@@ -805,12 +805,12 @@
         },
         {
           "name": "Send test event",
-          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/api/webhooks/{{webhookId}}/test", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "{{webhookId}}", "test"] }, "description": "Sends a signed ping event synchronously (like Stripe's send-test) and returns the endpoint's outcome inline ({delivered, status_code}). Bypasses the outbox, so it does NOT appear in the delivery log — real events and replays do." },
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/api/webhooks/{{webhookId}}/test", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "{{webhookId}}", "test"] }, "description": "Synchronously POSTs a signed test 'ping' and returns { delivered, status_code } (or { delivered:false, error:'delivery_failed' } on a transport error). Records a WebhookDelivery row for the attempt (success and failure), so the Delivery log is populated immediately — run it, then the Delivery log request." },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"2xx/404\", () => pm.expect(pm.response.code).to.be.oneOf([200, 202, 204, 404]));"], "type": "text/javascript" } }]
         },
         {
           "name": "Delivery log",
-          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/webhooks/{{webhookId}}/deliveries", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "{{webhookId}}", "deliveries"] } },
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/webhooks/{{webhookId}}/deliveries", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "{{webhookId}}", "deliveries"] }, "description": "Recent delivery attempts for this subscription (newest first, tenant-scoped): each row has success, status_code, error, event_id. Populated by Send test event (sync) and by published/replayed events (async via the outbox). Captures the newest row's id into {{deliveryId}} for Replay." },
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test(\"200/404\", () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
             "if (pm.response.code !== 200) return;",
@@ -820,7 +820,7 @@
         },
         {
           "name": "Replay a delivery",
-          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/api/webhooks/deliveries/{{deliveryId}}/replay", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "deliveries", "{{deliveryId}}", "replay"] } },
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/api/webhooks/deliveries/{{deliveryId}}/replay", "host": ["{{baseUrl}}"], "path": ["api", "webhooks", "deliveries", "{{deliveryId}}", "replay"] }, "description": "Re-enqueues the exact stored payload of {{deliveryId}} (same event id, so a receiver can dedup) → 202; delivered async via the outbox with retry/backoff, which logs its own attempt row. 404 for an unknown or other-tenant delivery id." },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test(\"2xx/404\", () => pm.expect(pm.response.code).to.be.oneOf([200, 202, 204, 404]));"], "type": "text/javascript" } }]
         },
         {

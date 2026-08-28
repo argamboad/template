@@ -117,6 +117,101 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
         Assert.Equal(OutboxStatus.DeadLettered, (await read.Set<OutboxMessage>().SingleAsync()).Status);
     }
 
+    // --- synchronous "send test" also records a delivery (HOOKS-2) ---
+    // The test-send is the only in-template path that actually fires a delivery, so it must log one row
+    // per attempt too — otherwise the delivery log / replay are unreachable on the shipped template.
+
+    [Fact]
+    public async Task SendTest_RecordsDelivery_OnSuccess()
+    {
+        var tenant = Guid.CreateVersion7();
+        var protector = new WebhookSecretProtector(new EphemeralDataProtectionProvider());
+        var subId = await SeedSubscriptionAsync(tenant, protector);
+
+        WebhookTestResult? result;
+        await using (var db = Fixture.CreateContext(tenant))
+        {
+            var sender = new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.OK)), new AllowAllUrlGuard());
+            result = await BuildService(db, tenant, protector, sender).SendTestAsync(subId, default);
+        }
+
+        Assert.NotNull(result);
+        Assert.True(result!.Delivered);
+        Assert.Equal(200, result.StatusCode);
+        Assert.False(result.TransportFailed);
+
+        await using var read = Fixture.CreateContext();
+        var delivery = Assert.Single(await read.Set<WebhookDelivery>().ToListAsync());
+        Assert.True(delivery.Success);
+        Assert.Equal(200, delivery.StatusCode);
+        Assert.Equal(tenant, delivery.TenantId);
+        Assert.Equal(subId, delivery.SubscriptionId);
+        Assert.Equal(WebhookEvents.Ping, delivery.EventType);
+    }
+
+    [Fact]
+    public async Task SendTest_RecordsDelivery_OnNon2xx()
+    {
+        var tenant = Guid.CreateVersion7();
+        var protector = new WebhookSecretProtector(new EphemeralDataProtectionProvider());
+        var subId = await SeedSubscriptionAsync(tenant, protector);
+
+        WebhookTestResult? result;
+        await using (var db = Fixture.CreateContext(tenant))
+        {
+            var sender = new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.InternalServerError)), new AllowAllUrlGuard());
+            result = await BuildService(db, tenant, protector, sender).SendTestAsync(subId, default);
+        }
+
+        Assert.NotNull(result);
+        Assert.False(result!.Delivered);
+        Assert.Equal(500, result.StatusCode);
+        Assert.False(result.TransportFailed); // a returned HTTP status is not a transport failure
+
+        await using var read = Fixture.CreateContext();
+        var delivery = Assert.Single(await read.Set<WebhookDelivery>().ToListAsync());
+        Assert.False(delivery.Success);
+        Assert.Equal(500, delivery.StatusCode);
+    }
+
+    [Fact]
+    public async Task SendTest_RecordsDelivery_OnTransportFailure()
+    {
+        var tenant = Guid.CreateVersion7();
+        var protector = new WebhookSecretProtector(new EphemeralDataProtectionProvider());
+        var subId = await SeedSubscriptionAsync(tenant, protector);
+
+        WebhookTestResult? result;
+        await using (var db = Fixture.CreateContext(tenant))
+        {
+            var sender = new WebhookSender(new HttpClient(new ThrowingHandler()), new AllowAllUrlGuard());
+            result = await BuildService(db, tenant, protector, sender).SendTestAsync(subId, default);
+        }
+
+        Assert.NotNull(result);
+        Assert.False(result!.Delivered);
+        Assert.Null(result.StatusCode);
+        Assert.True(result.TransportFailed);
+
+        await using var read = Fixture.CreateContext();
+        var delivery = Assert.Single(await read.Set<WebhookDelivery>().ToListAsync());
+        Assert.False(delivery.Success);
+        Assert.Null(delivery.StatusCode);
+        Assert.False(string.IsNullOrEmpty(delivery.Error)); // failure detail retained for the debug trail
+    }
+
+    [Fact]
+    public async Task SendTest_UnknownSubscription_ReturnsNull_AndRecordsNothing()
+    {
+        var tenant = Guid.CreateVersion7();
+
+        await using (var db = Fixture.CreateContext(tenant))
+            Assert.Null(await BuildService(db, tenant).SendTestAsync(Guid.CreateVersion7(), default));
+
+        await using var read = Fixture.CreateContext();
+        Assert.Empty(await read.Set<WebhookDelivery>().ToListAsync());
+    }
+
     [Fact]
     public async Task Replay_ReenqueuesTheSamePayload()
     {
@@ -167,10 +262,13 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
         NextAttemptAt = DateTimeOffset.UtcNow,
     };
 
-    private static WebhookSubscriptionService BuildService(Perezosoft.Infrastructure.Persistence.AppDbContext db, Guid tenant) =>
+    private static WebhookSubscriptionService BuildService(
+        Perezosoft.Infrastructure.Persistence.AppDbContext db, Guid tenant,
+        WebhookSecretProtector? protector = null, IWebhookSender? sender = null) =>
         new(new EfRepository<WebhookSubscription>(db), new EfRepository<WebhookDelivery>(db),
             new EfOutbox(db, TimeProvider.System), new TestCurrentTenant { TenantId = tenant },
-            new TokenGenerator(), new WebhookSecretProtector(new EphemeralDataProtectionProvider()),
+            new TokenGenerator(), protector ?? new WebhookSecretProtector(new EphemeralDataProtectionProvider()),
+            sender ?? new WebhookSender(new HttpClient(new StubHandler(HttpStatusCode.OK)), new AllowAllUrlGuard()),
             new AllowAllUrlGuard(), TimeProvider.System);
 
     private async Task<Guid> SeedSubscriptionAsync(Guid tenant, WebhookSecretProtector protector)
@@ -222,5 +320,11 @@ public class WebhookDeliveryLogTests(PostgresFixture fixture) : PostgresTestBase
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(status));
+    }
+
+    private sealed class ThrowingHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("connection refused"); // stands in for a transport/DNS failure
     }
 }

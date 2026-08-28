@@ -124,5 +124,13 @@ public class WebhookSubscriptionServiceTests(PostgresFixture fixture) : Postgres
     private static WebhookSubscriptionService Build(Perezosoft.Infrastructure.Persistence.AppDbContext db, WebhookSecretProtector? protector = null) =>
         new(new EfRepository<WebhookSubscription>(db), new EfRepository<WebhookDelivery>(db),
             new EfOutbox(db, TimeProvider.System), new TestCurrentTenant(),
-            new TokenGenerator(), protector ?? NewProtector(), new AllowAllUrlGuard(), TimeProvider.System);
+            new TokenGenerator(), protector ?? NewProtector(),
+            new WebhookSender(new HttpClient(new UnusedHandler()), new AllowAllUrlGuard()), // send test not exercised here
+            new AllowAllUrlGuard(), TimeProvider.System);
+
+    private sealed class UnusedHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("These tests do not send test webhooks.");
+    }
 }

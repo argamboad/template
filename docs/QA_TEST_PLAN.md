@@ -2115,14 +2115,19 @@ Given I've sent test deliveries to my subscription
 When I view its delivery log and replay one
 Then I see per-attempt rows, and replay re-POSTs the same event to my endpoint
 ```
+**Precondition:** send one or more **test** events first (QA-API-05 step 2) — the sync send-test records a
+delivery row per attempt (success and failure), so the log is populated in-template even though the sample
+app fires no published events. (Published events via `IWebhookPublisher` also log, through the outbox.)
 **Walkthrough**
 1. `GET /api/webhooks/{id}/deliveries` (JWT) → a list of attempts, newest first, each with `success`,
-   `status_code`, `error`, `event_id`.
+   `status_code`, `error`, `event_id`. Each send-test from QA-API-05 shows up here.
 2. `POST /api/webhooks/deliveries/{deliveryId}/replay` (JWT) → **202**; webhook.site receives the **same**
-   event again (same `X-Webhook-Id`, so a real receiver can dedup).
-3. **Failure path (optional):** point the subscription at a URL that returns 500, send a test → the log
-   shows `success:false` and the outbox retries with backoff (watch the API logs), dead-lettering after
-   the cap. Replay of an unknown/other-tenant delivery id → **404**.
+   event again (same `X-Webhook-Id`, so a real receiver can dedup). Replay goes through the outbox, so its
+   own attempt is logged too.
+3. **Failure path:** point the subscription at a URL that returns 500, send a test → the response is
+   `{ "delivered": false, "status_code": 500 }` and the log gains a `success:false` row. (The sync
+   send-test does **not** retry; the outbox retry/backoff + dead-lettering applies to *published*/replayed
+   deliveries — watch the API logs on a replay.) Replay of an unknown/other-tenant delivery id → **404**.
 
 ---
 
@@ -2449,10 +2454,19 @@ Critical/High defects. 🟢 Edge cases triaged (Pass or accepted-known-issue).
   boot-verified it serves in Production when enabled and 404s when off).
 - **Updated 2026-07-01** — **HOOKS-2 (delivery log + replay):** a tenant-facing debug trail. `WebhookDelivery`
   records **one row per delivery attempt** (event, success, status/error, and the sent body; not
-  `ITenantScoped` — written from the tenant-less dispatcher, read side filters by `TenantId`; migration
-  `AddWebhookDelivery`). Owner routes `GET /api/webhooks/{id}/deliveries` + `POST
-  /api/webhooks/deliveries/{id}/replay` (re-enqueue the exact stored payload, same event id). Covered by
-  `WebhookDeliveryLogTests`. **Candidate HOOKS-3 (not built):** a Blazor management UI for webhooks/API keys.
+  `ITenantScoped` — written from both the tenant-less outbox dispatcher and the request-scoped send-test,
+  read side filters by `TenantId`; migration `AddWebhookDelivery`). Owner routes `GET
+  /api/webhooks/{id}/deliveries` + `POST /api/webhooks/deliveries/{id}/replay` (re-enqueue the exact stored
+  payload, same event id). Covered by `WebhookDeliveryLogTests`. **Candidate HOOKS-3 (not built):** a Blazor
+  management UI for webhooks/API keys.
+- **Updated 2026-08-28** — **HOOKS-2 fix (send-test now records a delivery):** the synchronous
+  `POST /api/webhooks/{id}/test` delivered inline but wrote **no** `WebhookDelivery` row, and the sample app
+  fires no published events — so `GET /api/webhooks/{id}/deliveries` was always empty and replay had nothing
+  to replay (QA-API-06 unrunnable). The send-test now records one row per attempt (success **and** failure)
+  via `IWebhookSubscriptionService.SendTestAsync`, so the log doubles as the in-template debug trail and
+  replay is testable. Response shape unchanged (`{ delivered, status_code }`, or `{ delivered:false,
+  error:"delivery_failed" }` on a transport error — internal detail stays in the row, GAP-3). New
+  `WebhookDeliveryLogTests` (`SendTest_RecordsDelivery_*`).
 - **Updated 2026-07-01** — **BILLING-7 (dissolve cleanup):** closed the one real gap — deleting a
   billing-enabled tenant left the Stripe subscription active (still charging). `BillingDataContributor`
   now wipes the `Subscription` projection on dissolve and **cancels the provider subscription** via a
