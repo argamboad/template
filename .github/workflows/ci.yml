@@ -65,7 +65,7 @@ jobs:
           ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=ef_designtime;Username=ci;Password=ci"
         run: |
           # Tool version comes from the committed manifest .config/dotnet-tools.json (v3 audit T51/R63)
-          # — pinned to match the EF packages (10.0.9); an unpinned install would float and let the
+          # — pinned to match the EF packages (10.0.11); an unpinned install would float and let the
           # drift gate change verdict without a code change (DEP-9). Bump the manifest with the EF
           # PackageVersions in Directory.Packages.props.
           dotnet tool restore
@@ -219,7 +219,7 @@ jobs:
       # when building just one (-f), so each runner needs the workloads for all TFMs its OS exposes —
       # e.g. macOS needs android too (NETSDK1147 otherwise). restore resolves that per-host, forever.
       - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
+        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.400.1
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Perezosoft.Maui.csproj -f ${{ matrix.tfm }} -c Debug -p:AcceptAndroidSDKLicenses=true
@@ -285,10 +285,11 @@ jobs:
           - tfm: net10.0-maccatalyst
     # Pinned (not macos-latest): the .NET-for-iOS/macCatalyst workload requires a matching Xcode
     # and macos-latest can lag several Xcode versions behind (fails with "requires Xcode NN").
-    # The workload restore below pins the WORKLOAD SET (10.0.301, iOS/macCatalyst 26.5.x, requires
+    # The workload restore below pins the WORKLOAD SET (10.0.400.1, iOS/macCatalyst 26.5.x, requires
     # Xcode 26.5). macos-26's DEFAULT Xcode moved to 26.6 on 2026-07-21, but NO 26.6-matched
-    # iOS/macCatalyst workload exists yet (checked 2026-08-24: every set in the 10.0.300 band still
-    # ships 26.5.x), so DEVELOPER_DIR selects the image's still-installed full Xcode 26.5 instead.
+    # iOS/macCatalyst workload exists yet (re-checked 2026-08-25 at the 10.0.400 SDK bump: the
+    # 10.0.400 band still ships 26.5.x), so DEVELOPER_DIR selects the image's still-installed full
+    # Xcode 26.5 instead.
     # When a 26.6-matched workload set ships, bump the set pin + DEVELOPER_DIR together. (The old
     # "non-default Xcodes can be incomplete" caveat — actions/runner-images#13743/#11348 — applied
     # to a NEWER-than-default install; 26.5 was the complete default until 2026-07-21.)
@@ -305,12 +306,12 @@ jobs:
 
       # See the native-build note: restore installs ALL workloads this host's TFM list needs (on macOS
       # that's ios + maccatalyst + android — the android TFM restores here too, even building -f ios).
-      # --version pins the workload set (10.0.301 ships the iOS/macCatalyst workloads matched to
+      # --version pins the workload set (10.0.400.1 ships the iOS/macCatalyst workloads matched to
       # Xcode 26.5, selected via DEVELOPER_DIR above) — same feature band as the pinned SDK.
       - name: Install the MAUI workloads (host-aware, workload set pinned to the image's Xcode)
         run: |
           xcodebuild -version
-          dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
+          dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.400.1
 
       - name: Build (compile-only gate)
         run: dotnet build src/Maui/Perezosoft.Maui.csproj -f ${{ matrix.tfm }} -c Debug
@@ -333,7 +334,7 @@ jobs:
   native-smoke-apple:
     needs: native-paths
     if: needs.native-paths.outputs.changed == 'true'
-    # Same Xcode reasoning as native-build-apple: pinned image + workload set 10.0.301 (iOS 26.5.x)
+    # Same Xcode reasoning as native-build-apple: pinned image + workload set 10.0.400.1 (iOS 26.5.x)
     # + DEVELOPER_DIR selecting Xcode 26.5 until a 26.6-matched workload set ships.
     runs-on: macos-26
     timeout-minutes: 60
@@ -349,7 +350,7 @@ jobs:
       - name: Install the MAUI workloads (host-aware, workload set pinned to the image's Xcode)
         run: |
           xcodebuild -version
-          dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
+          dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.400.1
 
       - name: Build the apps (Catalyst + iOS simulator) + API
         run: |
@@ -488,7 +489,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
+        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.400.1
 
       - name: Build the app + API
         # The boot-probe drives no CDP/Playwright, so E2E.Tests isn't built here (the Linux `e2e` job
@@ -612,7 +613,7 @@ jobs:
           df -h / | tail -1
 
       - name: Install the MAUI workloads (host-aware)
-        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.301
+        run: dotnet workload restore src/Maui/Perezosoft.Maui.csproj --version 10.0.400.1
 
       - name: Build the app (self-contained APK) + API + smoke deps
         run: |
