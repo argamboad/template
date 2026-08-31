@@ -839,7 +839,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (145 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (144 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -902,8 +902,7 @@
 - `docs/postman/Perezosoft.postman_collection.json` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/postman/Perezosoft.staging.postman_environment.json` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/postman/README.md` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/qa-runs/2026-08-28-session1-detail.md` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/qa-runs/2026-08-copilot-pass.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/qa-runs/2026-08-run-log.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/qa-runs/helpers/adv.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/qa-runs/helpers/getlinks.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/qa-runs/helpers/mfa.py` — authoring docs; the course TEACHES writing these in 0.1
@@ -987,4 +986,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 820 tracked files · 570 built in lessons · 250 bucketed · 0 unmapped
+**Totals:** 819 tracked files · 570 built in lessons · 249 bucketed · 0 unmapped
