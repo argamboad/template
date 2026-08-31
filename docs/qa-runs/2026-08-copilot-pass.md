@@ -126,18 +126,27 @@ extension's sensitive-data filter — verified token behavior via API accept-att
 | QA-I18N-03 | In-app UI fully translated (no English leaks) | ✅ 2026-08-31 | Home welcome + Hogar + Ajustes + invite form all Spanish; only brand (Google/Microsoft) + self-labeled lang options stay as-is — no leaks |
 | QA-I18N-04 | Email language matches requester's UI language | ✅ 2026-08-31 | OTP es *"Tu código de verificación"* / en *"Your verification code"*; magic link es *"Tu enlace de acceso"* / en *"Your sign-in link"* (via `culture` body field, not Accept-Language); invitation es *"Te han invitado a un hogar"* |
 
-## 👥 Human re-test queue (genuine clicks + dialog confirms — Sherlock & Watson)
+## 👥 Human re-test queue — CLOSED (historical; kept for the workflow story)
 
-Items passed via API/CI workaround that we'll re-run the *real* way with the user driving the
-human step. Already API- + CI-verified, so this is fidelity confirmation, not a coverage gap.
-**This list grows** as later chunks hit more confirm dialogs / downloads / OAuth-linking.
+> **How to read this section:** it's a mid-campaign time capsule from 2026-08-29. The table below
+> records the *blocked* state discovered while driving the MCP browser pane (which suppresses
+> native `confirm()` — the app's `JsConfirm` fail-closed safely, CONF-15, a positive finding). The
+> **RESOLVED** paragraph that follows is the same-day breakthrough that unblocked them, and every
+> queued case was then re-run genuinely — final outcomes:
+>
+> - **QA-HH-03 / HH-07 / HH-08** — ✅✅ re-run GENUINELY 2026-08-29 in the user's real Chrome
+>   (real confirm dialogs, user's OK) — see the §7 rows for evidence.
+> - **QA-HH-13** — export ✅ verified by content (bundle complete, secrets-free). The literal
+>   *file-saves-to-disk* click in real Chrome was never separately re-run — no coverage gap (the
+>   case's substance passed); noted for honesty as the one queue item closed by content-verification
+>   rather than a fidelity re-run.
 
-| Case | Human step | Prep Claude does first |
+| Case | Human step (as queued, pre-resolution) | Outcome |
 |---|---|---|
-| QA-HH-03 | ~~click Remove → confirm~~ **NOT human-reachable in the pane** | — |
-| QA-HH-08 | ~~click Leave → confirm~~ **NOT human-reachable in the pane** | — |
-| QA-HH-07 | ~~Leave and delete → confirm~~ **NOT human-reachable in the pane** | — |
-| QA-HH-13 | click **Download** → confirm the JSON file saves (may also be sandbox-blocked) | signed in as owner |
+| QA-HH-03 | click Remove → confirm — *was* unreachable in the pane | ✅✅ genuine re-run 2026-08-29 |
+| QA-HH-08 | click Leave → confirm — *was* unreachable in the pane | ✅✅ genuine re-run 2026-08-29 |
+| QA-HH-07 | Leave and delete → confirm — *was* unreachable in the pane | ✅✅ genuine re-run 2026-08-29 |
+| QA-HH-13 | click Download → JSON file saves | ✅ content-verified; disk-save click not separately re-run |
 
 **RESOLVED 2026-08-29 — WORKFLOW ESTABLISHED.** The MCP browser *pane* is CDP-automated and
 suppresses native `confirm()` (app `JsConfirm` fail-closes safely — CONF-15, a positive finding).
@@ -145,19 +154,10 @@ suppresses native `confirm()` (app `JsConfirm` fail-closes safely — CONF-15, a
 Claude drives the click via `mcp__claude-in-chrome__*` in the user's **real Chrome** (shared
 localhost session, so already signed in); the native dialog **renders and blocks there**; the user
 clicks **OK**; Claude verifies via API/DB + re-reads the UI. **Proven end-to-end on HH-03, HH-07,
-HH-08 (all ✅✅).** Use this for every remaining confirm-gated / genuine-click case (§9 delete
-account + unlink, §10b admin writes, etc.). Note: the extension click that triggers a blocking
+HH-08 (all ✅✅).** This workflow then carried every later confirm-gated / genuine-click case (§9
+delete account + unlink, §10b admin writes). Note: the extension click that triggers a blocking
 dialog may return a CDP "timed out"/"frozen renderer" message — that's expected (the dialog is
 blocking); proceed to the user's OK click.
-
-## §10 Web — Localization (i18n)
-
-| Case | Title | Status | Notes |
-|---|---|---|---|
-| QA-I18N-01 | Switch language on the login page ⚙️ | ⬜ | |
-| QA-I18N-02 | Language persists per user across sessions ⚙️ | ⬜ | |
-| QA-I18N-03 | In-app UI fully translated (no English leaks) 👁 | ⬜ | |
-| QA-I18N-04 | Email language matches the requester's UI language | ⬜ | Mailpit |
 
 ## §10b Web — Admin console (platform staff) — ✅ COMPLETE (7/7, 2026-08-31)
 
