@@ -230,7 +230,7 @@
 - `tests/Api.Tests/Architecture/RoutePrefixInspectorTests.cs`
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (102 files)
+## 3.4 — The web client & auth UI (104 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -261,6 +261,7 @@
 - `src/Shared.Ui/wwwroot/brand/lockup_light.svg` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/brand/lockup_light_1520.png` — placeholder brand assets — replaced in 9.1
 - `src/Shared.Ui/wwwroot/css/app.css`
+- `src/Shared.Ui/wwwroot/js/bfcache-guard.js` — reload bfcache restores — Back after sign-out can't show a stale authenticated view (QA-SEC-03)
 - `src/Shared.Ui/wwwroot/js/theme.js` — THEME-1 pre-paint dark-mode bootstrap (data-bs-theme)
 - `src/Web/Http/AuthHeaderHandler.cs`
 - `src/Web/Http/CookieHandler.cs`
@@ -321,6 +322,7 @@
 - `src/Web/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js`
 - `src/Web/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map`
 - `src/Web/wwwroot/og_image_1200x630.png`
+- `tests/Api.Tests/BfcacheGuardTests.cs` — pins the guard's contract + presence in BOTH hosts' index.html
 - `tests/E2E.Tests/ThemeJourneyTests.cs` — dark-mode journey (live flip, reload persist, cross-device reconcile)
 - `tests/Ui.Tests/AuthServiceTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/HomePageTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
@@ -837,7 +839,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (139 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (141 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -922,6 +924,8 @@
 - `docs/stories/ui.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/CONCEPTS.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/FRONTMATTER.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/OUTLINE.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/PEREZOSOFT_COURSE.pdf` — authoring docs; the course TEACHES writing these in 0.1
@@ -979,4 +983,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 812 tracked files · 568 built in lessons · 244 bucketed · 0 unmapped
+**Totals:** 816 tracked files · 570 built in lessons · 246 bucketed · 0 unmapped
