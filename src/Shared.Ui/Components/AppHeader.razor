@@ -55,7 +55,13 @@
     private bool _isStaff;
 
     // Close the menu after any navigation so it doesn't stay open over the new page on mobile.
-    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        // Impersonation swaps the active token in place (a soft nav, no parameter change), so this
+        // parameterless component wouldn't otherwise re-render — re-source identity + staff flag then.
+        Auth.IdentityChanged += OnIdentityChanged;
+    }
 
     // Show the Admin link only for platform staff (cheap, cached probe). Hidden while impersonating.
     protected override async Task OnInitializedAsync() => _isStaff = await Auth.IsStaffAsync();
@@ -67,6 +73,22 @@
         InvokeAsync(StateHasChanged);
     }
 
+    // Identity changed under us (enter/leave impersonation): re-probe staff status and re-render so the
+    // tenant badge, name, and Admin-link visibility reflect the active token — not the staff cold-start.
+    private async void OnIdentityChanged()
+    {
+        try
+        {
+            var isStaff = await Auth.IsStaffAsync();
+            await InvokeAsync(() =>
+            {
+                _isStaff = isStaff;
+                StateHasChanged();
+            });
+        }
+        catch { /* best-effort — leaves the prior header until the next render */ }
+    }
+
     private void ToggleMenu() => _menuOpen = !_menuOpen;
 
     private async Task SignOutAsync()
@@ -75,5 +97,9 @@
         Nav.NavigateTo("/login", forceLoad: true);
     }
 
-    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        Auth.IdentityChanged -= OnIdentityChanged;
+    }
 }

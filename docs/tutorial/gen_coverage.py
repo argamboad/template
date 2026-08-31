@@ -443,6 +443,7 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Api/Models/AdminModels.cs", "7.5", ""),
     ("src/Shared.Ui/Pages/AdminConsole.razor", "7.5", ""),
     ("tests/Api.Tests/Admin/*", "7.5", ""),
+    ("tests/Core.Tests/Auth/ImpersonationIdentityTests.cs", "7.5", "client identity swap raises AuthService.IdentityChanged so the header re-sources on impersonate"),
 
     # ---- Part 8 ----
     ("src/Api/Configuration/ProxyForwardingExtensions.cs", "8.1", "config-gated forwarded headers"),
