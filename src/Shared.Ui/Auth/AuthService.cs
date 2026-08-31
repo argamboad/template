@@ -59,6 +59,16 @@ public class AuthService(
     /// </summary>
     public event Action? SignedOut;
 
+    /// <summary>
+    /// Raised when the active identity is swapped in place — entering or leaving impersonation —
+    /// without a full sign-in. Lets parameterless chrome (the header) re-source the displayed
+    /// identity + staff flag from the new token; the soft nav that follows re-renders the layout
+    /// body but not a parameterless child. Distinct from <see cref="SignedIn"/> so it does NOT
+    /// trigger preference reconciliation (an admin session must not adopt the impersonated user's
+    /// preferences as its own).
+    /// </summary>
+    public event Action? IdentityChanged;
+
     private TimeProvider Time => timeProvider ?? TimeProvider.System;
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_accessToken) && !IsTokenExpired(_accessToken);
@@ -504,6 +514,7 @@ public class AuthService(
     {
         _accessToken = accessToken;
         _isStaff = null;
+        IdentityChanged?.Invoke();
     }
 
     /// <summary>
@@ -514,7 +525,9 @@ public class AuthService(
     {
         _accessToken = null;
         _isStaff = null;
-        return await TryRefreshAsync();
+        var restored = await TryRefreshAsync();
+        IdentityChanged?.Invoke();
+        return restored;
     }
 
     public async Task LogoutAsync()

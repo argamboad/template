@@ -604,7 +604,7 @@
 - `tests/Api.Tests/Webhooks/WebhookSubscriptionServiceTests.cs`
 - `tests/Core.Tests/WebhookSignatureTests.cs`
 
-## 7.5 — Admin back-office & impersonation (13 files)
+## 7.5 — Admin back-office & impersonation (14 files)
 
 - `src/Api/Configuration/PlatformAdminSettings.cs`
 - `src/Api/Controllers/AdminApiControllerBase.cs`
@@ -618,6 +618,7 @@
 - `tests/Api.Tests/Admin/AdminControllerTests.cs`
 - `tests/Api.Tests/Admin/PlatformStaffServiceTests.cs`
 - `tests/Api.Tests/Integration/ImpersonationGuardTests.cs` — staff gate rejects impersonation tokens (v3 ADM-2)
+- `tests/Core.Tests/Auth/ImpersonationIdentityTests.cs` — client identity swap raises AuthService.IdentityChanged so the header re-sources on impersonate
 - `tests/E2E.Tests/AnnouncementJourneyTests.cs` — ADMIN-3 announce -> NOTIFY fan-out
 
 ## 8.1 — Single-origin hosting (4 files)
@@ -978,4 +979,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 811 tracked files · 567 built in lessons · 244 bucketed · 0 unmapped
+**Totals:** 812 tracked files · 568 built in lessons · 244 bucketed · 0 unmapped
