@@ -839,7 +839,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (141 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (145 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -902,6 +902,12 @@
 - `docs/postman/Perezosoft.postman_collection.json` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/postman/Perezosoft.staging.postman_environment.json` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/postman/README.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/qa-runs/2026-08-28-session1-detail.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/qa-runs/2026-08-copilot-pass.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/qa-runs/helpers/adv.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/qa-runs/helpers/getlinks.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/qa-runs/helpers/mfa.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/qa-runs/helpers/mint_jwt.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/requirements.txt` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/_EXAMPLE_epic.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/admin.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -923,8 +929,6 @@
 - `docs/stories/theme.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/ui.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/CONCEPTS.md` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
-- `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/COVERAGE.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/FRONTMATTER.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/OUTLINE.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -983,4 +987,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 816 tracked files · 570 built in lessons · 246 bucketed · 0 unmapped
+**Totals:** 820 tracked files · 570 built in lessons · 250 bucketed · 0 unmapped
