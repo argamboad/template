@@ -498,6 +498,10 @@ RULES: list[tuple[str, str, str]] = [
     ("src/Shared.Ui/Components/ThemeSwitcher.razor", "3.4", ""),
     ("tests/E2E.Tests/ThemeJourneyTests.cs", "3.4", "dark-mode journey (live flip, reload persist, cross-device reconcile)"),
 
+    # ---- drift absorbed 2026-08-31 (QA-SEC-03 bfcache guard) ----
+    ("src/Shared.Ui/wwwroot/js/bfcache-guard.js", "3.4", "reload bfcache restores — Back after sign-out can't show a stale authenticated view (QA-SEC-03)"),
+    ("tests/Api.Tests/BfcacheGuardTests.cs", "3.4", "pins the guard's contract + presence in BOTH hosts' index.html"),
+
     # ---- drift absorbed 2026-07-14 (PREFS-1 / ADR-022 + BILLING-9) ----
     ("tests/Api.Tests/Billing/AcceptSeatQuotaTests.cs", "5.3", "BILLING-9: seat quota re-checked at invitation ACCEPT (402 seat_limit_reached)"),
     ("tests/Api.Tests/AccountControllerTests.cs", "3.5", "PREFS-1/ADR-022: theme+locale preference-endpoint storage rules"),
