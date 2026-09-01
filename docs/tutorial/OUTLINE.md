@@ -98,8 +98,9 @@ Goal · Concepts · Maps-to (ADR / Rule / story / repo files — see COVERAGE.md
   cheap); `ISessionStore`/`IOAuthInitiator` per-platform seams; login/callback pages.
 - **3.5 Localization.** `IStringLocalizer` + resx (EN/ES) — UI *and* emails; the E2E i18n test.
 - **3.6 The E2E harness.** Playwright + Page Object Model; Mailpit-driven OTP journeys.
-- **3.7 ★ Build your own slice (capstone).** The learner runs the 7-step checklist +
-  full TDD loop unaided, UI and E2E included. No repo files — theirs.
+- **3.7 ★ Build your own slice (capstone).** The learner writes the story + the
+  `DATA_MODEL.md` entry first, then runs the eight-step checklist + full TDD loop
+  unaided, UI and E2E included. No repo files — theirs.
 
 ## Part 4 — Reliability & operations
 - **4.1 The transactional outbox.** Why dual-write is a bug; `SKIP LOCKED` claiming (ADR-007).

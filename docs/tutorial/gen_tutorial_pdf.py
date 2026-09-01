@@ -58,6 +58,7 @@ try:
 except Exception:
     pdfmetrics.registerFont(TTFont("Head", os.path.join(WF, "segoeuib.ttf")))
 _reg("Mono", "consola.ttf"); _reg("Mono-Bold", "consolab.ttf")
+_reg("Sym", "seguisym.ttf")            # Segoe UI Symbol — fallback for arrows/symbols
 pdfmetrics.registerFontFamily("Body", normal="Body", bold="Body-Bold",
                               italic="Body-Italic", boldItalic="Body-BoldItalic")
 pdfmetrics.registerFontFamily("Sans", normal="Sans", bold="Sans-Bold",
@@ -82,6 +83,22 @@ BODYW = A4[0] - 56*mm
 
 # Glyphs we are unsure a chosen font covers -> normalize (rare: x2, x1).
 NORMALIZE = [("►", ">"), ("❌", '<font color="#c0392b">x</font>')]
+
+# Glyphs the body (Constantia) and/or code (Consolas) faces lack but Segoe UI
+# Symbol has — measured against the lessons' actual character inventory. The
+# old Segoe-body build silently DROPPED ⇒/⚠/⊃/🗑/🔍/✅; now they render.
+SYM_FALLBACK = "→←↔⇒⚠⊃🗑🔍✅✓"
+
+def sym_fallback(escaped):
+    escaped = escaped.replace("️", "")   # variation selector: invisible, unmapped
+    # non-BMP emoji can't reach the page through reportlab markup at all —
+    # normalize the two the lessons use to their textual role
+    escaped = escaped.replace("🗑 ", "").replace("🗑", "")   # decorative "DELETE-ME" prefix
+    escaped = escaped.replace("🔍", "(?)")                   # parity-verdict "unverified"
+    for ch in SYM_FALLBACK:
+        if ch in escaped:
+            escaped = escaped.replace(ch, '<font name="Sym">%s</font>' % ch)
+    return escaped
 
 styles = getSampleStyleSheet()
 def P(name, **kw):
@@ -171,6 +188,7 @@ def code_line_markup(line, lexer):
         # internal alignment: runs of 2+ spaces must not collapse (single spaces
         # stay breakable so long lines can still wrap)
         esc = re.sub(r"  +", lambda mo: "&nbsp;" * len(mo.group(0)), esc)
+        esc = sym_fallback(esc)
         seg.append('<font color="%s">%s</font>' % (_tok_color(tt), esc))
     return "".join(seg)
 
@@ -188,10 +206,11 @@ def inline(text):
     for part in parts:
         if part.startswith("`") and part.endswith("`") and len(part) >= 2:
             out.append('<font name="Mono" size="8.7" color="#1d2b36">%s</font>'
-                       % html.escape(part[1:-1]))
+                       % sym_fallback(html.escape(part[1:-1])))
             continue
         seg = html.escape(part)
         seg = seg.replace("❌", '<font color="#c0392b">x</font>')
+        seg = sym_fallback(seg)
         seg = re.sub(r'\*\*([^*]+)\*\*', r'<b>\1</b>', seg)
         seg = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'<i>\1</i>', seg)
         seg = re.sub(r'\[([^\]]+)\]\(([^)]+)\)',
@@ -362,13 +381,25 @@ def parse_md(md, story, figures=None):
             story.append(Spacer(1, 6))
             continue
 
+        # lists — a wrapped item continues on indented lines that don't start a
+        # new item or block; absorb them into the item's paragraph
+        def _gather_items(item_re):
+            nonlocal i
+            items = []
+            while i < N and re.match(item_re, lines[i].rstrip()):
+                buf = [re.sub(item_re, '', lines[i].rstrip())]
+                i += 1
+                while i < N and lines[i].strip() and re.match(r'^\s{2,}', lines[i]) \
+                        and not re.match(r'^\s*(#{1,4}\s|```|>|[-*]\s|\d+\.\s|\||<!--)',
+                                         lines[i]):
+                    buf.append(lines[i].strip()); i += 1
+                items.append(" ".join(buf))
+            return items
+
         # unordered list
         if re.match(r'^\s*[-*]\s+', s):
-            items = []
-            while i < N and re.match(r'^\s*[-*]\s+', lines[i].rstrip()):
-                txt = re.sub(r'^\s*[-*]\s+', '', lines[i].rstrip())
-                items.append(ListItem(Paragraph(inline(txt), LI), leftIndent=14, value="•"))
-                i += 1
+            items = [ListItem(Paragraph(inline(t), LI), leftIndent=14, value="•")
+                     for t in _gather_items(r'^\s*[-*]\s+')]
             story.append(ListFlowable(items, bulletType="bullet", start="•",
                                       leftIndent=10, bulletColor=ACC))
             story.append(Spacer(1, 4))
@@ -376,11 +407,8 @@ def parse_md(md, story, figures=None):
 
         # ordered list
         if re.match(r'^\s*\d+\.\s+', s):
-            items = []
-            while i < N and re.match(r'^\s*\d+\.\s+', lines[i].rstrip()):
-                txt = re.sub(r'^\s*\d+\.\s+', '', lines[i].rstrip())
-                items.append(ListItem(Paragraph(inline(txt), LI), leftIndent=16))
-                i += 1
+            items = [ListItem(Paragraph(inline(t), LI), leftIndent=16)
+                     for t in _gather_items(r'^\s*\d+\.\s+')]
             story.append(ListFlowable(items, bulletType="1", leftIndent=12,
                                       bulletColor=INK, bulletFontName="Head"))
             story.append(Spacer(1, 4))
