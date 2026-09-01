@@ -506,15 +506,16 @@ PART_SUBTITLES = {
     "A": "The MAUI shells: one UI on four native platforms, and the auth "
          "bridge that survives process death.",
 }
-# Part-divider figures: canonical subsystem diagrams (rendered by gen_diagrams.py)
+# Part-divider figures: canonical subsystem diagrams (rendered by gen_diagrams.py).
+# Parts 0/1/6/9 carry none — Part 1's solution map already opens the front
+# matter, and Parts 0/6/9 have no single subsystem diagram that fits.
 PART_FIGURES = {
-    "1": ("arch-solution-map", "The solution you are about to grow — clients, server onion, tests (ARCHITECTURE.md §1)"),
     "2": ("arch-auth-server", "What Part 2 builds — the server side of auth (ARCHITECTURE.md §4)"),
-    "3": ("arch-client", "What Part 3 builds — the client architecture (ARCHITECTURE.md §9)"),
+    "3": ("arch-onion", "What Part 3 makes explicit — the server onion and its seams (ARCHITECTURE.md §2)"),
     "4": ("arch-background", "What Part 4 builds — background processing (ARCHITECTURE.md §5)"),
     "5": ("arch-billing", "What Part 5 builds — the billing projection (ARCHITECTURE.md §6)"),
-    "6": ("arch-tenancy", "The walls this part hardens — tenancy in both directions (ARCHITECTURE.md §3)"),
     "7": ("arch-notify-hooks", "What Part 7 builds — notifications & outbound webhooks (ARCHITECTURE.md §7)"),
+    "8": ("arch-tenancy", "The tenancy walls you built in Part 2 — and the database backstop this part adds (ARCHITECTURE.md §3)"),
     "A": ("arch-client", "The shells' shared client architecture (ARCHITECTURE.md §9)"),
 }
 

@@ -91,28 +91,13 @@ re-read of Part 5.
 
 # The platform at a glance
 
-```
-        Browser (Blazor WebAssembly)          MAUI shells (desktop / mobile)
-                    │                                     │
-                    └────────────── HTTPS ────────────────┘
-                                     │
-                    ┌────────────────▼─────────────────┐
-                    │            src/Api               │   controllers (platform)
-                    │  auth · tenancy · billing · ...  │   + Features/<X> (slices)
-                    └────────────────┬─────────────────┘
-                                     │ depends on
-                    ┌────────────────▼─────────────────┐
-                    │        src/Infrastructure         │   EF Core · SMTP · Stripe
-                    │  implementations of Core seams    │   S3 · outbox · webhooks
-                    └────────────────┬─────────────────┘
-                                     │ depends on
-                    ┌────────────────▼─────────────────┐
-                    │            src/Core               │   entities · abstractions
-                    │        depends on NOTHING         │   the seams live here
-                    └───────────────────────────────────┘
-                                     │
-                              PostgreSQL 17
-```
+<!-- figure: arch-solution-map | The whole platform on one page — clients, the server onion, and the API boundary between them (ARCHITECTURE.md §1) -->
+
+The clients speak HTTP/JSON to `src/Api` and share no compiled code with it;
+inside the server, dependencies point strictly inward — `Api` and
+`Infrastructure` both depend on `Core`, and `Core` depends on nothing. The
+seams (small interfaces like `IEmailSender`) live in `Core`; their
+implementations live in `Infrastructure`; PostgreSQL sits underneath it all.
 
 One sentence to keep for the whole book: **app data belongs to the tenant, not the
 user** — and by the end of Part 2 you will have made it impossible, at three separate
