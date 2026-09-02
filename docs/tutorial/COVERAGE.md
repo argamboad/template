@@ -839,7 +839,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (144 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (187 files)
 
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
@@ -932,7 +932,50 @@
 - `docs/tutorial/FRONTMATTER.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/OUTLINE.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/PEREZOSOFT_COURSE.pdf` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-auth-server.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-auth-server.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-background.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-background.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-billing.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-billing.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-client.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-client.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-notify-hooks.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-notify-hooks.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-onion.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-onion.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-solution-map.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-solution-map.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-tenancy.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/arch-tenancy.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-announce.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-announce.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-billing-webhook.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-billing-webhook.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-dissolve.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-dissolve.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-magic-link.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-magic-link.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-mfa.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-mfa.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-oauth.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-oauth.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-otp.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-otp.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-refresh.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-refresh.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-request.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-request.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-startup.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-startup.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-webhook-delivery.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/flows-webhook-delivery.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/mermaid-410c701968cb.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/mermaid-410c701968cb.sha1` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/mermaid-c5f96cf12c49.png` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/diagrams/mermaid-c5f96cf12c49.sha1` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/gen_coverage.py` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/tutorial/gen_diagrams.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/gen_tutorial_pdf.py` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/0.1-mental-model-and-the-decision-record.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/0.2-a-reproducible-machine.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -986,4 +1029,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 819 tracked files · 570 built in lessons · 249 bucketed · 0 unmapped
+**Totals:** 862 tracked files · 570 built in lessons · 292 bucketed · 0 unmapped
