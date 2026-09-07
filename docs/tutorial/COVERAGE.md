@@ -405,12 +405,14 @@
 - `tests/Api.Tests/Scheduling/ExpiredTokenCleanupJobTests.cs`
 - `tests/Api.Tests/Scheduling/ScheduledJobsHostTests.cs`
 
-## 4.5 — Observability: logs, traces, health (6 files)
+## 4.5 — Observability: logs, traces, health (8 files)
 
 - `src/Api/Observability/DatabaseHealthCheck.cs`
+- `src/Api/Observability/OtlpEndpoints.cs`
 - `src/Api/Observability/RequestLoggingScopeMiddleware.cs`
 - `src/Api/Observability/TelemetryExtensions.cs`
 - `tests/Api.Tests/Observability/DatabaseHealthCheckTests.cs`
+- `tests/Api.Tests/Observability/OtlpEndpointsTests.cs`
 - `tests/Api.Tests/Observability/RequestLoggingScopeMiddlewareTests.cs`
 - `tests/Api.Tests/Observability/TelemetryEnrichmentTests.cs`
 
@@ -1029,4 +1031,4 @@
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
 
-**Totals:** 862 tracked files · 570 built in lessons · 292 bucketed · 0 unmapped
+**Totals:** 864 tracked files · 572 built in lessons · 292 bucketed · 0 unmapped
