@@ -148,7 +148,7 @@ deferred items without an explicit decision.
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
 | `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (150 cases: smoke + regression + §14a v3-audit adversarial/tenant-isolation + §13c native release checklist) |
-| `docs/ROADMAP.md` | Sequenced plan — pillars + all waves done (terminal state 2026-07-14) + the **post-terminal cost wave** (`LOCALCI` — local/self-hosted CI, planned 2026-09-08) |
+| `docs/ROADMAP.md` | Sequenced plan — pillars + all waves done (terminal state 2026-07-14) + the **post-terminal cost wave** (`LOCALCI` — local/self-hosted CI) + the **flavors wave** (`FLAVORS` — spec + conformance kit, then React/Angular/Flutter fronts, Node/Go/Spring/FastAPI backs, Expo for true-native mobile, tiered DBs incl. SQL Server; both planned 2026-09-08) |
 | `docs/STATUS.md` | 2026-07-04 status snapshot + operator guides — native QA pass (✅ 2026-07-14), Apple first-run smoke (MacBook walkthrough), prod activation (⤵ downstream Phase-8 runbook, ADR-017 amendment); SaaS-readiness assessment |
 | `docs/PLATFORM_BACKLOG.md` | Per-item design sketches for the future foundation slices (the detail behind ROADMAP) |
 | `docs/stories/` | User stories per epic — generated at build time |

@@ -179,3 +179,76 @@ honest**, not extending it. First item: GitHub Actions minutes.
 repo stays **private** while runners are attached; queued Apple jobs wait for the Mac to be online
 (24 h expiry, one-click re-run); self-hosted runners are not clean machines, so `global.json` + the
 lockfiles + the CLAUDE.md bump-together playbook remain the toolchain-drift authority.
+
+---
+
+## Flavors wave — the platform as a spec with interchangeable stacks (planned 2026-09-08)
+
+**The idea:** Vuelto proved the platform works as a clone-and-rebrand template — for a .NET shop. A JS,
+Java, Go, or Python developer gets nothing from it today. The durable asset is not the C# but the
+**contract** around it (constant decisions, the 76 foundation rules, data model, feature flows, the
+Postman collection as API contract, the Gherkin stories, the QA plan, the audit suite). This wave
+turns that contract into a stack-neutral **spec** with a **conformance kit**, and then ships other
+stacks as **flavors** that pass the same kit. Design detail: `PLATFORM_BACKLOG.md` §14.
+
+**Decisions taken 2026-09-08 (record as ADRs when `SPEC` is picked up):**
+- **Spec-first, repo per piece.** A `spec` repo (docs + conformance kit + the conformance matrix
+  workflow) is the source of truth; each flavor is its own template repo pinning a `SPEC_VERSION`;
+  a `scaffold` CLI composes backend + frontend + DB pieces into one fresh app repo. Not a monorepo:
+  "use this template" must yield exactly one stack, and every stack brings its own toolchain.
+- **Frontends: React, Angular, Flutter** (plus the existing Blazor). Vue rejected (audience overlaps
+  React, no structural edge). One shared Playwright suite via a **test-id contract** in the spec
+  serves every DOM frontend; Flutter is the deliberate exception (own journey suite).
+- **Backends: Node/NestJS, Go, Spring, FastAPI** (plus the existing ASP.NET Core), in that order of
+  fit. Go ranks above Python: pgx + sqlc maps onto the outbox/RLS design with no framework in the way,
+  and a static binary fits the free-tier hosting better than anything else.
+- **Databases are tiered, not free-choice** — the tenancy defense lives here. **Tier A** (native
+  row-level security + queue-safe claim + transactional DDL): Postgres family, SQL Server, Oracle
+  on request, CockroachDB/Yugabyte by conformance proof. **Tier B** (no RLS, app-filter only,
+  downgrade signed in the app brief): MySQL/MariaDB. **Isolation-shaped** (database per tenant is the
+  wall): MongoDB, SQLite via Turso/D1, DynamoDB via IAM leading keys. Mongo Shared = Tier B, signed.
+  Ask-for-Mongo playbook: offer Postgres JSONB first.
+- **Native/desktop come in two tiers per frontend family** (table below): a **hybrid shell** (the web
+  UI inside a native shell — MAUI Blazor Hybrid's model; shares the web code and the Playwright suite)
+  and **true native** (own UI toolkit; own journey suite).
+
+| Epic | Size | What | Deps |
+|------|------|------|------|
+| `SPEC` | L | Extract the stack-neutral spec from this repo; restate R1–R76 as **outcomes** (HTTP-observable → conformance kit; code-structural → per-flavor arch tests); test-id contract; conformance kit (Newman + Playwright + adversarial tenant tests) passing against `platform-dotnet`; conformance-matrix workflow; DB-tier ADR | none — first |
+| `FRONT-REACT` | L | React + TS on Vite, TanStack Query/Router; hybrid shells Capacitor (mobile) + Tauri (desktop); retrofit Blazor pages to the test-id contract so ONE Playwright suite runs both | SPEC |
+| `BACK-NODE` | L | NestJS on Fastify + Drizzle + Zod; dependency-cruiser arch tests; first full backend port; the JS flavor pairs with FRONT-REACT | SPEC |
+| `BACK-GO` | L | chi + pgx + sqlc + goose; repository layer = first tenant wall (no ORM filter) + go-arch-lint ban on raw DB access; scratch image for Render free | SPEC |
+| `BACK-SPRING` + `FRONT-ANGULAR` | L + L | Spring Boot (Java/Kotlin) + Hibernate filters + Flyway + ArchUnit; Angular ships **with** it (enterprise/Java shops expect the pair; closest paradigm to Blazor → most mechanical port) | SPEC; demand |
+| `BACK-FASTAPI` | L | FastAPI + SQLAlchemy 2 + Alembic + Pydantic; import-linter | SPEC; demand |
+| `NATIVE-RN` | M | Expo / React Native as the **true-native mobile** option for the React family (shares the TS API client + query hooks with FRONT-REACT); desktop stays Tauri | FRONT-REACT |
+| `FRONT-FLUTTER` | L | One Dart codebase → iOS/Android/Windows/macOS/Linux/web. **Per-app, mobile-first only**: web-first (golden rule 5) is waived in that app's brief; own integration-test journey suite | SPEC; demand |
+| `DB-SQLSERVER` | M | Second Tier-A DB for the .NET and Spring flavors: security-policy RLS + `SESSION_CONTEXT` interceptor (set per connection open — pooled-connection trap), READPAST/UPDLOCK claim, poll-only dispatcher, DDL dialect for the RLS parity gate | SPEC; demand |
+| `SCAFFOLD` | M | `perezosoft new --backend <x> --frontend <y> --db <z>` composes pinned pieces + runs the rebrand | ≥ 2 backends and ≥ 2 frontends exist |
+
+**Support matrix (only these rows get CI in the conformance matrix; the spec allows any Tier-A DB ×
+backend × frontend):**
+
+| # | Backend | Frontend | DB | Status |
+|---|---|---|---|---|
+| 1 | ASP.NET Core | Blazor WASM + MAUI hybrid | Postgres | ✅ exists (`platform-dotnet`, the reference) |
+| 2 | ASP.NET Core | React + Capacitor/Tauri | Postgres | proves the frontend seam |
+| 3 | NestJS | React | Postgres | the JS flavor |
+| 4 | Go | React | Postgres | |
+| 5 | Spring Boot | React, Angular | Postgres | Angular ships with Spring |
+| 6 | FastAPI | React | Postgres | |
+| 7 | ASP.NET Core, Spring | any | SQL Server | alternate Tier-A DB |
+| 8 | any | Flutter | any | mobile-first apps only |
+
+**Mobile + desktop options per frontend family:**
+
+| Family | Web | Hybrid shell (shares web code + Playwright) | True native (own suite) | Desktop |
+|---|---|---|---|---|
+| Blazor | Blazor WASM | MAUI Blazor Hybrid ✅ | — | MAUI ✅ |
+| React | Vite SPA | Capacitor | Expo / React Native (`NATIVE-RN`) | Tauri (Electron rejected: size) |
+| Angular | SPA | Capacitor (Ionic's home turf) | — (NativeScript rejected: niche) | Tauri |
+| Flutter | Flutter web (second-class) | n/a — native by construction | Flutter | Flutter |
+
+**Order:** SPEC → FRONT-REACT → BACK-NODE → BACK-GO → (Spring + Angular) → FastAPI → RN/Flutter/SQL
+Server/Scaffold as demand appears. **Stop rule:** a flavor is only "supported" while its matrix cell is
+green at the current spec version; otherwise it is demoted to "community" in the spec README.
+
