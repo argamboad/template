@@ -42,8 +42,11 @@ device hitting `localhost:5238` (the app *and* the in-app browser tab) reaches y
 
 ## 3. Run the app
 
-From Visual Studio: select the Android target + your emulator, F5. Or CLI (emulator already
-running):
+From Visual Studio: select the Android target + your emulator, F5. From VS Code: the shared
+`.vscode/launch.json` has **API**, **Web**, **Android** (needs the .NET MAUI extension; pick the
+Debug Target once in the status bar) and the compounds **API + Web** / **API + Android**;
+`.vscode/tasks.json` adds **android: run** (emulator, no debugger) and **android: run on phone**
+(USB, `-p:AdbTarget=-d`). Or CLI (emulator already running):
 
 ```bash
 dotnet build src/Maui/Perezosoft.Maui.csproj -t:Run -f net10.0-android

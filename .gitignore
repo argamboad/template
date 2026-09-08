@@ -22,3 +22,6 @@ node_modules/
 
 # MAUI lockfile — excluded by design (NATIVE-1): platform-conditional restore makes it churn
 src/Maui/packages.lock.json
+
+# VS Code: launch.json + tasks.json are shared (F5 API + Web, Android tasks); per-user preferences stay local
+.vscode/settings.json
