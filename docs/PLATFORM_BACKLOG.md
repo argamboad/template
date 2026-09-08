@@ -30,6 +30,7 @@
 | 8 | ~~Admin back-office + impersonation~~ → **✅ DONE** (ADR-014, `stories/admin.md`) | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
 | 9 | Distributed cache (Redis) | `CACHE` | Only once you scale past one node | none (defer hard) |
 | 10 | ~~Postgres RLS tenancy backstop~~ (§11) → **✅ DONE** (ADR-020 + addendum) | `RLS` | Was the prod-activation prerequisite; built 2026-07-06 | none |
+| 11 | Local + self-hosted CI (§13) → **PLANNED** (ROADMAP post-terminal wave, 2026-09-08) | `LOCALCI` | Actions minutes are the finished platform's only running cost pressure | none (repo private) |
 
 ---
 
@@ -242,6 +243,43 @@ silently seeing 0 rows (the RLS-2/RLS-8 bug shape).
   site turns a working auth endpoint into a production 500. Adopt seam-first in a downstream
   greenfield or a future major refactor, not as a retrofit.
 - **Deps:** none. **Size:** ~1 slice + an adoption sweep; the sweep is the risk.
+
+## 13. Local + self-hosted CI — `LOCALCI` → **PLANNED (ROADMAP post-terminal wave, 2026-09-08; stories written: `docs/stories/localci.md`)**
+**What:** run the CI gates on the maintainer's own hardware — (a) self-hosted GitHub runners that
+`ci.yml` selects through repo variables, hosted runners as the always-available fallback; (b) a local
+pre-push gate runner that mirrors the PR-blocking jobs with GitHub uninvolved.
+**Why:** Actions minutes. macOS jobs bill at 10×, Windows at 2×; the Apple build + smoke pair on every
+develop push is the bulk of the spend. A free-tier project shouldn't pay hosted rates for platform CI
+it can run on a desk — and the switch-back must be a settings toggle, not a commit.
+**Sketch / hooks:**
+- **Piece 1 — switchable `runs-on` (the saving; LOCALCI-1).** One edit to `ci.yml`: each hosted label
+  becomes `${{ vars.CI_<OS>_RUNNER || '<hosted-label>' }}` — `CI_LINUX_RUNNER` / `CI_WINDOWS_RUNNER` /
+  `CI_MACOS_RUNNER`, each flipping independently (the `native-build` matrix `os` values go through the
+  same expression). Runner agents: Windows desktop for the Windows leg (a WSL- or Docker-based Linux
+  runner covers the Ubuntu jobs if wanted), MacBook for the Apple legs (launchd service — jobs queue
+  while the lid is shut, expire after 24 h, re-run is one click). `deploy-staging` / `deploy-prod` keep
+  hosted labels: short, and must not depend on a desk being awake. Switching back = delete the
+  variable; the workflow file never changes again.
+- **Piece 2 — local gate runner (LOCALCI-2).** Already prototyped on the unpushed branch
+  `ci/local-gates` (commit a624329): `ci-local.ps1`, a native mirror of build-test / qa-artifacts
+  (+ append-only guard) / secret-scan (gitleaks via docker) / license-scan, opt-in `-E2E` /
+  `-DockerBuild` / `-NativeWindows` / `-All`; all four defaults ran in ~2 min on the dev box. Needs a
+  **drift tripwire** before landing — e.g. a test asserting the script's gate list matches the `ci.yml`
+  job list, or extracting the shared steps into composite actions both consume. Rejected alternative:
+  `nektos/act` (faithful, but on this stack it re-downloads the SDK per run inside Docker, ~10 min+,
+  can't run the Windows leg, and the Postgres/Mailpit service containers need privileged fiddling).
+- **Piece 3 — trigger diet (LOCALCI-3).** `native-paths` already skips the Apple/smoke legs on
+  docs-only pushes; extend the same paths gate to the remaining non-deploy jobs, and consider moving
+  the Apple smoke to `workflow_dispatch` + a weekly `schedule`.
+**Constraints:** the repo **must stay private** while self-hosted runners are attached (a fork PR
+would otherwise execute on the desk); self-hosted machines are not clean — `global.json`
+(`rollForward: disable`) + the committed lockfiles + the CLAUDE.md bump-together playbook stay the
+toolchain-drift authority; runner registration tokens and labels live in GitHub settings, never in
+the repo.
+**Deps:** none. **Size:** M — LOCALCI-1 ≈ 1 slice + two runner registrations; LOCALCI-2 ≈ 1 slice
+(mostly landed); LOCALCI-3 ≈ S.
+
+---
 
 ## Not planned (explicitly out unless a need appears)
 - **Full-text / vector search** — Postgres FTS covers a lot before reaching for a search engine.

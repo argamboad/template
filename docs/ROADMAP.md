@@ -152,5 +152,30 @@ platform's terminal environment) are **downstream-app work**, executed per app v
 `NEW_APP_GUIDE.md` Phases 8–9. The **v3 delta audit** (2026-07-15 → 07-27, 62 tasks, PRs
 #147–#191) then hardened the finished platform rather than extending it — FOUNDATION_RULES v2.0
 is the resulting quality bar. What remains here is by-choice backlog (HOOKS-3 UI, API-key
-rotation, CACHE, FR/DE/PT — see above) and maintenance: toolchain drift, QA findings (§14a re-runs
-+ QA-AND-15 are the open device items), and keeping docs/CI honest as downstream apps report back.
+rotation, CACHE, FR/DE/PT — see above), maintenance: toolchain drift, QA findings (§14a re-runs
++ QA-AND-15 are the open device items), and keeping docs/CI honest as downstream apps report back —
+and the **post-terminal cost wave** below, which makes the finished platform cheaper to keep green.
+
+---
+
+## Post-terminal wave — cost & maintenance (planned 2026-09-08)
+
+The platform is feature-complete, so post-terminal work is about **running it cheaper and keeping it
+honest**, not extending it. First item: GitHub Actions minutes.
+
+| Item | Epic | Size | Why | Deps |
+|------|------|------|-----|------|
+| **Local + self-hosted CI** — run the gates on the maintainer's own machines, with hosted runners as a toggle-back fallback (design: `PLATFORM_BACKLOG.md` §13; **pick-up-ready stories: `stories/localci.md`**, ADR-025 draft inside) | `LOCALCI` | M | macOS jobs bill at 10× and Windows at 2×; one develop push (Apple build + smoke) can cost more than everything else that month. A local gate runner also shortens the pre-push loop. | none — repo stays private |
+
+**Slices** (each independently valuable — stop after any):
+
+| Slice | What | Saves |
+|-------|------|-------|
+| **LOCALCI-1** — switchable runners | Every `runs-on` in `ci.yml` reads a per-OS repo variable with the hosted label as fallback; self-hosted runner agents on the Windows desktop (+ optional Linux via WSL/Docker) and the MacBook. Set the variable → the job runs at home for 0 minutes; delete it → snaps back to hosted. Deploy jobs stay hosted. | ~all of the 10×/2× minutes |
+| **LOCALCI-2** — local gate runner | Land the parked `ci-local.ps1` (branch `ci/local-gates`: native mirror of build-test / qa-artifacts / secret-scan / license-scan, opt-in E2E / Docker / native-Windows) behind a drift tripwire so the mirror can't silently diverge from `ci.yml`; `WAYS_OF_WORKING.md` "run the gates locally first". | red pushes (each re-bills every job) |
+| **LOCALCI-3** — trigger diet | `native-paths` already skips the Apple/smoke legs on docs-only pushes; extend the same paths gate to every non-deploy job and consider `workflow_dispatch` + weekly schedule for the Apple smoke. | the long tail |
+
+**Order:** 1 → 2 → 3 (measured: ≈190 billed min per develop code push today, ≈157 of them macOS/Windows). LOCALCI-1 is the money; 2 and 3 are quality-of-life. Binding constraints: the
+repo stays **private** while runners are attached; queued Apple jobs wait for the Mac to be online
+(24 h expiry, one-click re-run); self-hosted runners are not clean machines, so `global.json` + the
+lockfiles + the CLAUDE.md bump-together playbook remain the toolchain-drift authority.
