@@ -321,6 +321,12 @@ sweep is a scheduled job (JOBS-3).
 > **without fabricating a status** (Stripe stays source of truth; entitlements already fail closed on a
 > lapsed period). Tests: `BillingWebhookHandlerTests` (past-due notifies once; no-change doesn't) +
 > `SubscriptionLapseSweepJobTests` (nudge-once + stamp; in-period ignored).
+>
+> **Addendum (2026-09-07, first real checkout on a downstream app):** the lifecycle also gets its one
+> good-news notice — `billing.activated` ("Subscription active", plan + renewal date) on a transition
+> **into** `active`/`trialing` from nothing or from a lapsed state (first activation, resubscribe). A renewal
+> and a trial converting are silent. Payment *receipts* stay Stripe's job (Customer emails → Successful
+> payments). `BillingWebhookHandlerTests.SubscriptionActivated_*` / `Resubscribe_*` / `TrialConverting_*`.
 
 **Acceptance criteria**
 
