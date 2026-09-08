@@ -282,7 +282,7 @@ the repo.
 
 ---
 
-## 14. Stack flavors — `FLAVORS` → **PLANNED (ROADMAP flavors wave, 2026-09-08)**
+## 14. Stack flavors — `FLAVORS` → **PLANNED (ROADMAP flavors wave, 2026-09-08; stories written: `docs/stories/flavors.md`)**
 **What:** ship the platform for other stacks as *flavors* — template repos that implement the same
 contract — plus interchangeable pieces (backend × frontend × DB) composed by a scaffold CLI. Decided
 set (2026-09-08): fronts **React, Angular, Flutter** (+ Blazor); backs **Node/NestJS, Go, Spring,

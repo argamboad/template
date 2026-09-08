@@ -189,7 +189,9 @@ Java, Go, or Python developer gets nothing from it today. The durable asset is n
 **contract** around it (constant decisions, the 76 foundation rules, data model, feature flows, the
 Postman collection as API contract, the Gherkin stories, the QA plan, the audit suite). This wave
 turns that contract into a stack-neutral **spec** with a **conformance kit**, and then ships other
-stacks as **flavors** that pass the same kit. Design detail: `PLATFORM_BACKLOG.md` §14.
+stacks as **flavors** that pass the same kit. Design detail: `PLATFORM_BACKLOG.md` §14; **pick-up-ready
+stories for every epic (SPEC slices 1–5 with the R1–R76 K/S/P/X classification, the slice ladder per
+backend, the screen ladder per frontend, ADR-026 + S-001…S-003 drafts): `stories/flavors.md`.**
 
 **Decisions taken 2026-09-08 (record as ADRs when `SPEC` is picked up):**
 - **Spec-first, repo per piece.** A `spec` repo (docs + conformance kit + the conformance matrix
