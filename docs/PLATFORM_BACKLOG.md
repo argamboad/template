@@ -30,6 +30,8 @@
 | 8 | ~~Admin back-office + impersonation~~ → **✅ DONE** (ADR-014, `stories/admin.md`) | `ADMIN` | Support/debugging at scale | Audit (ADR-008) required |
 | 9 | Distributed cache (Redis) | `CACHE` | Only once you scale past one node | none (defer hard) |
 | 10 | ~~Postgres RLS tenancy backstop~~ (§11) → **✅ DONE** (ADR-020 + addendum) | `RLS` | Was the prod-activation prerequisite; built 2026-07-06 | none |
+| 11 | Local + self-hosted CI (§13) → **PLANNED** (ROADMAP post-terminal wave, 2026-09-08) | `LOCALCI` | Actions minutes are the finished platform's only running cost pressure | none (repo private) |
+| 12 | Stack flavors — spec + conformance kit + React/Angular/Flutter fronts, Node/Go/Spring/FastAPI backs, tiered DBs (§14) → **PLANNED** (ROADMAP flavors wave, 2026-09-08) | `FLAVORS` | The platform's value is its contract, not its C#; other stacks' devs get nothing from it today | `SPEC` epic first |
 
 ---
 
@@ -242,6 +244,131 @@ silently seeing 0 rows (the RLS-2/RLS-8 bug shape).
   site turns a working auth endpoint into a production 500. Adopt seam-first in a downstream
   greenfield or a future major refactor, not as a retrofit.
 - **Deps:** none. **Size:** ~1 slice + an adoption sweep; the sweep is the risk.
+
+## 13. Local + self-hosted CI — `LOCALCI` → **PLANNED (ROADMAP post-terminal wave, 2026-09-08; stories written: `docs/stories/localci.md`)**
+**What:** run the CI gates on the maintainer's own hardware — (a) self-hosted GitHub runners that
+`ci.yml` selects through repo variables, hosted runners as the always-available fallback; (b) a local
+pre-push gate runner that mirrors the PR-blocking jobs with GitHub uninvolved.
+**Why:** Actions minutes. macOS jobs bill at 10×, Windows at 2×; the Apple build + smoke pair on every
+develop push is the bulk of the spend. A free-tier project shouldn't pay hosted rates for platform CI
+it can run on a desk — and the switch-back must be a settings toggle, not a commit.
+**Sketch / hooks:**
+- **Piece 1 — switchable `runs-on` (the saving; LOCALCI-1).** One edit to `ci.yml`: each hosted label
+  becomes `${{ vars.CI_<OS>_RUNNER || '<hosted-label>' }}` — `CI_LINUX_RUNNER` / `CI_WINDOWS_RUNNER` /
+  `CI_MACOS_RUNNER`, each flipping independently (the `native-build` matrix `os` values go through the
+  same expression). Runner agents: Windows desktop for the Windows leg (a WSL- or Docker-based Linux
+  runner covers the Ubuntu jobs if wanted), MacBook for the Apple legs (launchd service — jobs queue
+  while the lid is shut, expire after 24 h, re-run is one click). `deploy-staging` / `deploy-prod` keep
+  hosted labels: short, and must not depend on a desk being awake. Switching back = delete the
+  variable; the workflow file never changes again.
+- **Piece 2 — local gate runner (LOCALCI-2).** Already prototyped on the unpushed branch
+  `ci/local-gates` (commit a624329): `ci-local.ps1`, a native mirror of build-test / qa-artifacts
+  (+ append-only guard) / secret-scan (gitleaks via docker) / license-scan, opt-in `-E2E` /
+  `-DockerBuild` / `-NativeWindows` / `-All`; all four defaults ran in ~2 min on the dev box. Needs a
+  **drift tripwire** before landing — e.g. a test asserting the script's gate list matches the `ci.yml`
+  job list, or extracting the shared steps into composite actions both consume. Rejected alternative:
+  `nektos/act` (faithful, but on this stack it re-downloads the SDK per run inside Docker, ~10 min+,
+  can't run the Windows leg, and the Postgres/Mailpit service containers need privileged fiddling).
+- **Piece 3 — trigger diet (LOCALCI-3).** `native-paths` already skips the Apple/smoke legs on
+  docs-only pushes; extend the same paths gate to the remaining non-deploy jobs, and consider moving
+  the Apple smoke to `workflow_dispatch` + a weekly `schedule`.
+**Constraints:** the repo **must stay private** while self-hosted runners are attached (a fork PR
+would otherwise execute on the desk); self-hosted machines are not clean — `global.json`
+(`rollForward: disable`) + the committed lockfiles + the CLAUDE.md bump-together playbook stay the
+toolchain-drift authority; runner registration tokens and labels live in GitHub settings, never in
+the repo.
+**Deps:** none. **Size:** M — LOCALCI-1 ≈ 1 slice + two runner registrations; LOCALCI-2 ≈ 1 slice
+(mostly landed); LOCALCI-3 ≈ S.
+
+---
+
+## 14. Stack flavors — `FLAVORS` → **PLANNED (ROADMAP flavors wave, 2026-09-08; stories written: `docs/stories/flavors.md`)**
+**What:** ship the platform for other stacks as *flavors* — template repos that implement the same
+contract — plus interchangeable pieces (backend × frontend × DB) composed by a scaffold CLI. Decided
+set (2026-09-08): fronts **React, Angular, Flutter** (+ Blazor); backs **Node/NestJS, Go, Spring,
+FastAPI** (+ ASP.NET Core); **Expo/React Native** as true-native mobile for the React family; DBs
+tiered (below). Sequencing + support matrix + native/desktop table: `ROADMAP.md` flavors wave.
+**Why:** Vuelto proved clone-and-rebrand works for a .NET shop only. The durable asset is the contract
+(decisions, R1–R76, data model, flows, Postman collection, stories, QA plan, audit suite). A JS/Java/
+Go/Python dev should inherit it too — and a downstream app should be able to say ".NET back, React
+front, SQL Server".
+**Sketch / hooks:**
+- **`SPEC` first (the enabler).** Extract the stack-neutral docs from this repo into a `spec` repo,
+  semver-tagged. Restate every rule as an **outcome**, not a Postgres/.NET mechanism — e.g. R-RLS
+  becomes "a second tenant wall exists *below application code* and the adversarial tenant tests prove
+  it". Classify R1–R76: **HTTP-observable** (→ the conformance kit: Newman over the Postman collection,
+  the Playwright journeys, the §14a adversarial tenant-isolation cases) vs **code-structural** (→ each
+  flavor re-implements as arch tests with its stack's tool: NetArchTest / dependency-cruiser +
+  eslint-boundaries / ArchUnit / import-linter / go-arch-lint). Add a **test-id contract**: every element
+  the journeys touch has a spec-named `data-testid`; the suite selects only by those, so one suite runs
+  against every DOM frontend (retrofit Blazor in `FRONT-REACT`). The kit must pass against
+  `platform-dotnet` before anything else claims a spec version. A **conformance-matrix workflow** in
+  `spec` boots every supported combo from its compose file and runs the kit — a red cell = a flavor
+  lagging a spec bump ("chained for changes", made mechanical). Fan-out rule: a spec change opens one
+  port issue per flavor; no flavor claims the new version until its cell is green.
+- **Repo layout (repo per piece, not a monorepo):** `spec` · `platform-dotnet` (this repo — the
+  integrated reference: backend + Blazor + MAUI stay together, Blazor shares types with the backend and
+  does not split cleanly) · `backend-node` / `backend-go` / `backend-spring` / `backend-fastapi` ·
+  `frontend-react` / `frontend-angular` / `frontend-flutter` · `native-rn` · `scaffold`. Each piece pins
+  `SPEC_VERSION` and runs the kit in its own CI. Why not subfolders: "use this template" must yield ONE
+  stack; per-stack toolchains/lockfiles/Dependabot/CLAUDE.md collide in one repo; this repo's history
+  and audit trail (commit/PR references) must stay put.
+- **Per-stack tooling (the choices, so they aren't re-debated):**
+
+  | Backend | Web framework | Data / migrations | Validation | Arch tests |
+  |---|---|---|---|---|
+  | Node | NestJS on Fastify (DI/modules mirror ASP.NET) | Drizzle (SQL-close → per-tx `SET LOCAL` for RLS is trivial; Prisma fights it) | Zod | dependency-cruiser |
+  | Go | chi | pgx + sqlc + goose/Atlas; **repository layer is the first tenant wall** (no ORM filter) + ban raw pgx outside it | — | go-arch-lint |
+  | Spring | Spring Boot (Java/Kotlin) | Hibernate filters (≡ EF global filters) + Flyway | Bean Validation | ArchUnit |
+  | FastAPI | FastAPI | SQLAlchemy 2 + Alembic | Pydantic | import-linter |
+
+  Fronts: React = Vite + TS + TanStack Query/Router (Next.js rejected: its server blurs the API
+  boundary, golden rule 2); Angular = closest paradigm to Blazor (DI, services, typed forms, i18n) →
+  most mechanical port, ships with Spring for enterprise shops; Flutter = per-app only (below).
+- **DB tiers (the tenancy defense lives here — never free-choice):**
+
+  | Tier | Engines | Second wall | Queue claim | Wake |
+  |---|---|---|---|---|
+  | A | Postgres + real Postgres services (Neon, Supabase, RDS/Aurora, Azure, Cloud SQL, AlloyDB) | RLS policies | SKIP LOCKED | NOTIFY |
+  | A | SQL Server / Azure SQL | security policies (filter + block predicates), `SESSION_CONTEXT` read-only; applies to every user incl. dbo | READPAST + UPDLOCK | poll |
+  | A (request) | Oracle (VPD), IBM Db2 (RCAC) | native | SKIP LOCKED / engine-specific | AQ / poll |
+  | A by proof | CockroachDB (RLS 2025), YugabyteDB | Postgres-syntax RLS | SKIP LOCKED | changefeeds (no NOTIFY) — only if the kit's RLS + SKIP LOCKED probes pass |
+  | B (signed downgrade) | MySQL / MariaDB / TiDB | none native — app filter only | SKIP LOCKED | poll |
+  | Isolation-shaped | MongoDB (DB per tenant), SQLite via Turso/D1 (DB per tenant), DynamoDB (IAM leading keys per scoped STS credential) | physical / credential | findOneAndUpdate lease / n/a | change streams / n/a |
+  | Not applicable | Firestore rules (bypassed by server SDKs), Redis, Cassandra/Scylla, Elasticsearch, analytics engines | — | — | — |
+
+  **Ask-for-Mongo playbook:** (1) offer Postgres **JSONB** for the app's domain documents on the
+  platform's relational skeleton — zero platform change, ~80 % of the DX; (2) **Mongo Isolated**
+  (database per tenant, JSON-schema validators requiring the tenant field, multi-document transactions
+  ⇒ replica set mandatory incl. local compose, change streams for wake, RBAC insert+find-only role for
+  the append-only audit log, migrate-mongo + validator-drift test) = Tier A; (3) **Mongo Shared** (tenant
+  field + driver command interceptor rejecting unscoped filters + arch ban on raw driver use) = Tier B,
+  downgrade signed in the app brief. SQL Server trap to record in `DB-SQLSERVER`: session context is
+  session-scoped, so the interceptor must set it on **every connection open** (pool reset is the net,
+  the interceptor is the wall); upside: `ExecuteUpdate` needs no tags (the Npgsql tag-rendering gap
+  disappears).
+- **Native/desktop tiers:** *hybrid shell* (web UI in a native shell — MAUI Blazor Hybrid ✅,
+  Capacitor for React/Angular mobile, Tauri for desktop; shares the web code and the Playwright suite)
+  vs *true native* (Expo/React Native for the React family — shares the TS API client + hooks; Flutter
+  for all six targets; each with its own journey suite). Electron rejected (size vs Tauri); NativeScript
+  rejected (niche). **Flutter is per-app, mobile-first only:** Flutter web is canvas-rendered
+  (bundle, SEO, a11y) so golden rule 5 (web-first) is waived in that app's brief, and Playwright can't
+  drive it → it is the one frontend outside the shared-suite economy.
+- **Rejected (don't re-explore):** Vue/Svelte (audience overlap, no structural edge), Next.js, Django
+  (built-in auth pulls toward the Identity-style model ADR-002 rejected), Rust/Axum (no audience yet),
+  a monorepo, a free-choice DB.
+**Constraints:** a flavor is "supported" only while its matrix cell is green at the current spec
+version (else demoted to "community"); the reference implementation gates the spec (nothing merges to
+`spec` until `platform-dotnet` passes it); the DB-tier rule and the web-first waiver are ADRs in `spec`.
+**Deps:** `SPEC` before everything; `SCAFFOLD` after ≥ 2 backends and ≥ 2 frontends exist.
+**Size:** SPEC L; each backend flavor L (≈ 40–60 % of the original build — the design is done; the
+persistence/outbox/auth layers are the bulk); each DOM frontend L (every screen + native shells; the
+test-id contract is what makes the *second* one cheaper); Flutter L; RN M; SQL Server M; Scaffold M.
+**The real cost is not building — it is keeping N flavors at the Definition of Solid** (the v3 audit
+alone was 62 tasks). Only the spec + kit + matrix make that affordable; without all three the flavors
+drift into separate products within a quarter.
+
+---
 
 ## Not planned (explicitly out unless a need appears)
 - **Full-text / vector search** — Postgres FTS covers a lot before reaching for a search engine.
