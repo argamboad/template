@@ -495,6 +495,15 @@ dissolved, admin access). The `AuditAppendOnlyInterceptor` is present but **only
 declarative auto-audit-on-SaveChanges interceptor remains an optional future add (also noted in
 `docs/ROADMAP.md`).
 
+*Amendment (2026-09-07):* **log records are exported through OpenTelemetry too** (`WithLogging` + the OTLP
+log exporter on the same config-gated endpoint, `/v1/logs`), carrying the rendered message, the request
+scope and the trace/span ids. Found on the first downstream app's staging: a failed Stripe call showed up
+in Grafana as a trace with a 400 span and nothing else — the error's text lived only on Render's log
+stream, so the operator had to read two consoles to understand one failure. The console providers stay
+(the host's own stream); nothing is exported when no endpoint is configured, as before. The metrics also
+gain the .NET runtime (GC, heap, CPU, thread pool — `OpenTelemetry.Instrumentation.Runtime`) and the Npgsql
+connection-pool meter: on a small host these say "too small" or "leaking" long before any request errors.
+
 **ADR-009 — RBAC: a third `admin` role + a permission seam (capability checks, not role checks). (2026-06-30)**
 The platform shipped with exactly two tenant roles — `owner` and `member` — enforced by `IsOwner(...)`
 boolean checks copied across every tenant controller (`HouseholdController`,
