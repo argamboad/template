@@ -158,6 +158,14 @@ and gated so docs-only changes skip the native legs entirely. This is the DevOps
 extended to the hardest-to-test surface: even a canary that only proves "the Apple app still boots to
 a login screen" would have caught G7 the day it landed.
 
+One more thing the smoke does not cover, because it installs through `adb`: **the package installer's
+own rules.** A Release APK built without a keystore is signed by the old jarsigner path — APK
+Signature Scheme v1 only — and Android 11+ refuses it *silently*: tap the file, nothing happens. The
+first downstream app hit this on its first sideload. The csproj now forces the `apksigner` path in
+Release (v2 + v3), using the developer's debug key unless the store keystore properties are supplied,
+and `docs/DEPLOYMENT.md` §9 is the "build me an installable against host X" recipe (Android APK,
+Windows unpackaged folder, the `ApiBaseUrl` rule, the native callback scheme the host must allow).
+
 > **A red build you'll hit the moment you add `src/Maui` — the arch test vs XAML code-behind.** The
 > `SourceFile_DeclaresATypeMatchingItsName` arch test (3.3) — "a file `Foo.cs` should declare a type
 > `Foo`" — scans *all* of `src/`, and MAUI's XAML code-behind breaks its naming assumption: the file
