@@ -25,3 +25,6 @@ src/Maui/packages.lock.json
 
 # VS Code: launch.json + tasks.json are shared (F5 API + Web, Android tasks); per-user preferences stay local
 .vscode/settings.json
+
+# Native installables (DEPLOYMENT §9 publishes to out/android and out/windows)
+out/
