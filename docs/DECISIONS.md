@@ -63,6 +63,12 @@ Docs: PROJECT_BRIEF, FEATURES, DATA_MODEL, TECH_STACK, DECISIONS, WAYS_OF_WORKIN
 LOCALIZATION, MOBILE_TESTING, QA_TEST_PLAN, CLAUDE.md, plus per-epic stories under `docs/stories/`.
 User stories generated per-epic at build time, not upfront. *Rationale:* lean, persistent context for solo +
 Claude Code; stories stay grounded in real screens.
+> *Amendment (2026-09-08, first downstream app):* **app decisions carry an app prefix** (`JJ-001…`
+> for JiggerJot) in a closing section of the same `DECISIONS.md`, because `ADR-001+` here are the
+> platform's own build decisions (logged while the platform was built as its own app) and a downstream
+> app's `ADR-001` would collide. Platform decisions stay `ADR-…`/`ADR-C…`; when the two disagree, the
+> platform wins and the app logs a prefixed decision. The intro note above and `NEW_APP_GUIDE.md`
+> Phase 2 say the same.
 
 ---
 
@@ -86,6 +92,14 @@ run simultaneously without conflicts (the API/Web app ports are fixed in their l
 condition: service_healthy`. No pgAdmin in the platform — devs use their own DB client.
 *Rationale:* PostgreSQL is always needed; Mailpit traps passwordless + invitation email in dev with
 zero config; env-var ports prevent port clashes across projects.
+> *Amendment (2026-09-08, first downstream app):* env-driven **compose** ports are not enough when two
+> apps from this platform share a machine. The **app** ports are pinned in the launch profiles and
+> mirrored in ~40 files (dev `appsettings` CORS/`AppBaseUrl`/SMTP port, the Web client's `ApiBaseUrl`,
+> the MAUI fallbacks + `adb reverse`, the E2E and Android-smoke Mailpit defaults, CI's host-side Mailpit
+> mappings, the Postman local environment, the docs), and `APP_PORT` for the prod-like `app` compose
+> service was undocumented. Every downstream app must **re-pin a free set before Phase 4**
+> (`NEW_APP_GUIDE.md` → "Phase 3 → ports"); `APP_PORT` is now in `.env.example`. Single-sourcing the
+> app ports is a backlog item (`PLATFORM_BACKLOG.md` §15).
 
 **ADR-C14 — Testing: 100% TDD; unit tests (xUnit) + E2E (Playwright/NUnit). (2026-06-17)**
 All production code is test-driven (red-green-refactor). Unit tests (xUnit) in `Core.Tests` and

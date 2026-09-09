@@ -46,14 +46,33 @@ conversation is about *your product*.
 `DECISIONS.md` — plus three things the next phase needs: an **app name**, the **tenant's
 app-facing label** (Team? Workspace? Household?), and a **logo file** (SVG or large PNG).
 
+Two traps the first downstream app fell into, so the conceptualization avoids them:
+- **Don't re-model `Tenant` and `User`.** They are platform entities; tenancy is a
+  `TenantMembership` row, not a `tenant_id` on `User` (ADR-003). The app's `DATA_MODEL.md` references
+  them and adds only per-user preference fields.
+- **If the app has a shared, seeded catalog next to tenant-owned rows** (recipes, templates, a product
+  list), decide *before Phase 5* how `tenant_id = null` rows coexist with the global tenant filter and
+  RLS, which hide them by default. A platform primitive for this is on the backlog
+  (`PLATFORM_BACKLOG.md` §15); until it lands, the app owns the decision and logs it.
+
 ## Phase 2 — Create the repo
 
 1. Copy the platform tree into a new repository (don't fork — a new app is not a branch of the
-   platform): `git clone`, remove `.git`, `git init`, point at your new GitHub remote.
-2. Drop the Phase-1 docs into `docs/`.
-3. Create the two branches and protect them: **`main` is deploy-only** (protect it; nothing lands
+   platform): `git clone`, remove `.git`, `git init`, point at your new GitHub remote. **Or adopt it
+   into a repo you already have** (a docs-only repo from Phase 1, with its remote and branches):
+   `git -C <platform> ls-files -z | tar --null -T - -cf - | (cd <app> && tar -xf -)` brings exactly
+   the tracked files — no `.env`, build output or user files — and keeps your history.
+2. **Merge** the Phase-1 docs into `docs/` — it is a merge, not a drop. The skeletons have `_TODO_`
+   slots; keep the constant sections, fill the slots, and in `FEATURES.md` number the app's flows
+   **after** the six constant flows (§7 onward) so cross-references stay unambiguous. In
+   `DATA_MODEL.md` reference the platform's `Tenant`/`User`, never re-model them (ADR-003 tenancy is
+   membership-based — there is no `tenant_id` on `User`).
+3. **Number app decisions with an app prefix** (`JJ-001…` for JiggerJot) in a closing section of
+   `docs/DECISIONS.md`. The plain `ADR-001+` range is taken by the platform's own build decisions
+   (ADR-C11 amendment); cite those as `ADR-…`/`ADR-C…`.
+4. Create the two branches and protect them: **`main` is deploy-only** (protect it; nothing lands
    there except release merges), **`develop` is the working branch** — one branch + PR per slice.
-4. Push. **CI runs immediately and should be green** (build, ~500 tests, secret/license/QA-doc
+5. Push. **CI runs immediately and should be green** (build, ~500 tests, secret/license/QA-doc
    gates, native builds, browser E2E). The deploy jobs stay skipped until Phase 7's secrets exist.
 
 ## Phase 3 — Rebrand + fill the placeholders (first Claude Code session)
@@ -69,6 +88,28 @@ Open Claude Code in the repo and use **the expected first prompt from `README.md
 - Fills the `CLAUDE.md` TODOs (app-specific golden rules, conventions) from your Phase-1 docs.
 - Verifies: `git grep -i perezosoft` returns nothing, and a test OTP email arrives with the new
   brand.
+
+### Phase 3 → ports: re-pin before the first run
+
+If anything else from this platform runs on the same machine — the platform itself, another
+downstream app — the defaults collide. `docker ps` first: every compose stack binds Postgres and
+Mailpit host ports from its own `.env`. The **app** ports are pinned in the launch profiles and
+mirrored across the tree, so pick a free set and change it everywhere in **one** pass, then re-run
+restore/build/tests. JiggerJot took API `7260`/`5338`, Web `7108`/`5269`, `DB_PORT=5435`,
+`MAIL_SMTP_PORT=1027`, `MAIL_UI_PORT=8027`, `APP_PORT=8280`; the platform sits on `7160`/`5238`,
+`7008`/`5169`, `5433`, `1025`/`8025`, `8080`.
+
+Where the app ports live: both `Properties/launchSettings.json`; `src/Api/appsettings.Development.json`
+(SMTP port, CORS origins, `Auth:AppBaseUrl`); `src/Web/wwwroot/appsettings.json` (`ApiBaseUrl`);
+`MauiProgram.cs` fallbacks and the `adb reverse` lines in the MAUI `.csproj`; `tests/E2E.Tests`
+(`E2ETestBase`, `Mailpit.cs`, `playwright.runsettings`, README); `tests/native-smoke-android/smoke.js`;
+`ci.yml` (the app URLs, and the **host** side of the Mailpit service mappings — `"1025:1025"` →
+`"1027:1025"`, container side unchanged); `docs/postman/*.local.postman_environment.json`;
+`.env.example` (`*_PORT` and the connection string); the docs. Leave `docker-compose.yml` alone —
+`.env` overrides its `${VAR:-default}` fallbacks — and, when doing a numeric replace, exclude vendored
+`wwwroot/lib` (Bootstrap uses `5169` as a timing constant), lockfiles, audit logs and any seed data.
+Compose already namespaces containers, network and the `db_data` volume by folder name, so no rename
+is needed there.
 
 ## Phase 4 — First local run
 
