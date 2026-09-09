@@ -230,7 +230,7 @@ adversarial tests are **TypeScript on Vitest + undici** (small, no framework, re
 flavor author) — they are the new code; probes are SQL scripts run through the flavor's DB connection.
 
 **Steps**
-1. `kit/Dockerfile`: `mcr.microsoft.com/dotnet/sdk:10.0.400` base (pinned like `global.json`) +
+1. `kit/Dockerfile`: `mcr.microsoft.com/dotnet/sdk:10.0.401` base (pinned like `global.json`) +
    Node LTS + Newman + Playwright Chromium (`playwright.ps1 install --with-deps chromium`). Entrypoint
    `kit.sh` with the four flags; exit code = worst of the four stages; JUnit XML to `/out`.
 2. **Newman stage:** `newman run kit/postman/Perezosoft.postman_collection.json -e local --env-var
