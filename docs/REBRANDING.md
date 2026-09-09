@@ -36,6 +36,14 @@ mechanically, case-preserving, over `git ls-files` only, then run restore/build/
    text and **must** be rewritten — the project-reference names live in them — and locked-mode
    restore then passes without `--force-evaluate`.
 5. Rename the platform's palette constants while you are in `BrandedEmail.cs` (§4).
+6. **Regenerate the GENERATED binaries** — step 4 skips binaries, but two of them are built from
+   files the rename just rewrote, and CI compares them against a fresh generation:
+   - `docs/QA_TEST_GUIDE.pdf` + `docs/QA_RUN_LOG.pdf` are generated from `docs/QA_TEST_PLAN.md`.
+     Run `pip install -r docs/requirements.txt` then `cd docs && python gen_qa_guide.py &&
+     python gen_qa_runlog.py && python check_qa_artifacts.py`. Skip this and the **`qa-artifacts`**
+     job fails on the first push — the committed PDFs still say the old brand (JiggerJot hit exactly
+     this, 2026-09-09).
+   - The brand rasters — see **Rasters** below; they come from the SVGs, not from the rename.
 
 ```python
 # rename.py — run from the repo root after steps 1–2; adjust BRAND / APP_ID / STAGING / TAGLINE.
@@ -174,6 +182,8 @@ Swap the SVGs, set the ground colours in its config block, run it — don't hand
 - `git grep -i perezosoft -- . ':!docs/REBRANDING.md' | grep -v perezosoft-platform` returns nothing —
   the upstream slug is the one sanctioned survivor (§0); everything else is a leak.
 - `git ls-files | grep -i perezosoft` returns nothing (file names and binaries).
+- The generated binaries were regenerated, not just skipped: `cd docs && python check_qa_artifacts.py`
+  passes (§0 step 6), and the brand rasters came from `docs/brand/build_assets.py`.
 - A search for the old tagline and for the platform's palette constants (`#465d4d`, `#6b8a72`) returns
   nothing outside this doc.
 - Restore (locked mode), build and the test projects pass exactly as `ci.yml` runs them — the rename
