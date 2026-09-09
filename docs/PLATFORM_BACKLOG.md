@@ -386,10 +386,46 @@ side is fixed (`NEW_APP_GUIDE.md` Phase 2 + "Phase 3 → ports", `REBRANDING.md`
    template library, a product list) wants `tenant_id = null` rows readable by every tenant next to
    tenant-owned rows — and the global query filter + RLS (ADR-003/020) hide null-tenant rows. The
    platform should offer one sanctioned shape: a `ISharedOrTenantScoped` marker whose filter is
-   `tenant_id IS NULL OR tenant_id = current` mirrored in `RlsDdl`, with the write-stamping interceptor
-   refusing to stamp a null-tenant row from a tenant context, plus an export/dissolve contract that
-   ignores shared rows. Without it every app re-derives this in Phase 5 (JiggerJot's open point in its
-   `DATA_MODEL.md`). **Size:** M; needs an ADR.
+   `tenant_id IS NULL OR tenant_id = current`, mirrored in `RlsDdl`, plus an export/dissolve contract
+   that ignores shared rows. Without it every app re-derives this in Phase 5. **Size:** M; needs an ADR.
+
+   > **Built and field-tested downstream (2026-09-09).** JiggerJot shipped exactly this shape in its
+   > CKTL-1 slice, under its own `JJ-031`. It works, and building it turned up **three traps that are
+   > not visible from reading the platform's own policy** — every one of them because the platform's
+   > `TenantId` is non-nullable, which makes the hazard structurally impossible here. Any platform
+   > version of this must carry all three, or it ships a primitive that is less safe than the
+   > hand-rolled version it replaces.
+   >
+   > **① One `FOR ALL` policy leaves the shared rows deletable by every tenant.** The obvious mirrored
+   > policy — `USING (tenant_id IS NULL OR tenant_id = current OR bypass)` `FOR ALL` — is correct for
+   > reading and wrong for everything else. Postgres checks `DELETE` against `USING` and **never**
+   > against `WITH CHECK`, so that policy lets any tenant delete or rewrite any shared row: the single
+   > guarantee a shared catalog exists to provide. The working shape is **four command-scoped policies
+   > per table** — `SELECT` admits shared rows, `INSERT`/`UPDATE`/`DELETE` admit the tenant's own only.
+   > A welcome side effect is that writing a shared row then requires the bypass GUC, which makes
+   > seeding a deliberate, greppable act instead of the default for an unset `tenant_id`.
+   >
+   > **② The write-stamping interceptor should not be taught to handle these rows at all.** The sketch
+   > above proposed making it "refuse to stamp a null-tenant row from a tenant context". Downstream
+   > found the simpler answer is to leave `ISharedOrTenantScoped` out of the interceptor entirely and
+   > let the `INSERT` policy from ① do the refusing — at the database, where a raw-SQL path cannot
+   > route around it. The cost is that call sites must set `tenant_id` explicitly on an owned row,
+   > which the interface's doc comment has to say plainly.
+   >
+   > **③ `EveryTenantOwnedEntity_IsWiredIntoTenantDissolution` goes blind.** The canary selects entities
+   > whose `TenantId` is a **non-nullable** `Guid` — deliberately, so `OutboxMessage`'s optional handler
+   > context is excluded. Every `ISharedOrTenantScoped` entity has a nullable one by construction, so the
+   > canary cannot see them, and a missing `ITenantDataContributor` would orphan a dissolved tenant's
+   > rows with nothing failing anywhere. Whichever way the platform resolves this — widening the canary
+   > to "nullable `TenantId` **and** `ISharedOrTenantScoped`", or shipping a second canary beside it —
+   > it must be resolved in the same slice that introduces the marker, not left to each app.
+   >
+   > Reference implementation and its tests: `jigger-jot` `src/Core/Entities/ISharedOrTenantScoped.cs`,
+   > `RlsDdl.SharedOrTenantStatementsFor`, and the four suites that replace the guarantees these tables
+   > do not inherit (`SharedCatalogFilterTests`, `SharedCatalogRlsTests`,
+   > `SharedOrTenantRlsMigrationGateTests`, `SharedOrTenantDissolutionTests`). The RLS suite includes the
+   > mirror case — a tenant **can** delete its own row — so the policies cannot pass by forbidding
+   > everything, which is the failure mode ① invites when it is fixed carelessly.
 3. **Don't re-model Tenant/User in conceptualization.** `_PLATFORM_PRIMER.md` should state that the
    Phase-1 `DATA_MODEL.md` references the platform's `Tenant`/`User`/`TenantMembership` and only adds
    per-user preference fields; JiggerJot's first draft carried a `tenant_id` column on `User`
@@ -411,7 +447,8 @@ side is fixed (`NEW_APP_GUIDE.md` Phase 2 + "Phase 3 → ports", `REBRANDING.md`
    paid for themselves. **Size:** S.
 
 **Dependencies:** none. Items 1, 3, 4, 5 are doc/script work; items 2 and 6 are real platform
-primitives — 2 is the one to schedule, 6 is small and prevents a whole class of silent misconfiguration.
+primitives — 2 is the one to schedule, and its design is no longer speculative (a downstream app has
+built and tested it, traps and all), 6 is small and prevents a whole class of silent misconfiguration.
 
 ---
 
