@@ -133,6 +133,38 @@ top of the platform schema. The architecture tests fail the build if an entity d
 rules. Read `docs/DATA_MODEL.md`'s derived-rules section first: **derived values are computed,
 never stored**.
 
+### If your app has a shared catalog beside tenant-owned rows
+
+This is the Phase-1 decision coming due (see the trap note above). Until the platform primitive lands
+(`PLATFORM_BACKLOG.md` §15 item 2), you build it, and the first downstream app has already walked the
+path — copy its shape rather than re-deriving it. A table holding **both** shared rows (`tenant_id`
+null, readable by every tenant, owned by none) and tenant-owned rows cannot implement `ITenantScoped`:
+that interface's `TenantId` is non-nullable, and both the global filter and the forced RLS policy test
+`tenant_id = current`, so a shared row is invisible in the app *and* at the database.
+
+The working shape is a parallel marker interface with its own EF query filter
+(`tenant_id == null || tenant_id == current`) and its own hand-written RLS policies. **Three platform
+guarantees stop applying the moment you do this, and none of them fails loudly** — each one keys off
+`ITenantScoped` or a non-nullable `TenantId`:
+
+| What you lose | Why it misses | What to write instead |
+|---|---|---|
+| `TenantStampingInterceptor` stamps writes | keys off `ITenantScoped` | set `tenant_id` explicitly on an owned row; let the `INSERT` policy below refuse the rest |
+| `RlsMigrationGateTests` fails CI on a missing policy | inspects `ITenantScoped` tables only | your own migration-parity gate over the marked tables |
+| `EveryTenantOwnedEntity_IsWiredIntoTenantDissolution` | inspects a **non-nullable** `TenantId` only | your own canary, plus an `ITenantDataContributor` that wipes tenant rows and never shared ones |
+
+⚠️ **Do not mirror the platform's policy with a single `FOR ALL` statement.** The obvious predicate —
+`USING (tenant_id IS NULL OR tenant_id = current OR bypass)` — is right for reading and wrong for
+everything else. Postgres checks `DELETE` against `USING` and **never** against `WITH CHECK`, so one
+`FOR ALL` policy carrying it lets any tenant delete or rewrite any shared row, which is the one thing a
+shared catalog exists to prevent. Ship **four command-scoped policies per table**: `SELECT` admits
+shared rows, `INSERT`/`UPDATE`/`DELETE` admit the tenant's own only. Seeding shared rows then requires
+the bypass GUC, which is the right answer anyway — it makes seeding deliberate and greppable.
+
+Test both walls separately, and include the mirror case (a tenant **can** delete its own row) — without
+it, a policy set that forbids everything passes. Worked example, tests included: `jigger-jot`'s `JJ-031`
+and its CKTL-1 slice.
+
 ## Phase 6 — Build features, slice by slice
 
 The rhythm, per `docs/WAYS_OF_WORKING.md`:
