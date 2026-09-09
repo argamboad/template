@@ -370,6 +370,51 @@ drift into separate products within a quarter.
 
 ---
 
+## 15. Downstream-app ergonomics — `DOWNSTREAM` (from the first downstream app, JiggerJot, 2026-09-08)
+
+**Why:** standing JiggerJot up on this template surfaced friction every downstream app will hit. The doc
+side is fixed (`NEW_APP_GUIDE.md` Phase 2 + "Phase 3 → ports", `REBRANDING.md` §0/§6/verify,
+`docs/brand/build_assets.py`, ADR-C11/C13 amendments); these are the **code-level** follow-ups.
+
+1. **Single-sourced app ports.** Today the API/Web ports are pinned in `launchSettings.json` and
+   mirrored in ~40 files; a side-by-side app re-pins them all by hand. Options: derive everything from
+   two values in `.env` (`API_PORT`, `WEB_PORT`) — `launchSettings` can't read env, but a tiny
+   `Directory.Build.targets` could rewrite it, and the dev `appsettings`, the Web client config, the
+   MAUI fallbacks, E2E defaults and CI could all read the same two variables. Even shipping a
+   `scripts/repin-ports.py` with the exact file list would do. **Size:** S.
+2. **Shared catalog + tenant rows under the global filter.** Any app with seed data (a recipe catalog, a
+   template library, a product list) wants `tenant_id = null` rows readable by every tenant next to
+   tenant-owned rows — and the global query filter + RLS (ADR-003/020) hide null-tenant rows. The
+   platform should offer one sanctioned shape: a `ISharedOrTenantScoped` marker whose filter is
+   `tenant_id IS NULL OR tenant_id = current` mirrored in `RlsDdl`, with the write-stamping interceptor
+   refusing to stamp a null-tenant row from a tenant context, plus an export/dissolve contract that
+   ignores shared rows. Without it every app re-derives this in Phase 5 (JiggerJot's open point in its
+   `DATA_MODEL.md`). **Size:** M; needs an ADR.
+3. **Don't re-model Tenant/User in conceptualization.** `_PLATFORM_PRIMER.md` should state that the
+   Phase-1 `DATA_MODEL.md` references the platform's `Tenant`/`User`/`TenantMembership` and only adds
+   per-user preference fields; JiggerJot's first draft carried a `tenant_id` column on `User`
+   (contradicting ADR-003) and had to be corrected. **Size:** XS (primer text).
+4. **Adoption path into an existing repo.** Phase 2 assumed a fresh clone; a Phase-1 docs repo with a
+   remote and branches is the more common starting point. The `git ls-files | tar` adoption is now in
+   the guide; a `scripts/adopt.sh` would make it one command. **Size:** XS.
+5. **`seed/` convention.** Raw source material (PDFs, scraped JSON) needs a home: `seed/` with
+   `seed/sources/` gitignored (GitHub's 100 MB file limit bites on scanned books). Worth a line in
+   `WAYS_OF_WORKING.md` and the `.gitignore` template. **Size:** XS.
+
+6. **Fail closed when connected to another app's database.** Every app from this platform shares the
+   base schema, so a connection string naming a *different* app's database starts cleanly and reports
+   healthy — nothing in the stack notices. It cost the first downstream app a full debugging session
+   (2026-09-09) and is only visible by inspecting the provider. A cheap guard: have the app stamp its
+   own identity once (a row in a `PlatformApp` table, or a well-known key written by the first
+   migration) and refuse to boot when the value present disagrees with the running assembly. Same
+   fail-closed shape as the Stripe-key and `Rls__EnforceRuntimeRole` guards, both of which have already
+   paid for themselves. **Size:** S.
+
+**Dependencies:** none. Items 1, 3, 4, 5 are doc/script work; items 2 and 6 are real platform
+primitives — 2 is the one to schedule, 6 is small and prevents a whole class of silent misconfiguration.
+
+---
+
 ## Not planned (explicitly out unless a need appears)
 - **Full-text / vector search** — Postgres FTS covers a lot before reaching for a search engine.
 - **Marketing email / CRM** — distinct from transactional `IEmailSender`; an integration, not core.

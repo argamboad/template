@@ -11,6 +11,58 @@ below.
 Backstop after working through the list: `git grep -i perezosoft` and a search for the tagline
 `Lazy reputation. Efficient engineering.` should both return nothing (outside this doc).
 
+## 0. Solution, projects, namespaces — `Perezosoft.*` → `<Brand>.*` (do this FIRST, as one commit)
+
+§1–§5 list the *strings*; the verify at the end demands more. The solution file, every `*.csproj`,
+the root namespaces, the RCL static-asset path (`_content/Perezosoft.Shared.Ui/…` in **both** hosts'
+`index.html`), the CI smoke identifiers (`Perezosoft.Maui.app`, the `PEREZOSOFT_API_BASE_URL` env
+prefix), the Docker tag (`perezosoft-app:ci`), the Postman file names, the test issuer strings and the
+project names inside every `packages.lock.json` all carry the brand. The first downstream app
+(JiggerJot, 2026-09-08) measured **545 text files rewritten and 15 files renamed** — do it
+mechanically, case-preserving, over `git ls-files` only, then run restore/build/tests exactly as
+`ci.yml` does before touching anything else.
+
+1. Remove the template-only material first (§6): `git rm -r docs/tutorial _PLATFORM_PRIMER.md`.
+2. Rename the brand-named files: `git ls-files | grep -i perezosoft` → `git mv` each
+   (`Perezosoft.slnx`, `src/*/Perezosoft.*.csproj`, `tests/*/Perezosoft.*.csproj`,
+   `src/Api/Perezosoft.Api.http`, `docs/postman/Perezosoft.*.json`).
+3. Rewrite the text of every tracked, non-binary file **except this doc**. Special cases go first:
+   `com.perezosoft.platform` → your `ApplicationId` (e.g. `com.<brand>.app`),
+   `Perezosoft Platform` → `<Brand>`, `template-staging` → `<brand>-staging`, the tagline; then the
+   three case variants `Perezosoft` / `perezosoft` / `PEREZOSOFT` → `<Brand>` / `<brand>` / `<BRAND>`.
+   **Keep the upstream slug `perezosoft-platform`** where it names this repo as provenance (ADRs, the
+   brief, `STATUS.md`, the gitleaks title); it is the one sanctioned survivor of the verify grep.
+4. Detect binaries by content (a NUL byte in the first 8 KB), not only by extension. Lockfiles are
+   text and **must** be rewritten — the project-reference names live in them — and locked-mode
+   restore then passes without `--force-evaluate`.
+5. Rename the platform's palette constants while you are in `BrandedEmail.cs` (§4).
+6. **Regenerate the GENERATED binaries** — step 4 skips binaries, but two of them are built from
+   files the rename just rewrote, and CI compares them against a fresh generation:
+   - `docs/QA_TEST_GUIDE.pdf` + `docs/QA_RUN_LOG.pdf` are generated from `docs/QA_TEST_PLAN.md`.
+     Run `pip install -r docs/requirements.txt` then `cd docs && python gen_qa_guide.py &&
+     python gen_qa_runlog.py && python check_qa_artifacts.py`. Skip this and the **`qa-artifacts`**
+     job fails on the first push — the committed PDFs still say the old brand (JiggerJot hit exactly
+     this, 2026-09-09).
+   - The brand rasters — see **Rasters** below; they come from the SVGs, not from the rename.
+
+```python
+# rename.py — run from the repo root after steps 1–2; adjust BRAND / APP_ID / STAGING / TAGLINE.
+import os, re, subprocess
+BRAND, APP_ID, STAGING, TAGLINE = "JiggerJot", "com.jiggerjot.app", "jiggerjot-staging", "Mix what you have."
+special = [("com.perezosoft.platform", APP_ID), ("Perezosoft Platform", BRAND), ("template-staging", STAGING),
+           ("Lazy reputation. Efficient engineering.", TAGLINE)]
+generic = [("Perezosoft", BRAND), ("perezosoft", BRAND.lower()), ("PEREZOSOFT", BRAND.upper())]
+for f in filter(None, subprocess.check_output(["git", "ls-files", "-z"]).decode().split("\0")):
+    if f == "docs/REBRANDING.md": continue
+    raw = open(f, "rb").read()
+    if b"\0" in raw[:8192]: continue
+    s = o = raw.decode("utf-8")
+    s = s.replace("perezosoft-platform", "\0SLUG\0")
+    for a, b in special + generic: s = s.replace(a, b)
+    s = s.replace("\0SLUG\0", "perezosoft-platform")
+    if s != o: open(f, "wb").write(s.encode("utf-8"))
+```
+
 ## 1. Name & wordmark — "Perezosoft" → your brand
 - `src/Shared.Ui/Components/AppHeader.razor` — header wordmark
 - `src/Shared.Ui/Pages/Login.razor`, `Home.razor` — logo alt text + headings
@@ -111,6 +163,30 @@ commit:
   — sessions won't persist. Debug builds won't catch it (they run unsandboxed via
   `Entitlements.Debug.plist` — see the comment there).
 
+## 6. Template-only material — remove or rewrite
+These describe the *platform*, not your app, and carry the old brand in ways a text rename can't fix:
+- **`_PLATFORM_PRIMER.md`** — delete. It is the primer for conceptualizing the *next* app and lives here.
+- **`docs/tutorial/`** — delete. The platform course, including a binary `PEREZOSOFT_COURSE.pdf` that
+  `git grep` cannot see (the file-name check below catches it).
+- **`README.md`** — rewrite for the app (what it is, how to run it, where things are, provenance).
+- `docs/OVERVIEW.md`, `docs/STATUS.md`, `docs/ROADMAP.md`, `docs/PLATFORM_BACKLOG.md`, `docs/stories/*`,
+  `docs/audits/*` — platform history; they rename mechanically and may stay as reference.
+- The **`Notes` sample slice** goes when the first real feature lands (`WAYS_OF_WORKING.md`).
+
+## Rasters
+`docs/brand/build_assets.py` regenerates **every** PNG in §3, `favicon.ico` and the store/marketing set
+from the SVG sources with a headless Chromium (so lockup wordmarks carry the real webfonts) + Pillow.
+Swap the SVGs, set the ground colours in its config block, run it — don't hand-export twenty files.
+
 ## Verify the rebrand
-- `git grep -i perezosoft` and a tagline search both return nothing (outside this doc).
+- `git grep -i perezosoft -- . ':!docs/REBRANDING.md' | grep -v perezosoft-platform` returns nothing —
+  the upstream slug is the one sanctioned survivor (§0); everything else is a leak.
+- `git ls-files | grep -i perezosoft` returns nothing (file names and binaries).
+- The generated binaries were regenerated, not just skipped: `cd docs && python check_qa_artifacts.py`
+  passes (§0 step 6), and the brand rasters came from `docs/brand/build_assets.py`.
+- A search for the old tagline and for the platform's palette constants (`#465d4d`, `#6b8a72`) returns
+  nothing outside this doc.
+- Restore (locked mode), build and the test projects pass exactly as `ci.yml` runs them — the rename
+  touches lockfiles, namespaces and CI identifiers, and the tests (Postman parity, RLS gate) are what
+  prove the mechanical pass didn't miss one.
 - Web and desktop show the new brand, **and** a test email (trigger an OTP or invite) arrives with the new logo, colours, name, and tagline.

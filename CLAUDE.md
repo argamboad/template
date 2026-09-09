@@ -144,7 +144,8 @@ deferred items without an explicit decision.
 | `docs/FLOWS.md` | Sequence diagrams for the core call stacks (auth, tenancy, outbox, billing webhook, dissolve) + the OTP line-level walkthrough |
 | `docs/WAYS_OF_WORKING.md` | Slices, story format, commit/PR conventions |
 | `docs/audits/AUDIT_SUITE.md` | **The repeatable super-audit** — 5 diagnostic/gate phases + QA-paranoia + docs/course currency; triggered, not routine; `audits/v1..v3` are its worked runs |
-| `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates** |
+| `docs/REBRANDING.md` | Every brand touchpoint to replace per app — **incl. the email templates**, the §0 solution/namespace rename and the §6 template-only material |
+| `docs/brand/build_assets.py` | Regenerates every brand raster (PNGs, `favicon.ico`, store set) from the SVG sources — REBRANDING §3; a downstream app swaps the SVGs and runs it |
 | `docs/LOCALIZATION.md` | i18n setup (EN/ES live) + how to add a language |
 | `docs/MOBILE_TESTING.md` | Run/sign-in on the Android emulator (adb reverse, OAuth) |
 | `docs/QA_TEST_PLAN.md` | Manual QA plan — step-by-step tests across web + all four native platforms (150 cases: smoke + regression + §14a v3-audit adversarial/tenant-isolation + §13c native release checklist) |
