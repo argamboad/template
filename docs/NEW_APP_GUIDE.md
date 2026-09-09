@@ -160,6 +160,23 @@ Follow **`docs/DEPLOYMENT.md`** top to bottom — it's the runbook. The order an
 6. **§6 CI auto-deploy** — GitHub secret **`RENDER_DEPLOY_HOOK_STAGING`**; from then on every
    merge to `develop` deploys staging and runs the version-gated smoke.
 
+⚠️ **Verify you are pointed at YOUR database — a green health check does not prove it.** Every app
+from this platform shares the same base schema, so if a connection string names *another* app's
+database the service starts, `/health/ready` returns `Healthy`, and the outbox poller happily reads
+`OutboxMessages` — all against the wrong data. The first downstream app ran this way until it was
+caught by inspecting Neon (2026-09-09). Confirm all three, before and after the first deploy:
+
+1. **The endpoint id belongs to this app's project.** Neon endpoint ids (`ep-…`) are unique per
+   project and easy to transpose between `.env` files; the region/proxy segment is NOT distinctive,
+   since projects in one region share it. Check the id against the project, not just the hostname.
+2. **The passwords match that project.** Each Neon project has its own `neondb_owner` password.
+   Correcting a host but keeping the old password fails at boot with
+   `28P01: password authentication failed` inside `Migrate()` — startup migrations run before the app
+   serves, so the whole service stays down.
+3. **The schema landed where you expect.** After the first successful deploy, the app's own database
+   should hold the platform's tables and a matching `__EFMigrationsHistory`; the other app's history
+   should be unchanged. An empty table count on your project means you are still connected elsewhere.
+
 ## Phase 8 — Activate production (~10 min, when ready for customers)
 
 Per `DEPLOYMENT.md` §6 / `STATUS.md` §5: create the prod Render service (separate Neon DB;

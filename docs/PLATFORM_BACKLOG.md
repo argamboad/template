@@ -401,8 +401,17 @@ side is fixed (`NEW_APP_GUIDE.md` Phase 2 + "Phase 3 → ports", `REBRANDING.md`
    `seed/sources/` gitignored (GitHub's 100 MB file limit bites on scanned books). Worth a line in
    `WAYS_OF_WORKING.md` and the `.gitignore` template. **Size:** XS.
 
-**Dependencies:** none. Items 1, 3, 4, 5 are doc/script work; item 2 is a real platform primitive and the
-one to schedule.
+6. **Fail closed when connected to another app's database.** Every app from this platform shares the
+   base schema, so a connection string naming a *different* app's database starts cleanly and reports
+   healthy — nothing in the stack notices. It cost the first downstream app a full debugging session
+   (2026-09-09) and is only visible by inspecting the provider. A cheap guard: have the app stamp its
+   own identity once (a row in a `PlatformApp` table, or a well-known key written by the first
+   migration) and refuse to boot when the value present disagrees with the running assembly. Same
+   fail-closed shape as the Stripe-key and `Rls__EnforceRuntimeRole` guards, both of which have already
+   paid for themselves. **Size:** S.
+
+**Dependencies:** none. Items 1, 3, 4, 5 are doc/script work; items 2 and 6 are real platform
+primitives — 2 is the one to schedule, 6 is small and prevents a whole class of silent misconfiguration.
 
 ---
 

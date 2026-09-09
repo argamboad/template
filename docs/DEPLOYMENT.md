@@ -66,8 +66,11 @@ Tear down with `docker compose --profile app down`.
 2. Copy the **Direct connection** string (the host **without** `-pooler`). That's the right default here:
    a single Render instance keeps its own Npgsql connection pool, and the app **polls** (no
    `LISTEN/NOTIFY`) and uses no server-side prepared statements, so it doesn't need PgBouncer. Keep
-   `SSL Mode=Require`. Shape:
-   `Host=<ep>.<region>.aws.neon.tech;Port=5432;Database=<db>;Username=<user>;Password=<pw>;SSL Mode=Require;Trust Server Certificate=true`.
+   `SSL Mode=VerifyFull`. Shape:
+   `Host=<ep>.<region>.aws.neon.tech;Port=5432;Database=<db>;Username=<user>;Password=<pw>;SSL Mode=VerifyFull`.
+   **Do not add `Trust Server Certificate=true`** — it encrypts but skips validating the certificate,
+   so it does not prove the server is Neon. Neon serves a publicly trusted certificate and the .NET
+   runtime image trusts it out of the box; `VerifyFull` is verified working (JiggerJot, 2026-09-09).
    *(Only switch to the pooled `-pooler` host if you later run many instances — Neon's pooler is
    transaction-mode PgBouncer, which this app is compatible with but doesn't require.)*
 3. This becomes `ConnectionStrings__DefaultConnection`. Migrations apply automatically on first boot.
@@ -262,12 +265,25 @@ role the app connects as** — Postgres exempts superusers/`BYPASSRLS` roles ent
 - **Local dev** — the compose `dev` user is a superuser: RLS is present but bypassed, on purpose
   (zero-friction inner loop). The integration suite ALWAYS runs RLS-enforced via its own runtime
   role; to run the app enforced locally, see the optional block in `.env.example`.
-- **Staging (Neon, single role)** — the Neon owner is *not* a superuser, and `FORCE` subjects
-  owners to policies: **RLS is live on staging with no config change.** Migrations still work
-  (owner does DDL).
+- **Staging (Neon) — the two-role setup is REQUIRED, not optional.** ⚠️ A previous version of this
+  runbook said single-role staging enforces RLS because the Neon owner is not a superuser. That is
+  **wrong**: `rolsuper` is indeed false, but Neon grants `neondb_owner` membership in
+  **`neon_superuser`, which carries `BYPASSRLS`** — and `BYPASSRLS` exempts a role from every policy,
+  `FORCE`d ones included. Connecting as the owner therefore runs with the tenancy backstop **silently
+  off**. Verify on any Neon project with:
+  `SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolcanlogin;`
+  Run step 1 below on staging as well as production. `Rls__EnforceRuntimeRole=true` catches the
+  mistake — it refuses to boot on an owner connection — so a staging service that won't start with
+  that flag set is the guard working, not a bug. (Found 2026-09-09: two downstream apps, one
+  correctly two-role, one not.)
 - **Prod (two roles — activate with production, `STATUS.md` §5):**
   1. `psql` into the database **as the owner** and run
      `docker/db/provision-rls-runtime-role.sql` — **change the password literal first**.
+     ⚠️ **On Neon, create this role with that SQL — never through the Neon console or API.** Roles
+     created that way are granted `neon_superuser` and inherit `BYPASSRLS`, producing a runtime role
+     that boots happily and enforces nothing. After provisioning, confirm
+     `rolbypassrls = false` for `app_runtime`; the owner also needs `GRANT app_runtime TO <owner>`
+     for `ALTER DEFAULT PRIVILEGES` to keep covering tables that later migrations create.
   2. Set `ConnectionStrings__DefaultConnection` to the `app_runtime` connection (same host/db,
      `Username=app_runtime;Password=<yours>;SSL Mode=Require`).
   3. Set `ConnectionStrings__Migrations` to the owner connection (startup migrations bootstrap
