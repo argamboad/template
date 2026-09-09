@@ -780,6 +780,15 @@ jobs:
           dotnet build src/Web/Perezosoft.Web.csproj -c Debug --no-restore
           dotnet build tests/E2E.Tests/Perezosoft.E2E.Tests.csproj -c Debug --no-restore
 
+      - name: Drop the runner's Google Chrome apt repo
+        # Playwright fetches Chromium from its own CDN; `--with-deps` only needs the Ubuntu
+        # archives. The runner image ships Google's chrome-stable apt source, and its CDN can
+        # serve mismatched index metadata (Release vs Packages.gz "Hash Sum mismatch"), which
+        # hard-fails the apt-get update inside `install --with-deps` — killed the 2026-09-09
+        # develop run twice (34383035730). A repo we never install from can't be allowed to
+        # fail the job; remove ONLY its list (Ubuntu's own sources live in ubuntu.sources).
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+
       - name: Install Chromium (Playwright)
         run: pwsh tests/E2E.Tests/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
 
