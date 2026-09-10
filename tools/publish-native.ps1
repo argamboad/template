@@ -28,6 +28,9 @@ if (-not $Android -and -not $Windows) { $Android = $true; $Windows = $true }
 $repo = Split-Path -Parent $PSScriptRoot
 $proj = Get-ChildItem (Join-Path $repo "src/Maui") -Filter *.csproj | Select-Object -First 1
 if (-not $proj) { throw "No MAUI project under src/Maui" }
+# The shell project is <App>.Maui; the artifact is the app, so drop the suffix — Vuelto.apk, not Vuelto.Maui.apk.
+$app = $proj.BaseName -replace '\.Maui$', ''
+
 New-Item -ItemType Directory -Force $Out | Out-Null
 
 if ($Android) {
@@ -40,7 +43,7 @@ if ($Android) {
     # <id>-Signed.apk. Never hand out the folder; hand out the copy below.
     $signed = Get-ChildItem $dir -Filter *-Signed.apk | Select-Object -First 1
     if (-not $signed) { throw "No *-Signed.apk in $dir — the signing step did not run" }
-    $apk = Join-Path $Out ("{0}.apk" -f $proj.BaseName)
+    $apk = Join-Path $Out ("{0}.apk" -f $app)
     Copy-Item $signed.FullName $apk -Force
 
     # Prove the scheme the phone requires (v2+; Android 11+ refuses a v1-only APK, silently).
