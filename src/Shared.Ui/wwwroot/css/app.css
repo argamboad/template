@@ -6,6 +6,15 @@
        Current values: Perezosoft sage/forest greens, harmonized with the logo. */
     --bs-primary: #465d4d;          /* primary — buttons, header, accents */
     --bs-primary-rgb: 70, 93, 77;
+    /* Bootstrap 5.3 DERIVES a second family of tokens from its own primary rather than from
+       --bs-primary, so overriding the two above does not reach them and .text-primary-emphasis,
+       .bg-primary-subtle and .border-primary-subtle stay Bootstrap navy. Restate them here or the
+       brand stops at the buttons. The subtle pair uses Bootstrap's own tints (80% and 60% white);
+       the emphasis colour is tuned rather than formulaic, because Bootstrap shades it to 40% of the
+       primary and this green is dark enough already that the result reads as black. */
+    --bs-primary-text-emphasis: #3B4F41;   /* darkened sage — 8.8:1 on white */
+    --bs-primary-bg-subtle: #DADFDB;
+    --bs-primary-border-subtle: #B5BEB8;
     --brand-accent: #6b8a72;        /* accent — logo body, loading spinner */
     --brand-dark: #2f3d33;          /* darkest shade — hover / active */
     --brand-accent-light: #9bb6a1;  /* light accent */
@@ -24,11 +33,34 @@
     --app-border: #2e3a33;
     --bs-link-color: #9bb6a1;
     --bs-link-hover-color: #c3d5c8;
+    /* The dark counterparts of the derived family above, on Bootstrap's own shades and tints. */
+    --bs-primary-text-emphasis: #909E94;
+    --bs-primary-bg-subtle: #0E130F;
+    --bs-primary-border-subtle: #2A382E;
 }
 
 [data-bs-theme="dark"] a,
 [data-bs-theme="dark"] .btn-link {
     color: var(--brand-accent-light);
+}
+
+/* ...but not an anchor that is really a button. The rule above is specificity 0,1,1 and beats
+   .btn-primary at 0,1,0, so in dark theme an <a class="btn btn-primary"> takes the light accent and
+   sits on the primary fill — 3.27:1, where AA wants 4.5:1. It fires for anchors only, which is why
+   an identical <button> looks right and the two render differently from the same class. */
+[data-bs-theme="dark"] a.btn-primary,
+[data-bs-theme="dark"] a.btn-primary:hover,
+[data-bs-theme="dark"] a.btn-primary:focus {
+    color: #fff;
+}
+
+/* Same collision, on the header. The bar is the primary colour in BOTH themes, so its wordmark is
+   white by way of Bootstrap's --bs-navbar-brand-color at 0,1,0 — which the anchor rule also
+   outranks. Scoped to the brand rather than to every anchor in the bar: the nav links resolve
+   through .navbar-nav .nav-link at 0,2,0 and were never affected, and widening this would silently
+   change their opacity in one theme only. */
+[data-bs-theme="dark"] .app-header .navbar-brand {
+    color: #fff;
 }
 
 /* The wordmark lockups are dark-on-transparent; swap in the light-on-transparent variant
@@ -78,6 +110,32 @@ a, .btn-link {
 .btn-primary:focus, .btn-primary:active {
     background-color: var(--brand-dark);
     border-color: var(--brand-dark);
+}
+
+/* Not a specificity problem: bootstrap.min.css compiles these with a literal #0d6efd rather than
+   var(--bs-primary), so no token override can reach them and every ticked box and switch in the app
+   stays Bootstrap blue. The focus BORDER is hardcoded the same way; its halo is already
+   brand-coloured by the rule below, so only the border is restated here. */
+.form-check-input:checked {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.form-check-input:focus {
+    border-color: var(--bs-primary);
+}
+
+/* The switch knob is the last one of the family: Bootstrap swaps it for a blue circle on focus, as
+   an inline SVG that no token can reach. Only the UNCHECKED switch shows it — in Bootstrap's own
+   file the :checked rule comes after :focus and wins. app.css loads after Bootstrap, though, so
+   overriding :focus at equal specificity would take the checked knob with it and put a green circle
+   on the green track, where it disappears. Hence the second rule. */
+.form-switch .form-check-input:focus {
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23465d4d'/%3e%3c/svg%3e");
+}
+
+.form-switch .form-check-input:checked:focus {
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
