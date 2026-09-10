@@ -234,6 +234,12 @@ section before each step — the traps below were found the hard way).
 **First, verify:** run the native QA pass (`docs/QA_TEST_PLAN.md` §12–13, guides in the QA PDFs).
 Don't sign an app you haven't seen working.
 
+**Sideloading a build at a host** (before any of that, and how you will test on a real device):
+`pwsh tools/publish-native.ps1 -ApiBaseUrl https://<your-host>` — see `docs/DEPLOYMENT.md` §9,
+which names the three ways an Android sideload fails **silently** (the unsigned twin APK, a v1-only
+signature, an upgrade over a running app). Use the script; every one of those is a wrong-file or
+wrong-state trap the phone will not explain.
+
 **Then, the first-native-release checklist:**
 
 1. **Android** (native.md → NATIVE-8): generate the release keystore once with `keytool` — it IS
