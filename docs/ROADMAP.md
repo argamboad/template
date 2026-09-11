@@ -182,6 +182,28 @@ lockfiles + the CLAUDE.md bump-together playbook remain the toolchain-drift auth
 
 ---
 
+## Pre-launch gates — GATES (built 2026-09-11) ✅
+
+Post-terminal, and not a feature so much as an admission about *sequence*: a downstream app is ready
+to show people well before it is ready to charge them or to meet strangers. Two deployment-config
+switches, both shipped closed, both cleared on launch day (ADR-027, `docs/stories/gates.md`):
+
+- **GATES-1 — `Billing:Enabled`, default off.** The billing controllers and the provider webhook are
+  removed from the MVC application model at startup, so the routes 404 rather than refuse; every tenant
+  resolves to Free through the catalog's existing fail-closed fallback, and the upgrade wording
+  disappears from the seat-limit error and the full-household page in both languages. Knock-on: the
+  production Stripe-key guard now fires only when billing is on, since a gated-off deployment has no
+  reachable webhook for the fake provider to back. Free seats moved 3 → 5.
+- **GATES-2 — a signup green list, empty means open.** It decides who may *found* a household; a valid
+  pending invitation admits its addressee only when that invitation's tenant **owner** is green-listed.
+  Enforced at the single account-creation choke point, on creation only — an existing account always
+  signs in.
+
+Built on the platform first; **the port to `vuelto` and `jigger-jot` is the open item**, the same
+shape LOCALCI-3 took.
+
+---
+
 ## Flavors wave — the platform as a spec with interchangeable stacks (planned 2026-09-08)
 
 **The idea:** Vuelto proved the platform works as a clone-and-rebrand template — for a .NET shop. A JS,
