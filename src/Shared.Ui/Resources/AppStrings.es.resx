@@ -80,6 +80,7 @@
   <data name="Login_OtpPrompt" xml:space="preserve"><value>Introduce el código de 6 dígitos enviado a {0}.</value></data>
   <data name="Login_VerifyCode" xml:space="preserve"><value>Verificar código</value></data>
   <data name="Login_ErrSomethingWrong" xml:space="preserve"><value>Algo salió mal. Inténtalo de nuevo.</value></data>
+  <data name="Login_ErrSignupNotAllowed" xml:space="preserve"><value>Esta aplicación está en pruebas privadas y aún no acepta cuentas nuevas. Si alguien te invitó, pídele que te envíe la invitación de nuevo.</value></data>
   <data name="Login_ErrExternalFailed" xml:space="preserve"><value>Error al iniciar sesión con el proveedor externo. Inténtalo de nuevo.</value></data>
   <data name="Login_ErrEmailUnverified" xml:space="preserve"><value>Tu proveedor no ha verificado esta dirección de correo, por lo que no se puede vincular a una cuenta existente.</value></data>
   <data name="Login_ErrInvalidLink" xml:space="preserve"><value>Este enlace de acceso ha caducado o ya se ha utilizado. Solicita uno nuevo.</value></data>

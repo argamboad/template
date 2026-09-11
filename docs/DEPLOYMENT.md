@@ -247,6 +247,7 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 | `Auth__AllowedOrigins` | no | leave empty — single-origin needs no CORS |
 | `Authentication__Google/Microsoft__*` | optional | enable OAuth |
 | `PublicApi__Enabled`, `Webhooks__Enabled` | optional | default off |
+| `Signup__AllowedEmails__0…`, `Signup__AllowedDomains__0…` | optional | the signup green list (GATES-2). Both empty ⇒ open. Non-empty ⇒ only these may create an account, plus anyone invited into a household whose **owner** is listed |
 | `Admin__StaffEmails__0…` | optional | platform-staff allowlist |
 | `ConnectionStrings__Migrations` | prod (two-role RLS) | owner/migrator connection — startup migrations do DDL (§7) |
 | `Rls__EnforceRuntimeRole` | prod (two-role RLS) | `true` — fail-closed startup check that RLS actually applies (§7) |
