@@ -464,6 +464,31 @@ stale branch `ci/local-gates` deleted; merged after green CI.
 
 ### LOCALCI-3 — Trigger diet: paths gate for every non-deploy job, Apple smoke on a schedule
 
+**Status: ✅ Implemented** (2026-09-11), ahead of LOCALCI-1 and LOCALCI-2 and needing neither. Built
+downstream first, in `jigger-jot`, where the cost that actually bit was **wall-clock rather than
+money**: a one-line CSS fix paid a full ~15-minute run, so small repairs cost more waiting than
+doing. Ported here and to `vuelto` the same day, so the three workflows stay one workflow.
+
+**What landed, against the plan below:** 3a in full. 3b in full, with the Apple smoke's condition
+tightened from the sketch — the drafted `(vars.CI_MACOS_RUNNER != '' || github.event_name != 'push')`
+would have run it on every PULL REQUEST too, which is more often than today rather than less. It now
+names its three cases explicitly: scheduled, dispatched, or a develop push with a self-hosted Mac.
+
+**`vars.CI_MACOS_RUNNER` does not exist yet** and nothing waits for it: an unset variable reads as
+empty, which is exactly the hosted-fallback branch. LOCALCI-1 will set it and the smoke returns to
+every push for free.
+
+**Two tests guard it**, and the second is the one that matters:
+`EveryCiJob_EitherGatesOnChanges_OrIsOnTheAlwaysRunList` stops a future job quietly re-billing every
+docs push, and `TheTwoGatesThatCatchDocsMistakes_AreNeverCodeGated` stops anyone gating `secret-scan`
+or `qa-artifacts` on code — which would switch off the QA-PDF check for precisely the change it
+exists to catch.
+
+**Observed downstream on a real code push** (`jigger-jot`, merge to develop): every code gate ran,
+`native-smoke-apple` skipped, `deploy-staging` succeeded. The docs-only skip path still needs one
+docs-only PR to see.
+
+
 **As a** platform maintainer
 **I want** docs-only pushes to run only the gates that docs can break, and the most expensive smoke to
 run on a cadence instead of every push
