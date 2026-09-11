@@ -84,7 +84,7 @@ public class SeatQuotaJourneyTests : E2ETestBase
         var tenantId = Regex.Match(Page.Url, @"checkout/([0-9a-fA-F-]+)/pro").Groups[1].Value;
         await PostBillingWebhookAsync(tenantId, status: "active", occurredAt: DateTimeOffset.UtcNow.AddMinutes(-1));
 
-        // On Pro (10 seats), reserve more seats than Free allows: owner + 3 pending = 4 > 3.
+        // On Pro (10 seats), reserve more seats than Free allows: owner + FreePlanSeatLimit pending.
         await household.GotoAsync();
         var lateToken = "";
         for (var i = 1; i <= FreePlanSeatLimit; i++)

@@ -17,10 +17,13 @@ smoke path that doesn't need an external OAuth provider.
      --Email:Smtp:Host=localhost --Email:Smtp:Port=1025 --Email:Smtp:Username= --Email:Smtp:Password= \
      --Auth:RateLimit:PasswordlessPermitLimit=1000 \
      --Admin:StaffEmails:0=e2e-staff@example.com \
+     --Billing:Enabled=true \
      --Billing:Stripe:SecretKey=
    ```
    The `Admin:StaffEmails` entry enables the admin-console journey (ADMIN-3); it must match
-   `AnnouncementJourneyTests.StaffEmail`. The empty `Billing:Stripe:SecretKey` forces the
+   `AnnouncementJourneyTests.StaffEmail`. **`Billing:Enabled=true` is required** — billing ships gated
+   OFF (GATES-1, ADR-027), which removes `/api/billing` from the route table entirely, so without it
+   the billing and seat-quota journeys hit 404s. The empty `Billing:Stripe:SecretKey` forces the
    **FakeBillingProvider** even if your `.env` has Stripe test keys — the billing journey
    (BILLING-8) depends on the fake's deterministic checkout URLs and `valid` webhook signature.
    CI sets the same overrides. Tests that call the API directly (the billing webhook) use

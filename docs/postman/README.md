@@ -102,6 +102,7 @@ instead). **Admin** requires your email in that environment's `Admin__StaffEmail
 | 8 · Admin | your email in `Admin__StaffEmails__0` (repo `.env`) + API restart |
 | 9 · Public API | `PublicApi__Enabled=true` + restart (`404` when off) |
 | 10 · Webhooks | `Webhooks__Enabled=true` + restart; target URL must be public-routable (SSRF guard) |
+| 6 · Billing (every request) | `Billing__Enabled=true` + restart — gated OFF by default (GATES-1); while off every billing route is `404`, webhook included |
 | 6 · Billing webhook | fake provider (dev default); header `Stripe-Signature: valid` |
 
 ## Notes
