@@ -228,6 +228,18 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 
 ## Environment variables (reference)
 
+**Where to put them, and what a change costs.** Anything with a `value:` in `render.yaml` is declared
+by the blueprint: edit it there and redeploy, because a blueprint sync can overwrite the same key typed
+into the dashboard. Anything marked `sync: false`, or absent from the file entirely, is dashboard-only
+and is left alone by a sync — that is where secrets live, and it is the right place for the signup
+green list if you would rather not commit people's addresses. Saving an environment change in the
+dashboard **restarts the service**, which is all that is needed: every gate and guard in this table is
+read at startup, so there is no cache to clear and no deploy to trigger.
+
+**Indexed keys** (`Signup__AllowedEmails__0`, `Admin__StaffEmails__0`, `Proxy__KnownNetworks__0`) are
+arrays. Number them from zero and keep them contiguous — one address per key, not a comma-separated
+list in `__0`.
+
 | Key | Required | Notes |
 |---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | yes | `Production` (set by `render.yaml`) |

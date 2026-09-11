@@ -54,3 +54,12 @@ services:
       #   value: "false"
       # - key: Webhooks__Enabled
       #   value: "false"
+      # Signup green list (GATES-2, ADR-027) — leave these out entirely and signup is OPEN to anyone
+      # who finds the URL. Set one per person, numbered from zero and CONTIGUOUS (__0, __1, __2 …);
+      # each listed person may found a household and invite others into it without those others being
+      # listed. Add them in the Render dashboard rather than here if you would rather not commit the
+      # addresses — a key absent from this file is not touched by a blueprint sync.
+      # - key: Signup__AllowedEmails__0
+      #   sync: false
+      # - key: Signup__AllowedDomains__0
+      #   sync: false
