@@ -80,11 +80,12 @@
 - `.github/pull_request_template.md` — the PR checklist — process as a gate
 - `.github/workflows/ci.yml` — born here (build+test+secret/license gates); every part adds jobs — e2e 3.6, docker 8.2, deploy 8.3, native A.1
 
-## 2.1 — Users & JWT access tokens (23 files)
+## 2.1 — Users & JWT access tokens (27 files)
 
 - `src/Api/Authentication/ClaimsPrincipalExtensions.cs`
 - `src/Api/Configuration/IJwtSettings.cs`
 - `src/Api/Configuration/JwtValidation.cs`
+- `src/Api/Configuration/SignupSettings.cs` — GATES-2 green list; empty = open (landed post-write)
 - `src/Api/Controllers/AuthController.cs` — grows through 2.4/2.5/6.5
 - `src/Api/Controllers/AuthControllerBase.cs`
 - `src/Api/Models/AuthModels.cs`
@@ -94,6 +95,7 @@
 - `src/Api/Services/ITokenHasher.cs`
 - `src/Api/Services/JwtClaims.cs`
 - `src/Api/Services/JwtTokenService.cs`
+- `src/Api/Services/SignupGate.cs` — GATES-2: who may FOUND a household, enforced at the account-creation choke point (landed post-write)
 - `src/Api/Services/TokenGenerator.cs`
 - `src/Api/Services/TokenHasher.cs` — store hashes, never raw tokens
 - `src/Api/Services/UserService.cs`
@@ -101,6 +103,8 @@
 - `src/Core/Repositories/IUserRepository.cs`
 - `src/Infrastructure/Persistence/Configurations/UserConfiguration.cs`
 - `src/Infrastructure/Repositories/UserRepository.cs`
+- `tests/Api.Tests/Auth/SignupGateTests.cs` — GATES-2 (landed post-write)
+- `tests/Api.Tests/Auth/SignupRefusalSurfacingTests.cs` — GATES-2: the refusal on every sign-in path (landed post-write)
 - `tests/Api.Tests/Integration/RefreshReplayTests.cs` — rotated-token replay revokes all sessions (v3 TB-AUTH-1)
 - `tests/Api.Tests/TokenHasherTests.cs` — hasher hostile-input + fixed-time contract (v3 TB-AUTH-8)
 - `tests/Api.Tests/TokenServiceTests.cs`
@@ -230,7 +234,7 @@
 - `tests/Api.Tests/Architecture/RoutePrefixInspectorTests.cs`
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (104 files)
+## 3.4 — The web client & auth UI (107 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -325,6 +329,7 @@
 - `tests/Api.Tests/BfcacheGuardTests.cs` — pins the guard's contract + presence in BOTH hosts' index.html
 - `tests/E2E.Tests/ThemeJourneyTests.cs` — dark-mode journey (live flip, reload persist, cross-device reconcile)
 - `tests/Ui.Tests/AuthServiceTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/BillingGateUiTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/HomePageTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/Infrastructure/ComponentTestBase.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/Infrastructure/Fakes.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
@@ -335,6 +340,8 @@
 - `tests/Ui.Tests/NotifyBillingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/PreferenceScopingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/ReconcileMatrixTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/SeatLimitCopyTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/SignupRefusedCopyTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/SwitcherStateTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 
 ## 3.5 — Localization (EN/ES) (11 files)
@@ -427,9 +434,12 @@
 - `src/Infrastructure/Persistence/Configurations/AuditEventConfiguration.cs`
 - `tests/Api.Tests/AuditLogTests.cs`
 
-## 5.1 — Billing abstraction & entitlements (19 files)
+## 5.1 — Billing abstraction & entitlements (25 files)
 
+- `src/Api/Configuration/BillingGateConvention.cs` — GATES-1: drops the billing controllers from the application model so gated-off routes 404 (landed post-write)
+- `src/Api/Configuration/BillingSettings.cs` — GATES-1 config gate, default OFF (landed post-write)
 - `src/Api/Controllers/BillingController.cs`
+- `src/Api/Controllers/FeaturesController.cs` — GATES-1: anonymous report of which gates are open, so the client can hide the billing link (landed post-write)
 - `src/Api/Endpoints/EntitlementEndpointExtensions.cs` — RequireEntitlement -> 402
 - `src/Api/Models/BillingModels.cs`
 - `src/Api/Services/BillingService.cs`
@@ -442,11 +452,14 @@
 - `src/Infrastructure/Persistence/Configurations/SubscriptionConfiguration.cs`
 - `src/Shared.Ui/Pages/Billing.razor` — BILLING-8 billing summary page
 - `tests/Api.Tests/Billing/BillingControllerTests.cs`
+- `tests/Api.Tests/Billing/BillingGateTests.cs` — GATES-1 (landed post-write)
 - `tests/Api.Tests/Billing/BillingProviderRegistrationTests.cs`
 - `tests/Api.Tests/Billing/BillingServiceTests.cs`
 - `tests/Api.Tests/Billing/EntitlementServiceTests.cs`
+- `tests/Api.Tests/Billing/PlanCatalogTests.cs` — GATES-1 pins the catalog's fail-closed Free fallback (landed post-write)
 - `tests/Api.Tests/Billing/RequireEntitlementFilterTests.cs`
 - `tests/Api.Tests/Billing/SubscriptionTenantIsolationTests.cs`
+- `tests/Api.Tests/Integration/FeaturesEndpointTests.cs` — GATES-1 (landed post-write)
 - `tests/E2E.Tests/BillingJourneyTests.cs` — fake-provider upgrade loop
 
 ## 5.2 — Stripe: checkout, webhook, portal (7 files)
@@ -843,7 +856,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (192 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (193 files)
 
 - `.vscode/launch.json` — editor run/debug config — not part of the rebuilt app
 - `.vscode/tasks.json` — editor run/debug config — not part of the rebuilt app
@@ -923,6 +936,7 @@
 - `docs/stories/e2e.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/files.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/flavors.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/stories/gates.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/gdpr.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/hooks.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/localci.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -1038,4 +1052,4 @@
 - `tests/E2E.Tests/README.md` — docs
 - `tools/publish-native.ps1` — maintainer sideload tooling; native distribution is downstream (ADR-024), referenced by A.1 but never hand-typed
 
-**Totals:** 871 tracked files · 574 built in lessons · 297 bucketed · 0 unmapped
+**Totals:** 885 tracked files · 587 built in lessons · 298 bucketed · 0 unmapped

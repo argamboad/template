@@ -5,8 +5,9 @@
 > creation is restricted to a green list (nobody signs up just by finding the URL). Both are
 > cleared on the day the app is published. **Decision record: ADR-027.**
 >
-> **Status: 🚧 IN PROGRESS** (started 2026-09-11). Built on the platform first; ports to `vuelto`
-> and `jigger-jot` after the suite is green, the same way LOCALCI-3 did.
+> **Status: ✅ COMPLETE on the platform** (2026-09-11) — GATES-1 + GATES-2 shipped with the full suite
+> green. **Downstream port to `vuelto` and `jigger-jot` is still open**, the same way LOCALCI-3 was
+> built here first and ported the same day.
 
 ## Why this exists
 
@@ -187,6 +188,22 @@ accounts provably unaffected; `ConfigPostureTests` covers the new settings; `.en
 plan updated in the same PR.
 
 ---
+
+## What the build surfaced (worth knowing before porting)
+
+- **The production Stripe-key guard had to be relaxed.** It refused to boot outside Development without
+  `Billing__Stripe__SecretKey`, which would have blocked the exact deployment this epic is for. Its
+  stated reason — the fake provider trusts a literal webhook signature and the webhook is anonymous —
+  evaporates when the gate is off, because the webhook route does not exist. It now fires only when
+  billing is ON, and `BillingControllers_AreAllGated` is what keeps "no reachable webhook" true.
+- **Gating is structural, not a filter.** `BillingGateConvention` removes the controllers from the MVC
+  application model, so a billing endpoint nobody has written yet is gated by construction.
+- **The client needed a probe.** `GET /api/features` (anonymous) is how the header and the seat-limit
+  copy learn the gate state. It is convenience; the API stays the authority.
+- **Seat tests now read the limit from the catalog** instead of copying it, so the 3 → 5 change did not
+  need five separate edits and the next re-tune will not either.
+- **A flaky test was ours, not the product's:** the magic-link case did not URL-escape the token, so it
+  failed only when a generated token happened to contain a character a query string re-reads.
 
 ## Launch-day checklist (what "publishing" means)
 

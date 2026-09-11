@@ -310,7 +310,7 @@ Ordered, each a mergeable vertical slice. TDD throughout — the failing Playwri
   is part of each slice, not a separate refactor.
 - **Seats count pending invites** — E2E-2 depends on that `QuotaService` rule; if the seat rule
   changes, this journey is the canary.
-- **Free-plan `SeatLimit: 3` is an EXAMPLE quota** (`PlanCatalog.cs` says "tune per app") — the
+- **The Free-plan `SeatLimit` is an EXAMPLE quota** (5 since GATES-1; was 3) (`PlanCatalog.cs` says "tune per app") — the
   test should read failure gracefully: if a downstream app retunes the catalog, the test's invite
   count must follow. Keep the limit referenced in one constant in the test file.
 - **No notification producer is browser-reachable** — don't be tempted to add a test-only endpoint
