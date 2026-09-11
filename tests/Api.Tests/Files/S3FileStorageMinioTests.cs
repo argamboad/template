@@ -15,7 +15,13 @@ namespace Perezosoft.Api.Tests.Files;
 public sealed class MinioFixture : IAsyncLifetime
 {
     public const string Bucket = "perezosoft-test";
-    private readonly MinioContainer _minio = new MinioBuilder("minio/minio:latest").Build();
+    // quay.io, not Docker Hub, and PINNED (never :latest — v3 DEP-9). MinIO's `minio/minio` Docker Hub
+    // repository became unpullable ("pull access denied ... repository does not exist") on 2026-09-11,
+    // which broke this fixture on every branch at once; quay.io is MinIO's other first-party registry and
+    // still serves the same releases. A floating tag is what turned an upstream distribution change into
+    // a CI outage with no pinned known-good to fall back to.
+    private readonly MinioContainer _minio =
+        new MinioBuilder("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z").Build();
 
     public S3StorageSettings Settings { get; private set; } = default!;
 
