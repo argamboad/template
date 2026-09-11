@@ -883,6 +883,9 @@ jobs:
           # The whole browser suite shares one source IP, so raise the per-IP passwordless limit well
           # above the prod default of 5 (the limiter itself is unit-tested at the default in Api.Tests).
           Auth__RateLimit__PasswordlessPermitLimit: "1000"
+          # GATES-1 (ADR-027): billing ships gated OFF, which removes /api/billing from the route table
+          # entirely — the upgrade-loop and seat-quota journeys would 404. Open the gate for the suite.
+          Billing__Enabled: "true"
           # Staff allowlist for the admin-console E2E journey (ADMIN-3) — must match
           # AnnouncementJourneyTests.StaffEmail.
           Admin__StaffEmails__0: "e2e-staff@example.com"

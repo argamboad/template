@@ -275,7 +275,7 @@ limit; checked when inviting (extends
 
 ```gherkin
 Scenario: Inviting beyond the seat limit is blocked
-  Given my Free plan allows 3 seats and my tenant already has 3 members
+  Given my Free plan's seats are all used by members
   When I invite a 4th member
   Then the invite is rejected 402 with an upgrade prompt
   And no TenantInvitation is created
@@ -453,7 +453,7 @@ Scenario: accept blocked when the tenant is over its downgraded cap
   And no membership was moved and the invitation stays pending
 
 Scenario: accept at exactly the cap still works (seat-neutral swap)
-  Given a Free tenant with 2 members and 1 pending invitation (3/3 seats used)
+  Given a Free tenant whose seats are all used by members plus 1 pending invitation
   When the invitee redeems the token
   Then they join and the tenant has 3 members
 

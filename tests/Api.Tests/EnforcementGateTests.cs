@@ -131,6 +131,54 @@ public class EnforcementGateTests
     }
 
     [Fact]
+    public void EveryContainerImage_IsPinned_NotFloating() // v3 DEP-9, widened after the 2026-09-11 outage
+    {
+        // DEP-9 says pin container images, never `:latest`. It was applied to the CI workflow's service
+        // images by hand and never machine-checked, so the Testcontainers fixtures and the dev compose
+        // file kept floating tags. On 2026-09-11 MinIO's Docker Hub repository stopped serving pulls
+        // entirely and `minio/minio:latest` took build-test down on every branch at once — with no
+        // pinned known-good to fall back to, which is the whole cost of a floating tag. This gate covers
+        // the surfaces the hand-applied convention missed: test fixtures and compose.
+        var root = RepoRoot();
+        var offenders = new List<string>();
+
+        // Testcontainers builders: new XxxBuilder("image:tag")
+        var builderImage = new Regex(@"new\s+\w*Builder\s*\(\s*""([^""]+)""");
+        foreach (var file in Directory.EnumerateFiles(Path.Combine(root, "tests"), "*.cs", SearchOption.AllDirectories))
+        {
+            if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
+                || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")) continue;
+            foreach (Match m in builderImage.Matches(File.ReadAllText(file)))
+                Check(m.Groups[1].Value, Path.GetFileName(file));
+        }
+
+        // Compose services: `image: repo/name:tag`
+        var composeImage = new Regex(@"(?m)^\s*image:\s*([^\s#]+)");
+        var compose = Path.Combine(root, "docker-compose.yml");
+        if (File.Exists(compose))
+            foreach (Match m in composeImage.Matches(File.ReadAllText(compose)))
+                Check(m.Groups[1].Value, "docker-compose.yml");
+
+        Assert.True(offenders.Count == 0,
+            "Container images must carry an explicit, non-floating tag (v3 DEP-9) — an unpinned image "
+            + "turns any upstream registry change into an immediate CI outage with nothing to fall back "
+            + $"on: {string.Join(", ", offenders)}");
+
+        void Check(string image, string where)
+        {
+            // Ignore build-arg/variable references and anything that isn't an image reference.
+            if (image.Contains('$') || image.Contains('{')) return;
+            // A tag is the part after the LAST colon, provided that colon isn't the registry's port.
+            var lastColon = image.LastIndexOf(':');
+            var tag = lastColon > 0 && !image[(lastColon + 1)..].Contains('/') ? image[(lastColon + 1)..] : null;
+            if (tag is null)
+                offenders.Add($"{where}: '{image}' has no tag (implicitly :latest)");
+            else if (tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
+                offenders.Add($"{where}: '{image}' is pinned to :latest");
+        }
+    }
+
+    [Fact]
     public void ClaudeMdDocMap_ListsEveryTopLevelDoc() // R75, doc-map half
     {
         var root = RepoRoot();

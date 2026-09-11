@@ -190,9 +190,11 @@
 - `src/Infrastructure/Persistence/Configurations/TenantMembershipConfiguration.cs`
 - `src/Infrastructure/Repositories/TenantRepository.cs`
 
-## 2.9 — Invitations, dissolve & the contributor seam (10 files)
+## 2.9 — Invitations, dissolve & the contributor seam (14 files)
 
+- `src/Api/Configuration/SignupSettings.cs` — GATES-2 green list; empty = open
 - `src/Api/Controllers/HouseholdInvitationsController.cs`
+- `src/Api/Services/SignupGate.cs` — GATES-2: who may FOUND a household, enforced at 2.8's account-creation choke point
 - `src/Api/Services/TenantDissolutionService.cs` — contributor fan-out
 - `src/Api/Services/TenantInvitationService.cs`
 - `src/Core/Abstractions/ITenantDataContributor.cs` — the seam GDPR later extends
@@ -200,6 +202,8 @@
 - `src/Core/Repositories/ITenantInvitationRepository.cs`
 - `src/Infrastructure/Persistence/Configurations/TenantInvitationConfiguration.cs`
 - `src/Infrastructure/Repositories/TenantInvitationRepository.cs`
+- `tests/Api.Tests/Auth/SignupGateTests.cs` — GATES-2
+- `tests/Api.Tests/Auth/SignupRefusalSurfacingTests.cs` — GATES-2: the refusal on every sign-in path
 - `tests/Api.Tests/WipeDataTests.cs`
 - `tests/Core.Tests/TenantInvitationTests.cs`
 
@@ -230,7 +234,7 @@
 - `tests/Api.Tests/Architecture/RoutePrefixInspectorTests.cs`
 - `tests/Api.Tests/ArchitectureTests.cs` — born here; gains a rule per part (R5/R6/R15…)
 
-## 3.4 — The web client & auth UI (104 files)
+## 3.4 — The web client & auth UI (107 files)
 
 - `src/Shared.Ui/App.razor`
 - `src/Shared.Ui/Auth/AppClaims.cs`
@@ -325,6 +329,7 @@
 - `tests/Api.Tests/BfcacheGuardTests.cs` — pins the guard's contract + presence in BOTH hosts' index.html
 - `tests/E2E.Tests/ThemeJourneyTests.cs` — dark-mode journey (live flip, reload persist, cross-device reconcile)
 - `tests/Ui.Tests/AuthServiceTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/BillingGateUiTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/HomePageTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/Infrastructure/ComponentTestBase.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/Infrastructure/Fakes.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
@@ -335,6 +340,8 @@
 - `tests/Ui.Tests/NotifyBillingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/PreferenceScopingTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/ReconcileMatrixTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/SeatLimitCopyTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
+- `tests/Ui.Tests/SignupRefusedCopyTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 - `tests/Ui.Tests/SwitcherStateTests.cs` — bUnit component-test chassis for the RCL (v3 TOOL-2) — doubles + one proving test
 
 ## 3.5 — Localization (EN/ES) (11 files)
@@ -427,9 +434,12 @@
 - `src/Infrastructure/Persistence/Configurations/AuditEventConfiguration.cs`
 - `tests/Api.Tests/AuditLogTests.cs`
 
-## 5.1 — Billing abstraction & entitlements (19 files)
+## 5.1 — Billing abstraction & entitlements (25 files)
 
+- `src/Api/Configuration/BillingGateConvention.cs` — GATES-1: drops the billing controllers from the application model so gated-off routes 404
+- `src/Api/Configuration/BillingSettings.cs` — GATES-1 config gate, default OFF
 - `src/Api/Controllers/BillingController.cs`
+- `src/Api/Controllers/FeaturesController.cs` — GATES-1: anonymous report of which gates are open, so the client can hide the billing link
 - `src/Api/Endpoints/EntitlementEndpointExtensions.cs` — RequireEntitlement -> 402
 - `src/Api/Models/BillingModels.cs`
 - `src/Api/Services/BillingService.cs`
@@ -442,11 +452,14 @@
 - `src/Infrastructure/Persistence/Configurations/SubscriptionConfiguration.cs`
 - `src/Shared.Ui/Pages/Billing.razor` — BILLING-8 billing summary page
 - `tests/Api.Tests/Billing/BillingControllerTests.cs`
+- `tests/Api.Tests/Billing/BillingGateTests.cs` — GATES-1
 - `tests/Api.Tests/Billing/BillingProviderRegistrationTests.cs`
 - `tests/Api.Tests/Billing/BillingServiceTests.cs`
 - `tests/Api.Tests/Billing/EntitlementServiceTests.cs`
+- `tests/Api.Tests/Billing/PlanCatalogTests.cs` — GATES-1 pins the catalog's fail-closed Free fallback
 - `tests/Api.Tests/Billing/RequireEntitlementFilterTests.cs`
 - `tests/Api.Tests/Billing/SubscriptionTenantIsolationTests.cs`
+- `tests/Api.Tests/Integration/FeaturesEndpointTests.cs` — GATES-1
 - `tests/E2E.Tests/BillingJourneyTests.cs` — fake-provider upgrade loop
 
 ## 5.2 — Stripe: checkout, webhook, portal (7 files)
@@ -843,7 +856,7 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (192 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (193 files)
 
 - `.vscode/launch.json` — editor run/debug config — not part of the rebuilt app
 - `.vscode/tasks.json` — editor run/debug config — not part of the rebuilt app
@@ -923,6 +936,7 @@
 - `docs/stories/e2e.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/files.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/flavors.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/stories/gates.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/gdpr.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/hooks.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/localci.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -1038,4 +1052,4 @@
 - `tests/E2E.Tests/README.md` — docs
 - `tools/publish-native.ps1` — maintainer sideload tooling; native distribution is downstream (ADR-024), referenced by A.1 but never hand-typed
 
-**Totals:** 871 tracked files · 574 built in lessons · 297 bucketed · 0 unmapped
+**Totals:** 885 tracked files · 587 built in lessons · 298 bucketed · 0 unmapped
