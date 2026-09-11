@@ -380,6 +380,36 @@ src/Web/wwwroot/appsettings.json.ci-local.bak
   `Jwt__Secret`, `Auth__RateLimit__…`, `Admin__StaffEmails__0`, `Auth__AppBaseUrl`) each appear in the
   script's `$env:` block.
 
+#### 2b-bis. The course-coverage tripwire (test first) — **R79**
+
+Same class of bug as R78, different artifact: `docs/tutorial/gen_coverage.py` is **manual-run only**
+— no workflow or test references it — so a PR that adds a file nobody mapped leaves the gate red and
+nothing notices. It has now drifted silently twice: PR #204 (43 diagram assets, COVERAGE.md left
+stale) and PRs #214/#223/#224 (3 unmapped files, gate exiting 1 — found and fixed by PR #225).
+
+Wire it into the **`qa-artifacts` CI job**, not a C# arch test: that job already installs Python
+(`setup-python` + `pip install -r docs/requirements.txt`) and already enforces exactly this
+semantic for the QA PDFs ("regenerate and fail if the committed artifact drifted"). A C# fact in
+`EnforcementGateTests` would have to shell out to Python, which `build-test` has no reason to
+install.
+
+Add to `.github/workflows/ci.yml`, job `qa-artifacts`, after the QA-PDF step:
+
+```yaml
+      - name: Course coverage gate (every tracked file is mapped)
+        # gen_coverage.py exits 1 on any unmapped file; the diff check catches the other half —
+        # a COVERAGE.md committed stale even though the mapping exists (PR #204). Both halves
+        # have drifted in production; neither was caught until a human ran the script (R79).
+        run: |
+          python docs/tutorial/gen_coverage.py
+          git diff --exit-code docs/tutorial/COVERAGE.md
+```
+
+- `FOUNDATION_RULES_v2.md`: **R79 [machine]** after R78 — "every tracked file maps to a lesson or a
+  declared bucket, and `COVERAGE.md` is the regenerated truth; CI fails on either half."
+- Note in the story's DoD that R79 needs **no new test file** — the generator *is* the test; the
+  slice's job is wiring it to a trigger.
+
 #### 2c. Docs
 - `docs/WAYS_OF_WORKING.md`: insert the extracted "Run the gates locally first" section before
   "Merge discipline"; add one bullet: "a green `ci-local.ps1` run is the expected state of a branch
@@ -522,7 +552,7 @@ merged after green CI.
 | Slice | Size | Saves (hosted-mode billed min per develop code push) | Stop here? |
 |---|---|---|---|
 | LOCALCI-1 | 1 slice + 2 runner registrations (~half a day incl. the Mac) | **≈ 157 of ≈ 190** (all macOS + Windows) | Yes — this is the money |
-| LOCALCI-2 | 1 slice (script exists; reconcile + tripwire + docs) | red pushes (each ≈ 30–190) | Yes |
+| LOCALCI-2 | 1 slice (script exists; reconcile + R78/R79 tripwires + docs) | red pushes (each ≈ 30–190) | Yes |
 | LOCALCI-3 | S | ≈ 30 per docs-only push; 87 per push in hosted mode | Yes |
 
 **Do first, separately (unrelated loose end absorbed by the stale branch):** PR #204 added 43
@@ -531,13 +561,13 @@ actual; the gate is manual-run only). Land a tiny `docs/coverage-regen` PR on de
 LOCALCI-2 so the script branch stays single-purpose.
 
 ## Checklist (all slices)
-- [ ] Tests written first (R77 / R78 facts red → green)
+- [ ] Tests written first (R77 / R78 facts red → green; R79 = wire the existing generator, no new test)
 - [ ] `ci.yml` behaviour identical with no variables set (LOCALCI-1) — verified by a real run
 - [ ] Repo private; runners registered with one custom label each; no job routes on bare `self-hosted`
 - [ ] Deploy jobs hosted; deploy-hook secrets never reach a self-hosted runner
 - [ ] `DEVELOPER_DIR` pin untouched; Mac symlink documented in the bump playbook step ⑤
 - [ ] Idempotency: second run on the same machine green
-- [ ] Docs: ADR-025, DEPLOYMENT §10, FOUNDATION_RULES R77/R78, WAYS_OF_WORKING, CLAUDE.md doc map,
+- [ ] Docs: ADR-025, DEPLOYMENT §10, FOUNDATION_RULES R77/R78/R79, WAYS_OF_WORKING, CLAUDE.md doc map,
       PR template, tutorial lesson 1.6 + COVERAGE/PDF regen
 - [ ] ROADMAP post-terminal wave + PLATFORM_BACKLOG §13 marked ✅ per slice as they land
 - [ ] Never merge before the branch CI finishes green (WAYS_OF_WORKING merge discipline)
