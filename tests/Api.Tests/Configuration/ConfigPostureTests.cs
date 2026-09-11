@@ -32,6 +32,10 @@ public class ConfigPostureTests
         Assert.False(BoundFromEmptyConfig<WebhooksSettings>(WebhooksSettings.SectionName).Enabled);
 
     [Fact]
+    public void Billing_IsOff_ByDefault() => // GATES-1/ADR-027: a fresh deployment sells nobody anything
+        Assert.False(BoundFromEmptyConfig<BillingSettings>(BillingSettings.SectionName).Enabled);
+
+    [Fact]
     public void PlatformStaffAllowlist_IsEmpty_ByDefault() => // no self-serve / accidental platform staff
         Assert.Empty(BoundFromEmptyConfig<PlatformAdminSettings>("Admin").StaffEmails);
 

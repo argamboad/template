@@ -221,6 +221,7 @@
   <data name="Join_ErrorTitle" xml:space="preserve"><value>No se pudo unir</value></data>
   <data name="Join_FullTitle" xml:space="preserve"><value>Este hogar está completo</value></data>
   <data name="Join_FullBody" xml:space="preserve"><value>Ha alcanzado el límite de miembros de su plan. Pide al propietario que mejore su plan y vuelve a usar tu invitación.</value></data>
+  <data name="Join_FullBodyNoBilling" xml:space="preserve"><value>Ha alcanzado su límite de miembros. Pide al propietario que libere un asiento y vuelve a usar tu invitación.</value></data>
   <data name="Join_BackToHousehold" xml:space="preserve"><value>Volver al hogar</value></data>
   <data name="Join_DefaultError" xml:space="preserve"><value>La invitación no es válida o ha caducado.</value></data>
   <data name="Settings_Preferences" xml:space="preserve"><value>Preferencias</value></data>
@@ -288,6 +289,7 @@
   <data name="Household_ErrRename" xml:space="preserve"><value>No se pudo renombrar el hogar.</value></data>
   <data name="Household_ErrEmailAlreadyMember" xml:space="preserve"><value>Ese correo ya es miembro.</value></data>
   <data name="Household_ErrSeatLimit" xml:space="preserve"><value>Has alcanzado el límite de asientos de tu plan. Mejora tu plan para invitar a más miembros.</value></data>
+  <data name="Household_ErrSeatLimitNoBilling" xml:space="preserve"><value>Tu hogar está lleno. Quita a un miembro o revoca una invitación pendiente para liberar un asiento.</value></data>
   <data name="Household_ErrSendInvite" xml:space="preserve"><value>No se pudo enviar la invitación.</value></data>
   <data name="Household_ErrRegenerate" xml:space="preserve"><value>No se pudo regenerar el token.</value></data>
   <data name="Household_StatusRevoked" xml:space="preserve"><value>Invitación revocada.</value></data>

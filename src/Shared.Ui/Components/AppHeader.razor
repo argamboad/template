@@ -41,7 +41,10 @@
                     <NavLink class="btn btn-outline-warning btn-sm" href="/admin" data-testid="nav-admin">@Localizer["Nav_Admin"]</NavLink>
                 }
                 <NavLink class="btn btn-outline-light btn-sm" href="/household">@Localizer["Nav_Household"]</NavLink>
-                <NavLink class="btn btn-outline-light btn-sm" href="/billing" data-testid="nav-billing">@Localizer["Nav_Billing"]</NavLink>
+                @if (_billingEnabled)
+                {
+                    <NavLink class="btn btn-outline-light btn-sm" href="/billing" data-testid="nav-billing">@Localizer["Nav_Billing"]</NavLink>
+                }
                 <NavLink class="btn btn-outline-light btn-sm" href="/settings">@Localizer["Nav_Settings"]</NavLink>
                 <button class="btn btn-outline-light btn-sm" data-testid="sign-out" @onclick="SignOutAsync">@Localizer["Nav_SignOut"]</button>
             </div>
@@ -53,6 +56,9 @@
 @code {
     private bool _menuOpen;
     private bool _isStaff;
+    // GATES-1 (ADR-027): a deployment with billing off has no /billing routes at all, so the link would
+    // be a dead end — and, worse, an advertisement for an upgrade path that does not exist.
+    private bool _billingEnabled;
 
     // Close the menu after any navigation so it doesn't stay open over the new page on mobile.
     protected override void OnInitialized()
@@ -64,7 +70,12 @@
     }
 
     // Show the Admin link only for platform staff (cheap, cached probe). Hidden while impersonating.
-    protected override async Task OnInitializedAsync() => _isStaff = await Auth.IsStaffAsync();
+    // The billing probe is anonymous and deployment-wide, so it needs no re-check on identity change.
+    protected override async Task OnInitializedAsync()
+    {
+        _isStaff = await Auth.IsStaffAsync();
+        _billingEnabled = await Auth.IsBillingEnabledAsync();
+    }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {

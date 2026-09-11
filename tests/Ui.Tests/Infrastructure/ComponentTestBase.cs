@@ -21,6 +21,7 @@ public abstract class ComponentTestBase : BunitContext
     protected FakeThemePersistence ThemeStore { get; } = new();
     protected FakeCulturePersistence CultureStore { get; } = new();
     protected AuthService Auth { get; }
+    protected FakeFileDownloadLauncher DownloadLauncher { get; } = new();
 
     protected ComponentTestBase()
     {
@@ -43,11 +44,21 @@ public abstract class ComponentTestBase : BunitContext
         Services.AddSingleton<ICulturePersistence>(CultureStore);
         Services.AddSingleton<IStringLocalizer<AppStrings>>(new FakeStringLocalizer());
         Services.AddSingleton<AppResumeNotifier>(); // pages that refresh on app-resume (Billing) inject it
+        Services.AddSingleton<IFileDownloadLauncher>(DownloadLauncher); // Household injects it for the GDPR export
 
         // bUnit ships a fake NavigationManager (assert via Services.GetRequiredService<NavigationManager>())
         // and a JSInterop (JSInterop.Mode = Loose so unmatched JS calls no-op rather than throw).
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
+
+    /// <summary>
+    /// Stub the anonymous <c>GET /api/features</c> gate probe (GATES-1, ADR-027). Explicit rather than a
+    /// harness default: a page that reads a gate should have to say which side of it the test is on.
+    /// Unstubbed, the probe 404s and <see cref="AuthService.IsBillingEnabledAsync"/> fails closed to off —
+    /// which is why a billing page test that forgets this finds itself redirected home.
+    /// </summary>
+    protected void StubFeatures(bool billing = true) =>
+        Http.On(HttpMethod.Get, "/api/features", $"{{\"billing\":{billing.ToString().ToLowerInvariant()}}}");
 
     /// <summary>
     /// Put <see cref="Auth"/> into a signed-in state by driving the actual refresh flow: stub

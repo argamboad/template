@@ -30,7 +30,15 @@ if (builder.Environment.IsDevelopment())
 else
     builder.Logging.AddJsonConsole(o => { o.IncludeScopes = true; o.UseUtcTimestamp = true; });
 
-builder.Services.AddControllers();
+// GATES-1 (ADR-027): billing is config-gated, default OFF, so a deployment can run private and free.
+// Bound HERE (before AddControllers) because the gate is structural — the convention drops the billing
+// controllers out of the application model, so their routes are never built and answer 404 rather than
+// existing and refusing. The provider settings under the same section stay inert while this is off.
+var billingSettings = new BillingSettings();
+builder.Configuration.GetSection(BillingSettings.SectionName).Bind(billingSettings);
+builder.Services.AddSingleton(billingSettings);
+
+builder.Services.AddControllers(o => o.Conventions.Add(new BillingGateConvention(billingSettings)));
 
 // OpenAPI / Swagger UI. The "Authorize" button takes a JWT access token (get one
 // from POST /api/auth/refresh after signing in) so protected endpoints are testable.

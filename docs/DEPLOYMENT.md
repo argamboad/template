@@ -95,12 +95,18 @@ Tear down with `docker compose --profile app down`.
 > the blueprint uses it. If you move to a host without that block, 587 is equally fine (the sender uses
 > `SecureSocketOptions.Auto`). A paid Render instance lifts the block too.
 
-## 3. Stripe (test mode) — REQUIRED
+## 3. Stripe (test mode) — REQUIRED ONLY IF YOU SELL SOMETHING
 
-The billing provider is **fail-closed**: in any non-Development environment the app **refuses to boot**
-without `Billing__Stripe__SecretKey` (the in-memory fake provider trusts an unsigned webhook and must
-never run in Production — GAP-1). For staging, use a **test-mode** secret key (`sk_test_…`) from the
-Stripe dashboard. You don't need working billing to sign in — this just satisfies the guard.
+**Skip this whole section if you are publishing free.** Leave `Billing__Enabled` unset (its shipped
+default — GATES-1, ADR-027) and the billing surface does not exist: `/api/billing` and the provider
+webhook 404, the client renders no billing link, and every tenant is on the Free plan. No Stripe account
+is needed to deploy, and nothing in the app offers anyone an upgrade.
+
+With `Billing__Enabled=true` the provider is **fail-closed**: in any non-Development environment the app
+**refuses to boot** without `Billing__Stripe__SecretKey` (the in-memory fake provider trusts an unsigned
+webhook and must never back a reachable billing surface in Production — GAP-1). For staging, use a
+**test-mode** secret key (`sk_test_…`) from the Stripe dashboard. You don't need working billing to sign
+in — this just satisfies the guard.
 
 **Wiring real billing (still test mode) — the three ids, where each one hides:**
 
@@ -227,7 +233,8 @@ run an automated post-deploy smoke, wire the pipeline in `.github/workflows/ci.y
 | `ASPNETCORE_ENVIRONMENT` | yes | `Production` (set by `render.yaml`) |
 | `ConnectionStrings__DefaultConnection` | yes | Neon **direct** endpoint, `SSL Mode=Require` |
 | `Jwt__Secret` | yes | ≥32 chars; Render auto-generates |
-| `Billing__Stripe__SecretKey` | **yes** | fail-closed guard; a `sk_test_…` key for staging |
+| `Billing__Enabled` | optional | default **off** — off means no `/api/billing` routes at all and everyone is Free (GATES-1) |
+| `Billing__Stripe__SecretKey` | **if billing is on** | fail-closed guard; a `sk_test_…` key for staging. Not needed while the gate is off |
 | `Email__Smtp__Host/Port/Username/Password` | yes | Brevo |
 | `Email__Smtp__FromAddress` | yes | a Brevo-**verified** sender; sends fail without it |
 | `Email__Smtp__FromName` | no | display name on outgoing mail |
