@@ -97,6 +97,8 @@ RULES: list[tuple[str, str, str]] = [
     ("*.py", "META", "authoring tooling"),
     ("*.pdf", "META", "generated QA guides"),
     (".claude/*", "META", "assistant config"),
+    (".vscode/*", "META", "editor run/debug config — not part of the rebuilt app"),
+    ("tools/publish-native.ps1", "META", "maintainer sideload tooling; native distribution is downstream (ADR-024), referenced by A.1 but never hand-typed"),
 
     # ---- Part 0 ----
     (".gitignore", "0.2", ""),

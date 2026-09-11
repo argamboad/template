@@ -667,10 +667,11 @@
 - `tests/Api.Tests/Rls/RlsTagDetectionTests.cs` — backstop + migration-parity + posture-guard tests
 - `tests/Api.Tests/Rls/RlsTestSetup.cs` — backstop + migration-parity + posture-guard tests
 
-## 9.1 — Make it yours (rebrand & de-sample) (5 files)
+## 9.1 — Make it yours (rebrand & de-sample) (6 files)
 
 - `docs/brand/android_adaptive_foreground_432.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
 - `docs/brand/app_store_icon_1024.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
+- `docs/brand/build_assets.py` — brand asset masters (web/store icons) — regenerated with the learner's brand
 - `docs/brand/linkedin_banner_1128x191.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
 - `docs/brand/linkedin_logo_300.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
 - `docs/brand/play_store_icon_512.png` — brand asset masters (web/store icons) — regenerated with the learner's brand
@@ -842,8 +843,10 @@
 - `src/Maui/wwwroot/lib/bootstrap/dist/js/bootstrap.min.js.map` — Blazor template's bundled Bootstrap
 - `src/Shared.Ui/wwwroot/js/qrcode-generator.min.js` — QR library for MFA enroll
 
-## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (187 files)
+## [META] Repo meta / docs / authoring tooling — not part of the rebuilt app (192 files)
 
+- `.vscode/launch.json` — editor run/debug config — not part of the rebuilt app
+- `.vscode/tasks.json` — editor run/debug config — not part of the rebuilt app
 - `CLAUDE.md` — docs
 - `CONTRIBUTING.md` — docs
 - `README.md` — docs
@@ -919,8 +922,10 @@
 - `docs/stories/deploy.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/e2e.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/files.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/stories/flavors.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/gdpr.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/hooks.md` — authoring docs; the course TEACHES writing these in 0.1
+- `docs/stories/localci.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/mfa.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/native.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/stories/notify.md` — authoring docs; the course TEACHES writing these in 0.1
@@ -1031,5 +1036,6 @@
 - `docs/tutorial/lessons/A.1-maui-shells-and-parity.md` — authoring docs; the course TEACHES writing these in 0.1
 - `docs/tutorial/lessons/A.2-native-auth-bridge.md` — authoring docs; the course TEACHES writing these in 0.1
 - `tests/E2E.Tests/README.md` — docs
+- `tools/publish-native.ps1` — maintainer sideload tooling; native distribution is downstream (ADR-024), referenced by A.1 but never hand-typed
 
-**Totals:** 865 tracked files · 573 built in lessons · 292 bucketed · 0 unmapped
+**Totals:** 871 tracked files · 574 built in lessons · 297 bucketed · 0 unmapped
