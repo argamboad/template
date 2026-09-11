@@ -80,12 +80,11 @@
 - `.github/pull_request_template.md` — the PR checklist — process as a gate
 - `.github/workflows/ci.yml` — born here (build+test+secret/license gates); every part adds jobs — e2e 3.6, docker 8.2, deploy 8.3, native A.1
 
-## 2.1 — Users & JWT access tokens (27 files)
+## 2.1 — Users & JWT access tokens (23 files)
 
 - `src/Api/Authentication/ClaimsPrincipalExtensions.cs`
 - `src/Api/Configuration/IJwtSettings.cs`
 - `src/Api/Configuration/JwtValidation.cs`
-- `src/Api/Configuration/SignupSettings.cs` — GATES-2 green list; empty = open (landed post-write)
 - `src/Api/Controllers/AuthController.cs` — grows through 2.4/2.5/6.5
 - `src/Api/Controllers/AuthControllerBase.cs`
 - `src/Api/Models/AuthModels.cs`
@@ -95,7 +94,6 @@
 - `src/Api/Services/ITokenHasher.cs`
 - `src/Api/Services/JwtClaims.cs`
 - `src/Api/Services/JwtTokenService.cs`
-- `src/Api/Services/SignupGate.cs` — GATES-2: who may FOUND a household, enforced at the account-creation choke point (landed post-write)
 - `src/Api/Services/TokenGenerator.cs`
 - `src/Api/Services/TokenHasher.cs` — store hashes, never raw tokens
 - `src/Api/Services/UserService.cs`
@@ -103,8 +101,6 @@
 - `src/Core/Repositories/IUserRepository.cs`
 - `src/Infrastructure/Persistence/Configurations/UserConfiguration.cs`
 - `src/Infrastructure/Repositories/UserRepository.cs`
-- `tests/Api.Tests/Auth/SignupGateTests.cs` — GATES-2 (landed post-write)
-- `tests/Api.Tests/Auth/SignupRefusalSurfacingTests.cs` — GATES-2: the refusal on every sign-in path (landed post-write)
 - `tests/Api.Tests/Integration/RefreshReplayTests.cs` — rotated-token replay revokes all sessions (v3 TB-AUTH-1)
 - `tests/Api.Tests/TokenHasherTests.cs` — hasher hostile-input + fixed-time contract (v3 TB-AUTH-8)
 - `tests/Api.Tests/TokenServiceTests.cs`
@@ -194,9 +190,11 @@
 - `src/Infrastructure/Persistence/Configurations/TenantMembershipConfiguration.cs`
 - `src/Infrastructure/Repositories/TenantRepository.cs`
 
-## 2.9 — Invitations, dissolve & the contributor seam (10 files)
+## 2.9 — Invitations, dissolve & the contributor seam (14 files)
 
+- `src/Api/Configuration/SignupSettings.cs` — GATES-2 green list; empty = open
 - `src/Api/Controllers/HouseholdInvitationsController.cs`
+- `src/Api/Services/SignupGate.cs` — GATES-2: who may FOUND a household, enforced at 2.8's account-creation choke point
 - `src/Api/Services/TenantDissolutionService.cs` — contributor fan-out
 - `src/Api/Services/TenantInvitationService.cs`
 - `src/Core/Abstractions/ITenantDataContributor.cs` — the seam GDPR later extends
@@ -204,6 +202,8 @@
 - `src/Core/Repositories/ITenantInvitationRepository.cs`
 - `src/Infrastructure/Persistence/Configurations/TenantInvitationConfiguration.cs`
 - `src/Infrastructure/Repositories/TenantInvitationRepository.cs`
+- `tests/Api.Tests/Auth/SignupGateTests.cs` — GATES-2
+- `tests/Api.Tests/Auth/SignupRefusalSurfacingTests.cs` — GATES-2: the refusal on every sign-in path
 - `tests/Api.Tests/WipeDataTests.cs`
 - `tests/Core.Tests/TenantInvitationTests.cs`
 
@@ -436,10 +436,10 @@
 
 ## 5.1 — Billing abstraction & entitlements (25 files)
 
-- `src/Api/Configuration/BillingGateConvention.cs` — GATES-1: drops the billing controllers from the application model so gated-off routes 404 (landed post-write)
-- `src/Api/Configuration/BillingSettings.cs` — GATES-1 config gate, default OFF (landed post-write)
+- `src/Api/Configuration/BillingGateConvention.cs` — GATES-1: drops the billing controllers from the application model so gated-off routes 404
+- `src/Api/Configuration/BillingSettings.cs` — GATES-1 config gate, default OFF
 - `src/Api/Controllers/BillingController.cs`
-- `src/Api/Controllers/FeaturesController.cs` — GATES-1: anonymous report of which gates are open, so the client can hide the billing link (landed post-write)
+- `src/Api/Controllers/FeaturesController.cs` — GATES-1: anonymous report of which gates are open, so the client can hide the billing link
 - `src/Api/Endpoints/EntitlementEndpointExtensions.cs` — RequireEntitlement -> 402
 - `src/Api/Models/BillingModels.cs`
 - `src/Api/Services/BillingService.cs`
@@ -452,14 +452,14 @@
 - `src/Infrastructure/Persistence/Configurations/SubscriptionConfiguration.cs`
 - `src/Shared.Ui/Pages/Billing.razor` — BILLING-8 billing summary page
 - `tests/Api.Tests/Billing/BillingControllerTests.cs`
-- `tests/Api.Tests/Billing/BillingGateTests.cs` — GATES-1 (landed post-write)
+- `tests/Api.Tests/Billing/BillingGateTests.cs` — GATES-1
 - `tests/Api.Tests/Billing/BillingProviderRegistrationTests.cs`
 - `tests/Api.Tests/Billing/BillingServiceTests.cs`
 - `tests/Api.Tests/Billing/EntitlementServiceTests.cs`
-- `tests/Api.Tests/Billing/PlanCatalogTests.cs` — GATES-1 pins the catalog's fail-closed Free fallback (landed post-write)
+- `tests/Api.Tests/Billing/PlanCatalogTests.cs` — GATES-1 pins the catalog's fail-closed Free fallback
 - `tests/Api.Tests/Billing/RequireEntitlementFilterTests.cs`
 - `tests/Api.Tests/Billing/SubscriptionTenantIsolationTests.cs`
-- `tests/Api.Tests/Integration/FeaturesEndpointTests.cs` — GATES-1 (landed post-write)
+- `tests/Api.Tests/Integration/FeaturesEndpointTests.cs` — GATES-1
 - `tests/E2E.Tests/BillingJourneyTests.cs` — fake-provider upgrade loop
 
 ## 5.2 — Stripe: checkout, webhook, portal (7 files)
